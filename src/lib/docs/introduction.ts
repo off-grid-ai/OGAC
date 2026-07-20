@@ -7,7 +7,8 @@ export const introductionSection: DocSection = {
     {
       slug: '',
       title: 'What is Off Grid AI Console',
-      description: 'The one interface that makes your enterprise intelligent - models, data, and governance already set up and connected.',
+      description:
+        'The one interface that makes your enterprise intelligent - models, data, and governance already set up and connected.',
       body: `Off Grid AI Console is the one interface that makes your enterprise intelligent. Everything you
 need to run AI - access to models, evals, guardrails, PII masking, data pipelines, audit, lineage,
 knowledge bases - is already set up and connected. You define your organization's rules, policies,
@@ -144,7 +145,8 @@ The guides go capability by capability from here.`,
     {
       slug: 'why-off-grid',
       title: 'Why Off Grid AI Console',
-      description: 'Why one already-connected platform beats assembling a pile of AI point tools yourself.',
+      description:
+        'Why one already-connected platform beats assembling a pile of AI point tools yourself.',
       body: `The AI-infrastructure market is a pile of point tools: one product to route model calls,
 another to trace them, another to test them, another to police them, another to reach your internal
 data. Each is a separate contract, a separate integration, and one more seam where the pieces disagree.
@@ -185,7 +187,7 @@ handful of people who could otherwise wire the plumbing.
 Off Grid AI can run on your own servers or in your own cloud - deployment is flexible, and that
 flexibility is a convenience, not the pitch. Regulated buyers get a platform they can defend to a
 regulator because governance is built into the foundation, wherever it runs; and the platform is
-**open source**, so anyone can inspect and trust exactly how it works.`,
+**source available**, so they can inspect and trust exactly how it works.`,
     },
   ],
 };

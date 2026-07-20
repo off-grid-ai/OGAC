@@ -98,6 +98,7 @@ export function appWorkflowIdFor(appId: string, runId: string): string {
 // ── Workflow I/O contract (2B implements the workflow against this shape) ────────────────────────
 
 import type { Actor } from '@/lib/audit-event';
+import type { Asker } from '@/lib/retrieval/acl';
 
 /**
  * Input handed to AppRunWorkflow (Phase 2B). Carries the resolved caller context (like
@@ -107,20 +108,23 @@ import type { Actor } from '@/lib/audit-event';
 export interface AppRunWorkflowInput {
   appId: string;
   runId: string;
+  /** True only for a recurring Schedule action; the workflow derives a unique id per fire. */
+  scheduled?: boolean;
   input: Record<string, unknown>;
   orgId?: string;
   actor?: Actor;
   caller?: string;
   project?: string;
+  asker?: Asker;
   /**
    * PA-16 — the bound-pipeline id this durable run must enforce (data-allowlist ceiling + egress
    * leash + policy/guardrail overlay). The dispatch site resolves it with the SAME resolver the
-   * inline route uses (resolveConsumerPipeline) and threads the plain id here; the workflow resolves
-   * the full contract ONCE via an activity (the I/O boundary) and passes it into each step's
-   * executeStepActivity — so the WORKER path enforces the identical contract the inline path does.
-   * Null/absent ⇒ no bound pipeline ⇒ legacy allow (the additive guarantee), unchanged.
+   * inline route uses (resolveExplicitPipelineBinding) and threads the plain id here; the workflow
+   * re-resolves the full contract ONCE via an activity (the I/O boundary) and passes it into each
+   * step's executeStepActivity — so the WORKER path enforces the identical contract the inline path
+   * does. Null/absent means deliberately unbound; a stale explicit id fails closed in the activity.
    */
-  pipelineId?: string | null;
+  pipelineId: string | null;
   /**
    * SHADOW / LIVE run mode (BFSI blast-radius). The dispatch site resolves the effective mode
    * (app.shadowDefault ∨ requested) via the pure resolveRunMode and threads it here; the workflow

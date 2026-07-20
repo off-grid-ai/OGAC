@@ -14,13 +14,13 @@ User → Module UI → /api/v1/<module>/* → Adapter → Headless Service
 
 The five planes:
 
-| Plane | What it means |
-|---|---|
-| **Data** | Capture, connectors, ingest, PII masking |
-| **Intelligence** | Gateway, brain, agents, studio |
-| **Governance** | Control, regulatory, lineage, FinOps |
-| **Observability** | Analytics, observability, reports |
-| **Platform** | Fleet, access, admin, storage |
+| Plane             | What it means                            |
+| ----------------- | ---------------------------------------- |
+| **Data**          | Capture, connectors, ingest, PII masking |
+| **Intelligence**  | Gateway, brain, agents, studio           |
+| **Governance**    | Control, regulatory, lineage, FinOps     |
+| **Observability** | Analytics, observability, reports        |
+| **Platform**      | Fleet, access, admin, storage            |
 
 Before touching a module, understand which plane it belongs to and what headless service it fronts.
 
@@ -33,12 +33,14 @@ Before touching a module, understand which plane it belongs to and what headless
 Pages and components fetch from `/api/v1/*`. They do not talk to Postgres, Keycloak, Qdrant, OpenSearch, or any other backing service directly.
 
 **Wrong:**
+
 ```ts
 // In a React component
 const res = await fetch(`http://127.0.0.1:6333/collections`); // ❌
 ```
 
 **Right:**
+
 ```ts
 // In a React component
 const res = await fetch('/api/v1/vectordb'); // ✅ — routes through the adapter
@@ -99,12 +101,37 @@ Code written against the local docker-compose stack (`deploy/docker-compose.yml`
 ### 10. No new top-level pages without a module registration
 
 If you find yourself creating `src/app/(console)/something/page.tsx` without a corresponding entry in `src/modules/registry.ts`, stop. That page will be:
+
 - Unprotected (no module access check)
 - Invisible to the services directory
 - Outside the nav system
 - Outside the multi-tenant access model
 
 Every surface is a module. Every module is in the registry.
+
+### 11. Layout owns geometry; the route owns presentation
+
+The console shell has one neutral content boundary:
+
+```text
+Console layout -> ConsoleContent (100% x 100%, no padding) -> routed component
+```
+
+- `ConsoleContent` and `PageTransition` fill the available width and height. They do not inspect the
+  pathname, add gutters, or choose scroll behavior.
+- A management route wraps its content in `PageFrame`, which owns the standard responsive padding
+  and vertical scrolling.
+- An immersive route such as Chat renders its canvas directly and therefore remains full-bleed.
+- A contextual entity layout may own one `PageFrame` for all child tabs. Its child pages and
+  `loading.tsx` fallbacks must inherit that frame instead of nesting a second gutter.
+- Every other `loading.tsx` owns its own `PageFrame`, so the fallback and resolved page occupy the
+  same geometry.
+- The utility bar never renders the page title or description. Each route owns exactly one visible
+  page heading.
+
+`test/route-presentation-ownership.test.ts`, `test/loading-presentation-ownership.test.ts`, and
+`test/console-content.integration.test.ts` enforce this contract. Adding pathname exceptions or
+global shell padding is an architecture regression.
 
 ---
 
@@ -141,6 +168,7 @@ src/
 ## What "Done" Means
 
 A task is done when:
+
 - TypeScript compiles clean (`npm run build` passes)
 - The module is registered and accessible via the module system
 - The API route is authenticated

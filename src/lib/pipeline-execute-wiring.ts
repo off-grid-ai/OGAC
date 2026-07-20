@@ -74,13 +74,13 @@ export function defaultExecuteDeps(pipelineId: string, orgId: string, runId: str
       return { model, text: extractText(data), usage: extractUsage(data) };
     },
 
-    async runGuardrail(phase, text, orgId, model) {
+    async runGuardrail(phase, text, orgId, model, promptContext) {
       const { runChecks, outcomeFromChecks } = await import('@/lib/checks');
       const checks = await runChecks(
         phase,
         phase === 'pre'
           ? { phase, input: text, model, orgId }
-          : { phase, output: text, model, orgId },
+          : { phase, input: promptContext ?? '', output: text, model, orgId },
       );
       return { checks, outcome: outcomeFromChecks(checks) };
     },

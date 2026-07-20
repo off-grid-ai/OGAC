@@ -1,4 +1,5 @@
 import { ProjectsBrowser } from '@/components/projects/ProjectsBrowser';
+import { PageFrame } from '@/components/PageFrame';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -8,5 +9,9 @@ export const dynamic = 'force-dynamic';
 // /api/v1/chat/projects APIs; the detail lives at /projects/[id].
 export default async function ProjectsPage() {
   await requireModuleForUser('projects');
-  return <ProjectsBrowser />;
+  return (
+    <PageFrame>
+      <ProjectsBrowser />
+    </PageFrame>
+  );
 }

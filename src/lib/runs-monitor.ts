@@ -46,6 +46,18 @@ export interface RunRow {
   href: string;
 }
 
+/**
+ * Canonical identity for the unified run read model.
+ *
+ * Source ids are only guaranteed unique inside their plane: an app execution, agent execution, and
+ * chat turn may legitimately carry the same provider/source id. Namespacing by kind preserves all
+ * three while repeated observations of the SAME execution resolve to one row. Every list key and
+ * generic detail lookup must use this one authority rather than rebuilding the string ad hoc.
+ */
+export function runKey(kind: RunKind, sourceId: string): string {
+  return `${kind}:${sourceId}`;
+}
+
 // ─── Status normalization — each plane's vocabulary → the one product vocabulary ─────────────────
 // App runs:   queued|running|awaiting_human|done|error|cancelled
 // Agent runs: done|error|blocked|running (mostly 'done' today)
@@ -115,7 +127,9 @@ export function describeDuration(ms: number | null): string {
 // finish timestamp (so computeDurationMs → null), but each step carries its own `ms`; the run's
 // duration is the sum of its steps' durations. Returns null when there is no positive total, so the
 // caller falls back to '—' rather than showing a fake 0. Pure, zero-IO.
-export function sumStepMs(steps: readonly { ms?: number | null }[] | null | undefined): number | null {
+export function sumStepMs(
+  steps: readonly { ms?: number | null }[] | null | undefined,
+): number | null {
   if (!Array.isArray(steps) || steps.length === 0) return null;
   let total = 0;
   for (const s of steps) {
@@ -181,7 +195,7 @@ export function fromAppRun(src: AppRunSource): RunRow {
   const finishedAt = src.finishedAt ?? null;
   return {
     id: src.id,
-    key: `app:${src.id}`,
+    key: runKey('app', src.id),
     kind: 'app',
     name: (src.title ?? '').trim() || src.appId,
     status,
@@ -191,7 +205,7 @@ export function fromAppRun(src: AppRunSource): RunRow {
     durationMs: computeDurationMs(startedAt, finishedAt),
     pipeline: src.appId,
     actor: (src.actor ?? '').trim(),
-    href: `/build/apps/${encodeURIComponent(src.appId)}/runs/${encodeURIComponent(src.id)}`,
+    href: `/solutions/apps/${encodeURIComponent(src.appId)}/runs/${encodeURIComponent(src.id)}`,
   };
 }
 
@@ -200,7 +214,7 @@ export function fromAgentRun(src: AgentRunSource): RunRow {
   const finishedAt = src.finishedAt ?? null;
   return {
     id: src.id,
-    key: `agent:${src.id}`,
+    key: runKey('agent', src.id),
     kind: 'agent',
     name: src.agentId,
     status: normalizeStatus(src.status),
@@ -210,7 +224,7 @@ export function fromAgentRun(src: AgentRunSource): RunRow {
     durationMs: computeDurationMs(startedAt, finishedAt),
     pipeline: src.agentId,
     actor: (src.actor ?? '').trim(),
-    href: `/operations/runs/${encodeURIComponent(`agent:${src.id}`)}`,
+    href: `/operations/runs/${encodeURIComponent(runKey('agent', src.id))}`,
   };
 }
 
@@ -218,7 +232,7 @@ export function fromChatRun(src: ChatRunSource): RunRow {
   const startedAt = src.ts ?? null;
   return {
     id: src.runId,
-    key: `chat:${src.runId}`,
+    key: runKey('chat', src.runId),
     kind: 'chat',
     name: (src.conversation ?? '').trim() || 'Chat',
     status: normalizeStatus(src.outcome),
@@ -230,7 +244,7 @@ export function fromChatRun(src: ChatRunSource): RunRow {
     durationMs: null,
     pipeline: (src.model ?? '').trim() || 'chat',
     actor: (src.actor ?? '').trim(),
-    href: `/operations/runs/${encodeURIComponent(`chat:${src.runId}`)}`,
+    href: `/operations/runs/${encodeURIComponent(runKey('chat', src.runId))}`,
   };
 }
 
@@ -245,7 +259,24 @@ export function mergeRuns(input: {
     ...(input.agent ?? []).map(fromAgentRun),
     ...(input.chat ?? []).map(fromChatRun),
   ];
-  return sortRuns(rows);
+  return deduplicateRuns(rows);
+}
+
+/**
+ * Collapse repeated observations of one execution at the read-model boundary.
+ *
+ * Audit/event sources are intentionally append-only and durable workers are at-least-once, so the
+ * same chat run can be observed more than once. That is one execution, not two list rows. Sorting
+ * first makes the newest observation authoritative; `Map` then retains that row. Distinct kinds
+ * remain distinct even when their raw ids collide because `runKey(kind, id)` is the identity.
+ */
+export function deduplicateRuns(rows: RunRow[]): RunRow[] {
+  const unique = new Map<string, RunRow>();
+  for (const row of sortRuns(rows)) {
+    const key = runKey(row.kind, row.id);
+    if (!unique.has(key)) unique.set(key, row.key === key ? row : { ...row, key });
+  }
+  return [...unique.values()];
 }
 
 // ─── sort — newest first; rows with no start sink to the bottom (stable by key) ───────────────────

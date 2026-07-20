@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireUser } from '@/lib/authz';
-import { runInboundGuardrails, runOutboundGuardrails } from '@/lib/chat-run';
+import {
+  prepareOutboundRelease,
+  runInboundGuardrails,
+  runOutboundGuardrails,
+} from '@/lib/chat-run';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { promptRunTag } from '@/lib/prompt-observability';
 import { resolvePartialMap } from '@/lib/prompt-partials';
@@ -131,15 +135,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 4) Outbound guardrail scan on the answer (recorded, non-blocking — mirrors chat).
-  const postChecks = output ? await runOutboundGuardrails(output, model).catch(() => []) : [];
+  // 4) Outbound guardrail scan gates release. A thrown screen is null (not an empty clean result),
+  // and a blocked/error verdict never returns the raw completion to the browser.
+  const postChecks = output
+    ? await runOutboundGuardrails(output, model, undefined, prompt).catch(() => null)
+    : [];
+  const release = prepareOutboundRelease(output, '', postChecks);
+  if (release.blocked) {
+    return NextResponse.json(
+      {
+        error: 'output guardrail did not clear the generated response',
+        rendered: prompt,
+        model: model || null,
+        checks: [...preChecks, ...(postChecks ?? [])],
+      },
+      { status: 422 },
+    );
+  }
 
   return NextResponse.json({
     rendered: prompt,
-    output,
+    output: release.answer,
     model: model || null,
     missing: composed.missing,
     cyclic: composed.cyclic,
-    checks: [...preChecks, ...postChecks],
+    checks: [...preChecks, ...(postChecks ?? [])],
   });
 }

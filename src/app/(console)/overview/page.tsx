@@ -1,10 +1,4 @@
-import {
-  ChatCircle,
-  Database,
-  FileText,
-  Plus,
-  ShieldCheck,
-} from '@phosphor-icons/react/dist/ssr';
+import { ChatCircle, Database, FileText, Plus, ShieldCheck } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { auth } from '@/auth';
 import { listAgentRuns } from '@/lib/agentrun';
@@ -19,13 +13,8 @@ import { probeService } from '@/lib/status';
 import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { safeWithTimeout } from '@/lib/with-timeout';
-import {
-  ActivityCard,
-  BlockingFeed,
-  Section,
-  ServicesCard,
-  TileCard,
-} from './overview-components';
+import { ActivityCard, BlockingFeed, Section, ServicesCard, TileCard } from './overview-components';
+import { PageFrame } from '@/components/PageFrame';
 
 // Overview — the jobs-oriented operator home (VISION Pillar 4). This page is the THIN I/O shell:
 // it fetches the real module snapshots server-side (each fault-isolated so one dead service can't
@@ -64,21 +53,22 @@ async function probeHomeServices() {
   const entries = getServices().filter((s) => HOME_SERVICE_IDS.has(s.id));
   return Promise.all(
     entries.map(async (s) => {
-      const h: RawProbe = await safe(
-        () => probeService(s.url, s.healthPath, 3000),
-        { status: 'down' as const, httpStatus: null, ms: null },
-      );
+      const h: RawProbe = await safe(() => probeService(s.url, s.healthPath, 3000), {
+        status: 'down' as const,
+        httpStatus: null,
+        ms: null,
+      });
       return { id: s.id, label: s.label, status: h.status, ms: h.ms };
     }),
   );
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Open chat', href: '/workspace/chat', icon: ChatCircle },
-  { label: 'Add data source', href: '/data/integrations', icon: Plus },
-  { label: 'Review policy', href: '/governance/policy', icon: ShieldCheck },
-  { label: 'Add knowledge', href: '/workspace/knowledge', icon: Database },
-  { label: 'Generate report', href: '/insights/reports', icon: FileText },
+  { label: 'Open chat', href: '/work/chat', icon: ChatCircle },
+  { label: 'Add data source', href: '/operations/configuration/adapters', icon: Plus },
+  { label: 'Review policy', href: '/governance/policies/overview', icon: ShieldCheck },
+  { label: 'Add knowledge', href: '/data/knowledge', icon: Database },
+  { label: 'Generate report', href: '/governance/trust/reports', icon: FileText },
 ];
 
 export default async function ConsoleHome() {
@@ -147,69 +137,74 @@ export default async function ConsoleHome() {
   const firstName = session?.user?.name?.split(' ')[0] ?? session?.user?.email?.split('@')[0];
 
   return (
-    <div className="mx-auto max-w-[110rem] space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">
-          {firstName ? `Welcome back, ${firstName}` : 'Overview'}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Everything your platform is doing right now — what it stopped, what it cost, and whether
-          it&apos;s healthy — in one place, so you can run it without digging through five modules.
-        </p>
-      </div>
+    <PageFrame>
+      {
+        <div className="mx-auto max-w-[110rem] space-y-8">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">
+              {firstName ? `Welcome back, ${firstName}` : 'Overview'}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Everything your platform is doing right now — what it stopped, what it cost, and
+              whether it&apos;s healthy — in one place, so you can run it without digging through
+              five modules.
+            </p>
+          </div>
 
-      {/* Quick actions */}
-      <div className="flex flex-wrap gap-2">
-        {QUICK_ACTIONS.map((a) => (
-          <Link
-            key={a.href}
-            href={a.href}
-            className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-          >
-            <a.icon className="size-4" />
-            {a.label}
-          </Link>
-        ))}
-      </div>
-
-      {/* Governance posture — the synthesized "is it controlled right now?" answer */}
-      {home.posture.length > 0 ? (
-        <Section title="Governance posture" href="/governance" linkLabel="Governance">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {home.posture.map((t) => (
-              <TileCard key={t.label} t={t} />
+          {/* Quick actions */}
+          <div className="flex flex-wrap gap-2">
+            {QUICK_ACTIONS.map((a) => (
+              <Link
+                key={a.href}
+                href={a.href}
+                className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              >
+                <a.icon className="size-4" />
+                {a.label}
+              </Link>
             ))}
           </div>
-        </Section>
-      ) : null}
 
-      {/* The cross-module blocking feed: audit ∪ policy ∪ guardrails, last 24h */}
-      <BlockingFeed blocking={home.blocking} />
+          {/* Governance posture — the synthesized "is it controlled right now?" answer */}
+          {home.posture.length > 0 ? (
+            <Section title="Governance posture" href="/governance/posture" linkLabel="Governance">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {home.posture.map((t) => (
+                  <TileCard key={t.label} t={t} />
+                ))}
+              </div>
+            </Section>
+          ) : null}
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {home.cost.length > 0 ? (
-          <Section title="Cost" href="/insights/finops" linkLabel="FinOps">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {home.cost.map((t) => (
-                <TileCard key={t.label} t={t} />
-              ))}
-            </div>
+          {/* The cross-module blocking feed: audit ∪ policy ∪ guardrails, last 24h */}
+          <BlockingFeed blocking={home.blocking} />
+
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+            {home.cost.length > 0 ? (
+              <Section title="Cost" href="/runtime/api-budgets" linkLabel="FinOps">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {home.cost.map((t) => (
+                    <TileCard key={t.label} t={t} />
+                  ))}
+                </div>
+              </Section>
+            ) : null}
+
+            <Section
+              title={`Services (${home.health.up}/${home.health.total} up)`}
+              href="/operations/services"
+              linkLabel="All services"
+            >
+              <ServicesCard health={home.health} />
+            </Section>
+          </div>
+
+          {/* Recent activity */}
+          <Section title="Recent activity" href="/operations/runs" linkLabel="All runs">
+            <ActivityCard activity={home.activity} />
           </Section>
-        ) : null}
-
-        <Section
-          title={`Services (${home.health.up}/${home.health.total} up)`}
-          href="/gateway/services"
-          linkLabel="All services"
-        >
-          <ServicesCard health={home.health} />
-        </Section>
-      </div>
-
-      {/* Recent activity */}
-      <Section title="Recent activity" href="/build/agent-runs" linkLabel="All runs">
-        <ActivityCard activity={home.activity} />
-      </Section>
-    </div>
+        </div>
+      }
+    </PageFrame>
   );
 }

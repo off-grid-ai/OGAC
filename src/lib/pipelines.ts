@@ -39,9 +39,14 @@ const DEFAULT_ORG = 'default';
 let ensurePromise: Promise<void> | null = null;
 export async function ensurePipelinesSchema(): Promise<void> {
   if (ensurePromise) return ensurePromise;
-  ensurePromise = (async (): Promise<void> => {
-    const { sql } = await import('drizzle-orm');
-    await db.execute(sql`
+  ensurePromise = db
+    .transaction(async (tx): Promise<void> => {
+      const { sql } = await import('drizzle-orm');
+      // All self-migrating stores share one transaction-scoped lock. PostgreSQL's
+      // `IF NOT EXISTS` does not prevent catalog deadlocks when separate test workers/processes
+      // cold-start Apps and Pipelines in opposite orders.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('offgrid_schema_ddl'));`);
+      await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS pipelines (
         id text PRIMARY KEY,
         org_id text NOT NULL DEFAULT 'default',
@@ -62,25 +67,30 @@ export async function ensurePipelinesSchema(): Promise<void> {
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now());
     `);
-    // ALTER ADD COLUMN IF NOT EXISTS safety net — a pre-existing table gains any new column.
-    for (const col of [
-      "ADD COLUMN IF NOT EXISTS team_id text",
-      "ADD COLUMN IF NOT EXISTS gateway_id text",
-      "ADD COLUMN IF NOT EXISTS default_model text",
-      "ADD COLUMN IF NOT EXISTS routing jsonb NOT NULL DEFAULT '{}'::jsonb",
-      "ADD COLUMN IF NOT EXISTS data_allowlist jsonb NOT NULL DEFAULT '[]'::jsonb",
-      "ADD COLUMN IF NOT EXISTS policy_overlay jsonb NOT NULL DEFAULT '{}'::jsonb",
-      "ADD COLUMN IF NOT EXISTS guardrail_overlay jsonb NOT NULL DEFAULT '{}'::jsonb",
-      "ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'draft'",
-      "ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1",
-      "ADD COLUMN IF NOT EXISTS is_template boolean NOT NULL DEFAULT false",
-    ]) {
-      await db.execute(sql.raw(`ALTER TABLE pipelines ${col};`));
-    }
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_org_idx ON pipelines (org_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_gateway_idx ON pipelines (gateway_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_team_idx ON pipelines (team_id);`);
-    await db.execute(sql`
+      // ALTER ADD COLUMN IF NOT EXISTS safety net — a pre-existing table gains any new column.
+      for (const col of [
+        'ADD COLUMN IF NOT EXISTS team_id text',
+        'ADD COLUMN IF NOT EXISTS gateway_id text',
+        'ADD COLUMN IF NOT EXISTS default_model text',
+        "ADD COLUMN IF NOT EXISTS routing jsonb NOT NULL DEFAULT '{}'::jsonb",
+        "ADD COLUMN IF NOT EXISTS data_allowlist jsonb NOT NULL DEFAULT '[]'::jsonb",
+        "ADD COLUMN IF NOT EXISTS policy_overlay jsonb NOT NULL DEFAULT '{}'::jsonb",
+        "ADD COLUMN IF NOT EXISTS guardrail_overlay jsonb NOT NULL DEFAULT '{}'::jsonb",
+        "ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'draft'",
+        'ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1',
+        'ADD COLUMN IF NOT EXISTS is_template boolean NOT NULL DEFAULT false',
+      ]) {
+        await tx.execute(sql.raw(`ALTER TABLE pipelines ${col};`));
+      }
+      await tx.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_org_idx ON pipelines (org_id);`);
+      await tx.execute(
+        sql`CREATE INDEX IF NOT EXISTS pipelines_gateway_idx ON pipelines (gateway_id);`,
+      );
+      await tx.execute(sql`CREATE INDEX IF NOT EXISTS pipelines_team_idx ON pipelines (team_id);`);
+      await tx.execute(
+        sql`CREATE UNIQUE INDEX IF NOT EXISTS pipelines_id_org_unique ON pipelines (id, org_id);`,
+      );
+      await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS pipeline_versions (
         id text PRIMARY KEY,
         pipeline_id text NOT NULL,
@@ -91,13 +101,14 @@ export async function ensurePipelinesSchema(): Promise<void> {
         created_at timestamptz NOT NULL DEFAULT now(),
         created_by text NOT NULL DEFAULT '');
     `);
-    await db.execute(
-      sql`CREATE INDEX IF NOT EXISTS pipeline_versions_pipeline_idx ON pipeline_versions (pipeline_id);`,
-    );
-  })().catch((e) => {
-    ensurePromise = null;
-    throw e;
-  });
+      await tx.execute(
+        sql`CREATE INDEX IF NOT EXISTS pipeline_versions_pipeline_idx ON pipeline_versions (pipeline_id);`,
+      );
+    })
+    .catch((e) => {
+      ensurePromise = null;
+      throw e;
+    });
   return ensurePromise;
 }
 
@@ -258,7 +269,9 @@ export async function listPipelinesByDomains(
   const tokenSets = domains.map(domainMatchTokens).filter((t) => t.length);
   if (!tokenSets.length) return [];
   const all = await listPipelines(orgId);
-  return all.filter((p) => tokenSets.some((tokens) => allowlistReferencesTokens(p.dataAllowlist, tokens)));
+  return all.filter((p) =>
+    tokenSets.some((tokens) => allowlistReferencesTokens(p.dataAllowlist, tokens)),
+  );
 }
 
 /**
@@ -387,7 +400,8 @@ export async function updatePipeline(
   if (patch.gatewayId !== undefined) set.gatewayId = patch.gatewayId ?? null;
   if (patch.defaultModel !== undefined) set.defaultModel = patch.defaultModel ?? null;
   if (patch.routing !== undefined) set.routing = normalizeRouting(patch.routing);
-  if (patch.dataAllowlist !== undefined) set.dataAllowlist = normalizeAllowlist(patch.dataAllowlist);
+  if (patch.dataAllowlist !== undefined)
+    set.dataAllowlist = normalizeAllowlist(patch.dataAllowlist);
   if (patch.policyOverlay !== undefined) set.policyOverlay = patch.policyOverlay ?? {};
   if (patch.guardrailOverlay !== undefined) set.guardrailOverlay = patch.guardrailOverlay ?? {};
   if (patch.status !== undefined) set.status = patch.status;
@@ -525,7 +539,8 @@ export async function rollbackPipeline(
   if (restore.gatewayId !== undefined) set.gatewayId = restore.gatewayId ?? null;
   if (restore.defaultModel !== undefined) set.defaultModel = restore.defaultModel ?? null;
   if (restore.routing !== undefined) set.routing = normalizeRouting(restore.routing);
-  if (restore.dataAllowlist !== undefined) set.dataAllowlist = normalizeAllowlist(restore.dataAllowlist);
+  if (restore.dataAllowlist !== undefined)
+    set.dataAllowlist = normalizeAllowlist(restore.dataAllowlist);
   if (restore.policyOverlay !== undefined) set.policyOverlay = restore.policyOverlay ?? {};
   if (restore.guardrailOverlay !== undefined) set.guardrailOverlay = restore.guardrailOverlay ?? {};
   if (restore.isTemplate !== undefined) set.isTemplate = restore.isTemplate;

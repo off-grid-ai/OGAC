@@ -27,7 +27,7 @@ export default async function AppRunDetail({
     <div className="w-full space-y-5">
       <div>
         <Link
-          href={`/build/apps/${id}/runs`}
+          href={`/solutions/apps/${id}/runs`}
           className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" /> All runs

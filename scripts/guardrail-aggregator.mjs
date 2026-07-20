@@ -60,12 +60,29 @@ function describeError(err) {
   return code ? `${err.message} (cause: ${code})` : String(err && err.message ? err.message : err);
 }
 
+function isUsableVerdict(body, phase) {
+  return (
+    body &&
+    typeof body === 'object' &&
+    !Array.isArray(body) &&
+    typeof body.is_valid === 'boolean' &&
+    body.scanners &&
+    typeof body.scanners === 'object' &&
+    !Array.isArray(body.scanners) &&
+    Object.values(body.scanners).every((score) => typeof score === 'number' && Number.isFinite(score)) &&
+    (phase === 'output'
+      ? typeof body.sanitized_output === 'string'
+      : typeof body.sanitized_prompt === 'string')
+  );
+}
+
 // POST the prompt to one shard's /analyze/prompt. Returns { name, required, ok, status, body }.
-async function callShard(shard, payload) {
+async function callShard(shard, payload, phase) {
   const headers = { 'content-type': 'application/json' };
   if (shard.token) headers.authorization = `Bearer ${shard.token}`;
   try {
-    const res = await fetch(`${trimSlash(shard.url)}/analyze/prompt`, {
+    const endpoint = phase === 'output' ? 'output' : 'prompt';
+    const res = await fetch(`${trimSlash(shard.url)}/analyze/${endpoint}`, {
       method: 'POST',
       headers,
       body: payload,
@@ -77,11 +94,13 @@ async function callShard(shard, payload) {
     } catch {
       /* non-json body ⇒ treat as no verdict */
     }
+    const usable = isUsableVerdict(body, phase);
     if (!res.ok) console.error(`[guard-agg] shard ${shard.name} HTTP ${res.status}`);
+    else if (!usable) console.error(`[guard-agg] shard ${shard.name} returned a malformed verdict`);
     return {
       name: shard.name,
       required: !!shard.required,
-      ok: res.ok && !!body,
+      ok: res.ok && usable,
       status: res.status,
       body,
     };
@@ -121,18 +140,27 @@ async function shardHealth() {
   return { ok: requiredDown.length === 0, shards, requiredDown };
 }
 
-async function handleAnalyze(req, res, chunks) {
+async function handleAnalyze(req, res, chunks, phase) {
   const raw = Buffer.concat(chunks);
   let original = '';
   try {
-    original = String(JSON.parse(raw.toString() || '{}').prompt || '');
+    const parsed = JSON.parse(raw.toString() || '{}');
+    if (!parsed || typeof parsed.prompt !== 'string')
+      return json(res, 400, { error: 'prompt must be a string' });
+    if (phase === 'output' && typeof parsed.output !== 'string')
+      return json(res, 400, { error: 'output must be a string' });
+    if ('scanners' in parsed)
+      return json(res, 400, {
+        error: 'scanner configuration is startup-only; use fleet CONFIG_FILE YAML',
+      });
+    original = phase === 'output' ? parsed.output : parsed.prompt;
   } catch {
     return json(res, 400, { error: 'invalid JSON body' });
   }
   // Forward the EXACT body the console sent (it carries { prompt, scanners } — the India recognizers
   // are folded into that scanners config) to every shard, unchanged.
-  const results = await Promise.all(SHARDS.map((s) => callShard(s, raw)));
-  const { merged, blocked, degraded, answered } = mergeGuardResponses(original, results);
+  const results = await Promise.all(SHARDS.map((s) => callShard(s, raw, phase)));
+  const { merged, blocked, degraded, answered } = mergeGuardResponses(original, results, phase);
   const extra = {
     'x-offgrid-guard-answered': answered.join(',') || 'none',
   };
@@ -158,7 +186,10 @@ async function route(req, res, chunks) {
   if (url === '/health' || url === '/')
     return shardHealth().then((h) => json(res, 200, { name: 'Off Grid AI — guardrail aggregator', ...h }));
   if (!authOK(req)) return json(res, 401, { error: 'invalid or missing token' });
-  if (url === '/analyze/prompt' && req.method === 'POST') return handleAnalyze(req, res, chunks);
+  if (url === '/analyze/prompt' && req.method === 'POST')
+    return handleAnalyze(req, res, chunks, 'input');
+  if (url === '/analyze/output' && req.method === 'POST')
+    return handleAnalyze(req, res, chunks, 'output');
   return json(res, 404, { error: `no route ${req.method} ${url}` });
 }
 

@@ -3,6 +3,7 @@ import { submitAppRun } from '@/lib/adapters/apprun';
 import { newAppRunId } from '@/lib/app-run';
 import { getAppBySlug } from '@/lib/apps-store';
 import { requireUser } from '@/lib/authz';
+import { pipelineBindingHttpFailure } from '@/lib/pipeline-binding-http';
 import { currentOrgId } from '@/lib/tenancy';
 import { buildTriggerInput } from '@/lib/trigger-dispatch';
 
@@ -93,6 +94,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       { status: 202 },
     );
   } catch (e) {
+    const failure = pipelineBindingHttpFailure(e);
+    if (failure) return NextResponse.json(failure.body, { status: failure.status });
     // Never surface the internal error text (may carry endpoint/stack detail) to an app caller —
     // log server-side, return a generic message.
     console.error('app run failed:', e);

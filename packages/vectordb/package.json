@@ -2,7 +2,7 @@
   "name": "@offgrid/vectordb",
   "version": "0.0.1",
   "description": "Plug-and-play vector DB / knowledge-base inspection + 2D visualization layer for Off Grid: connect by URL, list/inspect collections, sample points, and PCA-project embeddings to 2D.",
-  "license": "AGPL-3.0-only",
+  "license": "LicenseRef-Off-Grid-AI-1.0",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

@@ -135,10 +135,22 @@ export interface PiiResult {
   entities: string[];
   redacted?: string;
   engine: string;
+  /** Engine the caller selected when `engine` names a fallback that actually handled the text. */
+  requestedEngine?: string;
+  /** Explicit execution outcome; prevents a fallback result being mistaken for the selected engine. */
+  status?: 'applied' | 'fallback' | 'unconfigured' | 'down';
+  /** Operator-readable explanation for a fallback/down state. */
+  reason?: string;
+  /** Presidio is data redaction; LLM Guard is content scanning. Never conflate the two. */
+  scope?: 'data-redaction' | 'content-guardrail';
   /** true ⇒ the engine was configured but unreachable → FAIL CLOSED, the run must be blocked. */
   blocked?: boolean;
   /** false ⇒ no engine is configured → the step did not screen (surfaced, never faked as clean). */
   configured?: boolean;
+  /** Shards that returned a verdict when the content guardrail is pooled. */
+  answeredBy?: string[];
+  /** Optional shards that did not answer. The verdict is real, but coverage was degraded. */
+  degraded?: string[];
 }
 
 export interface PiiPort {
@@ -147,6 +159,12 @@ export interface PiiPort {
   // durable/worker path (no request scope, so `headers()`-based org resolution would throw); omit it
   // on the request path to resolve the org from the session. Optional keeps existing callers valid.
   scan(text: string, orgId?: string): Promise<PiiResult>;
+  /**
+   * Scan generated model output with the prompt that produced it. Stock LLM Guard exposes a
+   * different `/analyze/output` contract for this phase; callers must not disguise output as a
+   * prompt scan. Data-redaction-only ports may omit this operation.
+   */
+  scanOutput?(prompt: string, output: string, orgId?: string): Promise<PiiResult>;
   health(): Promise<boolean>;
 }
 
@@ -169,7 +187,7 @@ export interface LineageEvent {
 
 export interface LineagePort {
   meta: AdapterMeta;
-  emit(event: LineageEvent): Promise<void>;
+  emit(event: LineageEvent): Promise<import('@/lib/lineage-delivery').LineageDeliveryReceipt>;
 }
 
 // Provenance signing — make an answer/export tamper-evident. HMAC (default) is a shared-secret

@@ -1,12 +1,13 @@
 import { after, NextResponse } from 'next/server';
 import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
+import { AgentPipelineBindingError } from '@/lib/pipeline-run-glue';
+import { askerFrom } from '@/lib/retrieval/acl';
 import { listAgentRuns, scoreRun } from '@/lib/agentrun';
 import { callerFromSession } from '@/lib/app-access-caller';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { actorFromSession, auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { resolveAgentBinding } from '@/lib/pipeline-run-glue';
-import { getChatBindingGovernance, getCustomAgent } from '@/lib/store';
+import { getCustomAgent } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 // GET → recent agent run traces (steps + checks + provenance + citations).
@@ -24,9 +25,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const b = (await req.json().catch(() => null)) as
-    | { agentId?: unknown; query?: unknown; project?: unknown }
-    | null;
+  const b = (await req.json().catch(() => null)) as {
+    agentId?: unknown;
+    query?: unknown;
+    project?: unknown;
+  } | null;
   if (!b || typeof b.agentId !== 'string' || typeof b.query !== 'string' || !b.query.trim()) {
     return NextResponse.json({ error: 'agentId and query required' }, { status: 400 });
   }
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
   // column, so an unbound policy is least-privilege (admins only). The query is the ABAC attribute
   // surface. Denied → 403 + reason, audited access.denied. Only enforced for a known custom agent;
   // a built-in/unknown id falls through to dispatch's own 404 (additive, never breaks existing IDs).
-  const agent = await getCustomAgent(b.agentId, orgId).catch(() => undefined);
+  const agent = await getCustomAgent(b.agentId, orgId);
   if (agent) {
     const caller = await callerFromSession(gate, orgId);
     const access = await enforceAppAccessWithSharing({
@@ -58,28 +61,38 @@ export async function POST(req: Request) {
     }
   }
 
-  // PA-16b — resolve the bound-pipeline CONTRACT this agent run enforces (data allowlist + egress
-  // leash + policy/guardrail overlay), most-specific-wins: an agent has no per-agent binding column
-  // yet, so this is the org-default chat/consumer pipeline (null agent binding → org default). Null
-  // (nothing bound / unresolvable) ⇒ the run behaves exactly as before (additive-only). Threaded
-  // into dispatch → the sync RunContext so runAgent enforces it per PA-16b.
-  const gov = await getChatBindingGovernance().catch(() => ({ defaultChatPipelineId: null, allowlist: [] }));
-  const { contract, pipelineId } = await resolveAgentBinding(null, gov.defaultChatPipelineId, orgId);
-
   // C4: resolve the caller CONTEXT here — the request is the only place identity/org/project exist.
   // Pass the fully-resolved actor (machine vs user + label preserved, not just the email) so a
   // durable run in the worker attributes its four-plane fan-out exactly as an inline run would.
-  const d = await dispatchAgentRun({
-    agentId: b.agentId,
-    query: b.query,
-    caller: gate.user.email ?? undefined,
-    orgId,
-    actor: actorFromSession(gate),
-    project: typeof b.project === 'string' && b.project.trim() ? b.project.trim() : undefined,
-    contract,
-    // PA-12: thread the resolved pipeline id so the run's observability trace is tagged at the source.
-    pipelineId,
-  });
+  let d;
+  try {
+    d = await dispatchAgentRun({
+      agentId: b.agentId,
+      query: b.query,
+      caller: gate.user.email ?? undefined,
+      orgId,
+      actor: actorFromSession(gate),
+      project: typeof b.project === 'string' && b.project.trim() ? b.project.trim() : undefined,
+      asker: askerFrom({ email: gate.user.email, role: gate.user.role }),
+    });
+  } catch (error) {
+    if (!(error instanceof AgentPipelineBindingError)) throw error;
+    const status =
+      error.binding.code === 'agent_not_found'
+        ? 404
+        : error.binding.state === 'unavailable'
+          ? 503
+          : 409;
+    return NextResponse.json(
+      {
+        error:
+          error.binding.code === 'agent_not_found' ? 'unknown agent' : 'agent binding unavailable',
+        reason: error.message,
+        binding: error.binding.state,
+      },
+      { status },
+    );
+  }
 
   // Durable submit accepted but the pipeline is still executing in the worker — 202 with the
   // workflow/run id so the client can poll GET /runs until the run row appears.

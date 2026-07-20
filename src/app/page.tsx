@@ -68,7 +68,10 @@ const SHOTS: TourShot[] = [
 const PROOF: { value: string; label: string }[] = [
   { value: '1', label: 'interface for every model, gateway and pipeline' },
   { value: '0', label: 'engineering tickets: business teams ship governed AI in plain language' },
-  { value: '100%', label: 'of AI traffic logged, traced, reversible. Rules set once, inherited everywhere' },
+  {
+    value: '100%',
+    label: 'of AI traffic logged, traced, reversible. Rules set once, inherited everywhere',
+  },
   { value: '4', label: 'frameworks on demand: ISO 42001, NIST AI RMF, EU AI Act, DPDP' },
 ];
 
@@ -126,7 +129,7 @@ export default function LandingPage() {
               <BlurFade delay={0.05} inView>
                 <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                   <Sparkle className="size-3.5 text-primary" weight="fill" />
-                  AWS for AI · open source
+                  AWS for AI · source available
                 </span>
               </BlurFade>
               <BlurFade delay={0.12} inView>
@@ -138,13 +141,19 @@ export default function LandingPage() {
               </BlurFade>
               <BlurFade delay={0.24} inView>
                 <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-                  One interface where AI is already safe to run. Set your rules once. Everyone builds
-                  inside them.
+                  One interface where AI is already safe to run. Set your rules once. Everyone
+                  builds inside them.
                 </p>
               </BlurFade>
               <BlurFade delay={0.32} inView>
                 <div className="mt-7 flex max-w-xs">
-                  <BookCallDialog label="Book a demo" variant="default" size="lg" className="w-full" autoOpenParam="book" />
+                  <BookCallDialog
+                    label="Book a demo"
+                    variant="default"
+                    size="lg"
+                    className="w-full"
+                    autoOpenParam="book"
+                  />
                 </div>
               </BlurFade>
               <BlurFade delay={0.4} inView>
@@ -196,9 +205,8 @@ export default function LandingPage() {
               One governed path
             </p>
             <h2 className="mt-3 max-w-2xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              From your data to a{' '}
-              <DecryptText text="signed, audited" className="text-primary" /> result. One path, end
-              to end.
+              From your data to a <DecryptText text="signed, audited" className="text-primary" />{' '}
+              result. One path, end to end.
             </h2>
           </BlurFade>
           <BlurFade delay={0.12} inView>
@@ -297,7 +305,7 @@ export default function LandingPage() {
                     },
                     {
                       title: 'No vendor lock-in',
-                      body: 'Open source, open standards. Swap a model or a gateway without ripping anything out.',
+                      body: 'Inspectable source, open standards. Swap a model or a gateway without ripping anything out.',
                     },
                     {
                       title: 'One coherent system',
@@ -327,8 +335,8 @@ export default function LandingPage() {
 
       <footer className="bg-background">
         <div className="mx-auto flex max-w-[100rem] flex-col items-center justify-between gap-2 px-4 py-8 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground sm:flex-row sm:px-6">
-          <span>Off Grid AI · AWS for AI · open source</span>
-          <span>AGPL-3.0 · set once, use everywhere</span>
+          <span>Off Grid AI · AWS for AI · source available</span>
+          <span>Community use up to 25 users · commercial terms available</span>
         </div>
       </footer>
     </div>

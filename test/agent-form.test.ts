@@ -29,6 +29,7 @@ test('parseCreateInput: full input is trimmed and defaulted', () => {
     tools: ['a', 1, 'b'],
     grounded: false,
     trigger: 'observed',
+    pipelineId: '  pl_claims  ',
   });
   assert.deepEqual(input, {
     name: 'Renewals',
@@ -39,6 +40,7 @@ test('parseCreateInput: full input is trimmed and defaulted', () => {
     tools: ['a', 'b'],
     grounded: false,
     trigger: 'observed',
+    pipelineId: 'pl_claims',
   });
 });
 
@@ -51,6 +53,11 @@ test('parseCreateInput: missing required field → null', () => {
 test('parseCreateInput: grounded defaults true when omitted', () => {
   const input = parseCreateInput({ name: 'X', systemPrompt: 'y' });
   assert.equal(input?.grounded, true);
+  assert.equal(input?.pipelineId, null);
+});
+
+test('parseCreateInput: invalid pipeline binding type rejects the request', () => {
+  assert.equal(parseCreateInput({ name: 'X', systemPrompt: 'y', pipelineId: 42 }), null);
 });
 
 test('parseEditPatch: only present keys appear (partial patch)', () => {
@@ -75,4 +82,10 @@ test('parseEditPatch: normalizes tools, grounded, trigger', () => {
 
 test('parseEditPatch: role falls back to Custom when blanked', () => {
   assert.deepEqual(parseEditPatch({ role: '' }), { role: 'Custom' });
+});
+
+test('parseEditPatch: pipeline binding trims, clears with null, and rejects invalid types', () => {
+  assert.deepEqual(parseEditPatch({ pipelineId: '  pl_a  ' }), { pipelineId: 'pl_a' });
+  assert.deepEqual(parseEditPatch({ pipelineId: null }), { pipelineId: null });
+  assert.equal(parseEditPatch({ pipelineId: false }), null);
 });

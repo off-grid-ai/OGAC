@@ -29,17 +29,32 @@ export interface ConnectorTarget {
 
 // A connector target with its credential already resolved from the vault: the endpoint has any SQL
 // password spliced in, and `authHeader` carries a Bearer header for REST when the connector has an
-// api key. Produced by resolveTargetCreds; consumed by the dialect branches below.
-interface ResolvedExecTarget {
+// api key. Produced by resolveConnectorTarget; consumed by the dialect branches below.
+export interface ResolvedExecTarget {
   type: string;
   endpoint: string;
   authHeader: Record<string, string>;
 }
 
+export interface RestConnectorRequest {
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  path: string[];
+  body?: Record<string, unknown>;
+  query?: Record<string, string>;
+  headers?: Record<string, string>;
+}
+
+export interface RestConnectorResponse {
+  ok: boolean;
+  status: number;
+  body: unknown;
+  headers: Record<string, string>;
+}
+
 // Resolve a target's credential from the vault (by `id`) into a ready-to-use exec target. Falls back
 // to the raw endpoint + no header when there's no id / no vaulted secret / the vault is unreachable,
 // so seeded connectors with inline creds keep working. Dynamic import breaks the exec↔secrets cycle.
-async function resolveTargetCreds(conn: ConnectorTarget): Promise<ResolvedExecTarget> {
+export async function resolveConnectorTarget(conn: ConnectorTarget): Promise<ResolvedExecTarget> {
   const base: ResolvedExecTarget = { type: conn.type, endpoint: conn.endpoint, authHeader: {} };
   if (!conn.id) return base;
   try {
@@ -179,7 +194,7 @@ export async function execConnectorQuery(
   const limit = Math.max(1, Math.min(query.limit ?? 100, 1000));
   // Inject the vaulted credential (SQL password / REST bearer) at query time. Endpoint stays
   // credential-free on the row; the resolved copy is used only here and never persisted.
-  const resolved = await resolveTargetCreds(conn);
+  const resolved = await resolveConnectorTarget(conn);
   const endpoint = resolved.endpoint;
 
   if (dialect === 'postgres') {
@@ -284,6 +299,50 @@ export async function execConnectorQuery(
   return null;
 }
 
+// Credential-safe REST action seam used by typed domain adapters. Callers supply path SEGMENTS,
+// never a URL, so they cannot redirect a connector to another host or smuggle traversal/slashes.
+// This primitive stays transport-only; business adapters must constrain resources, verbs, fields,
+// tenancy, and idempotency before calling it.
+export async function execRestConnectorRequest(
+  conn: ConnectorTarget,
+  request: RestConnectorRequest,
+): Promise<RestConnectorResponse | null> {
+  if (detectDialect(conn.type, conn.endpoint) !== 'rest') return null;
+  if (!Array.isArray(request.path) || request.path.some((segment) => !segment || segment.length > 128)) {
+    return null;
+  }
+  try {
+    const resolved = await resolveConnectorTarget(conn);
+    const base = resolved.endpoint.replace(/\/$/, '');
+    const url = new URL(`${base}/${request.path.map(encodeURIComponent).join('/')}`);
+    for (const [key, value] of Object.entries(request.query ?? {})) {
+      url.searchParams.set(key, value);
+    }
+    const response = await fetch(url, {
+      method: request.method,
+      headers: {
+        ...(request.headers ?? {}),
+        ...resolved.authHeader,
+        ...(request.body ? { 'content-type': 'application/json' } : {}),
+      },
+      body: request.body ? JSON.stringify(request.body) : undefined,
+      signal: AbortSignal.timeout(5000),
+    });
+    const contentType = response.headers.get('content-type') ?? '';
+    const body = contentType.includes('application/json')
+      ? await response.json().catch(() => null)
+      : await response.text().catch(() => '');
+    return {
+      ok: response.ok,
+      status: response.status,
+      body,
+      headers: Object.fromEntries(response.headers.entries()),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─── testConnection — a cheap live probe (SELECT 1 / REST root) ────────────────
 // Opens a connection with the vaulted credential injected and runs the lightest possible check:
 // `SELECT 1` for SQL, a HEAD/GET of the base URL for REST. Returns an honest pass/fail + a short
@@ -300,7 +359,7 @@ export async function testConnection(conn: ConnectorTarget): Promise<ConnectionT
   if (!dialect) {
     return { ok: false, dialect: null, message: 'This connector type cannot be queried live yet.' };
   }
-  const resolved = await resolveTargetCreds(conn);
+  const resolved = await resolveConnectorTarget(conn);
   const endpoint = resolved.endpoint;
 
   try {
@@ -360,7 +419,7 @@ export async function testConnection(conn: ConnectorTarget): Promise<ConnectionT
 export async function listResources(conn: ConnectorTarget): Promise<string[] | null> {
   const dialect = detectDialect(conn.type, conn.endpoint);
   if (!dialect) return null;
-  const resolved = await resolveTargetCreds(conn);
+  const resolved = await resolveConnectorTarget(conn);
   const endpoint = resolved.endpoint;
 
   try {

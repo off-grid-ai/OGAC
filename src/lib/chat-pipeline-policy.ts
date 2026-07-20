@@ -74,9 +74,8 @@ export function resolveChatPipeline(
 }
 
 /**
- * Resolve the pipeline an APP/AGENT consumer run executes on — most-specific-wins: the consumer's
- * OWN binding (apps.pipeline_id), else the org default. Apps aren't allowlist-gated (an admin binds
- * them directly in the builder), so there is no set check here — just the two-level fallback. Pure.
+ * Resolve a Chat-scoped optional override against its org Chat default. Apps and runtime agents do
+ * not use this rule: their null binding is deliberately unbound.
  */
 export function resolveConsumerPipeline(
   boundPipelineId: string | null | undefined,

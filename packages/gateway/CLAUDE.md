@@ -14,6 +14,7 @@ but the architecture and the OSS principle are decided — do NOT relitigate the
 build to them.
 
 ### 1. Config-driven composition root — no duplication, ever
+
 Every capability is a **self-contained feature module: its own logic AND its own
 UI**. The gateway is the host; a single config file composes modules:
 
@@ -41,6 +42,7 @@ Keycloak/org provider). It is not a separate app. That is what "the GW is the
 spine of the console" means, literally.
 
 ### 2. Three hard principles
+
 - **No duplication** — a module is defined once; the config only references it.
 - **No lock-in** — every module takes its URL/backend as config; point it at your
   own Qdrant / analytics / nodes, or delete the line. OpenAI-compatible in and
@@ -51,6 +53,7 @@ spine of the console" means, literally.
   integrations with no account, no console, no paywall.
 
 ### 3. The OSS / Pro line: **plug-and-play is OSS; tough, maintained work is Pro**
+
 Not an arbitrary feature list — a principle. If it's an interface + a config line,
 it's open. If it takes real, ongoing engineering + maintenance, it's **Pro**.
 
@@ -65,14 +68,15 @@ it's open. If it takes real, ongoing engineering + maintenance, it's **Pro**.
 
 Honest, not lock-in: the connector interface is open, so anyone CAN write their
 own — most won't, because maintaining connectors/ETL is exactly the treadmill
-they're paying to avoid (the Fivetran/Airbyte bet). We sell the *work and its
-upkeep*, never a locked capability.
+they're paying to avoid (the Fivetran/Airbyte bet). We sell the _work and its
+upkeep_, never a locked capability.
 
 **Per-module license is a movable flag.** Build every capability as a module the
 same way; which side of the OSS/Pro line it lands on is decided per module and can
 change. Don't hard-code the boundary into the architecture.
 
 ### For the agent working here
+
 Build to this. Keep new capability behind the module manifest + config seams (not
 hardwired). When a change touches the OSS/Pro boundary for a specific module,
 confirm which side it's on with the user — but the architecture above is settled.
@@ -80,6 +84,7 @@ confirm which side it's on with the user — but the architecture above is settl
 ---
 
 ## Current state vs. target
+
 - Built: cluster router (routing, true health, admission-control backpressure),
   plug-and-play observability **sinks** + policy **pipeline**; layer packages in
   `shared` (`@offgrid/policy|analytics|finops|vectordb`) with logic + integration
@@ -91,17 +96,18 @@ confirm which side it's on with the user — but the architecture above is settl
   logic-only; the UI + registry work is the path to the target above.
 
 ## Layout
+
 - `src/cli.ts` — single-node gateway (handlers migrating from desktop `model-server`).
 - `src/cluster-cli.ts` + `src/cluster/*` — the multinode router (routing, health, capture, observability sinks, admission limiter, policy pipeline).
 - `src/policy/*` — the policy pipeline interface (concrete policies ship as `@offgrid/policy`).
 - `src/runtime-env.ts` — host-agnostic path/resource seam (Electron vs standalone).
 
 ## Conventions
+
 - Dependency-light; Node `http` + global `fetch`. Build with `npm run build` (tsup, esm+cjs+dts).
 - Observability and policy are **plug-and-play** (sink/policy interfaces) — keep new capability behind those seams, not hardwired.
-- Small, meaningful commits; push. AGPL-3.0-only. No verbatim copying from other projects (inspiration only).
+- Small, meaningful commits; push. Off Grid AI Source-Available License 1.0. No verbatim copying from other projects (inspiration only).
 - Backpressure/admission control is in-process on the sync path; durable queued inference belongs on Temporal as a separate async layer.
-
 
 ## Multi-agent operating model (how we build here)
 

@@ -11,6 +11,7 @@ import type { EtlJobStatus } from '@/lib/etl-model';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,10 @@ const JOB_TONE: Record<EtlJobStatus, string> = {
 // below. The job's DAG is the source of truth the pipeline compiles from; older jobs without a DAG
 // are back-filled from their flat fields so they open in the builder too. This is the "place" the
 // list drills into (list→detail IA), never a modal.
-export default async function EtlJobDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export async function EtlJobDetailContent({
+  params,
+  backHref = '/data/etl',
+}: Readonly<{ params: Promise<{ id: string }>; backHref?: string }>) {
   await requireModuleForUser('data');
   const { id } = await params;
   const orgId = await currentOrgId();
@@ -41,38 +45,50 @@ export default async function EtlJobDetailPage({ params }: Readonly<{ params: Pr
   const dag: EtlDagSpec = job.dag ?? backfillDag(job);
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Link
-            href="/data/etl"
-            className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" />
-            ETL jobs
-          </Link>
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            {job.name}
-            {job.lastRunStatus ? <Badge className={JOB_TONE[job.lastRunStatus]}>{job.lastRunStatus}</Badge> : null}
-          </h2>
-          <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            Build the movement visually: read from a connected source, shape and redact the rows, and
-            land them in a warehouse table. Save it, then run it now or on a schedule — every run is
-            governed and recorded.
-          </p>
-        </div>
-        <EtlJobActions jobId={job.id} />
-      </div>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <Link
+                href={backHref}
+                className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="size-3.5" />
+                ETL jobs
+              </Link>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                {job.name}
+                {job.lastRunStatus ? (
+                  <Badge className={JOB_TONE[job.lastRunStatus]}>{job.lastRunStatus}</Badge>
+                ) : null}
+              </h2>
+              <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+                Build the movement visually: read from a connected source, shape and redact the
+                rows, and land them in a warehouse table. Save it, then run it now or on a schedule
+                — every run is governed and recorded.
+              </p>
+            </div>
+            <EtlJobActions jobId={job.id} />
+          </div>
 
-      <EtlBuilder
-        jobId={job.id}
-        jobName={job.name}
-        initialDag={dag}
-        connectors={connectorOptions}
-        initialRuns={runs}
-      />
-    </div>
+          <EtlBuilder
+            jobId={job.id}
+            jobName={job.name}
+            initialDag={dag}
+            connectors={connectorOptions}
+            initialRuns={runs}
+          />
+        </div>
+      }
+    </PageFrame>
   );
+}
+
+export default function EtlJobDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
+  return <EtlJobDetailContent params={params} />;
 }
 
 // Seed a DAG from a legacy flat job (source → [redact nodes] → destination).
@@ -100,5 +116,11 @@ function backfillDag(job: EtlJobSpec): EtlDagSpec {
   }
   const chain = [src.id, ...redactNodes.map((n) => n.id), dst.id];
   const edges = chain.slice(0, -1).map((from, i) => ({ from, to: chain[i + 1] }));
-  return { nodes: [src, ...redactNodes, dst], edges, trigger: job.trigger, cron: job.cron, rowLimit: job.rowLimit };
+  return {
+    nodes: [src, ...redactNodes, dst],
+    edges,
+    trigger: job.trigger,
+    cron: job.cron,
+    rowLimit: job.rowLimit,
+  };
 }

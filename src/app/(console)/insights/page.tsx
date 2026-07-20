@@ -7,6 +7,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
+import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
 import { LangfuseInsightsPanel } from '@/components/observability/LangfuseInsightsPanel';
 import { LangfuseRegistryPanel } from '@/components/observability/LangfuseRegistryPanel';
 import { LangfuseTraces } from '@/components/observability/LangfuseTraces';
@@ -27,6 +28,7 @@ import {
 import { getDrift, getEvals, getFlags } from '@/lib/adapters/registry';
 import type { DriftReport } from '@/lib/adapters/types';
 import { listAgentRuns } from '@/lib/agentrun';
+import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { listEvalRuns } from '@/lib/evals';
 import {
   resolveRange,
@@ -42,6 +44,7 @@ import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { scoringConfigured } from '@/lib/qa/scoring';
 import { currentOrgId } from '@/lib/tenancy';
 import { withTimeout } from '@/lib/with-timeout';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,7 +80,9 @@ function EvalRunsCard({ evals }: Readonly<{ evals: Eval[] }>) {
     <Card className="shadow-sm">
       <CardHeader>
         <CardTitle className="text-sm">Eval runs</CardTitle>
-        <p className="text-xs text-muted-foreground">Golden-set runs — click for per-case results.</p>
+        <p className="text-xs text-muted-foreground">
+          Golden-set runs — click for per-case results.
+        </p>
       </CardHeader>
       <CardContent>
         {evals.length ? (
@@ -175,7 +180,7 @@ function RunTracesTable({ runs }: Readonly<{ runs: Trace[] }>) {
             </TableCell>
             <TableCell>
               <Link
-                href={`/build/agents/${r.agentId}/runs/${r.id}`}
+                href={`/solutions/agents/${r.agentId}/runs/${r.id}`}
                 className="text-xs text-primary hover:underline"
               >
                 trace →
@@ -203,8 +208,11 @@ export default async function ObservabilityPage({
   // Pipeline facet — eval-run history filters server-side (eval_runs carry pipeline_id, PA-12); the
   // other probes aren't pipeline-aware yet, so the note by the control is explicit about the scope.
   const pipelines = await listPipelines(org).catch(() => []);
-  const facet = resolvePipelineFacet(sp.pipeline, pipelines.map((p) => p.id));
-  const facetName = facet ? pipelines.find((p) => p.id === facet)?.name ?? facet : null;
+  const facet = resolvePipelineFacet(
+    sp.pipeline,
+    pipelines.map((p) => p.id),
+  );
+  const facetName = facet ? (pipelines.find((p) => p.id === facet)?.name ?? facet) : null;
   // Every probe runs in parallel AND under a wall-clock ceiling: the observability page fans out to
   // eval history, the drift engine (Evidently), durable runs, feature flags, and three Langfuse
   // calls. The Langfuse trio already degrade gracefully; here we also cap eval/drift/runs/flag reads
@@ -232,6 +240,48 @@ export default async function ObservabilityPage({
   const latest = evals[0];
   const trend = [...evals].reverse().map((r, i) => ({ label: `#${i + 1}`, score: r.score }));
   const online = scoringConfigured();
+  const dashboard = buildDomainDashboard('insights', {
+    facts: [
+      {
+        label: 'Latest eval score',
+        value: latest ? `${latest.score}%` : 'No runs',
+        description: latest
+          ? `${latest.passed} of ${latest.total} cases passed.`
+          : 'Run an eval to establish measured quality.',
+        href: '/insights/quality/scorecards',
+        state: latest ? (latest.score >= 85 ? 'good' : 'attention') : 'attention',
+      },
+      {
+        label: 'Drift posture',
+        value: drift.status,
+        description: `${drift.engine} evaluated ${drift.metrics.length} drift metrics.`,
+        href: '/insights/quality/drift',
+        state: drift.status === 'stable' ? 'good' : 'attention',
+      },
+      {
+        label: 'Recent agent runs',
+        value: runs.length.toLocaleString(),
+        description: 'Runs in the current governed activity window.',
+        href: '/insights/ai/traces',
+      },
+      {
+        label: 'Online scoring',
+        value: onlineState(online, onlineEnabled),
+        description: online
+          ? 'Runtime scoring configuration detected.'
+          : 'Using local evaluation records.',
+        href: '/solutions/quality',
+        state: online && !onlineEnabled ? 'attention' : 'neutral',
+      },
+    ],
+    activities: runs.slice(0, 6).map((run) => ({
+      id: run.id,
+      label: run.agentId,
+      detail: `${run.status}: ${run.query}`,
+      timestamp: run.startedAt.slice(0, 10),
+      href: `/solutions/agents/${run.agentId}/runs/${run.id}`,
+    })),
+  });
 
   // Live alert evaluation against the operator's console-owned threshold rules. Drift score is the
   // PSI metric (0..1-ish population stability index); eval pass-rate is the latest score as a fraction.
@@ -257,172 +307,188 @@ export default async function ObservabilityPage({
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Agent QA &amp; observability. Offline eval scores, drift (PSI), and the online
-          LLM-as-judge — every agent run is traced through the governed pipeline with checks and
-          tamper-evident provenance. Online scores stream to the tracing store via the observability
-          adapter.
-          {facetName ? (
-            <span className="text-foreground">
-              {' '}
-              Eval runs filtered to pipeline “{facetName}”; other panels show all pipelines.
-            </span>
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <DomainDashboard model={dashboard} />
+
+          <div className="border-t border-border pt-6">
+            <h2 className="text-base font-normal text-foreground">Inspect evidence</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Read eval, drift, trace, and threshold evidence from the current measurement window.
+            </p>
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Agent QA &amp; observability. Offline eval scores, drift (PSI), and the online
+              LLM-as-judge — every agent run is traced through the governed pipeline with checks and
+              tamper-evident provenance. Online scores stream to the tracing store via the
+              observability adapter.
+              {facetName ? (
+                <span className="text-foreground">
+                  {' '}
+                  Eval runs filtered to pipeline “{facetName}”; other panels show all pipelines.
+                </span>
+              ) : null}
+            </p>
+            <div className="flex items-center gap-3">
+              <PipelineFacetSelect pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))} />
+              <RunSweepButton />
+            </div>
+          </div>
+
+          {drift.status === 'drift' ? (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <AlertTriangle className="size-4" />
+              Quality drift detected — {drift.note ?? 'eval scores are diverging from baseline.'}
+            </div>
           ) : null}
-        </p>
-        <div className="flex items-center gap-3">
-          <PipelineFacetSelect pipelines={pipelines.map((p) => ({ id: p.id, name: p.name }))} />
-          <RunSweepButton />
-        </div>
-      </div>
 
-      {drift.status === 'drift' ? (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          <AlertTriangle className="size-4" />
-          Quality drift detected — {drift.note ?? 'eval scores are diverging from baseline.'}
-        </div>
-      ) : null}
+          {alerts.map((a) => (
+            <div
+              key={`${a.metric}-${a.rule.op}-${a.rule.value}`}
+              className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                a.severity === 'critical'
+                  ? 'border-destructive/30 bg-destructive/10 text-destructive'
+                  : 'border-amber-500/30 bg-amber-500/10 text-amber-600'
+              }`}
+            >
+              <AlertTriangle className="size-4" />
+              Threshold breached — {a.message}
+            </div>
+          ))}
 
-      {alerts.map((a) => (
-        <div
-          key={`${a.metric}-${a.rule.op}-${a.rule.value}`}
-          className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-            a.severity === 'critical'
-              ? 'border-destructive/30 bg-destructive/10 text-destructive'
-              : 'border-amber-500/30 bg-amber-500/10 text-amber-600'
-          }`}
-        >
-          <AlertTriangle className="size-4" />
-          Threshold breached — {a.message}
-        </div>
-      ))}
+          <StatRail>
+            {stats.map((s) => (
+              <Card key={s.label} className="shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">
+                    {s.label}
+                  </CardTitle>
+                  <s.icon className="size-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-semibold capitalize text-foreground">{s.value}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </StatRail>
 
-      <StatRail>
-        {stats.map((s) => (
-          <Card key={s.label} className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs font-normal uppercase tracking-wide text-muted-foreground">
-                {s.label}
-              </CardTitle>
-              <s.icon className="size-4 text-muted-foreground" />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Eval score history</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Offline golden-set evals (engine: {getEvals().meta.id}). Newest on the right.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {trend.length ? (
+                  <ScoreTrendChart data={trend} />
+                ) : (
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    No eval runs yet. Run a QA sweep to start the history.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Drift &amp; degradation</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Engine: {drift.engine} · {drift.baseline} baseline vs {drift.current} current
+                  samples.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {drift.metrics.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Metric</TableHead>
+                        <TableHead>Value</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {drift.metrics.map((m) => (
+                        <TableRow key={m.name}>
+                          <TableCell className="font-mono text-xs text-foreground">
+                            {m.name}
+                          </TableCell>
+                          <TableCell className="text-foreground">{m.value}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className={DRIFT_COLOR[m.status] ?? ''}>
+                              {m.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    Not enough samples to assess drift yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <ThresholdManager />
+
+          <LangfuseInsightsPanel
+            configured={insights.configured}
+            cost={insights.cost}
+            trends={insights.trends}
+            error={insights.error}
+            range={range}
+          />
+
+          <LangfuseRegistryPanel
+            configured={registry.configured}
+            prompts={registry.prompts}
+            datasets={registry.datasets}
+            sessions={registry.sessions}
+            error={registry.error}
+            tab={regTab}
+          />
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Langfuse traces</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                LLM traces read back from Langfuse&apos;s public API — expand a trace for its span
+                waterfall. Spans are pushed via the OTLP observability seam.
+              </p>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold capitalize text-foreground">{s.value}</div>
+              <LangfuseTraces
+                configured={traces.configured}
+                traces={traces.traces}
+                error={traces.error}
+              />
             </CardContent>
           </Card>
-        ))}
-      </StatRail>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Eval score history</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Offline golden-set evals (engine: {getEvals().meta.id}). Newest on the right.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {trend.length ? (
-              <ScoreTrendChart data={trend} />
-            ) : (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                No eval runs yet. Run a QA sweep to start the history.
+          <EvalRunsCard evals={evals} />
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Recent agent run traces</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Every interaction through the governed pipeline — checks, grounding, and provenance
+                per run.
               </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Drift &amp; degradation</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Engine: {drift.engine} · {drift.baseline} baseline vs {drift.current} current samples.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {drift.metrics.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Metric</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {drift.metrics.map((m) => (
-                    <TableRow key={m.name}>
-                      <TableCell className="font-mono text-xs text-foreground">{m.name}</TableCell>
-                      <TableCell className="text-foreground">{m.value}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={DRIFT_COLOR[m.status] ?? ''}>
-                          {m.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                Not enough samples to assess drift yet.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <ThresholdManager />
-
-      <LangfuseInsightsPanel
-        configured={insights.configured}
-        cost={insights.cost}
-        trends={insights.trends}
-        error={insights.error}
-        range={range}
-      />
-
-      <LangfuseRegistryPanel
-        configured={registry.configured}
-        prompts={registry.prompts}
-        datasets={registry.datasets}
-        sessions={registry.sessions}
-        error={registry.error}
-        tab={regTab}
-      />
-
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Langfuse traces</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            LLM traces read back from Langfuse&apos;s public API — expand a trace for its span
-            waterfall. Spans are pushed via the OTLP observability seam.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <LangfuseTraces
-            configured={traces.configured}
-            traces={traces.traces}
-            error={traces.error}
-          />
-        </CardContent>
-      </Card>
-
-      <EvalRunsCard evals={evals} />
-
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Recent agent run traces</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Every interaction through the governed pipeline — checks, grounding, and provenance per
-            run.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <RunTracesTable runs={runs} />
-        </CardContent>
-      </Card>
-    </div>
+            </CardHeader>
+            <CardContent>
+              <RunTracesTable runs={runs} />
+            </CardContent>
+          </Card>
+        </div>
+      }
+    </PageFrame>
   );
 }

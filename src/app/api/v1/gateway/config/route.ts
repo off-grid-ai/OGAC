@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
-import { gatewayFetch, shapeGatewayTuning, type AggregatorConfig } from '@/lib/gateway';
+import { gatewayControlFetch, shapeGatewayTuning, type AggregatorConfig } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
   let raw: AggregatorConfig | null = null;
   try {
-    const r = await gatewayFetch('/config', {
+    const r = await gatewayControlFetch('/config', {
       cache: 'no-store',
       signal: AbortSignal.timeout(2500),
     });

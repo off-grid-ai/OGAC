@@ -4,7 +4,7 @@ import { db } from '@/db';
 import { fleetNodes } from '@/db/schema';
 import { requireAdmin } from '@/lib/authz';
 import { activeModelConfig, validateFleetNode, type FleetNode } from '@/lib/fleet';
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { gatewayControlFetch } from '@/lib/gateway';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,10 +20,10 @@ const MODEL_KEYS = ['modelId', 'primaryGguf', 'mmprojGguf', 'contextSize'] as co
 
 async function tellAggregator(name: string, body: Record<string, unknown>) {
   try {
-    const r = await fetch(`${GATEWAY_URL}/nodes/${encodeURIComponent(name)}`, {
+    const r = await gatewayControlFetch(`/nodes/${encodeURIComponent(name)}`, {
       method: 'POST',
       cache: 'no-store',
-      headers: gatewayHeaders({ 'content-type': 'application/json' }),
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(120000),
     });
@@ -41,7 +41,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ na
   const { name } = await params;
   const patch = (await req.json().catch(() => null)) as Partial<FleetNode> | null;
   if (!patch || typeof patch !== 'object') {
-    return NextResponse.json({ error: 'body must be a JSON object of fields to update' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'body must be a JSON object of fields to update' },
+      { status: 400 },
+    );
   }
 
   const [current] = await db.select().from(fleetNodes).where(eq(fleetNodes.name, name));

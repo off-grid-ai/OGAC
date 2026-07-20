@@ -201,6 +201,18 @@ world's models, its own governance, one surface.
 
 This vision sets the priorities the roadmap executes against:
 
+**The platform model is an enterprise AI cloud installed inside the customer boundary.** Think
+“AWS for AI,” not a bundle of dashboards or Docker images. Each top-level Console bucket is a
+coherent user domain—not automatically a separate product—and must have a useful landing dashboard
+that explains what is inside, what needs attention, and what the operator can do next. The deep
+capabilities within those domains have owned user journeys, entities, lifecycle, APIs, evidence, and
+economics. The composable services underneath are managed primitives: their capabilities must be
+exposed through stable Off Grid contracts and combined into complete operator outcomes. A service
+being installed, listed, or reachable is not product completion; its valuable capabilities must be
+manageable from the appropriate product surface and proven in a real production path. Customers
+install Off Grid AI once and should be able to build, run, govern, evaluate, observe, and operate
+enterprise AI without assembling a separate platform themselves.
+
 1. **Consolidate, don't proliferate.** Six thin observability/analytics/finops/reports/siem/drift
    tiles are one job — "is my AI healthy, safe, and what is it costing." Build the *job*, not the
    tiles. Same for the governance surfaces.
@@ -236,9 +248,16 @@ Why it wins where point tools and the cloud stack don't:
 - **Sovereign + no lock-in** — every engine on their hardware; permissive OSS; the moat is ownership,
   air-gap, and the governance spine, not proprietary formats or a SaaS dependency.
 
-Live on S2 under OrbStack; consumed by the console via ports-and-adapters; seeded with a 600k-row BFSI
-dataset. The remaining leap is the **plain-language builder** so non-technical staff author these governed
-pipelines themselves — the empowerment that turns "we have a data platform" into "everyone is intelligent."
+Consumed by the console via ports-and-adapters and seeded with a 600k-row BFSI dataset. The remaining
+leap is the **plain-language builder** so non-technical staff author these governed pipelines themselves —
+the empowerment that turns "we have a data platform" into "everyone is intelligent."
+
+Deployment topology is not owned by this strategy document. Node addresses, service placement, fleet
+membership, and cluster membership are runtime registry data; console routes and product documents must
+not hard-code them. The authoritative deployment configuration, recovery automation, and current health
+records live in the private
+[`off-grid-ai/onprem-fleet-orchestration`](https://github.com/off-grid-ai/onprem-fleet-orchestration)
+repository.
 
 ---
 

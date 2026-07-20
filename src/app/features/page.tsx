@@ -46,13 +46,40 @@ const GROUPS: FeatureGroup[] = [
     title: 'One gateway every AI call passes through',
     tagline: 'The chokepoint that ends Shadow AI and makes everything else governable.',
     features: [
-      { name: 'AI Gateway', value: 'A single, OpenAI-compatible endpoint for every model call — one place to route, govern, observe, and kill.' },
-      { name: 'Guardrails (PII + injection)', value: 'Every prompt is scanned for sensitive data and prompt-injection before it ever reaches a model.' },
-      { name: 'Policy — RBAC + ABAC', value: 'Deny-overrides access decisions: who can use which model, data, and tool, provably enforced.' },
-      { name: 'Identity & SSO', value: 'Google / Microsoft / enterprise SSO (SAML/OIDC). Enterprise login with no bespoke user store.' },
-      { name: 'Secrets management', value: 'Env by default, a hardened vault for production — no plaintext keys anywhere, rotated centrally.' },
-      { name: 'Append-only audit + SIEM', value: 'Every model call, tool call, and byte of egress on one immutable record; ship to OpenSearch for search + dashboards.' },
-      { name: 'Kill switch', value: 'One control halts all AI org-wide — the switch a board signs off on.' },
+      {
+        name: 'AI Gateway',
+        value:
+          'A single, OpenAI-compatible endpoint for every model call — one place to route, govern, observe, and kill.',
+      },
+      {
+        name: 'Guardrails (PII + injection)',
+        value:
+          'Every prompt is scanned for sensitive data and prompt-injection before it ever reaches a model.',
+      },
+      {
+        name: 'Policy — RBAC + ABAC',
+        value:
+          'Deny-overrides access decisions: who can use which model, data, and tool, provably enforced.',
+      },
+      {
+        name: 'Identity & SSO',
+        value:
+          'Google / Microsoft / enterprise SSO (SAML/OIDC). Enterprise login with no bespoke user store.',
+      },
+      {
+        name: 'Secrets management',
+        value:
+          'Env by default, a hardened vault for production — no plaintext keys anywhere, rotated centrally.',
+      },
+      {
+        name: 'Append-only audit + SIEM',
+        value:
+          'Every model call, tool call, and byte of egress on one immutable record; ship to OpenSearch for search + dashboards.',
+      },
+      {
+        name: 'Kill switch',
+        value: 'One control halts all AI org-wide — the switch a board signs off on.',
+      },
     ],
   },
   {
@@ -61,23 +88,59 @@ const GROUPS: FeatureGroup[] = [
     title: 'Your knowledge, grounded and cited',
     tagline: 'Agents answer from your content — not the model’s guesses.',
     features: [
-      { name: 'Org knowledge base (RAG)', value: 'Versioned knowledge base over your own SOPs and playbooks; embedded on-disk, or a dedicated vector store at scale.' },
-      { name: 'Retrieval router', value: 'Detects intent and queries the right source — knowledge base, database, or tool — with provenance on every hit.' },
-      { name: 'Grounding & citation checks', value: 'Verifies each claim against its sources, so hallucination is caught before it ships.' },
-      { name: 'Response cache', value: 'Exact + semantic caching (in-process or Redis) cuts cost and latency on repeated prompts.' },
-      { name: 'Model routing', value: 'Smart, conditional, and geo-aware routing across models with a cloud leash you control.' },
+      {
+        name: 'Org knowledge base (RAG)',
+        value:
+          'Versioned knowledge base over your own SOPs and playbooks; embedded on-disk, or a dedicated vector store at scale.',
+      },
+      {
+        name: 'Retrieval router',
+        value:
+          'Detects intent and queries the right source — knowledge base, database, or tool — with provenance on every hit.',
+      },
+      {
+        name: 'Grounding & citation checks',
+        value:
+          'Verifies each claim against its sources, so hallucination is caught before it ships.',
+      },
+      {
+        name: 'Response cache',
+        value:
+          'Exact + semantic caching (in-process or Redis) cuts cost and latency on repeated prompts.',
+      },
+      {
+        name: 'Model routing',
+        value:
+          'Smart, conditional, and geo-aware routing across models with a cloud leash you control.',
+      },
     ],
   },
   {
     icon: Gauge,
     layer: 'Agent QA',
     title: 'Proof the agents are still doing a good job',
-    tagline: 'Automated QA that answers: are they working, and if not, which one regressed and when?',
+    tagline:
+      'Automated QA that answers: are they working, and if not, which one regressed and when?',
     features: [
-      { name: 'Offline evals', value: 'Golden-set recall plus assertion matrices and RAG metrics — regression-test agents before release.' },
-      { name: 'Online scoring', value: 'An LLM-as-judge scores live traffic for quality + faithfulness and trends it over time — a falling score is your alarm.' },
-      { name: 'Drift & degradation', value: 'Population-stability and test suites detect distribution shift and quality decay over time.' },
-      { name: 'Live observability', value: 'OpenTelemetry traces, metrics, and per-call cost per user / team / project.' },
+      {
+        name: 'Offline evals',
+        value:
+          'Golden-set recall plus assertion matrices and RAG metrics — regression-test agents before release.',
+      },
+      {
+        name: 'Online scoring',
+        value:
+          'An LLM-as-judge scores live traffic for quality + faithfulness and trends it over time — a falling score is your alarm.',
+      },
+      {
+        name: 'Drift & degradation',
+        value:
+          'Population-stability and test suites detect distribution shift and quality decay over time.',
+      },
+      {
+        name: 'Live observability',
+        value: 'OpenTelemetry traces, metrics, and per-call cost per user / team / project.',
+      },
     ],
   },
   {
@@ -86,10 +149,23 @@ const GROUPS: FeatureGroup[] = [
     title: 'Tamper-evident, provable outputs',
     tagline: 'Prove what was produced, by whom, unaltered.',
     features: [
-      { name: 'Signed exports', value: 'Every report carries a detached ed25519 manifest — offline-verifiable with only a public key, no shared secret.' },
-      { name: 'C2PA Content Credentials', value: 'Industry-standard signed manifests embedded in generated images.' },
-      { name: 'Sigstore attestation', value: 'Keyless signing of artifacts with a public transparency-log trail.' },
-      { name: 'Data lineage', value: 'A queryable source → chunk → answer graph explains where any answer came from.' },
+      {
+        name: 'Signed exports',
+        value:
+          'Every report carries a detached ed25519 manifest — offline-verifiable with only a public key, no shared secret.',
+      },
+      {
+        name: 'C2PA Content Credentials',
+        value: 'Industry-standard signed manifests embedded in generated images.',
+      },
+      {
+        name: 'Sigstore attestation',
+        value: 'Keyless signing of artifacts with a public transparency-log trail.',
+      },
+      {
+        name: 'Data lineage',
+        value: 'A queryable source → chunk → answer graph explains where any answer came from.',
+      },
     ],
   },
   {
@@ -98,10 +174,25 @@ const GROUPS: FeatureGroup[] = [
     title: 'Run agents — safely and durably',
     tagline: 'The substrate for agents that act, not just answer.',
     features: [
-      { name: 'Sandboxed code execution', value: 'Agent-authored code runs in an ephemeral, network-isolated, resource-capped container — off by default, gated by policy.' },
-      { name: 'Durable workflows', value: 'Durable multi-step agents survive a crash and resume — required before you trust autonomy.' },
-      { name: 'Tool registry', value: 'Agents call only registered, scoped tools — arbitrary action is refused by default.' },
-      { name: 'Feature flags', value: 'Toggle modules and capabilities per tenant / environment; instant rollback.' },
+      {
+        name: 'Sandboxed code execution',
+        value:
+          'Agent-authored code runs in an ephemeral, network-isolated, resource-capped container — off by default, gated by policy.',
+      },
+      {
+        name: 'Durable workflows',
+        value:
+          'Durable multi-step agents survive a crash and resume — required before you trust autonomy.',
+      },
+      {
+        name: 'Tool registry',
+        value:
+          'Agents call only registered, scoped tools — arbitrary action is refused by default.',
+      },
+      {
+        name: 'Feature flags',
+        value: 'Toggle modules and capabilities per tenant / environment; instant rollback.',
+      },
     ],
   },
   {
@@ -110,9 +201,18 @@ const GROUPS: FeatureGroup[] = [
     title: 'Defensible to a regulator and a board',
     tagline: 'Turn the audit trail into the documents they actually ask for.',
     features: [
-      { name: 'Report packs', value: 'IRDAI / RBI / SEBI / DPDP-aligned report packs generated from the audit record.' },
-      { name: 'Governance registry & DPIA', value: 'Model risk becomes a tracked, board-level line item.' },
-      { name: 'Multi-tenant + data residency', value: 'Per-tenant isolation and on-prem deployment keep data where the law requires.' },
+      {
+        name: 'Report packs',
+        value: 'IRDAI / RBI / SEBI / DPDP-aligned report packs generated from the audit record.',
+      },
+      {
+        name: 'Governance registry & DPIA',
+        value: 'Model risk becomes a tracked, board-level line item.',
+      },
+      {
+        name: 'Multi-tenant + data residency',
+        value: 'Per-tenant isolation and on-prem deployment keep data where the law requires.',
+      },
     ],
   },
   {
@@ -121,10 +221,24 @@ const GROUPS: FeatureGroup[] = [
     title: 'One pane of glass over the whole estate',
     tagline: 'Where humans meet the agents — and where you keep control.',
     features: [
-      { name: 'Fleet control (coming soon)', value: '“MDM for AI” — provision, govern, and observe every AI-enabled device from one console. Agent-enrolled inventory works today; full MDM control is coming soon.' },
-      { name: 'FinOps + virtual keys', value: 'Issue keys with budgets; per-user / project cost and chargeback — no surprise token bills.' },
-      { name: 'BI / data exploration', value: 'Explore usage and data in built-in dashboards — without exporting it.' },
-      { name: 'Agents & Reports', value: 'Pre-built use cases (claims/FNOL, KYC, SOP synthesis) ready to run and govern.' },
+      {
+        name: 'Fleet control (coming soon)',
+        value:
+          '“MDM for AI” — provision, govern, and observe every AI-enabled device from one console. Agent-enrolled inventory works today; full MDM control is coming soon.',
+      },
+      {
+        name: 'FinOps + virtual keys',
+        value:
+          'Issue keys with budgets; per-user / project cost and chargeback — no surprise token bills.',
+      },
+      {
+        name: 'BI / data exploration',
+        value: 'Explore usage and data in built-in dashboards — without exporting it.',
+      },
+      {
+        name: 'Agents & Reports',
+        value: 'Pre-built use cases (claims/FNOL, KYC, SOP synthesis) ready to run and govern.',
+      },
     ],
   },
 ];
@@ -163,8 +277,8 @@ const FIELD_FORCE: Angle[] = [
   },
   {
     icon: Coins,
-    title: 'Predictable cost, no per-seat AI tax',
-    body: 'All open source, self-hosted: no per-token fees to a vendor, no per-user AI licence. You meter and budget usage yourself; spend is a line item you control, not a surprise invoice.',
+    title: 'Predictable infrastructure and inference cost',
+    body: 'Self-host the source-available console and open-source engines without a per-token vendor markup. Community use is free for up to 25 users; larger deployments use clear commercial terms.',
   },
 ];
 
@@ -192,10 +306,26 @@ const AGENTIFY: Angle[] = [
 ];
 
 const GUARANTEES: Angle[] = [
-  { icon: Lock, title: 'Local-first', body: 'Runs on your infrastructure; models on-device, data in your control.' },
-  { icon: Plugs, title: 'No lock-in', body: 'Permissive open source behind swappable ports — change any tool via one env var.' },
-  { icon: Coins, title: 'No vendor fees', body: 'All-in-one OSS: no per-token fees, no API keys, no per-seat AI licence.' },
-  { icon: ShieldCheck, title: 'Auditable & compliant', body: 'Append-only audit, ABAC, signed exports, and regulator report packs.' },
+  {
+    icon: Lock,
+    title: 'Local-first',
+    body: 'Runs on your infrastructure; models on-device, data in your control.',
+  },
+  {
+    icon: Plugs,
+    title: 'No lock-in',
+    body: 'Permissive open source behind swappable ports — change any tool via one env var.',
+  },
+  {
+    icon: Coins,
+    title: 'No token markup',
+    body: 'Run local models without external API keys or a per-token platform surcharge.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Auditable & compliant',
+    body: 'Append-only audit, ABAC, signed exports, and regulator report packs.',
+  },
 ];
 
 // ─── Render helpers ───────────────────────────────────────────────────────────
@@ -253,7 +383,7 @@ export default function FeaturesPage() {
               <Link href="/journey">The journey</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/gateway/fleet">Open console</Link>
+              <Link href="/operations/devices">Open console</Link>
             </Button>
           </div>
         </div>
@@ -268,17 +398,19 @@ export default function FeaturesPage() {
               The complete feature set
             </Badge>
             <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">
-              Everything you need to <span className="text-primary">see, govern, prove, and run</span>{' '}
-              AI agents across your enterprise.
+              Everything you need to{' '}
+              <span className="text-primary">see, govern, prove, and run</span> AI agents across
+              your enterprise.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground">
-              Off Grid AI Console is the all-in-one control plane for agentic AI — every layer of the
-              stack on one console, on your own infrastructure, entirely open source. No per-token
-              fees, no API keys, no lock-in.
+              Off Grid AI Console is the all-in-one control plane for agentic AI — every layer of
+              the stack on one source-available console, on your own infrastructure, with
+              open-source engines behind stable ports. No per-token markup, no required cloud API
+              keys, no lock-in.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/gateway/fleet">
+                <Link href="/operations/devices">
                   Open the console
                   <ArrowRight className="size-4" />
                 </Link>
@@ -349,8 +481,8 @@ export default function FeaturesPage() {
               Arm a distributed workforce with AI — without losing control of it
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Thousands of reps, agents, and edge devices, each running AI on customer data. Off Grid AI
-              Console is how you give them that power and stay accountable for every call.
+              Thousands of reps, agents, and edge devices, each running AI on customer data. Off
+              Grid AI Console is how you give them that power and stay accountable for every call.
             </p>
           </BlurFade>
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -373,8 +505,8 @@ export default function FeaturesPage() {
               Go from Shadow AI to an org-wide, autonomous AI estate
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Not a moonshot — a path. Each capability earns more autonomy, with the guardrails,
-              QA, and provenance to make machine-run work trustworthy.
+              Not a moonshot — a path. Each capability earns more autonomy, with the guardrails, QA,
+              and provenance to make machine-run work trustworthy.
             </p>
           </BlurFade>
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -396,7 +528,9 @@ export default function FeaturesPage() {
       {/* Guarantees */}
       <section className="border-b border-border">
         <div className="mx-auto max-w-6xl px-6 py-16">
-          <h2 className="text-xl font-semibold tracking-tight">The guarantees underneath all of it</h2>
+          <h2 className="text-xl font-semibold tracking-tight">
+            The guarantees underneath all of it
+          </h2>
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {GUARANTEES.map((g) => (
               <AngleCard key={g.title} a={g} />
@@ -412,12 +546,12 @@ export default function FeaturesPage() {
             One control plane for every AI agent you run.
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            Own it end to end — on your infrastructure, on open source, with nothing routed through a
-            server we own.
+            Own it end to end — on your infrastructure, with inspectable source and nothing routed
+            through a server we own.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button asChild>
-              <Link href="/gateway/fleet">
+              <Link href="/operations/devices">
                 Open the console
                 <ArrowRight className="size-4" />
               </Link>

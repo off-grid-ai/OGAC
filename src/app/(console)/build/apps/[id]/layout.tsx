@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppLifecycleNav } from '@/components/build/AppLifecycleNav';
+import { PageFrame } from '@/components/PageFrame';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { resolveConsumerChip } from '@/lib/pipeline-chip';
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // The founder's ask: "opening an app gives ITS OWN surface with the 5 screens as tabs, scoped to
 // that app." This layout wraps every /apps/<id>/* page with the scoped AppLifecycleNav band (Build ·
 // Input · Runs · Review · Reports). It resolves the app once here (title + 404) so the child tab
-// pages only fetch what they render. The global Build band (BuildNav) suppresses itself on these
+// pages only fetch what they render. Global collection navigation stays in the sidebar while these
 // paths so there's exactly one nav band.
 export default async function AppShellLayout({
   children,
@@ -29,9 +30,9 @@ export default async function AppShellLayout({
   const pipeline = await resolveConsumerChip(app.pipelineId ?? null, orgId).catch(() => null);
 
   return (
-    <div className="w-full space-y-6">
+    <PageFrame className="space-y-6">
       <AppLifecycleNav appId={app.id} title={app.title} pipeline={pipeline} />
       {children}
-    </div>
+    </PageFrame>
   );
 }

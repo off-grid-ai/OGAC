@@ -4,32 +4,27 @@ import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { toDisplayHost, toDisplayHostname } from '@/lib/display-host';
-import { isHealthy, type ServiceEntry, type ServiceHealth } from '@/lib/services-directory';
+import { toDisplayHostname } from '@/lib/display-host';
+import { summarizeServiceCapabilityAudit } from '@/lib/service-capability-map';
+import type { ServiceTopologyDirectoryEntry } from '@/lib/service-directory-view';
+import { isHealthy, type ServiceHealth } from '@/lib/service-health';
+import { HEALTH_UI, ReadinessStrip } from './ServiceReadiness';
 
-const AUTH_LABEL: Record<ServiceEntry['auth'], string> = {
+const AUTH_LABEL: Record<ServiceTopologyDirectoryEntry['auth'], string> = {
   session: 'Login',
   'api-key': 'API key',
   public: 'Public',
 };
 
-const KIND_GROUPS: { kind: ServiceEntry['kind']; label: string }[] = [
+const KIND_GROUPS: { kind: ServiceTopologyDirectoryEntry['kind']; label: string }[] = [
   { kind: 'console', label: 'Console' },
   { kind: 'gateway', label: 'Gateway' },
   { kind: 'api', label: 'Internal services' },
   { kind: 'product', label: 'Products' },
   { kind: 'site', label: 'Sites' },
 ];
-
-// Presentation for each honest health state. Embedded backends and optional deps on their
-// fallback are healthy (emerald/muted) — never the alarming red reserved for a real outage.
-const HEALTH_UI: Record<ServiceHealth['status'], { dot: string; text: string; label: string }> = {
-  up: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Up' },
-  down: { dot: 'bg-red-500', text: 'text-red-500', label: 'Down' },
-  embedded: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Embedded' },
-  optional: { dot: 'bg-muted-foreground/50', text: 'text-muted-foreground', label: 'Optional' },
-};
 
 function HealthDot({ h }: Readonly<{ h: ServiceHealth | undefined }>) {
   if (!h) {
@@ -46,32 +41,78 @@ function HealthDot({ h }: Readonly<{ h: ServiceHealth | undefined }>) {
       <span className={`size-2 shrink-0 rounded-full ${ui.dot}`} />
       <span className={ui.text}>{ui.label}</span>
       {h.ms != null && <span className="text-muted-foreground">{h.ms}ms</span>}
-      {h.detail && <span className="truncate text-muted-foreground" title={h.detail}>{h.detail}</span>}
-      {down && h.error && <span className="truncate text-muted-foreground" title={h.error}>{h.error}</span>}
+      {h.detail && (
+        <span className="truncate text-muted-foreground" title={h.detail}>
+          {h.detail}
+        </span>
+      )}
+      {down && h.error && (
+        <span className="truncate text-muted-foreground" title={h.error}>
+          {h.error}
+        </span>
+      )}
     </span>
   );
 }
 
-function ServiceCard({ s, h }: Readonly<{ s: ServiceEntry; h: ServiceHealth | undefined }>) {
+function ServiceCard({
+  s,
+  h,
+}: Readonly<{ s: ServiceTopologyDirectoryEntry; h: ServiceHealth | undefined }>) {
+  const audit = summarizeServiceCapabilityAudit(s.id);
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/40">
       <div className="flex items-start justify-between gap-2">
-        <Link href={`/gateway/services/${s.id}`} className="text-sm font-medium text-foreground hover:text-primary">
+        <Link
+          href={`/operations/services/${s.id}`}
+          className="text-sm font-medium text-foreground hover:text-primary"
+        >
           {s.label}
         </Link>
-        <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px] uppercase">{AUTH_LABEL[s.auth]}</Badge>
+        <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px] uppercase">
+          {AUTH_LABEL[s.auth]}
+        </Badge>
       </div>
       <p className="flex-1 text-xs text-muted-foreground">{s.description}</p>
+      <div className="flex items-center gap-3 font-mono text-[10px] text-muted-foreground">
+        <span>
+          {s.componentCount} component{s.componentCount === 1 ? '' : 's'}
+        </span>
+        <span>
+          {s.instanceCount} instance{s.instanceCount === 1 ? '' : 's'}
+        </span>
+      </div>
+      <ReadinessStrip readiness={s.readiness} health={h} />
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[10px] uppercase text-muted-foreground">
+          Capability audit
+        </span>
+        {audit.status === 'audited' ? (
+          <Badge
+            variant="outline"
+            className="rounded-md px-1.5 py-0 font-mono text-[9px] font-normal"
+          >
+            {audit.productionItems}/{audit.totalItems} in workflow
+          </Badge>
+        ) : (
+          <Badge
+            variant="outline"
+            className="rounded-md px-1.5 py-0 font-mono text-[9px] font-normal"
+          >
+            not audited
+          </Badge>
+        )}
+      </div>
       <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-2">
         <HealthDot h={h} />
-        {/^https?:\/\//i.test(s.url) ? (
+        {s.displayUrl ? (
           <a
-            href={toDisplayHost(s.url)}
+            href={s.displayUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 truncate font-mono text-[11px] text-muted-foreground hover:text-primary"
           >
-            {toDisplayHostname(s.url)}
+            {toDisplayHostname(s.displayUrl)}
             <ArrowSquareOut className="size-3 shrink-0" />
           </a>
         ) : (
@@ -83,7 +124,9 @@ function ServiceCard({ s, h }: Readonly<{ s: ServiceEntry; h: ServiceHealth | un
   );
 }
 
-export function ServicesDirectory({ services }: Readonly<{ services: ServiceEntry[] }>) {
+export function ServicesDirectory({
+  services,
+}: Readonly<{ services: ServiceTopologyDirectoryEntry[] }>) {
   const [health, setHealth] = useState<Record<string, ServiceHealth>>({});
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
 
@@ -96,11 +139,16 @@ export function ServicesDirectory({ services }: Readonly<{ services: ServiceEntr
         const data = (await res.json()) as { services: ServiceHealth[]; checkedAt: string };
         setHealth(Object.fromEntries(data.services.map((s) => [s.id, s])));
         setCheckedAt(data.checkedAt);
-      } catch { /* keep last-known */ }
+      } catch {
+        /* keep last-known */
+      }
     };
     load();
     const t = setInterval(load, 30_000);
-    return () => { alive = false; clearInterval(t); };
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
   }, []);
 
   const upCount = Object.values(health).filter((h) => isHealthy(h.status)).length;
@@ -109,21 +157,34 @@ export function ServicesDirectory({ services }: Readonly<{ services: ServiceEntr
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Services</h1>
           <p className="text-sm text-muted-foreground">
             Every Off Grid AI surface and internal service with live health.
           </p>
         </div>
-        {checkedAt && (
-          <div className="text-right font-mono text-xs text-muted-foreground">
-            <span className={upCount === checkedCount ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}>
-              {upCount}/{checkedCount} healthy
-            </span>
-            <div className="text-[10px] text-muted-foreground">checked {new Date(checkedAt).toLocaleTimeString()}</div>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {checkedAt && (
+            <div className="text-right font-mono text-xs text-muted-foreground">
+              <span
+                className={
+                  upCount === checkedCount
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-amber-500'
+                }
+              >
+                {upCount}/{checkedCount} probes non-failing
+              </span>
+              <div className="text-[10px] text-muted-foreground">
+                checked {new Date(checkedAt).toLocaleTimeString()}
+              </div>
+            </div>
+          )}
+          <Button asChild variant="outline" size="sm">
+            <Link href="/operations/services/capability-map">Capability map</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Grouped sections — each group is a quiet header + one consistent responsive grid,
@@ -132,14 +193,21 @@ export function ServicesDirectory({ services }: Readonly<{ services: ServiceEntr
       {KIND_GROUPS.map(({ kind, label }) => {
         const group = services.filter((s) => s.kind === kind);
         if (group.length === 0) return null;
-        const groupUp = group.filter((s) => { const st = health[s.id]?.status; return st != null && isHealthy(st); }).length;
+        const groupUp = group.filter((s) => {
+          const st = health[s.id]?.status;
+          return st != null && isHealthy(st);
+        }).length;
         const groupChecked = group.filter((s) => health[s.id]).length;
         return (
           <section key={kind} className="space-y-3">
             <div className="flex items-center justify-between border-b border-border pb-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {label}
+              </span>
               {groupChecked > 0 && (
-                <span className={`font-mono text-[11px] ${groupUp === groupChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`}>
+                <span
+                  className={`font-mono text-[11px] ${groupUp === groupChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`}
+                >
                   {groupUp}/{groupChecked}
                 </span>
               )}

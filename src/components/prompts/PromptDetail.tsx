@@ -67,7 +67,7 @@ export function PromptDetail({ prompt, isOwner }: Readonly<{ prompt: PromptView;
     const r = await fetch(`/api/v1/prompts/${prompt.id}`, { method: 'DELETE' });
     if (r.ok) {
       toast.success('Prompt deleted');
-      router.push('/workspace/prompts');
+      router.push('/work/prompts');
     } else {
       toast.error('Could not delete');
     }
@@ -82,7 +82,7 @@ export function PromptDetail({ prompt, isOwner }: Readonly<{ prompt: PromptView;
           </div>
           <div>
             <Link
-              href="/workspace/prompts"
+              href="/work/prompts"
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="size-3" /> Prompts
@@ -110,7 +110,7 @@ export function PromptDetail({ prompt, isOwner }: Readonly<{ prompt: PromptView;
                 size="sm"
                 variant="outline"
                 className="gap-1.5"
-                onClick={() => router.push(`/workspace/prompts?panel=${encodeURIComponent(prompt.id)}`)}
+                onClick={() => router.push(`/work/prompts?panel=${encodeURIComponent(prompt.id)}`)}
               >
                 <PencilSimple className="size-4" /> Edit
               </Button>

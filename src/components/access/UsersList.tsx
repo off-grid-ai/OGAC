@@ -277,7 +277,9 @@ export function UsersList() {
             <span className="font-medium">Identity provider error:</span> {apiError}
             {apiError === 'forbidden' && (
               <span className="ml-1 text-muted-foreground">
-                — the service account needs the <code className="rounded bg-muted px-1">view-users</code> role under realm-management in your identity provider.
+                — the service account needs the{' '}
+                <code className="rounded bg-muted px-1">view-users</code> role under
+                realm-management in your identity provider.
               </span>
             )}
           </div>
@@ -300,7 +302,10 @@ export function UsersList() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
+                    <TableCell
+                      colSpan={5}
+                      className="py-6 text-center text-xs text-muted-foreground"
+                    >
                       No users found.
                     </TableCell>
                   </TableRow>
@@ -309,7 +314,7 @@ export function UsersList() {
                     <TableRow key={u.id} className="group">
                       <TableCell className="font-mono text-xs">
                         <Link
-                          href={`/governance/access/${u.id}`}
+                          href={`/governance/access/users/${encodeURIComponent(u.id)}`}
                           className="inline-flex items-center gap-1 text-foreground hover:text-primary hover:underline"
                         >
                           <CaretRight className="size-3 text-muted-foreground group-hover:text-primary" />

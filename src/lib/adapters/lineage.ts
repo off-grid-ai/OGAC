@@ -1,4 +1,8 @@
 import { buildDatasetObject, type DatasetFacetSpec } from '@/lib/lineage-facets';
+import {
+  lineageDeliveryReceipt,
+  type LineageDeliveryReceipt,
+} from '@/lib/lineage-delivery';
 import { LINEAGE } from './services';
 import type { LineageEvent, LineagePort } from './types';
 
@@ -18,8 +22,17 @@ function metaOf(id: string) {
 
 export const nullLineage: LineagePort = {
   meta: metaOf('native'),
-  async emit() {
+  async emit(event) {
     // No-op: when no lineage backend is configured, lineage stays implicit in the audit log.
+    return lineageDeliveryReceipt({
+      adapterId: 'native',
+      job: event.job,
+      runId: event.run,
+      status: 'implicit',
+      httpStatus: null,
+      attemptedAt: new Date().toISOString(),
+      detail: 'Lineage remains implicit in the audit trace; no external delivery was attempted.',
+    });
   },
 };
 
@@ -43,22 +56,73 @@ export function runEvent(event: LineageEvent, eventTime: string) {
   };
 }
 
-export const marquezLineage: LineagePort = {
-  meta: metaOf('marquez'),
-  async emit(event) {
-    const url = env.OFFGRID_MARQUEZ_URL;
-    if (!url) return;
-    try {
-      await fetch(`${url}/api/v1/lineage`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(runEvent(event, new Date().toISOString())),
-        signal: AbortSignal.timeout(3000),
-      });
-    } catch {
-      // Lineage is observational — a missing event must never break ingestion or retrieval.
-    }
-  },
-};
+export function createMarquezLineage(input: {
+  baseUrl?: string;
+  fetcher?: typeof fetch;
+  now?: () => Date;
+} = {}): LineagePort {
+  const fetcher = input.fetcher ?? fetch;
+  const now = input.now ?? (() => new Date());
+  return {
+    meta: metaOf('marquez'),
+    async emit(event): Promise<LineageDeliveryReceipt> {
+      const attemptedAt = now().toISOString();
+      const url = input.baseUrl ?? env.OFFGRID_MARQUEZ_URL;
+      if (!url) {
+        return lineageDeliveryReceipt({
+          adapterId: 'marquez',
+          job: event.job,
+          runId: event.run,
+          status: 'not-configured',
+          httpStatus: null,
+          attemptedAt,
+          detail: 'OFFGRID_MARQUEZ_URL is not configured; no event was delivered.',
+        });
+      }
+      try {
+        const response = await fetcher(`${url.replace(/\/$/, '')}/api/v1/lineage`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(runEvent(event, attemptedAt)),
+          signal: AbortSignal.timeout(3000),
+        });
+        if (response.ok) {
+          return lineageDeliveryReceipt({
+            adapterId: 'marquez',
+            job: event.job,
+            runId: event.run,
+            status: 'accepted',
+            httpStatus: response.status,
+            attemptedAt,
+            detail: `Marquez accepted the OpenLineage event (HTTP ${response.status}).`,
+          });
+        }
+        return lineageDeliveryReceipt({
+          adapterId: 'marquez',
+          job: event.job,
+          runId: event.run,
+          status: 'rejected',
+          httpStatus: response.status,
+          attemptedAt,
+          detail: `Marquez rejected the OpenLineage event (HTTP ${response.status}).`,
+        });
+      } catch (error) {
+        return lineageDeliveryReceipt({
+          adapterId: 'marquez',
+          job: event.job,
+          runId: event.run,
+          status: 'unreachable',
+          httpStatus: null,
+          attemptedAt,
+          detail: `Marquez delivery failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+    },
+  };
+}
+
+export const marquezLineage: LineagePort = createMarquezLineage();
 
 export const LINEAGE_PORTS: LineagePort[] = [nullLineage, marquezLineage];

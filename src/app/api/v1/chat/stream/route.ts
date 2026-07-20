@@ -30,7 +30,7 @@ import {
   chatRequiresMasking,
   inboundGuardrailBlocks,
   newChatRunId,
-  outboundGuardrailBlocks,
+  prepareOutboundRelease,
   runInboundGuardrails,
   runOutboundGuardrails,
   signChatAnswer,
@@ -596,11 +596,9 @@ export async function POST(req: Request) {
               const delta = JSON.parse(data)?.choices?.[0]?.delta;
               if (delta?.reasoning_content) {
                 reasoning += delta.reasoning_content;
-                send({ reasoning: delta.reasoning_content });
               }
               if (delta?.content) {
                 full += delta.content;
-                send({ content: delta.content });
               }
             } catch {
               /* partial JSON across chunks — ignore, next read completes it */
@@ -610,27 +608,60 @@ export async function POST(req: Request) {
       } catch (e) {
         send({ error: (e as Error).message });
       }
-      // Persist the assistant answer, then tell the client we're done. Temporary chats skip all
-      // persistence — the transcript lives only in the client for the session.
-      if (!temporary) {
+      // ── W2: OUTBOUND guardrail scan on the answer. FAIL CLOSED (SECURITY #236): a screen that
+      // threw/timed out yields null (NOT an empty "clean" list) so outboundGuardrailBlocks() treats
+      // it as a block, and a completed screen with a blocked verdict also blocks. When blocked, tell
+      // the client to withhold/redact the raw output rather than trust an un-cleared answer.
+      const guardrailCandidate = reasoning ? `${reasoning}\n${full}` : full;
+      const postChecks: CheckResult[] | null = guardrailCandidate
+        ? await runOutboundGuardrails(
+            guardrailCandidate,
+            effectiveModel,
+            orgId,
+            String(content).trim()
+              ? String(content)
+              : ([...prior].reverse().find((m) => m.role === 'user')?.content ?? ''),
+          ).catch(() => null)
+        : [];
+      const release = full
+        ? prepareOutboundRelease(full, reasoning, postChecks)
+        : { blocked: false, answer: '', reasoning: '' };
+      if (release.blocked) {
+        send({ guardrail: { phase: 'post', blocked: true } });
+        auditEnforcement(
+          enforceCtx,
+          'pipeline.guardrail.block',
+          `conversation:${convo.id || 'temporary'}`,
+          'blocked',
+          postChecks === null
+            ? 'outbound guardrail failed to screen (fail-closed block)'
+            : 'outbound guardrail blocked model output',
+        );
+      } else {
+        // The upstream stream is deliberately buffered. Only this terminal, cleared release may
+        // cross the SSE boundary; a later block can never retract already-emitted model tokens.
+        if (release.reasoning) send({ reasoning: release.reasoning });
+        if (release.answer) send({ content: release.answer });
+      }
+
+      // Persist only cleared assistant content. A blocked answer remains available solely in the
+      // in-memory scan buffer and is never written to conversation history.
+      if (!temporary && !release.blocked) {
         try {
           await addMessage({
             conversationId: convo.id,
             role: 'assistant',
-            content: full,
-            reasoning: reasoning || null,
+            content: release.answer,
+            reasoning: release.reasoning || null,
             citations: citations.length ? citations : null,
-            // On regenerate/edit, attach under the driving user turn so the old answer stays as a
-            // sibling branch; otherwise default to the active leaf (the just-added user turn).
             ...(assistantParentId ? { parentId: assistantParentId } : {}),
           });
         } catch {
           /* best-effort persistence */
         }
       }
-      // Egress audit: when this turn actually left the box to a cloud provider, record a
-      // `gateway.egress` event with the provider model + real token usage so FinOps prices the cloud
-      // spend and the Regulatory ledger proves what left. Local turns skip this (nothing egressed).
+
+      // Audit accounting happens after the release decision and never includes raw completion text.
       if (routedToCloud && plan) {
         recordAudit(
           egressAuditEvent(
@@ -644,27 +675,22 @@ export async function POST(req: Request) {
           ),
         );
       }
-      // Governance: audit this completion so Analytics/FinOps/Regulatory count chat usage, billed
-      // to the project's virtual key when one exists.
       void writeChatAudit({
         userId,
         model: effectiveModel,
         tokens: estimateTokens(String(content)) + estimateTokens(full),
         promptTokens: estimateTokens(String(content)),
         completionTokens: estimateTokens(full),
-        outcome: full ? 'ok' : 'error',
+        outcome: release.blocked ? 'blocked' : full ? 'ok' : 'error',
         keyId: budget.keyId,
         project: convo.projectId ?? null,
       });
-      // Cross-conversation memory: distill durable facts from this turn (fire-and-forget).
-      // Temporary chats are never added to memory.
-      if (!temporary && full && String(content).trim()) {
-        void extractMemory(userId, orgId, String(content), full, effectiveModel);
+
+      // Memory and traces are content-bearing side effects: only cleared output may reach them.
+      if (!temporary && release.answer && String(content).trim()) {
+        void extractMemory(userId, orgId, String(content), release.answer, effectiveModel);
       }
-      // Observability: push a Langfuse trace for this chat turn so the Observability page has real
-      // data (plain chat previously emitted none). Fire-and-forget; skips temporary/incognito chats.
-      // On regenerate/edit `content` may be empty, so fall back to the driving user turn.
-      if (!temporary) {
+      if (!temporary && !release.blocked) {
         const traceInput = String(content).trim()
           ? String(content)
           : ([...prior].reverse().find((m) => m.role === 'user')?.content ?? '');
@@ -673,65 +699,39 @@ export async function POST(req: Request) {
           userId,
           model: effectiveModel,
           input: traceInput,
-          output: full,
+          output: release.answer,
           startTime: traceStart,
           endTime: Date.now(),
           promptTokens: estimateTokens(traceInput),
-          completionTokens: estimateTokens(full),
-          // Correlate the trace with the run's other planes (audit / lineage / provenance) by the one
-          // chat-run id — the SAME pattern the agent run uses (traceId == normalize(runId)).
+          completionTokens: estimateTokens(release.answer),
           traceId: correlationIds(chatRunId).traceId,
-          // PA-12 — stamp the bound pipeline (resolved above) at the trace SOURCE so the pipeline
-          // Observability tab + global Observability filter exactly. Null when nothing is bound.
           pipelineId: pipelineBinding.pipelineId,
         });
       }
 
-      // ── W2: OUTBOUND guardrail scan on the answer. FAIL CLOSED (SECURITY #236): a screen that
-      // threw/timed out yields null (NOT an empty "clean" list) so outboundGuardrailBlocks() treats
-      // it as a block, and a completed screen with a blocked verdict also blocks. When blocked, tell
-      // the client to withhold/redact the raw output rather than trust an un-cleared answer.
-      const postChecks: CheckResult[] | null = full
-        ? await runOutboundGuardrails(full, effectiveModel, orgId).catch(() => null)
-        : [];
-      const outboundBlocked = full ? outboundGuardrailBlocks(postChecks) : false;
-      if (outboundBlocked) {
-        send({ guardrail: { phase: 'post', blocked: true } });
-        auditEnforcement(
-          enforceCtx,
-          'pipeline.guardrail.block',
-          `conversation:${convo.id || 'temporary'}`,
-          'blocked',
-          postChecks === null
-            ? 'outbound guardrail failed to screen (fail-closed block)'
-            : 'outbound guardrail blocked model output',
-        );
-      }
-
       // ── W2: PROVENANCE — sign the answer, bound to the run id (tamper-evident, offline-verifiable).
       const refs = citations.map((c) => c.name);
-      const provenance = full
+      const provenance = release.answer
         ? signChatAnswer({
             runId: chatRunId,
             conversationId: convo.id,
             query: String(content),
-            answer: full,
+            answer: release.answer,
             refs,
           })
         : null;
 
       // ── W1: DURABLE RUN — record the governed chat run via the Temporal spine (gated by
-      // OFFGRID_QUEUE_ENABLED), inline fallback when the queue is off / Temporal is unreachable. The
-      // token stream above already reached the client; this records the run (guardrail verdicts +
-      // lineage + attributed audit) durably + replayably, and hands back the workflow/run id.
-      const completionStatus = full ? 'done' : 'error';
+      // OFFGRID_QUEUE_ENABLED), inline fallback when the queue is off / Temporal is unreachable.
+      // The durable record receives only cleared content; a blocked run has an empty answer.
+      const completionStatus = release.answer ? 'done' : 'error';
       const runInput: ChatRunWorkflowInput = {
         runId: chatRunId,
         conversationId: convo.id,
         userId,
         model: effectiveModel,
         query: String(content),
-        answer: full,
+        answer: release.answer,
         orgId,
         project: convo.projectId ?? null,
         pipelineId: pipelineBinding.pipelineId,
@@ -739,7 +739,7 @@ export async function POST(req: Request) {
         // than fabricate a clean verdict; the 'blocked' status below is the durable signal.
         checks: [...preChecks, ...(postChecks ?? [])],
         refs,
-        status: outboundBlocked ? 'blocked' : completionStatus,
+        status: release.blocked ? 'blocked' : completionStatus,
       };
       const dispatch = await dispatchChatRun(runInput).catch(() => null);
 
@@ -755,7 +755,7 @@ export async function POST(req: Request) {
           provenance,
         },
       });
-      if (citations.length) send({ citations });
+      if (!release.blocked && citations.length) send({ citations });
       send({ done: true });
       controller.close();
     },

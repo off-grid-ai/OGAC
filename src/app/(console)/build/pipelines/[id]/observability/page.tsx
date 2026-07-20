@@ -106,7 +106,7 @@ export default async function PipelineObservabilityPage({
 
   return (
     <div className="w-full space-y-4">
-      <LensLink pipelineName={p.name} surface="Observability" href="/insights" />
+      <LensLink pipelineName={p.name} surface="Observability" href="/insights/ai" />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Requests" value={slice.requests.toLocaleString()} />

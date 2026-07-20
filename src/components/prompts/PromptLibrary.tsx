@@ -213,7 +213,7 @@ export function PromptLibrary() {
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" className="gap-1.5" asChild>
-              <Link href="/workspace/prompts/partials">
+              <Link href="/work/prompts/partials">
                 <PuzzlePiece className="size-4" /> Partials
               </Link>
             </Button>
@@ -326,7 +326,7 @@ function PromptCard({
           <TextAlignLeft className="size-3.5" />
         </span>
         <Link
-          href={`/workspace/prompts/${encodeURIComponent(p.id)}`}
+          href={`/work/prompts/${encodeURIComponent(p.id)}`}
           className="truncate font-mono text-sm font-medium hover:text-primary hover:underline"
         >
           {p.title}

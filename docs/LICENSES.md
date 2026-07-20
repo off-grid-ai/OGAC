@@ -1,40 +1,45 @@
 # Licensing & legal
 
-Off Grid Console is **dual-licensed** and built so the whole platform can run **without paying any
-third party** — no per-token fees, no API keys, no per-seat AI licence.
+Off Grid Console is **dual-licensed** and built so the whole platform can run without paying a
+third-party AI provider — no per-token markup and no external model API key required.
 
 ## The console itself
-- **AGPL-3.0** for the open core, **+ a commercial license** for organizations that can't ship
-  AGPL. (Open-core: the OSS core is free; paid features + the commercial license fund the project.)
-- Contributions under a **CLA**.
 
-## Bundled OSS — permissive only
-Everything we **bundle / run in-process or in the default compose** is **permissive** (MIT /
-Apache-2.0 / BSD / ISC / MPL-2.0 / PostgreSQL). Nothing copyleft is linked into the core.
+- The **Off Grid AI Source-Available License 1.0** permits free commercial use for up to 25 users.
+- A **commercial license** covers larger deployments, proprietary embedding, hosted resale, and
+  white-labelling.
+- Contributions are accepted under a **CLA** that supports both license paths.
 
-| Capability | Tool | License |
-|---|---|---|
-| Inference | Off Grid AI Gateway (llama.cpp) | MIT |
-| State/audit | PostgreSQL · Drizzle | PostgreSQL · Apache-2.0 |
-| Retrieval | LanceDB · Qdrant · pgvector | Apache-2.0 / PostgreSQL |
-| Guardrails | Microsoft Presidio | MIT |
-| Policy | Open Policy Agent | Apache-2.0 |
-| Identity | Auth.js · Keycloak | ISC · Apache-2.0 |
-| Secrets | OpenBao | MPL-2.0 |
-| Observability | OpenTelemetry · VictoriaMetrics · Jaeger · Langfuse | Apache-2.0 / MIT |
-| Lineage | OpenLineage · Marquez | Apache-2.0 |
-| Caching | Redis | BSD-3-Clause |
-| SIEM | OpenSearch | Apache-2.0 |
-| Flags | Unleash | Apache-2.0 |
-| Agent runtime | Temporal | MIT |
-| Evals | promptfoo · Ragas / DeepEval | MIT · Apache-2.0 |
-| Drift | Evidently | Apache-2.0 |
-| Provenance | ed25519 (first-party) · C2PA (CAI) · Sigstore | first-party · permissive · Apache-2.0 |
-| Sandbox | Docker sandbox (first-party) | first-party |
-| MDM / Fleet Control | FleetDM **Free** · osquery | **MIT** · Apache-2.0 |
-| BI | Apache Superset | Apache-2.0 |
+## Bundled third-party OSS — permissive only
+
+Every third-party component we **bundle / run in-process or in the default compose** is
+**permissive** (MIT / Apache-2.0 / BSD / ISC / MPL-2.0 / PostgreSQL). Nothing copyleft is linked
+into the first-party core.
+
+| Capability          | Tool                                                | License                                                            |
+| ------------------- | --------------------------------------------------- | ------------------------------------------------------------------ |
+| Inference           | Off Grid AI Gateway · llama.cpp                     | Off Grid AI Source-Available License 1.0 · MIT                     |
+| State/audit         | PostgreSQL · Drizzle                                | PostgreSQL · Apache-2.0                                            |
+| Retrieval           | LanceDB · Qdrant · pgvector                         | Apache-2.0 / PostgreSQL                                            |
+| Guardrails          | Microsoft Presidio                                  | MIT                                                                |
+| Policy              | Open Policy Agent                                   | Apache-2.0                                                         |
+| Identity            | Auth.js · Keycloak                                  | ISC · Apache-2.0                                                   |
+| Secrets             | OpenBao                                             | MPL-2.0                                                            |
+| Observability       | OpenTelemetry · VictoriaMetrics · Jaeger · Langfuse | Apache-2.0 / MIT                                                   |
+| Lineage             | OpenLineage · Marquez                               | Apache-2.0                                                         |
+| Caching             | Redis                                               | BSD-3-Clause                                                       |
+| SIEM                | OpenSearch                                          | Apache-2.0                                                         |
+| Flags               | Unleash                                             | Apache-2.0                                                         |
+| Agent runtime       | Temporal                                            | MIT                                                                |
+| Evals               | promptfoo · Ragas / DeepEval                        | MIT · Apache-2.0                                                   |
+| Drift               | Evidently                                           | Apache-2.0                                                         |
+| Provenance          | ed25519 (first-party) · C2PA (CAI) · Sigstore       | Off Grid AI Source-Available License 1.0 · permissive · Apache-2.0 |
+| Sandbox             | Docker sandbox (first-party)                        | Off Grid AI Source-Available License 1.0                           |
+| MDM / Fleet Control | FleetDM **Free** · osquery                          | **MIT** · Apache-2.0                                               |
+| BI                  | Apache Superset                                     | Apache-2.0                                                         |
 
 ## Copyleft & paid — kept at arm's length (NOT bundled)
+
 - **Metabase (AGPL)** — embed-only (a separate, customer-run instance = mere aggregation), never linked.
 - **Fleet Premium** (`ee/`) — paid/source-available. We use **Fleet Free (MIT)** only. The Fleet
   Free core powers what ships today (host inventory, live osquery, software + CVE, policies). Device
@@ -46,6 +51,7 @@ Apache-2.0 / BSD / ISC / MPL-2.0 / PostgreSQL). Nothing copyleft is linked into 
 - **Sigstore public good** — free + keyless (no API key); self-host Fulcio/Rekor optionally.
 
 ## How we keep it clean
+
 - OSS swap-ins run **out-of-process** (HTTP/embed), so a copyleft tool a customer chooses to run is
   mere aggregation, never linked into our core.
 - Every new integration must be **permissive to bundle**, or **embed-only** if copyleft, or clearly

@@ -48,12 +48,7 @@ type FeatureResult = {
   href: string;
 };
 
-type SearchResult =
-  | ModuleResult
-  | FeatureResult
-  | ConversationResult
-  | PromptResult
-  | FileResult;
+type SearchResult = ModuleResult | FeatureResult | ConversationResult | PromptResult | FileResult;
 
 export async function GET(req: Request): Promise<NextResponse> {
   const gate = await requireUser(req);
@@ -70,9 +65,7 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   // 1. Modules — static filter
   const moduleResults: ModuleResult[] = MODULES.filter(
-    (m) =>
-      m.label.toLowerCase().includes(lower) ||
-      m.description.toLowerCase().includes(lower),
+    (m) => m.label.toLowerCase().includes(lower) || m.description.toLowerCase().includes(lower),
   )
     .slice(0, 5)
     .map((m) => ({
@@ -102,12 +95,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     db
       .select({ id: chatConversations.id, title: chatConversations.title })
       .from(chatConversations)
-      .where(
-        and(
-          ilike(chatConversations.title, `%${q}%`),
-          eq(chatConversations.userId, userEmail),
-        ),
-      )
+      .where(and(ilike(chatConversations.title, `%${q}%`), eq(chatConversations.userId, userEmail)))
       .limit(5),
 
     // 3. Prompt library
@@ -129,7 +117,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     kind: 'conversation',
     id: r.id,
     title: r.title,
-    href: '/chat',
+    href: '/work/chat',
   }));
 
   const promptResults: PromptResult[] = promptRows.map((r) => ({
@@ -137,7 +125,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     id: r.id,
     title: r.title,
     subtitle: r.content.slice(0, 60),
-    href: '/prompts',
+    href: '/work/prompts',
   }));
 
   const fileResults: FileResult[] = fileRows.map((r) => ({
@@ -145,7 +133,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     id: r.id,
     title: r.name,
     subtitle: r.kind,
-    href: '/workspace/storage',
+    href: '/work/files',
   }));
 
   const results: SearchResult[] = [

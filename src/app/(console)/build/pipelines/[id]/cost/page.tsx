@@ -48,7 +48,7 @@ export default async function PipelineCostPage({ params }: Readonly<{ params: Pr
 
   return (
     <div className="w-full space-y-4">
-      <LensLink pipelineName={p.name} surface="FinOps" href="/insights/finops" />
+      <LensLink pipelineName={p.name} surface="FinOps" href="/runtime/api-budgets" />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Spend" value={usd(slice.costUsd)} />

@@ -22,8 +22,9 @@ import type { RunContext } from '@/lib/agent-run-context';
 import { durableEnabled, type AgentRunWorkflowInput } from '@/lib/agent-run-durable';
 import type { AgentRun } from '@/lib/agentrun';
 import type { Actor } from '@/lib/audit-event';
-import type { PipelineContract } from '@/lib/pipeline-enforcement';
+import { type AgentPipelineBinding, requireRunnableAgentBinding } from '@/lib/pipeline-run-glue';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import type { Asker } from '@/lib/retrieval/acl';
 
 // The heavy collaborators (runAgent → gateway/DB chain, the Temporal client adapter) are pulled in
 // via DYNAMIC import inside defaultDispatchDeps so merely loading this module (e.g. under node:test)
@@ -48,19 +49,13 @@ export interface DispatchArgs {
   // whether it executes durably (in the worker, which has no request) or in the sync fallback.
   actor?: Actor;
   project?: string;
-  // PA-16b: the resolved bound-pipeline contract the route resolved (resolveAgentBinding). Threaded
-  // onto the RunContext for the SYNC path so runAgent enforces the data allowlist + egress leash.
-  // Null/absent ⇒ legacy behaviour. (The DURABLE worker path resolves its own contract in a later
-  // round — see the note in dispatchAgentRun; today the durable input doesn't carry it.)
-  contract?: PipelineContract | null;
-  // PA-12: the resolved bound-pipeline id (same binding as `contract`). Threaded onto the sync
-  // RunContext so runAgent stamps the observability trace with the canonical pipeline tag at the
-  // SOURCE. Null/absent ⇒ no pipeline tag (unchanged).
-  pipelineId?: string | null;
+  asker?: Asker;
 }
 
 // The impure collaborators, injected so the orchestration is testable without Temporal/DB.
 export interface DispatchDeps {
+  /** Resolve this agent's explicit, org-scoped pipeline binding. Null never inherits chat. */
+  resolveBinding: (agentId: string, orgId: string) => Promise<AgentPipelineBinding>;
   /** True when durable dispatch is opted-in (env-driven). */
   durableEnabled: () => boolean;
   /** Submit to the durable runtime. MUST NOT throw; a submitted:false handle means "run sync". */
@@ -91,6 +86,10 @@ export const PENDING_NOTE = 'workflow started; result pending';
 // opt-in) between requests is honored and this module stays light to load.
 export function defaultDispatchDeps(): DispatchDeps {
   return {
+    resolveBinding: async (agentId, orgId) => {
+      const { resolveAgentRunBinding } = await import('@/lib/pipeline-run-glue');
+      return resolveAgentRunBinding(agentId, orgId);
+    },
     durableEnabled: () => durableEnabled(process.env),
     submit: async (input) => {
       const { getAgentRuntime } = await import('@/lib/adapters/agentruntime');
@@ -120,6 +119,10 @@ export async function dispatchAgentRun(
   // the workflow, and the run's fan-out all share one correlation key.
   const runId = newRunId();
   const orgId = args.orgId ?? DEFAULT_ORG;
+  // The dispatch seam is the ONE owner for agent binding resolution. Every caller (direct run,
+  // Studio, webhook/trigger, rerun, Temporal) therefore receives the same explicit agent contract;
+  // routes cannot accidentally omit it or substitute chat's default.
+  const binding = requireRunnableAgentBinding(await deps.resolveBinding(args.agentId, orgId));
   const input: AgentRunWorkflowInput = {
     agentId: args.agentId,
     query: args.query,
@@ -129,11 +132,12 @@ export async function dispatchAgentRun(
     orgId,
     actor: args.actor,
     project: args.project,
+    asker: args.asker,
     // PA-16a-durable — thread the bound-pipeline id onto the DURABLE path so the WORKER enforces the
     // same contract the sync path does (mirrors app-run's ctx.contract?.pipelineId ?? null). The
     // route already resolved the binding into args.pipelineId (resolveAgentBinding); the workflow
     // re-resolves the full contract via an activity (the I/O boundary). Null ⇒ no binding ⇒ legacy.
-    pipelineId: args.pipelineId ?? null,
+    binding,
   };
 
   // Durable path — only when opted in AND the runtime accepts the submission. The adapter never
@@ -166,8 +170,9 @@ export async function dispatchAgentRun(
     actor: args.actor,
     org: orgId,
     project: args.project,
-    contract: args.contract ?? null,
-    pipelineId: args.pipelineId ?? null,
+    asker: args.asker,
+    contract: binding.contract,
+    pipelineId: binding.pipelineId,
   };
   const run = await deps.runAgent(
     args.agentId,

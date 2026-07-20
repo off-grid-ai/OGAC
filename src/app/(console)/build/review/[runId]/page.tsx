@@ -10,6 +10,7 @@ import { type AuthzSession } from '@/lib/authz';
 import { requireModuleForUser } from '@/lib/module-access';
 import { getReviewDetail } from '@/lib/review-inbox-reader';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,9 @@ export default async function ReviewDetailPage({
   const { runId } = await params;
   const orgId = await currentOrgId();
   const session = (await auth()) as AuthzSession | null;
-  const gate: AuthzSession = session ?? { user: { email: undefined, name: undefined, role: undefined } };
+  const gate: AuthzSession = session ?? {
+    user: { email: undefined, name: undefined, role: undefined },
+  };
   const caller = await callerFromSession(gate, orgId);
 
   const [detail, run] = await Promise.all([
@@ -39,17 +42,21 @@ export default async function ReviewDetailPage({
   const reviewable = canReview(run);
 
   return (
-    <div className="w-full space-y-6">
-      <div>
-        <Link
-          href="/build/review"
-          className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" /> Review queue
-        </Link>
-      </div>
+    <PageFrame>
+      {
+        <div className="w-full space-y-6">
+          <div>
+            <Link
+              href="/solutions/reviews"
+              className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="size-3.5" /> Review queue
+            </Link>
+          </div>
 
-      <ReviewDecision detail={detail} reviewable={reviewable} runStatus={run.status} />
-    </div>
+          <ReviewDecision detail={detail} reviewable={reviewable} runStatus={run.status} />
+        </div>
+      }
+    </PageFrame>
   );
 }

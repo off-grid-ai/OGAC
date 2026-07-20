@@ -9,6 +9,7 @@ import { listDomains } from '@/lib/data-domains-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,36 +75,40 @@ export default async function DataDomainsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Data domains</h2>
-          <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            Declare where each kind of data lives — &quot;customer data → Salesforce&quot;,
-            &quot;transactions → Postgres&quot;. Each rule binds a semantic label (plus aliases) to a
-            connector and a resource. The builder and retrieval router route a phrase to the right
-            system <b>by rule</b> — deterministic, never a guess.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {proposals.length > 0 ? <SuggestStartersButton proposals={proposals} /> : null}
-          <AddDomainButton connectors={connectorOptions} />
-        </div>
-      </div>
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Data domains</h2>
+              <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+                Declare where each kind of data lives — &quot;customer data → Salesforce&quot;,
+                &quot;transactions → Postgres&quot;. Each rule binds a semantic label (plus aliases)
+                to a connector and a resource. The builder and retrieval router route a phrase to
+                the right system <b>by rule</b> — deterministic, never a guess.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {proposals.length > 0 ? <SuggestStartersButton proposals={proposals} /> : null}
+              <AddDomainButton connectors={connectorOptions} />
+            </div>
+          </div>
 
-      <TestResolveBox
-        domains={domains.map((d) => ({
-          id: d.id,
-          label: d.label,
-          aliases: d.aliases,
-          connectorId: d.connectorId,
-          resource: d.resource,
-          orgId: d.orgId,
-        }))}
-        connectorName={Object.fromEntries(connectors.map((c) => [c.id, c.name]))}
-      />
+          <TestResolveBox
+            domains={domains.map((d) => ({
+              id: d.id,
+              label: d.label,
+              aliases: d.aliases,
+              connectorId: d.connectorId,
+              resource: d.resource,
+              orgId: d.orgId,
+            }))}
+            connectorName={Object.fromEntries(connectors.map((c) => [c.id, c.name]))}
+          />
 
-      {domainsBody}
-    </div>
+          {domainsBody}
+        </div>
+      }
+    </PageFrame>
   );
 }

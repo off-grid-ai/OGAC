@@ -81,8 +81,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (result.blocked) {
     // approve → release gate failed. Honest 422 with the decision (mirrors the publish route).
     return NextResponse.json(
-      { error: 'release gate failed', decision: result.gate?.decision, blocked: true },
-      { status: 422 },
+      {
+        error: result.consumers ? 'pipeline is still in use' : 'release gate failed',
+        reason: result.reason,
+        consumers: result.consumers,
+        decision: result.gate?.decision,
+        blocked: true,
+      },
+      { status: result.consumers ? 409 : 422 },
     );
   }
   return NextResponse.json({

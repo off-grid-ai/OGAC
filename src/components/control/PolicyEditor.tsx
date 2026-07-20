@@ -6,7 +6,14 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -244,17 +251,17 @@ export function PolicyEditor({
   return (
     <Card className="shadow-sm">
       <CardHeader className="space-y-0">
-        <div className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm">Policy · v{version}</CardTitle>
+        <CardTitle className="text-sm">Policy · v{version}</CardTitle>
+        <CardAction>
           <Button size="sm" onClick={publish} disabled={busy}>
             <Save className="size-4" />
             {busy ? 'Publishing…' : 'Publish'}
           </Button>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
+        </CardAction>
+        <CardDescription className="mt-1 text-xs">
           The org-wide policy every enrolled node enforces. Set it here → <strong>Publish</strong>{' '}
           bumps the version → nodes converge on their next poll. See Handbook → How-tos.
-        </p>
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="flex items-center justify-between rounded-md border border-border px-3 py-2.5">

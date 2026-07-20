@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  type OperatorHomeInput,
-  synthesizeOperatorHome,
-} from '../src/lib/overview-synthesis.ts';
+import { type OperatorHomeInput, synthesizeOperatorHome } from '../src/lib/overview-synthesis.ts';
 
 // Pure operator-home synthesizer. No network, no mocks — representative module snapshots in, the
 // asserted operator-home view-model out. Covers the cross-module blocking feed (audit ∪ policy ∪
@@ -73,8 +70,20 @@ function fullInput(): OperatorHomeInput {
       },
     ],
     decisions: [
-      { id: 'd1', allow: false, path: 'offgrid/authz', input: 'action=delete', timestamp: iso(1 * HOUR) },
-      { id: 'd2', allow: true, path: 'offgrid/authz', input: 'action=read', timestamp: iso(1 * HOUR) },
+      {
+        id: 'd1',
+        allow: false,
+        path: 'offgrid/authz',
+        input: 'action=delete',
+        timestamp: iso(1 * HOUR),
+      },
+      {
+        id: 'd2',
+        allow: true,
+        path: 'offgrid/authz',
+        input: 'action=read',
+        timestamp: iso(1 * HOUR),
+      },
     ],
     services: [
       { id: 'gateway', label: 'AI Gateway', status: 'up', ms: 42 },
@@ -82,8 +91,20 @@ function fullInput(): OperatorHomeInput {
       { id: 'presidio', label: 'Presidio', status: 'down', ms: null },
     ],
     activity: [
-      { id: 'r1', agentId: 'researcher', query: 'summarize Q2', status: 'done', startedAt: iso(HOUR) },
-      { id: 'r2', agentId: 'analyst', query: 'blocked query', status: 'blocked', startedAt: iso(2 * HOUR) },
+      {
+        id: 'r1',
+        agentId: 'researcher',
+        query: 'summarize Q2',
+        status: 'done',
+        startedAt: iso(HOUR),
+      },
+      {
+        id: 'r2',
+        agentId: 'analyst',
+        query: 'blocked query',
+        status: 'blocked',
+        startedAt: iso(2 * HOUR),
+      },
     ],
     now: NOW,
     connectors: [{ status: 'connected' }, { status: 'error' }],
@@ -128,9 +149,9 @@ test('blocking items are newest-first, timestamped ones before the undated rollu
 test('every blocking item deep-links to its source module', () => {
   const { blocking } = synthesizeOperatorHome(fullInput());
   const byId = new Map(blocking.items.map((i) => [i.id, i.href]));
-  assert.equal(byId.get('audit:a1'), '/insights/siem?outcome=blocked');
-  assert.equal(byId.get('audit:a2'), '/insights/siem?outcome=denied');
-  assert.equal(byId.get('policy:d1'), '/governance/policy');
+  assert.equal(byId.get('audit:a1'), '/governance/evidence/security?outcome=blocked');
+  assert.equal(byId.get('audit:a2'), '/governance/evidence/security?outcome=denied');
+  assert.equal(byId.get('policy:d1'), '/governance/policies/overview');
   assert.equal(byId.get('guardrails:redactions'), '/governance/guardrails');
 });
 
@@ -141,7 +162,7 @@ test('posture tiles synthesize the blocking count, policy, guardrails, and egres
   const block = byLabel.get('Blocking decisions (24h)')!;
   assert.equal(block.value, '4');
   assert.equal(block.tone, 'warn');
-  assert.equal(block.href, '/governance');
+  assert.equal(block.href, '/governance/posture');
   assert.match(block.hint!, /1 policy · 2 audit · 1 redaction/);
 
   assert.equal(byLabel.get('Policy engine')!.value, 'OPA');
@@ -166,7 +187,7 @@ test('cost tiles report spend, on-prem dividend, and over-budget keys', () => {
   const over = byLabel.get('Keys over budget')!;
   assert.equal(over.value, '1'); // analytics-team at 140%
   assert.equal(over.tone, 'bad');
-  cost.forEach((t) => assert.equal(t.href, '/insights/finops'));
+  cost.forEach((t) => assert.equal(t.href, '/runtime/api-budgets'));
 });
 
 test('health summary counts up/down and tones amber on partial outage', () => {
@@ -175,7 +196,7 @@ test('health summary counts up/down and tones amber on partial outage', () => {
   assert.equal(health.total, 3);
   assert.equal(health.tone, 'warn'); // 1 of 3 down
   assert.equal(health.tile.value, '2/3 up');
-  assert.equal(health.tile.href, '/gateway/services');
+  assert.equal(health.tile.href, '/operations/services');
   assert.equal(health.items.length, 3);
 });
 
@@ -235,7 +256,10 @@ test('unreachable policy / configured-but-offline guardrails tone bad', () => {
   assert.equal(g.tone, 'bad');
   assert.equal(g.value, 'OFFLINE');
   // NEVER surface the engine/product name on the tile.
-  assert.ok(!/llm.?guard|presidio|regex/i.test(g.value), `guardrail value leaked engine name: ${g.value}`);
+  assert.ok(
+    !/llm.?guard|presidio|regex/i.test(g.value),
+    `guardrail value leaked engine name: ${g.value}`,
+  );
 });
 
 test('guardrails not configured => calm NOT SET (muted), no engine name (the demo state)', () => {

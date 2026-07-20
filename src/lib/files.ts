@@ -105,12 +105,62 @@ function keyPath(id: string): string {
 // Low-level object put/get at a caller-chosen key — for content the console addresses by a
 // deterministic path (e.g. artifact bodies at artifacts/<id>/v<n>), as opposed to saveFile's
 // random-keyed uploads. Same single bucket; SeaweedFS remains the only file-storage layer.
-export async function putObject(key: string, body: Buffer | string, contentType = 'application/octet-stream'): Promise<void> {
+export interface PutObjectMetadata {
+  name?: string;
+  owner?: string;
+  visibility?: 'public' | 'private';
+}
+
+function objectMetadataHeaders(metadata?: PutObjectMetadata): Record<string, string> {
+  if (!metadata) return {};
+  return {
+    ...(metadata.name ? { 'x-amz-meta-name': encodeURIComponent(metadata.name) } : {}),
+    ...(metadata.owner ? { 'x-amz-meta-owner': encodeURIComponent(metadata.owner) } : {}),
+    ...(metadata.visibility ? { 'x-amz-meta-visibility': metadata.visibility } : {}),
+  };
+}
+
+export async function putObject(
+  key: string,
+  body: Buffer | string,
+  contentType = 'application/octet-stream',
+  metadata?: PutObjectMetadata,
+): Promise<void> {
   await ensureFileSchema();
   const bytes = typeof body === 'string' ? Buffer.from(body) : body;
   const path = key.split('/').map(encodeURIComponent).join('/');
-  const res = await s3Fetch(`${base}/${path}`, { method: 'PUT', headers: { 'content-type': contentType }, body: new Uint8Array(bytes) });
+  const res = await s3Fetch(`${base}/${path}`, {
+    method: 'PUT',
+    headers: { 'content-type': contentType, ...objectMetadataHeaders(metadata) },
+    body: new Uint8Array(bytes),
+  });
   if (!res.ok) throw new Error(`seaweedfs put ${res.status}`);
+}
+
+// Atomic idempotency primitive for domain adapters. S3's If-None-Match:* creates only when the key
+// does not already exist; 409/412 means another request already owns the deterministic key. The
+// caller then reads and compares the existing object to distinguish replay from key conflict.
+export async function putObjectIfAbsent(
+  key: string,
+  body: Buffer | string,
+  contentType = 'application/octet-stream',
+  metadata?: PutObjectMetadata,
+): Promise<'created' | 'exists'> {
+  await ensureFileSchema();
+  const bytes = typeof body === 'string' ? Buffer.from(body) : body;
+  const path = key.split('/').map(encodeURIComponent).join('/');
+  const res = await s3Fetch(`${base}/${path}`, {
+    method: 'PUT',
+    headers: {
+      'content-type': contentType,
+      'if-none-match': '*',
+      ...objectMetadataHeaders(metadata),
+    },
+    body: new Uint8Array(bytes),
+  });
+  if (res.status === 409 || res.status === 412) return 'exists';
+  if (!res.ok) throw new Error(`seaweedfs conditional put ${res.status}`);
+  return 'created';
 }
 export async function getObjectText(key: string): Promise<string | null> {
   const path = key.split('/').map(encodeURIComponent).join('/');

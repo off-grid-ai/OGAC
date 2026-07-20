@@ -32,6 +32,32 @@ test('data access: request INSIDE the allowlist is allowed', () => {
   assert.equal(v.noPipeline, false);
 });
 
+test('data access: a pipeline label or alias authorizes the resolved domain id', () => {
+  const byLabel = enforceDataAccess(
+    contract({ dataAllowlist: ['Customer Data'] }),
+    'dom_customer',
+    ['dom_customer', 'customer data', 'customers'],
+  );
+  const byAlias = enforceDataAccess(
+    contract({ dataAllowlist: ['holdings'] }),
+    'dom_customer',
+    ['dom_customer', 'customer data', 'holdings'],
+  );
+
+  assert.equal(byLabel.allow, true);
+  assert.equal(byAlias.allow, true);
+});
+
+test('data access: unrelated labels remain outside the hard ceiling', () => {
+  const v = enforceDataAccess(
+    contract({ dataAllowlist: ['loan accounts'] }),
+    'dom_customer',
+    ['dom_customer', 'customer data', 'customers'],
+  );
+
+  assert.equal(v.allow, false);
+});
+
 test('data access: request OUTSIDE the allowlist is DENIED (hard ceiling)', () => {
   const v = enforceDataAccess(contract({ dataAllowlist: ['dom_inv'] }), 'dom_secret');
   assert.equal(v.allow, false);

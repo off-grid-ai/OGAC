@@ -2,7 +2,7 @@
   "name": "@offgrid/gateway",
   "version": "0.1.0",
   "description": "Off Grid AI's local, OpenAI-compatible gateway — run open models (text, vision, image, voice, speech) on-device, behind one API. Embeddable in Electron or run standalone.",
-  "license": "AGPL-3.0-only",
+  "license": "LicenseRef-Off-Grid-AI-1.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

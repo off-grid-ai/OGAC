@@ -1,7 +1,4 @@
-import { Database } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { AddAssetButton } from '@/components/data-catalog/AddAssetButton';
-import { SeedCatalogButton } from '@/components/data-catalog/SeedCatalogButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listAssets, listAllClassifications } from '@/lib/data-catalog-store';
@@ -75,23 +72,6 @@ export default async function DataCatalogPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Database className="size-4 text-primary" />
-            Data catalog
-          </h2>
-          <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            Every dataset your org holds — its source, owner, sensitivity, PII, size, and how fresh it
-            is. Click through to classify it, set retention, and see its governance posture.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <SeedCatalogButton />
-          <AddAssetButton />
-        </div>
-      </div>
-
       {/* Stat band — fills the width. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Datasets" value={String(assets.length)} />
@@ -111,8 +91,9 @@ export default async function DataCatalogPage() {
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             No datasets catalogued yet. Use{' '}
-            <span className="font-medium text-foreground">Seed from connectors</span> to register the
-            datasets your declared connectors and data-domains already point at, or add one manually.
+            <span className="font-medium text-foreground">Seed from connectors</span> to register
+            the datasets your declared connectors and data-domains already point at, or add one
+            manually.
           </CardContent>
         </Card>
       ) : (

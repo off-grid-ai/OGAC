@@ -6,7 +6,8 @@ import { currentOrgId } from '@/lib/tenancy';
 
 // Custom Presidio recognizers collection. GET lists the org's recognizers; POST creates one after
 // pure validation (pattern → regex + context words, or deny_list → literal terms). These become
-// `ad_hoc_recognizers` on every Presidio /analyze call. Thin: admin-gated, validate, delegate.
+// `ad_hoc_recognizers` on Presidio data-movement /analyze calls. They do not reconfigure the
+// fleet-owned LLM Guard prompt/output scanner policy. Thin: admin-gated, validate, delegate.
 
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);

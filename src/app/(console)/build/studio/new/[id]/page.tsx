@@ -7,5 +7,5 @@ export const dynamic = 'force-dynamic';
 // tab). This route is kept so old links / bookmarks don't 404 — it redirects to the new home.
 export default async function LegacyAppRedirect({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  redirect(`/build/apps/${id}`);
+  redirect(`/solutions/apps/${id}`);
 }

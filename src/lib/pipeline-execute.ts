@@ -61,6 +61,7 @@ export interface ExecuteDeps {
     text: string,
     orgId: string,
     model: string,
+    promptContext?: string,
   ) => Promise<{ checks: CheckResult[]; outcome: 'ok' | 'redacted' | 'blocked' }>;
   /** PII scan → a redacted form of the text (for the mask-before-model substitution). */
   scanPii: (text: string, orgId: string) => Promise<{ hits: boolean; redacted?: string; entities: string[]; engine: string }>;
@@ -224,9 +225,25 @@ export async function executePipelineRun(
     return { status: 'error', runId, reason: 'gateway returned no completion (upstream unavailable or empty)' };
   }
 
-  // 4. Guardrails (output) — scan the answer before it leaves (recorded; non-blocking, mirrors the
-  //    agent-run path where the output scan is observational, so a governed answer is still returned).
-  const post = await deps.runGuardrail('post', text, orgId, completion.model || plan.model);
+  // 4. Guardrails (output) — scan the answer before it leaves. Warnings remain observational, but a
+  //    blocked verdict holds the raw completion; output PII/toxicity must never be released merely
+  //    because the gateway already produced it.
+  const post = await deps.runGuardrail(
+    'post',
+    text,
+    orgId,
+    completion.model || plan.model,
+    modelPrompt,
+  );
+  if (post.outcome === 'blocked') {
+    deps.audit('pipeline.invoke', 'blocked', 'output guardrail blocked model output', completion.model || plan.model, 0);
+    return {
+      status: 'blocked',
+      runId,
+      reason: 'output guardrail blocked model output',
+      checks: [...pre.checks, ...post.checks],
+    };
+  }
 
   const usage = completion.usage ?? { prompt: 0, completion: 0, total: 0 };
   deps.audit('pipeline.invoke', 'ok', `executed on ${completion.model || plan.model}`, completion.model || plan.model, usage.total);

@@ -73,7 +73,7 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
         push(
           'anomaly',
           `${metric} ${a.direction} on ${a.label}: value ${a.value} vs baseline ${a.baseline} (${a.severity}, ${Math.abs(a.deviation)}σ ${scan.method}).`,
-          '/insights/copilot',
+          '/insights/ai/copilot',
         );
         count++;
       }
@@ -86,10 +86,14 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
     push(
       'drift',
       `Drift verdict: ${d.status} (score ${d.driftScore ?? 'n/a'}), ${d.features.filter((f) => f.drifted).length}/${d.features.length} features drifted, ${d.baseline} baseline vs ${d.current} current samples${d.lastChecked ? `, checked ${d.lastChecked.slice(0, 19)}` : ''}.`,
-      '/insights/drift',
+      '/insights/quality/drift',
     );
     for (const f of d.features.filter((f) => f.drifted).slice(0, 5)) {
-      push('drift', `Feature "${f.name}" drifted (score ${f.score ?? 'n/a'}, ${f.status}).`, '/insights/drift');
+      push(
+        'drift',
+        `Feature "${f.name}" drifted (score ${f.score ?? 'n/a'}, ${f.status}).`,
+        '/insights/quality/drift',
+      );
     }
   }
 
@@ -99,10 +103,14 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
     push(
       'evals',
       `Evals: ${e.totals.passRate}% pass across ${e.totals.cases} cases in ${e.totals.runs} runs (${e.totals.failed} failed).`,
-      '/insights',
+      '/insights/quality/scorecards',
     );
     for (const s of e.suites.filter((s) => s.passRate < 100).slice(0, 4)) {
-      push('evals', `Suite "${s.engine}": ${s.passRate}% pass (${s.failed}/${s.total} cases failed), last run ${s.lastRun ?? 'n/a'}.`, '/insights');
+      push(
+        'evals',
+        `Suite "${s.engine}": ${s.passRate}% pass (${s.failed}/${s.total} cases failed), last run ${s.lastRun ?? 'n/a'}.`,
+        '/insights/quality/scorecards',
+      );
     }
   }
 
@@ -115,7 +123,11 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
       '/insights/finops',
     );
     for (const m of f.byModel.slice(0, 4)) {
-      push('finops', `Model "${m.label}": ${fmtUsd(m.costUsd)} over ${m.requests} requests.`, '/insights/finops');
+      push(
+        'finops',
+        `Model "${m.label}": ${fmtUsd(m.costUsd)} over ${m.requests} requests.`,
+        '/insights/finops',
+      );
     }
     // Two most recent days for a "cost up this week" answer.
     for (const day of f.daily.slice(-2)) {
@@ -131,7 +143,7 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
       push(
         'audit',
         `${r.ts.slice(0, 19)} — ${r.action} by ${r.actor} on ${r.project || 'default'}${r.model ? ` (${r.model})` : ''}: ${r.outcome}${r.runId ? ` [run ${r.runId}]` : ''}.`,
-        r.runId ? `/apps` : '/insights/audit',
+        r.runId ? '/solutions/apps' : '/governance/evidence/audit',
       );
     }
   }
@@ -141,7 +153,7 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
 
 const SYSTEM_PROMPT = [
   'You are the Ops Copilot for the Off Grid AI platform — a private, on-prem AI operations console.',
-  'You answer an operator\'s question about the platform\'s health, cost, safety, and reliability.',
+  "You answer an operator's question about the platform's health, cost, safety, and reliability.",
   'You are given a NUMBERED list of FACTS drawn from real platform records (audit log, cost rollup,',
   'drift, evals, anomaly detection). Rules you MUST follow:',
   '1. Ground every claim in the provided facts and cite them inline as [n] (matching the fact number).',

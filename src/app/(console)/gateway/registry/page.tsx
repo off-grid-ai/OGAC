@@ -3,6 +3,7 @@ import { listGatewaysWithHealth } from '@/lib/gateways';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 import { withTimeout } from '@/lib/with-timeout';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,5 +20,5 @@ export default async function GatewaysPage() {
   await requireModuleForUser('gateways');
   const orgId = await currentOrgId();
   const gateways = await withTimeout(listGatewaysWithHealth(orgId), 5000, []);
-  return <GatewaysManager gateways={gateways} />;
+  return <PageFrame>{<GatewaysManager gateways={gateways} />}</PageFrame>;
 }

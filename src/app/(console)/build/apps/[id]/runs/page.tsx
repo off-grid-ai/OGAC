@@ -44,7 +44,7 @@ export default async function AppRunsTab({ params }: Readonly<{ params: Promise<
           </div>
         </div>
         <Link
-          href={`/build/apps/${id}/input`}
+          href={`/solutions/apps/${id}/input`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           <Play className="size-4" weight="fill" />
@@ -80,7 +80,7 @@ export default async function AppRunsTab({ params }: Readonly<{ params: Promise<
                   </td>
                   <td className="px-3 py-2 text-right">
                     <Link
-                      href={`/build/apps/${id}/runs/${encodeURIComponent(r.id)}`}
+                      href={`/solutions/apps/${id}/runs/${encodeURIComponent(r.id)}`}
                       className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                     >
                       {r.status === 'awaiting_human' ? 'Review' : 'Watch'}{' '}
@@ -94,7 +94,7 @@ export default async function AppRunsTab({ params }: Readonly<{ params: Promise<
               <tr>
                 <td colSpan={5} className="px-3 py-10 text-center text-sm text-muted-foreground">
                   No runs yet.{' '}
-                  <Link href={`/build/apps/${id}/input`} className="text-primary hover:underline">
+                  <Link href={`/solutions/apps/${id}/input`} className="text-primary hover:underline">
                     Run it
                   </Link>{' '}
                   to see live status here.

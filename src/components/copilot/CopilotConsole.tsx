@@ -6,7 +6,7 @@ import { AskPanel } from '@/components/copilot/AskPanel';
 import { SuggestControlsTool } from '@/components/copilot/SuggestControlsTool';
 import { SuggestExpectationsTool } from '@/components/copilot/SuggestExpectationsTool';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 // The Ops Copilot surface. Full-width: the ask/answer column fills the page, an anomalies-at-a-glance
@@ -72,7 +72,7 @@ export function CopilotConsole({ anomalies }: Readonly<{ anomalies: FlaggedAnoma
       </div>
 
       {active === 'ask' ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(36rem,1fr)_minmax(20rem,24rem)]">
           <AskPanel />
           <AnomalyRail anomalies={anomalies} />
         </div>
@@ -87,12 +87,12 @@ export function CopilotConsole({ anomalies }: Readonly<{ anomalies: FlaggedAnoma
 
 function AnomalyRail({ anomalies }: Readonly<{ anomalies: FlaggedAnomaly[] }>) {
   return (
-    <Card className="h-fit shadow-sm">
-      <CardHeader>
+    <Card className="h-fit min-w-0 shadow-sm">
+      <CardHeader className="gap-1.5">
         <CardTitle className="text-sm">Anomalies right now</CardTitle>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <CardDescription className="text-xs leading-relaxed">
           Points that deviate from the metric&apos;s own recent behaviour — not a fixed threshold.
-        </p>
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {anomalies.length === 0 ? (
@@ -101,15 +101,20 @@ function AnomalyRail({ anomalies }: Readonly<{ anomalies: FlaggedAnomaly[] }>) {
           </p>
         ) : (
           anomalies.map((a, i) => (
-            <div key={`${a.metric}-${a.label}-${i}`} className="rounded-md border border-border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium capitalize text-foreground">{a.metric}</span>
+            <div
+              key={`${a.metric}-${a.label}-${i}`}
+              className="rounded-md border border-border p-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <span className="min-w-0 text-sm font-medium capitalize text-foreground">
+                  {a.metric}
+                </span>
                 <Badge
-                  variant="secondary"
+                  variant="outline"
                   className={
                     a.severity === 'critical'
-                      ? 'bg-destructive/10 text-destructive'
-                      : 'bg-amber-500/10 text-amber-600'
+                      ? 'border-destructive/25 bg-transparent text-destructive'
+                      : 'border-border bg-muted/40 text-muted-foreground'
                   }
                 >
                   {a.direction} · {a.severity}

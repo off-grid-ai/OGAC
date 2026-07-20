@@ -16,4 +16,4 @@ A hand-lettered caption bar across the bottom: "EVERY BOX IS REPLACEABLE OSS BEH
 
 Style: rough charcoal throughout, expressive but readable; labels and value tags hand-lettered in loose charcoal capitals, kept sparse. The AI GATEWAY box in the CONTROL band is drawn heaviest because everything funnels through it. Each component is a real, named tool with a one-line value.
 
-The meaning the viewer should sense: this is the whole agentic stack on one page — every layer, every component, and the concrete value each brings — unified under one console, all open source, owned and run by you.
+The meaning the viewer should sense: this is the whole agentic stack on one page — every layer, every component, and the concrete value each brings — unified under one source-available console, inspectable and run by you.

@@ -829,19 +829,17 @@ LLM Guard (`laiyer/llm-guard-api:0.3.16`) deployed + screened a live payload thr
   toxicity/bias are heavy transformers. Ran only with a trimmed PII+Secrets config + 6g cap. A
   production deploy of the full suite needs a sized host (or GPU). Compose service should document
   a minimal-scanner default + a "full suite needs N GB" note.
-- **G-LG-2 (console, P1) ✅ RESOLVED (code+wired, unit-verified):** stock Anonymize did NOT catch the
-  Indian PAN (`ABCDE1234F` passed). Closed by `src/lib/llm-guard-config.ts` — a pure generator that
-  folds the India recognizers (`IN_PAN`/`IN_AADHAAR`/`IN_IFSC`/`UPI_ID`) from the shared
-  `DEFAULT_RECOGNIZERS` (presidio-recognizers.ts) into the Anonymize scanner's `recognizer_conf`, so
-  the scanner config the console POSTs to LLM Guard on every scan carries them. DRY: one source of the
-  India patterns, two consumers (the generator + the existing Presidio path's mergeWithDefaults). The
-  adapter (`guardrail-provider.ts`) attaches this config to `/analyze/prompt`. Proven by
-  `test/guardrail-provider.test.ts` ("the POSTed scanner config INCLUDES the India recognizers") +
-  `test/llm-guard-config.test.ts`. Live fleet re-verify tracked under G-LG-3.
-- **G-LG-3 (console, P1):** engine screening is verified; the console ROUTING a governed run through
-  it (`OFFGRID_ADAPTER_GUARDRAILS=llm-guard` → guardrail step → masked in run trace + audit) is
-  code+wired, NOT yet live-verified on the fleet (needs the new console code deployed). Verify
-  end-to-end after the LiteLLM+guard deploy.
+- **G-LG-2 (console + fleet, P1) ✅ CORRECTED IN CODE / NOT LIVE-VERIFIED:** the earlier closure was
+  invalid. Stock `0.3.16` ignores a per-request `scanners` object and its `recognizer_conf` is an NER
+  model config, not arbitrary Presidio pattern recognizers. The Console now sends only the stock
+  `{prompt}` contract; the private fleet owns versioned `CONFIG_FILE` YAML with actual Regex policy
+  for PAN/Aadhaar/IFSC/UPI on both input and output. The obsolete generator/tests were removed.
+- **G-LG-3 (console + fleet, P1) ✅ CODE+WIRED / NOT LIVE-VERIFIED:** generated output now uses
+  `/analyze/output` with the exact prompt context the model saw. The aggregator fans out the matching
+  endpoint, preserves phase-correct `sanitized_output`, rejects ignored `scanners` configuration,
+  and exposes answered/degraded shard headers through the adapter. Private recovery automation now
+  reconciles both versioned shard configs and has real prompt + output functional gates. Deployment
+  and those exact live gates remain required before this can be marked verified.
 
 ---
 
@@ -1100,3 +1098,46 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   lists + reports + REST APIs + workflows, no code shown, governed by OGAC).** Larger than the current
   workflow/agent builder; a declarative business-app model + generic runtime. Staged build, not a
   one-shot. See the session notes — this is the north-star product, distinct from the shipped unify.
+
+## IA integration sweep (2026-07-18, commit `e8868c44`)
+
+- **[G-IA-LINKS] ✅ RESOLVED (2026-07-19) — canonical UI producers no longer emit retired internal
+  URLs.** The migration now covers shared actions, search/citations, reused legacy implementations,
+  dynamic query targets, Runtime Gateways, Data orchestration, Overview, Copilot, and the search API.
+  `test/retired-navigation-producers.test.ts` performs a repository-wide AST audit and permits only
+  the intentional legacy redirect receivers; the final audit found zero retired navigation producers.
+- **[G-IA-GATES] ✅ RESOLVED (2026-07-19) — URL hierarchy and presentation gates match the canonical
+  IA.** Contextual-module tests now accept sibling canonical leaves, route-page verification resolves
+  dynamic segments and route groups, presentation ownership recognizes contextual shells, and sidebar
+  assertions prove active ancestor expansion plus collapsed defaults. The consolidated release passed
+  3,778 tests (3,771 pass, seven intentional skips, zero failures), typecheck, and the 225-page
+  production build before deployment; subsequent IA/UI commits retain focused tests and clean builds.
+
+## CRM governed write-back slice (2026-07-20)
+
+- **[G-CRM-TASKS] RESOLVED IN CODE / DEPLOYMENT PENDING — typed opportunity follow-up and standalone
+  task writes share one governed CRM action seam.** The Console now has one tenant-scoped,
+  allowlisted and idempotent action seam for bank cross-sell and lender delinquency:
+  `POST /api/v1/admin/connectors/:id/actions/crm-writeback`. It reads the existing opportunity,
+  rejects unsafe fields and conflicting key reuse, PATCHes only `stage`, `next_action`, and
+  `offgrid_writeback`, emits an attributed audit event, and returns a signed receipt. Real HTTP
+  integration evidence covers GET → PATCH → replay with exactly one mutation. The deployed CRM
+  private fleet fixture at `onprem-fleet-orchestration@db67a7d` now owns a versioned `/v1/tasks`
+  resource with tenant scoping, bounded create/update fields, serialized mutations, durable state,
+  and a persisted idempotency ledger. Console task requests require that exact API version, pass the
+  session-derived org boundary in `x-offgrid-org-id`, emit attributed audit events, and return signed
+  receipts. Real HTTP tests prove create, update, replay, conflict, tenant propagation and fail-closed
+  version handling. Live closure remains pending the documented CRM container recreation followed by
+  Console deployment and integration verification. Generic webhook ingestion and broad CRM CRUD are
+  explicitly outside this action seam rather than being falsely claimed as implemented.
+
+## Insurance claim disposition source ownership (2026-07-20)
+
+- **[G-CLAIM-SOURCE] RESOLVED IN CODE — do not write claims through the Advisor/HR MySQL fixture.**
+  Inspection of the private fleet seed proves that `policyadmin` MySQL owns branches, advisors,
+  commissions, HR and reimbursement data; it has no claims table. The insurer claim register is
+  owned by the tenant-isolated Core Insurance PostgreSQL connector (`surcon_coreins`, table
+  `claims`). The governed disposition endpoint therefore targets only an org-owned PostgreSQL
+  connector and a fixed, parameterized `claims` statement. It never mutates PolicyAdmin MySQL.
+  Console-owned `claim_disposition_commands` records authority attribution, leased idempotency and
+  the source-result receipt without adding integration columns/tables to the customer's source.

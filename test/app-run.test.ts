@@ -12,8 +12,11 @@ import {
   type AppRunDeps,
   buildAgentQuery,
   executeStep,
+  MAX_GOVERNED_SOURCE_ROWS,
+  providedSourcesFromPriorResults,
   resolveDomainByIdOrLabel,
   runApp,
+  summarizeRows,
   type StepResult,
 } from '@/lib/app-run';
 import { resolveDomain } from '@/lib/data-domains';
@@ -103,12 +106,54 @@ test('a human step drives the run to awaiting_human (mid-workflow pause)', () =>
   assert.equal(deriveRunStatus(state.steps), 'awaiting_human');
 });
 
-test('buildAgentQuery threads prior-step output as context', () => {
-  const prior: StepResult[] = [{ stepId: 's1', kind: 'connector-query', status: 'done', output: 'quota: 3/5' }];
+test('buildAgentQuery threads decisions as context without duplicating governed connector sources', () => {
+  const prior: StepResult[] = [
+    { stepId: 's1', kind: 'connector-query', status: 'done', output: 'account: sensitive row' },
+    { stepId: 's2', kind: 'human', status: 'done', output: 'reviewer approved' },
+  ];
   const q = buildAgentQuery({ id: 's2', label: 'decide', kind: 'agent', agentId: 'ag1' }, prior);
   assert.match(q, /CONTEXT FROM PRIOR STEPS/);
-  assert.match(q, /quota: 3\/5/);
+  assert.match(q, /reviewer approved/);
+  assert.doesNotMatch(q, /sensitive row/);
   assert.match(q, /TASK: decide/);
+});
+
+test('providedSourcesFromPriorResults carries only governed connector evidence', () => {
+  const sources = providedSourcesFromPriorResults([
+    {
+      stepId: 's1',
+      kind: 'connector-query',
+      status: 'done',
+      output: 'accounts: 5 rows',
+      refs: [{ name: 'crm:accounts' }],
+    },
+    { stepId: 's2', kind: 'guardrail', status: 'done', output: 'clean' },
+  ]);
+
+  assert.deepEqual(sources, [
+    {
+      sourceId: 's1',
+      sourceKind: 'database',
+      title: 'crm:accounts',
+      snippet: 'accounts: 5 rows',
+      ref: 'crm:accounts',
+      score: 1,
+    },
+  ]);
+});
+
+test('summarizeRows keeps complete small reference tables and labels larger truncation', () => {
+  const complete = Array.from({ length: MAX_GOVERNED_SOURCE_ROWS }, (_, id) => ({ id }));
+  const completeSummary = summarizeRows('rate card', 'pricing', complete, complete.length);
+  assert.match(completeSummary, /"columns":\["id"\]/);
+  assert.match(completeSummary, /\[19\]/);
+  assert.doesNotMatch(completeSummary, /"id":19/);
+  assert.doesNotMatch(completeSummary, /Showing/);
+
+  const larger = [...complete, { id: 20 }];
+  const clipped = summarizeRows('rate card', 'pricing', larger, larger.length);
+  assert.match(clipped, /Showing 20 of 21/);
+  assert.doesNotMatch(clipped, /"id":20/);
 });
 
 test('executeStep(human) returns awaiting_human WITHOUT blocking', async () => {
@@ -126,11 +171,24 @@ test('executeStep(human) returns awaiting_human WITHOUT blocking', async () => {
 });
 
 test('runApp executes a 3-step spec in order to completion (connector→agent→output)', async () => {
-  const out = await runApp(LINEAR, {}, { orgId: 'default', runId: 'r4' }, fakeDeps());
+  let agentContext: import('@/lib/agent-run-context').RunContext | undefined;
+  const out = await runApp(
+    LINEAR,
+    {},
+    { orgId: 'default', runId: 'r4' },
+    fakeDeps({
+      async runAgent(agentId, query, _caller, _review, _org, context) {
+        agentContext = context;
+        return { id: `run_${agentId}`, answer: `decided from: ${query}`, status: 'done', citations: [] };
+      },
+    }),
+  );
   assert.equal(out.status, 'done');
   assert.deepEqual(out.steps.map((s) => s.stepId), ['s1', 's2', 's3']);
   // the agent step saw the connector output threaded in
   assert.match(out.steps[1].output ?? '', /decided from:/);
+  assert.equal(agentContext?.providedSources?.[0]?.ref, 'con_hr:employee_quota');
+  assert.match(agentContext?.providedSources?.[0]?.snippet ?? '', /reimbursement quota/);
 });
 
 test('runApp stops at awaiting_human when a human step is hit', async () => {

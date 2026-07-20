@@ -6,7 +6,9 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import {
   POLICY_TEMPLATES,
   buildPolicyPayload,
@@ -25,10 +27,7 @@ export function PolicyTemplatesPanel() {
   const [q, setQ] = useState('');
   const [applying, setApplying] = useState<string | null>(null);
 
-  const groups = useMemo(
-    () => groupTemplates(searchTemplates([...POLICY_TEMPLATES], q)),
-    [q],
-  );
+  const groups = useMemo(() => groupTemplates(searchTemplates([...POLICY_TEMPLATES], q)), [q]);
 
   async function apply(t: PolicyTemplate) {
     setApplying(t.id);
@@ -72,28 +71,17 @@ export function PolicyTemplatesPanel() {
           No templates match “{q}”.
         </p>
       ) : (
-        <div className="space-y-6">
-          {groups.map(({ group, items }) => (
-            <section key={group} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Stack className="size-4 text-primary" />
-                <h3 className="font-mono text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {group}
-                </h3>
-                <span className="text-[10px] text-muted-foreground">{items.length}</span>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {items.map((t) => (
-                  <TemplateCard
-                    key={t.id}
-                    template={t}
-                    busy={applying === t.id}
-                    onApply={() => apply(t)}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {groups.flatMap(({ items }) =>
+            items.map((t) => (
+              <TemplateCard
+                key={t.id}
+                template={t}
+                busy={applying === t.id}
+                onApply={() => apply(t)}
+              />
+            )),
+          )}
         </div>
       )}
     </div>
@@ -110,12 +98,21 @@ function TemplateCard({
   onApply: () => void;
 }>) {
   return (
-    <div className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-        <span className="flex size-6 shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
-          <CheckCircle className="size-3.5" />
-        </span>
-        <span className="truncate font-mono text-sm font-medium">{template.title}</span>
+    <Card
+      data-template-group={template.group}
+      className="group gap-0 overflow-hidden border-border/70 py-0 transition-colors duration-150 hover:border-primary/40"
+    >
+      <div className="border-b border-border/70 px-4 py-3">
+        <div className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+          <Stack className="size-3 text-primary" />
+          <span>{template.group}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
+            <CheckCircle className="size-3.5" />
+          </span>
+          <span className="truncate font-mono text-sm font-medium">{template.title}</span>
+        </div>
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
         <p className="text-xs leading-relaxed text-muted-foreground">{template.enforces}</p>
@@ -125,8 +122,13 @@ function TemplateCard({
           </p>
           <p className="font-mono text-[11px]">
             <Badge
-              variant={template.rule.effect === 'allow' ? 'default' : 'destructive'}
-              className="mr-1.5 text-[10px]"
+              variant="outline"
+              className={cn(
+                'mr-1.5 bg-transparent text-[10px]',
+                template.rule.effect === 'allow'
+                  ? 'border-primary/30 text-primary'
+                  : 'border-border bg-muted/60 text-foreground',
+              )}
             >
               {template.rule.effect}
             </Badge>
@@ -142,6 +144,6 @@ function TemplateCard({
           </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

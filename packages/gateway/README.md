@@ -27,12 +27,12 @@ docker run -p 7878:7878 \
 
 All host-specific paths resolve through one seam (`runtime-env`):
 
-| Env var | Meaning |
-|---|---|
-| `OFFGRID_DATA_DIR` | writable dir for models, caches, generated output |
-| `OFFGRID_BIN_DIR` | dir holding the platform binaries (llama-server, sd-cli, whisper, ffmpeg) |
-| `OFFGRID_RESOURCE_DIR` | dir holding bundled resources (tts worker, …) |
-| `OFFGRID_GATEWAY_PORT` | listen port (default `7878`) |
+| Env var                | Meaning                                                                   |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `OFFGRID_DATA_DIR`     | writable dir for models, caches, generated output                         |
+| `OFFGRID_BIN_DIR`      | dir holding the platform binaries (llama-server, sd-cli, whisper, ffmpeg) |
+| `OFFGRID_RESOURCE_DIR` | dir holding bundled resources (tts worker, …)                             |
+| `OFFGRID_GATEWAY_PORT` | listen port (default `7878`)                                              |
 
 Embedded hosts call `configureRuntime({ dataDir, binRoots, resourceDirs })` instead.
 
@@ -45,4 +45,5 @@ then the standalone server exposes `/healthz` and `/v1/models`.
 
 ## License
 
-[AGPL-3.0-only](LICENSE). © Off Grid AI / Wednesday Solutions, Inc.
+[Off Grid AI Source-Available License 1.0](LICENSE). Free community use is limited to 25 users.
+© Off Grid AI / Wednesday Solutions, Inc.

@@ -21,8 +21,8 @@ export const kbSource: RetrievalSource = {
   kind: 'kb',
   label: 'Knowledge base (Brain)',
   describe: 'Vector retrieval over ingested documents/SOPs, with citations.',
-  async search(query, k, opts) {
-    const hits = await searchDocuments(query, k, opts);
+  async search(query, k, opts, context) {
+    const hits = await searchDocuments(query, k, opts, context?.orgId);
     return hits.map((h) => ({
       sourceId: 'kb',
       sourceKind: 'kb',
@@ -41,8 +41,8 @@ export const databaseSource: RetrievalSource = {
   kind: 'database',
   label: 'Structured database',
   describe: 'The data-plane catalog (datasets, classifications); text-to-SQL when wired live.',
-  async search(query, k) {
-    const datasets = await listDatasets();
+  async search(query, k, _opts, context) {
+    const datasets = await listDatasets(context?.orgId);
     return datasets
       .map((d) => ({
         sourceId: 'database',
@@ -65,8 +65,8 @@ export const toolSource: RetrievalSource = {
   kind: 'tool',
   label: 'Tools & services',
   describe: 'Configured HTTP / MCP tools the router can invoke (the tool registry).',
-  async search(query, k) {
-    const tools = (await listTools()).filter((t) => t.enabled);
+  async search(query, k, _opts, context) {
+    const tools = (await listTools(context?.orgId)).filter((t) => t.enabled);
     return tools
       .map((t) => ({
         sourceId: 'tool',

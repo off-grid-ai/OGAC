@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
+import { gatewayWiringView, resolveGatewayEndpoints } from '@/lib/gateway-endpoints';
 import { safeRouterView } from '@/lib/litellm';
 
 export const dynamic = 'force-dynamic';
@@ -15,5 +16,5 @@ export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
   const view = await safeRouterView();
-  return NextResponse.json(view);
+  return NextResponse.json({ ...view, wiring: gatewayWiringView(resolveGatewayEndpoints()) });
 }

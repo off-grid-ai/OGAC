@@ -1,7 +1,7 @@
 # Off Grid Console — OSS license & legal audit
 
-**Status:** working audit for the dual-license model — **AGPL-3.0 edition** and a **commercial
-edition**. Not legal advice; re-confirm each license at release (some projects relicense —
+**Status:** working audit for the dual-license model — the **Off Grid AI Source-Available License
+1.0** and a **commercial license**. Re-confirm each dependency license at release (some projects relicense —
 flagged ⚠️ below).
 
 ## The decisive fact: architecture, not just license
@@ -21,18 +21,18 @@ UIs. Legally this is **mere aggregation**:
 This separation is the single most important compliance safeguard, and it's the same
 "single interface, no linking, no white-label" principle we hold architecturally.
 
-**Any Off Grid component may be closed-source.** Because we keep OSS tools out-of-process
-(aggregation, not linking), our own modules — console, gateway, Brain, agents — can be
-proprietary/commercial without inheriting copyleft. The one hard rule: a closed-source
-module must talk to an AGPL/GPL/SSPL/ELv2/BUSL tool **only over its API / a separate
+**A commercially licensed Off Grid component may be proprietary.** Because we keep OSS tools
+out-of-process (aggregation, not linking), our own modules — console, gateway, Brain, agents — can
+be distributed commercially without inheriting copyleft. The one hard rule: a proprietary module
+must talk to an AGPL/GPL/SSPL/ELv2/BUSL tool **only over its API / a separate
 process** — never by linking its code into the closed binary. Permissive (MIT/Apache/BSD)
 tools may be linked into a closed-source build freely.
 
 ## Verdict by edition
 
-- **AGPL-3.0 edition:** all listed tools are usable. Permissive deps combine freely; AGPL
+- **Community edition:** all listed tools are usable. Permissive deps combine freely; AGPL
   tools (run as separate services) are fine; SSPL/ELv2/BUSL tools are kept as **optional,
-  separate-process integrations** (not required dependencies of the AGPL core).
+  separate-process integrations** (not required dependencies of the first-party core).
 - **Commercial edition:** safe to bundle/ship the **permissive** stack. For the
   **copyleft/source-available** tools (⚠️), do one of: (a) ship as **separate
   containers/services** the customer runs (aggregation — recommended default), (b) **swap**
@@ -41,28 +41,28 @@ tools may be linked into a closed-source build freely.
 
 ## Tool-by-tool
 
-| Tool                                                | License                                          | Edition notes                                                                                                                                            |
-| --------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Off Grid AI Gateway**                             | first-party (ours)                               | ✅ we own it; dual-license at will                                                                                                                       |
-| llama.cpp / vLLM / Ollama                           | MIT / Apache-2.0 / MIT                           | ✅ both editions                                                                                                                                         |
-| NeMo Guardrails / Guardrails AI / Presidio / Rebuff | Apache-2.0 / Apache-2.0 / MIT / Apache-2.0       | ✅ both                                                                                                                                                  |
-| OpenTelemetry                                       | Apache-2.0                                       | ✅ both                                                                                                                                                  |
-| Langfuse                                            | MIT (core)                                       | ✅ core both; some **EE features are commercial-licensed** — use OSS edition or buy EE                                                                   |
-| **Grafana / Loki / Tempo**                          | **AGPL-3.0** ⚠️                                  | separate services (aggregation) or **swap → SigNoz (MIT) / VictoriaMetrics+Logs (Apache-2.0) / OpenObserve (Apache-2.0)**; or Grafana commercial license |
-| **Arize Phoenix**                                   | **Elastic License 2.0** ⚠️                       | self-host ship OK; not as our SaaS. Swap → **Langfuse (MIT)** / Opik (Apache-2.0)                                                                        |
-| Promptfoo / DeepEval / Ragas / Garak / Inspect      | MIT / Apache-2.0 / Apache-2.0 / Apache-2.0 / MIT | ✅ both                                                                                                                                                  |
-| Open Policy Agent / Cedar / OpenFGA                 | Apache-2.0                                       | ✅ both                                                                                                                                                  |
-| Keycloak                                            | Apache-2.0                                       | ✅ both                                                                                                                                                  |
-| Auth.js (NextAuth)                                  | ISC                                              | ✅ both                                                                                                                                                  |
-| **HashiCorp Vault**                                 | **BUSL-1.1** ⚠️                                  | self-host OK; competing-hosted-service restricted. Swap → **OpenBao (MPL-2.0)**                                                                          |
-| **LanceDB** / LlamaIndex / BGE                      | Apache-2.0 / MIT / MIT                           | ✅ both (our Brain store)                                                                                                                                |
-| Debezium / Kafka / Spark / Iceberg / Trino          | Apache-2.0                                       | ✅ both                                                                                                                                                  |
-| **Airbyte**                                         | **ELv2** (core) ⚠️                               | self-host ship OK; not as our SaaS. Swap → **Meltano (MIT)** or use Debezium                                                                             |
-| **MinIO**                                           | **AGPL-3.0** ⚠️                                  | separate service or **swap → SeaweedFS (Apache-2.0)** / Ceph; or MinIO commercial license                                                                |
-| OpenLineage / Marquez / Sigstore                    | Apache-2.0                                       | ✅ both                                                                                                                                                  |
-| Agno / Pydantic AI / LangGraph / Temporal           | MPL-2.0 / MIT / MIT / MIT                        | ✅ both                                                                                                                                                  |
-| E2B / Firecracker / Falco                           | Apache-2.0                                       | ✅ both                                                                                                                                                  |
-| PostgreSQL / Drizzle                                | PostgreSQL / Apache-2.0                          | ✅ both                                                                                                                                                  |
+| Tool                                                | License                                               | Edition notes                                                                                                                                            |
+| --------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Off Grid AI Gateway**                             | Off Grid AI Source-Available License 1.0 / commercial | ✅ first-party; community use up to 25 users or separate commercial terms                                                                                |
+| llama.cpp / vLLM / Ollama                           | MIT / Apache-2.0 / MIT                                | ✅ both editions                                                                                                                                         |
+| NeMo Guardrails / Guardrails AI / Presidio / Rebuff | Apache-2.0 / Apache-2.0 / MIT / Apache-2.0            | ✅ both                                                                                                                                                  |
+| OpenTelemetry                                       | Apache-2.0                                            | ✅ both                                                                                                                                                  |
+| Langfuse                                            | MIT (core)                                            | ✅ core both; some **EE features are commercial-licensed** — use OSS edition or buy EE                                                                   |
+| **Grafana / Loki / Tempo**                          | **AGPL-3.0** ⚠️                                       | separate services (aggregation) or **swap → SigNoz (MIT) / VictoriaMetrics+Logs (Apache-2.0) / OpenObserve (Apache-2.0)**; or Grafana commercial license |
+| **Arize Phoenix**                                   | **Elastic License 2.0** ⚠️                            | self-host ship OK; not as our SaaS. Swap → **Langfuse (MIT)** / Opik (Apache-2.0)                                                                        |
+| Promptfoo / DeepEval / Ragas / Garak / Inspect      | MIT / Apache-2.0 / Apache-2.0 / Apache-2.0 / MIT      | ✅ both                                                                                                                                                  |
+| Open Policy Agent / Cedar / OpenFGA                 | Apache-2.0                                            | ✅ both                                                                                                                                                  |
+| Keycloak                                            | Apache-2.0                                            | ✅ both                                                                                                                                                  |
+| Auth.js (NextAuth)                                  | ISC                                                   | ✅ both                                                                                                                                                  |
+| **HashiCorp Vault**                                 | **BUSL-1.1** ⚠️                                       | self-host OK; competing-hosted-service restricted. Swap → **OpenBao (MPL-2.0)**                                                                          |
+| **LanceDB** / LlamaIndex / BGE                      | Apache-2.0 / MIT / MIT                                | ✅ both (our Brain store)                                                                                                                                |
+| Debezium / Kafka / Spark / Iceberg / Trino          | Apache-2.0                                            | ✅ both                                                                                                                                                  |
+| **Airbyte**                                         | **ELv2** (core) ⚠️                                    | self-host ship OK; not as our SaaS. Swap → **Meltano (MIT)** or use Debezium                                                                             |
+| **MinIO**                                           | **AGPL-3.0** ⚠️                                       | separate service or **swap → SeaweedFS (Apache-2.0)** / Ceph; or MinIO commercial license                                                                |
+| OpenLineage / Marquez / Sigstore                    | Apache-2.0                                            | ✅ both                                                                                                                                                  |
+| Agno / Pydantic AI / LangGraph / Temporal           | MPL-2.0 / MIT / MIT / MIT                             | ✅ both                                                                                                                                                  |
+| E2B / Firecracker / Falco                           | Apache-2.0                                            | ✅ both                                                                                                                                                  |
+| PostgreSQL / Drizzle                                | PostgreSQL / Apache-2.0                               | ✅ both                                                                                                                                                  |
 
 **Console's own dependencies** (Next.js, React, Tailwind, shadcn/ui, Magic UI, Aceternity,
 recharts, next-auth, drizzle-orm, pg, lucide) are **MIT / ISC / Apache-2.0** — ✅ both editions.
@@ -77,12 +77,11 @@ recharts, next-auth, drizzle-orm, pg, lucide) are **MIT / ISC / Apache-2.0** —
 3. **HashiCorp Vault (BUSL)** → swap to **OpenBao** (MPL-2.0 fork) to avoid the BUSL question.
 4. **Langfuse EE** → stay on the MIT OSS edition unless EE is licensed.
 
-## Recommended zero-friction build (permissive only)
+## Recommended zero-friction third-party build (permissive dependencies only)
 
-To avoid **all** copyleft obligations, fork-maintenance, and per-release legal review, ship
-the **permissive option in every layer** — MIT / Apache-2.0 / BSD / ISC / MPL-2.0 only. These
-are used like any normal dependency (no source disclosure, free to close-source/commercialize,
-no need to stay forked or in-sync beyond normal version bumps):
+To avoid third-party copyleft obligations and fork maintenance, ship the **permissive dependency
+option in every layer** — MIT / Apache-2.0 / BSD / ISC / MPL-2.0 only. These dependencies can be
+used without imposing their license on first-party Off Grid AI code:
 
 - **Gateway:** Off Grid AI Gateway · llama.cpp · vLLM · Ollama
 - **Guardrails:** Presidio · NeMo Guardrails · Guardrails AI

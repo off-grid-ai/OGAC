@@ -33,14 +33,17 @@ export function makeConnectorSource(deps: ConnectorSourceDeps = defaultDeps): Re
     label: 'Connectors (declared data-domains)',
     describe:
       'Routes a query to a declared data-domain’s bound connector by rule (deterministic), then reads it live.',
-    async search(query, k) {
+    async search(query, k, _opts, context) {
       // 1. Resolve the query to a declared domain — BY RULE. No match ⇒ contribute nothing.
-      const domains = await deps.listDomains();
+      const domains =
+        context?.structuredAccess?.state === 'authorized'
+          ? context.structuredAccess.domains
+          : await deps.listDomains(context?.orgId);
       const domain = resolveDomain(query, domains);
       if (!domain) return [];
 
       // 2. Find the connector the domain binds to. Missing connector ⇒ nothing (never fabricate).
-      const connectors = await deps.listConnectors();
+      const connectors = await deps.listConnectors(context?.orgId);
       const connector = connectors.find((c) => c.id === domain.connectorId);
       if (!connector) return [];
 

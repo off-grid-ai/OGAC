@@ -65,7 +65,11 @@ The full rules live in `docs/ENGINEERING.md`. The short version:
 
 ## Contributor License Agreement
 
-Off Grid AI is open core: the project is licensed under AGPL-3.0-only, with a Contributor License Agreement (CLA) covering contributions. Before your first contribution can be merged, you sign the CLA. This lets the project accept your work and keep the option to offer paid features on top of the open core. The maintainers will point you to the CLA when you open your first pull request.
+Off Grid AI is fair-code/source-available under the [Off Grid AI Source-Available License](LICENSE),
+with a [Contributor License Agreement](CLA.md) covering contributions. By opening or updating a pull
+request, you accept the CLA. It lets you retain ownership of your work while giving Off Grid AI the
+rights required to distribute one codebase under both community and commercial licenses. If you
+contribute for an employer, confirm that you have authority to accept the CLA for that organization.
 
 ## Reporting security issues
 

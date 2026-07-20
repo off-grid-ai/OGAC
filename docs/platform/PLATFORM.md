@@ -1,6 +1,6 @@
 # Off Grid AI — the platform
 
-> **Become an intelligent enterprise, without compromising.** On-prem · local-first · open-source · data never leaves the box. This is the canonical platform model — the spine of what we open source. Visual map: [`platform-map.html`](./platform-map.html).
+> **Become an intelligent enterprise, without compromising.** On-prem · local-first · source-available · data never leaves the box. This is the canonical platform model — the spine of the public source. Visual map: [`platform-map.html`](./platform-map.html).
 
 ## The thesis (one sentence)
 One **governed pipeline** is the unit of everything — it governs **model access AND data movement** under one policy/guardrail/redaction/eval contract; it runs on a **smart gateway** (routing + edge + its own telemetry); every run and every sync emits into **one shared spine** (observability · audit · lineage · provenance · cost · compliance), is **replayable end-to-end**, and an **org view** rolls the whole estate up.
@@ -42,4 +42,4 @@ The platform must feel **beautiful and effortless** — creating and deploying a
 10 machines: **S1** control-plane · **S2** data-plane (Airbyte/ClickHouse/Redpanda/GE — **LIVE under OrbStack**, fronted on S1 edge loopbacks 8941–8944) · **g1–g8** model nodes.
 
 ## Positioning
-"A private AI, everywhere" + the governed data platform under it. Open-core: free under 20 people; 20+ license from us.
+"A private AI, everywhere" + the governed data platform under it. Fair-code: free for up to 25 users; larger deployments require a commercial license.

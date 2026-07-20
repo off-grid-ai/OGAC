@@ -24,9 +24,9 @@ Run this before the repository is made public. Every item is a gate. Do not publ
 - [ ] No real user emails or personal identifiers left in scripts, docs, or tests.
 - [ ] Fleet and deployment docs handled: either genericized or kept out of the public repo per the split below.
 
-## Standard OSS files present
+## Standard public-source files present
 
-- [ ] `LICENSE` present and correct (AGPL-3.0-only).
+- [ ] `LICENSE` present and correct (Off Grid AI Source-Available License 1.0, 25-user Community Use Limit).
 - [ ] `CONTRIBUTING.md` present, with build and test gates, the coverage bar, and the CLA note.
 - [ ] `SECURITY.md` present, with a real disclosure contact.
 - [ ] `CODE_OF_CONDUCT.md` present (Contributor Covenant).

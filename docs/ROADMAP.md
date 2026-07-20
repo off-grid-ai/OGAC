@@ -56,7 +56,7 @@ data sources, prompts, connectors — every OSS integration we surface). The con
 top of its phase-specific goal:
 
 1. **Full CRUD on every entity** the module owns — **create, read, update, delete** — with real
-   forms (validation), edit flows, and delete-with-confirmation. A list/aggregate view is the *R*
+   forms (validation), edit flows, and delete-with-confirmation. A list/aggregate view is the _R_
    only; it is **the bare minimum, not a finished feature.**
 2. **Actions that manage the underlying system**, not just display it: run an eval / edit golden
    cases, push & reload an OPA policy, edit masking/PII rules, run & schedule a backup, re-run or
@@ -73,27 +73,30 @@ deepened to full CRUD + actions before its module counts as done. Codified in `C
 ---
 
 ## Phase 0 — Fix the foundation
+
 **Goal:** stop the bleeding. Nothing compounds on broken primitives.
 **Timeline:** 1–2 weeks. Do this before touching anything else.
 
 ### Critical bugs (all must be fixed)
 
-| Bug | File | Impact |
-|---|---|---|
-| PII stateful regex (`/g` at module scope) | `src/lib/adapters/pii.ts` | Every other document silently misses PII |
-| Gateway port split (`:8800` vs `:7878`) | `src/app/api/v1/gateway/config/route.ts` | Silent traffic split when env var unset |
-| `/gateway/tokens` — no admin auth check | `src/app/api/v1/gateway/tokens/route.ts` | Any authenticated user can read/modify tokens |
-| RAG in-process cosine similarity | `src/lib/rag.ts` | Will OOM on any real corpus |
-| Two FinOps budget systems, neither enforces | `src/db/schema.ts`, `src/lib/finops.ts` | Budget alerts fire; inference never stops |
-| `emitSpan()` creates fresh root span every call | `src/lib/otel.ts` | Langfuse shows thousands of disconnected traces |
+| Bug                                             | File                                     | Impact                                          |
+| ----------------------------------------------- | ---------------------------------------- | ----------------------------------------------- |
+| PII stateful regex (`/g` at module scope)       | `src/lib/adapters/pii.ts`                | Every other document silently misses PII        |
+| Gateway port split (`:8800` vs `:7878`)         | `src/app/api/v1/gateway/config/route.ts` | Silent traffic split when env var unset         |
+| `/gateway/tokens` — no admin auth check         | `src/app/api/v1/gateway/tokens/route.ts` | Any authenticated user can read/modify tokens   |
+| RAG in-process cosine similarity                | `src/lib/rag.ts`                         | Will OOM on any real corpus                     |
+| Two FinOps budget systems, neither enforces     | `src/db/schema.ts`, `src/lib/finops.ts`  | Budget alerts fire; inference never stops       |
+| `emitSpan()` creates fresh root span every call | `src/lib/otel.ts`                        | Langfuse shows thousands of disconnected traces |
 
 ### Version freeze
+
 - Pin Langfuse (35 versions behind), Keycloak + OpenBao (security patches), MinIO (7 months behind)
 - Lock `next-auth` to exact version (currently floating beta `^5.0.0-beta.31`)
 - Lock `@lancedb/lancedb` and `c2pa-node` (v0.x with `^` — breaking changes permitted by semver)
 - Commit lockfile; all installs switch to `npm ci`
 
 ### Container cleanup
+
 Turn off: VictoriaMetrics, VictoriaLogs, OTel Collector, Jaeger, SeaweedFS — zero callers in `src/`. Reclaim RAM on S2.
 
 One-time setup: run `superset init` and `fleetctl setup` so both show real data.
@@ -103,6 +106,7 @@ One-time setup: run `superset init` and `fleetctl setup` so both show real data.
 ---
 
 ## Phase 1 — Navigation refactor (AWS-style shell)
+
 **Goal:** a navigation system that scales to 22+ modules without becoming unusable.
 **Timeline:** 2–3 weeks. Pure UI — no backend changes.
 **Depends on:** Phase 0 complete.
@@ -114,18 +118,21 @@ One-time setup: run `superset init` and `fleetctl setup` so both show real data.
 **Target:** two-level navigation, exactly like AWS console.
 
 **Home / service directory view:**
+
 - Left nav lists all service groups (Productivity, Infrastructure, Intelligence, Observability, Governance)
 - Each group is collapsible, showing the modules inside
 - Global search in the header — finds modules, sub-pages, and live service health results
 - The current page is `/services` — this becomes the home page
 
 **Inside a module:**
+
 - Left nav collapses to show only that module's sub-pages (tabs become nav items)
 - Breadcrumb in the header: `Off Grid > Gateway > Traffic`
 - Global search stays in the header at all times
 - "Back to all services" link at the top of the scoped nav
 
 ### Technical shape
+
 - New `<AppShell>` layout component with two states: `global` (all modules) and `scoped` (current module's sub-pages)
 - Module registry (`src/modules/registry.ts`) gains a `children` field per module — the sub-pages
 - Global search index built from: module registry + live health data + Postgres full-text search
@@ -136,6 +143,7 @@ One-time setup: run `superset init` and `fleetctl setup` so both show real data.
 ---
 
 ## Phase 2 — Prove It (Provit integration)
+
 **Goal:** Provit becomes a first-class module in the console. Every repo, every feature map, every test run, every recorded journey is visible and searchable in the same surface as the rest of the platform.
 **Timeline:** 4–6 weeks.
 **Depends on:** Phase 1 (nav) so the module slots in cleanly.
@@ -143,6 +151,7 @@ One-time setup: run `superset init` and `fleetctl setup` so both show real data.
 ### What Provit is
 
 Provit (running as `gungnir` on the fleet at `:7799`) is a visual QA platform. It:
+
 - Indexes repos → builds a feature plan (feature → test cases → code markers)
 - Records user journeys (screenshots, video frames, accessibility timelines)
 - Replays journeys and judges pass/fail via an LLM vision model (your gateway)
@@ -157,12 +166,12 @@ Today all of this data lives in flat JSON files on the Provit node (`./data/repo
 
 Add a push API to the console that Provit calls after each operation:
 
-| Provit event | Console endpoint | What it writes |
-|---|---|---|
-| Repo indexed | `POST /api/v1/provit/repos` | Repo record + feature plan |
-| Test run complete | `POST /api/v1/provit/runs` | Run result per behavior (pass/fail/duration) |
-| Session recorded | `POST /api/v1/provit/sessions` | Session plan + journey metadata |
-| Recording captured | `POST /api/v1/provit/recordings` | File upload (frames, video, timeline JSON) |
+| Provit event       | Console endpoint                 | What it writes                               |
+| ------------------ | -------------------------------- | -------------------------------------------- |
+| Repo indexed       | `POST /api/v1/provit/repos`      | Repo record + feature plan                   |
+| Test run complete  | `POST /api/v1/provit/runs`       | Run result per behavior (pass/fail/duration) |
+| Session recorded   | `POST /api/v1/provit/sessions`   | Session plan + journey metadata              |
+| Recording captured | `POST /api/v1/provit/recordings` | File upload (frames, video, timeline JSON)   |
 
 Auth: Provit authenticates with a machine client token (the gateway token system already exists — use it).
 
@@ -173,6 +182,7 @@ Provit captures: video frames (JPEG/PNG), full recordings (MP4/MOV), accessibili
 Storage path: activate SeaweedFS (already in compose, currently off) as the object store for Provit recordings. Every file upload to `/api/v1/provit/recordings` streams to SeaweedFS, stores the object key in Postgres. SeaweedFS is the right call here — it's S3-compatible, already in the compose, and recordings are large binary blobs that don't belong in Postgres.
 
 Schema additions:
+
 ```
 provit_repos       — repo records + feature plans (JSONB)
 provit_runs        — one row per behavior per run (status, duration, failures)
@@ -194,11 +204,13 @@ New module: `prove-it` (route `/prove-it`). Sub-pages (nav items):
 **D. Correlation with the rest of the platform**
 
 This is the payoff. Because everything goes through Postgres:
+
 - A failed test run on the same day as a gateway config change → link them in the Lineage view
 - A Provit recording of a broken UI → attach it to the agent run that generated the broken output
 - Provit's code marker check failing → surface in the Control audit log
 
 ### Multi-tenancy note
+
 All Provit tables get `org_id` from day one (see Phase 3). Provit's machine client token carries the org claim. Don't build it single-tenant and migrate later.
 
 **Definition of done:** Provit pushes repos, runs, sessions, recordings to the console. The Prove It module shows all four views with live data. Recordings play back in the journey viewer. SeaweedFS stores all binary assets.
@@ -207,7 +219,7 @@ All Provit tables get `org_id` from day one (see Phase 3). Provit's machine clie
 
 Use Provit to run full end-to-end **screenshot functional tests of the console itself** (sign in → navigate modules → act → assert + screenshot each step → surface results). Evaluated 2026-07 (read-only); Provit is ~70% there — it already has a Playwright driver (`adapters/capture.mjs`), a VLM oracle that judges a plain-English expectation against a screenshot (`src/core/oracle.ts`), a dashboard (`:7799`), and the console file-upload path (`showcase.ts` → `/api/v1/files`). **These changes live in the Provit repo, not the console.** Additive, low-risk, ~days for a working proof:
 
-1. **Web `observe`/assert step + `replayJourneyWeb.ts`** (mirror the proven iOS `src/ios/replayJourney.ts`): screenshot at checkpoints, call `oracle.judge`. *#1 gap — without it you get a recording, no pass/fail.* [M]
+1. **Web `observe`/assert step + `replayJourneyWeb.ts`** (mirror the proven iOS `src/ios/replayJourney.ts`): screenshot at checkpoints, call `oracle.judge`. _#1 gap — without it you get a recording, no pass/fail._ [M]
 2. **Keycloak login handling**: save a Playwright `storageState` from a one-time sign-in, reuse it; creds from env (`PROVIT_CONSOLE_USER/PASS`). [M]
 3. **A `web` config block** in `ProvitConfig` (`baseUrl`, viewport, headless, storageStatePath). [S]
 4. **Emit `timeline.jsonl` from the web capture** so the existing dashboard/judge/replay work for web unchanged. [M]
@@ -218,6 +230,7 @@ Sequence 1→2→3→4. Console flows authored as journey JSON (`launch web → 
 ---
 
 ## Phase 3 — Multi-tenancy
+
 **Goal:** the console serves multiple orgs from one deployment. Each org's data is completely isolated. This is the prerequisite for offering managed hosting.
 **Timeline:** 6–8 weeks. This is deep schema and auth work.
 **Depends on:** Phase 2 (all tables must have `org_id` before multi-tenancy can be enforced).
@@ -235,6 +248,7 @@ Sequence 1→2→3→4. Console flows authored as journey JSON (`launch web → 
 ### What changes
 
 **Schema:** every table currently without `org_id` gets it. Migration order matters:
+
 1. `organizations` table (new) — org record, name, plan tier, created_at
 2. Add `org_id` to all existing tables with a backfill default (`'default'` for single-tenant installs)
 3. Create Drizzle query wrapper `withOrg(db, orgId)` that applies the filter
@@ -250,6 +264,7 @@ Sequence 1→2→3→4. Console flows authored as journey JSON (`launch web → 
 ### Managed hosting readiness
 
 Once multi-tenancy is working:
+
 - A deployment can serve N orgs from one instance
 - Each org has its own data, its own gateway config, its own Provit repos, its own budgets
 - The `organizations.plan_tier` column gates Pro features (connector libraries, ETL, fleet orchestration)
@@ -260,6 +275,7 @@ Once multi-tenancy is working:
 ---
 
 ## Phase 3A — Hardening & Scale
+
 **Goal:** every service scales independently, survives node failure, recovers from disaster. This is the infrastructure prerequisite for managed hosting and for selling the platform to orgs with uptime SLAs.
 **Timeline:** 6–8 weeks. Runs in parallel with Phase 4 (different skill set — infra vs. UI/API).
 **Depends on:** Phase 3 (multi-tenancy schema must be stable before designing backup strategies around it).
@@ -271,6 +287,7 @@ Today the stack is split manually across two nodes: S1 holds the heavy stateful 
 ### Track 1 — Container orchestration (independent scaling)
 
 Move from bare `docker-compose` to an orchestrator that can schedule, scale, and restart containers independently per service. The right choice for an on-prem two-node fleet is **Nomad** (HashiCorp, AGPL) or **k3s** (lightweight Kubernetes). Both support:
+
 - Per-job resource limits and scaling policies
 - Health-check-driven restarts
 - Cross-node scheduling (a service doesn't have to live on a fixed node)
@@ -282,31 +299,32 @@ Migration path: each `docker-compose` service becomes a Nomad job spec. The comp
 
 Per-service scaling policy (steady state):
 
-| Service | Scaling model | Min replicas | Notes |
-|---|---|---|---|
-| Postgres | Active-passive (Patroni) | 2 | Primary + standby; auto-failover via etcd |
-| Keycloak | Active-active | 2 | Infinispan distributed cache; both nodes serve login |
-| OpenSearch | Clustered | 3 (1 primary + 2 replica) | Already supports clustering; enable shard replication |
-| Qdrant | Distributed | 2 | Qdrant supports sharding + replication natively |
-| Redis | Sentinel | 3 (1 primary + 2 sentinel) | Sentinel handles failover; Cluster if write throughput demands it |
-| OPA | Stateless, horizontal | 2 | No shared state; round-robin behind Caddy |
-| Presidio | Stateless, horizontal | 2 | Analyzer and anonymizer scale independently |
-| Langfuse | Stateless workers | 2 | Worker pool; Langfuse DB is separate Postgres |
-| Unleash | Stateless, horizontal | 2 | Unleash DB is separate Postgres |
-| Gateway cluster | Active-active | 3 | Already has a cluster router; add a third node |
-| Console (Next.js) | Stateless, horizontal | 2 | Already behind Caddy LB; add second instance |
-| Marquez | Stateless API | 2 | Marquez DB is separate Postgres |
-| Superset | Stateless | 2 | Celery worker pool for async queries |
-| FleetDM | Active-passive | 2 | FleetDM supports multi-node with shared MySQL |
-| OpenBao | HA with Raft | 3 | OpenBao built-in Raft consensus; 3-node quorum |
-| Temporal | Clustered | 3 | Temporal supports multi-node cluster with Cassandra or Postgres backend |
-| Caddy edge | Active-active | 2 | Two edge nodes; Cloudflare tunnel load balances between them |
+| Service           | Scaling model            | Min replicas               | Notes                                                                   |
+| ----------------- | ------------------------ | -------------------------- | ----------------------------------------------------------------------- |
+| Postgres          | Active-passive (Patroni) | 2                          | Primary + standby; auto-failover via etcd                               |
+| Keycloak          | Active-active            | 2                          | Infinispan distributed cache; both nodes serve login                    |
+| OpenSearch        | Clustered                | 3 (1 primary + 2 replica)  | Already supports clustering; enable shard replication                   |
+| Qdrant            | Distributed              | 2                          | Qdrant supports sharding + replication natively                         |
+| Redis             | Sentinel                 | 3 (1 primary + 2 sentinel) | Sentinel handles failover; Cluster if write throughput demands it       |
+| OPA               | Stateless, horizontal    | 2                          | No shared state; round-robin behind Caddy                               |
+| Presidio          | Stateless, horizontal    | 2                          | Analyzer and anonymizer scale independently                             |
+| Langfuse          | Stateless workers        | 2                          | Worker pool; Langfuse DB is separate Postgres                           |
+| Unleash           | Stateless, horizontal    | 2                          | Unleash DB is separate Postgres                                         |
+| Gateway cluster   | Active-active            | 3                          | Already has a cluster router; add a third node                          |
+| Console (Next.js) | Stateless, horizontal    | 2                          | Already behind Caddy LB; add second instance                            |
+| Marquez           | Stateless API            | 2                          | Marquez DB is separate Postgres                                         |
+| Superset          | Stateless                | 2                          | Celery worker pool for async queries                                    |
+| FleetDM           | Active-passive           | 2                          | FleetDM supports multi-node with shared MySQL                           |
+| OpenBao           | HA with Raft             | 3                          | OpenBao built-in Raft consensus; 3-node quorum                          |
+| Temporal          | Clustered                | 3                          | Temporal supports multi-node cluster with Cassandra or Postgres backend |
+| Caddy edge        | Active-active            | 2                          | Two edge nodes; Cloudflare tunnel load balances between them            |
 
 ### Track 2 — High availability
 
 HA means no single point of failure for any service in the critical path. Critical path = Postgres, Keycloak, the gateway, Caddy.
 
 **Postgres HA — Patroni + streaming replication**
+
 - Primary on S1, standby on S2 (or a third node)
 - Patroni manages leader election via etcd (etcd is a 3-node cluster itself)
 - PgBouncer in front of both nodes for connection pooling
@@ -314,16 +332,19 @@ HA means no single point of failure for any service in the critical path. Critic
 - The console's `DATABASE_URL` points to PgBouncer, not directly to Postgres
 
 **Keycloak HA — Infinispan cluster**
+
 - Both Keycloak nodes share distributed session cache via Infinispan
 - Both nodes are active — Caddy round-robins between them
 - One node dying doesn't log users out (sessions survive in the other node's cache)
 
 **Gateway HA — already built**
+
 - The cluster router already handles multinode routing and health-based admission
 - Add a third gateway node so the cluster survives one node failure with two remaining
 - Caddy health checks remove a dead node within one check interval (~5s)
 
 **OpenBao HA — Raft consensus**
+
 - OpenBao (Vault fork) has native Raft: 3 nodes form a quorum
 - Leader handles writes; followers serve reads
 - Auto-promotion if the leader dies; quorum maintained as long as 2 of 3 are up
@@ -332,15 +353,15 @@ HA means no single point of failure for any service in the critical path. Critic
 
 **What needs backing up:**
 
-| Data | Where it lives | Backup method | Schedule | Retention |
-|---|---|---|---|---|
-| Postgres (all tables) | S1 Postgres | `pg_dump` + WAL archiving to SeaweedFS | Continuous WAL + daily full dump | 30 days |
-| OpenSearch indices | S1 OpenSearch | Snapshot API → SeaweedFS S3 endpoint | Daily | 14 days |
-| Qdrant collections | S1 Qdrant | Snapshot API | Daily | 14 days |
-| OpenBao KV | S1 OpenBao | `bao kv get` export + Raft snapshot | Daily | 30 days |
-| Langfuse data | S2 Langfuse Postgres | `pg_dump` | Daily | 14 days |
-| Provit recordings | S2 SeaweedFS | SeaweedFS replication to offsite bucket | Continuous | 90 days |
-| Keycloak realm | S1 Keycloak | Realm export via admin API | Daily | 30 days |
+| Data                  | Where it lives       | Backup method                           | Schedule                         | Retention |
+| --------------------- | -------------------- | --------------------------------------- | -------------------------------- | --------- |
+| Postgres (all tables) | S1 Postgres          | `pg_dump` + WAL archiving to SeaweedFS  | Continuous WAL + daily full dump | 30 days   |
+| OpenSearch indices    | S1 OpenSearch        | Snapshot API → SeaweedFS S3 endpoint    | Daily                            | 14 days   |
+| Qdrant collections    | S1 Qdrant            | Snapshot API                            | Daily                            | 14 days   |
+| OpenBao KV            | S1 OpenBao           | `bao kv get` export + Raft snapshot     | Daily                            | 30 days   |
+| Langfuse data         | S2 Langfuse Postgres | `pg_dump`                               | Daily                            | 14 days   |
+| Provit recordings     | S2 SeaweedFS         | SeaweedFS replication to offsite bucket | Continuous                       | 90 days   |
+| Keycloak realm        | S1 Keycloak          | Realm export via admin API              | Daily                            | 30 days   |
 
 **Backup storage:** activate SeaweedFS with erasure coding across both nodes. Add an offsite bucket (Cloudflare R2 or Backblaze B2) as the secondary destination for all backups. SeaweedFS already supports S3-compatible replication.
 
@@ -350,14 +371,15 @@ HA means no single point of failure for any service in the critical path. Critic
 
 **RTO/RPO targets:**
 
-| Scenario | Target RTO | Target RPO |
-|---|---|---|
-| Single node (S1 or S2) failure | < 5 minutes | 0 (HA replica takes over) |
-| Both nodes lost (hardware failure) | < 2 hours | < 24 hours (last daily backup) |
-| Data corruption (Postgres) | < 1 hour | Point-in-time via WAL archiving |
-| Full DR (new hardware) | < 4 hours | Last daily backup |
+| Scenario                           | Target RTO  | Target RPO                      |
+| ---------------------------------- | ----------- | ------------------------------- |
+| Single node (S1 or S2) failure     | < 5 minutes | 0 (HA replica takes over)       |
+| Both nodes lost (hardware failure) | < 2 hours   | < 24 hours (last daily backup)  |
+| Data corruption (Postgres)         | < 1 hour    | Point-in-time via WAL archiving |
+| Full DR (new hardware)             | < 4 hours   | Last daily backup               |
 
 **DR runbook structure** (to be written as `docs/RUNBOOKS.md` entries):
+
 1. Node failure → Nomad auto-reschedules containers to surviving node; Patroni promotes Postgres standby
 2. Postgres corruption → restore from WAL archive to point-in-time; replay
 3. Full site loss → provision new hardware, run `deploy/scripts/restore.sh` which pulls latest backup manifest from offsite bucket and restores each service in dependency order
@@ -379,6 +401,7 @@ You can't have HA without knowing when things are failing. Currently there are n
 ---
 
 ## Phase 4 — OSS feature parity
+
 **Goal:** for every OSS service already running, close the gap between what it exposes and what the console actually uses. No new services. No new architecture. Just leverage what we're paying to run.
 **Timeline:** 6–8 weeks. Parallelisable across services — each service is an independent track.
 **Depends on:** Phase 3 (org-scoped queries on all new read-back views).
@@ -392,20 +415,24 @@ The research found a consistent pattern: services are wired as **write-only sink
 These services have rich APIs and the console calls them zero times on the read path. Each becomes a proper two-way integration.
 
 **OpenSearch** — currently write-only (`_bulk` audit ingest). Add:
+
 - Full-text audit search UI (the `_search` API with filters by user/action/date) in the Control module
 - Aggregations: top users by request count, error rate over time, model usage breakdown
 - Alert rule management — wire OpenSearch Watchers to the Control guardrails UI
 
 **Langfuse** — currently write-only (OTLP spans + scores pushed). Add:
+
 - Native trace waterfall in the Observability module (reading `/api/public/traces` + `/observations`) — the embedded iframe is blocked by X-Frame-Options; replace it with a first-party component that reads the Langfuse API directly
 - Per-trace cost rollup fed into FinOps (Langfuse has a cost API — wire it to the budget system)
 - Score distribution chart (the LLM-as-judge scores are written but never visualised)
 
 **Marquez** — currently emit-only (OpenLineage POST). Add:
+
 - Read the Marquez job→dataset graph directly (`/api/v1/namespaces/{ns}/jobs/{job}/lineage`) and render it as the Lineage view's primary source (not the audit-reconstructed fallback)
 - Dataset catalog: list all datasets Marquez knows about, with their upstream/downstream jobs
 
 **OpenBao** — currently scaffold only (`getSecrets()` has zero call sites). Add:
+
 - Real KV read/write/list wired to the Secrets panel in Control (the UI exists; the calls don't)
 - Secret rotation UI — list KV keys with last-updated timestamps, trigger rotation
 - Lease expiry alerts
@@ -413,22 +440,26 @@ These services have rich APIs and the console calls them zero times on the read 
 ### Priority 2 — Admin operations (moderate value, one-time setup unblocks them)
 
 **Presidio** — `/analyze` is used; `/anonymize` is never called. Add:
+
 - Replace the in-console regex string-replace with actual Presidio `/anonymize` ML redaction
 - Custom recognizer management UI — add/remove entity types via the Presidio API
 - Per-request entity breakdown in the audit log (what PII types were found, not just a boolean)
 
 **FleetDM** — read-only host list only. Add:
+
 - Policy management: create/edit/delete FleetDM policies from the Fleet module (not just view)
 - Live query UI: run an osquery query across the fleet, see results in real time
 - Software inventory per device: what's installed, what has known CVEs (FleetDM exposes this)
 - MDM enrollment status column in the device table
 
 **Superset** — health-ping only; embed blocked. Add:
+
 - Replace the iframe embed with the Superset guest-token SDK (solves X-Frame-Options)
 - Provision one default dashboard via the Superset API (`/api/v1/chart` + `/api/v1/dataset`) seeded from the console's gateway analytics data
 - SQL Lab passthrough: link from the Analytics module to Superset SQL Lab for ad-hoc queries
 
 **Unleash** — flag lookups only; strategies and segments unused. Add:
+
 - Flag management UI in the Admin module: create/edit/delete flags, set gradual rollout %, assign segments
 - A/B variant editor: define variants per flag, see variant distribution in Analytics
 
@@ -443,6 +474,7 @@ These services have rich APIs and the console calls them zero times on the read 
 ### Priority 4 — Wire idle shared packages
 
 Four `@offgrid/*` packages are complete and unused. Wire them now, not in a future architecture phase:
+
 - `@offgrid/rag` → replaces `src/lib/rag.ts` (fixes OOM, uses Qdrant properly)
 - `@offgrid/pipeline` → ETL primitives for the Data module connectors
 - `@offgrid/ui` → shared React components (reduces duplication with mobile web later)
@@ -450,18 +482,18 @@ Four `@offgrid/*` packages are complete and unused. Wire them now, not in a futu
 
 ### Per-service gap table
 
-| Service | Status (verified 2026-07-04) | Remaining |
-|---|---|---|
-| OpenSearch | ✅ full-text audit search (`AuditSearch` on control + siem), outcome facets, **suppression rules** | aggregation charts, alert-rule CRUD |
-| Langfuse | ✅ first-party trace read-back (`safeListTraces` → `LangfuseTraces` on observability) + run-trace table | cost→FinOps rollup, score charts |
-| Marquez | ✅ lineage graph read-back (`readLineageView`, graceful fallback) + curate UI | richer graph viz |
-| OpenBao | ✅ KV read/write/list + secrets panel (control) | key-rotation UI |
-| Presidio | ✅ `/analyze` + **`/anonymize` wired** (live test box runs the active adapter) | custom-recognizers UI |
-| FleetDM | ✅ device list + enroll + device actions + policy version | live-query UI, software inventory |
-| Superset | ✅ guest-token SDK embed + SQL API (`superset.ts` + analytics page) | provision a default dashboard |
-| Unleash | ✅ **full flag management UI** (create/toggle/delete) + gate-open override | A/B variants, gradual rollout |
-| Qdrant | ✅ reindex-from-Brain + point-count inspector (built, LanceDB still default) | flip default when populated |
-| Temporal | runtime adapter (`agentruntime.ts`) scaffolded | `@temporalio/client` worker, durable runs (L) |
+| Service    | Status (verified 2026-07-04)                                                                            | Remaining                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| OpenSearch | ✅ full-text audit search (`AuditSearch` on control + siem), outcome facets, **suppression rules**      | aggregation charts, alert-rule CRUD           |
+| Langfuse   | ✅ first-party trace read-back (`safeListTraces` → `LangfuseTraces` on observability) + run-trace table | cost→FinOps rollup, score charts              |
+| Marquez    | ✅ lineage graph read-back (`readLineageView`, graceful fallback) + curate UI                           | richer graph viz                              |
+| OpenBao    | ✅ KV read/write/list + secrets panel (control)                                                         | key-rotation UI                               |
+| Presidio   | ✅ `/analyze` + **`/anonymize` wired** (live test box runs the active adapter)                          | custom-recognizers UI                         |
+| FleetDM    | ✅ device list + enroll + device actions + policy version                                               | live-query UI, software inventory             |
+| Superset   | ✅ guest-token SDK embed + SQL API (`superset.ts` + analytics page)                                     | provision a default dashboard                 |
+| Unleash    | ✅ **full flag management UI** (create/toggle/delete) + gate-open override                              | A/B variants, gradual rollout                 |
+| Qdrant     | ✅ reindex-from-Brain + point-count inspector (built, LanceDB still default)                            | flip default when populated                   |
+| Temporal   | runtime adapter (`agentruntime.ts`) scaffolded                                                          | `@temporalio/client` worker, durable runs (L) |
 
 **Definition of done:** every OSS service is a **full management surface** — read back AND
 create/update/delete + trigger actions. No write-only sinks, no read-only dashboards.
@@ -473,6 +505,7 @@ create/update/delete + trigger actions. No write-only sinks, no read-only dashbo
 > **VERIFIED audit (2026-07-05, five parallel file:line code audits — see
 > `docs/SERVICE_CAPABILITY_AUDIT.md`):** of 14 integrations only **2 are DEEP** (SeaweedFS, Langfuse).
 > **4 are SCAFFOLD** — the integration is inert or first-party does the real work:
+>
 > - **Temporal** — fire-and-forget POST never polled; `runAgent()` is 100% synchronous. Not durable.
 > - **FleetDM** — list-hosts only; device commands/policy hit first-party Postgres, not FleetDM.
 > - **Superset** — embeds a possibly-nonexistent dashboard UUID (ghost → blank iframe); no provisioning.
@@ -488,23 +521,23 @@ create/update/delete + trigger actions. No write-only sinks, no read-only dashbo
 
 ## Phase 4.9 — Deep integrations (ACTIVE PRIORITY, started 2026-07-05)
 
-**Goal:** make each integration actually *use* its service, or stop claiming it. Close the gap between
+**Goal:** make each integration actually _use_ its service, or stop claiming it. Close the gap between
 what the UI/marketing implies and what the code does. Parallel execution — 3 agents at a time,
 worktree-isolated (nothing deploys until reviewed/merged).
 
 **Ranked worklist** (value × the fact that the current state misleads):
 
-| # | Integration | From → To | Effort | Batch |
-|---|---|---|---|---|
-| 1 | **Vector filtering + hybrid search** | ANN-only → metadata filters + BM25/hybrid rerank; fix 1000-scroll cap | M | 1 |
-| 2 | **OpenSearch real aggregations** | JS rollups on 5000 docs → native `aggs` (terms/date_histogram/percentiles); alert-rule CRUD | M | 1 |
-| 3 | **Superset dashboard provisioning** | ghost UUID → provision a real dashboard over the audit index; verify-or-fail the embed | S | 1 |
-| 4 | **Temporal durable runs** | sync `runAgent()` → real `@temporalio/client` + worker + `AgentRunWorkflow`; poll state; queue on `OFFGRID_QUEUE_ENABLED` | L | 2 |
-| 5 | **FleetDM live-query + software inventory** | list-only → osquery live query UI + per-device software/CVE inventory + policy CRUD against FleetDM | M | 2 |
-| 6 | **Presidio custom recognizers** | analyze/anonymize → manage custom recognizers + deny lists + per-entity thresholds | M | 2 |
-| 7 | **OPA Rego authoring/deploy** | JSON push → author/validate/deploy real Rego bundles; keep first-party ABAC as the default | M | 3 |
-| 8 | **OpenBao depth** | KV CRUD → key rotation, dynamic secrets (DB), lease/TTL view, seal/unseal ops | M | 3 |
-| 9 | **Unleash real management** | read-only eval → real Unleash flag CRUD + variants + gradual rollout (or drop the Unleash label) | S/M | 3 |
+| #   | Integration                                 | From → To                                                                                                                 | Effort | Batch |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------ | ----- |
+| 1   | **Vector filtering + hybrid search**        | ANN-only → metadata filters + BM25/hybrid rerank; fix 1000-scroll cap                                                     | M      | 1     |
+| 2   | **OpenSearch real aggregations**            | JS rollups on 5000 docs → native `aggs` (terms/date_histogram/percentiles); alert-rule CRUD                               | M      | 1     |
+| 3   | **Superset dashboard provisioning**         | ghost UUID → provision a real dashboard over the audit index; verify-or-fail the embed                                    | S      | 1     |
+| 4   | **Temporal durable runs**                   | sync `runAgent()` → real `@temporalio/client` + worker + `AgentRunWorkflow`; poll state; queue on `OFFGRID_QUEUE_ENABLED` | L      | 2     |
+| 5   | **FleetDM live-query + software inventory** | list-only → osquery live query UI + per-device software/CVE inventory + policy CRUD against FleetDM                       | M      | 2     |
+| 6   | **Presidio custom recognizers**             | analyze/anonymize → manage custom recognizers + deny lists + per-entity thresholds                                        | M      | 2     |
+| 7   | **OPA Rego authoring/deploy**               | JSON push → author/validate/deploy real Rego bundles; keep first-party ABAC as the default                                | M      | 3     |
+| 8   | **OpenBao depth**                           | KV CRUD → key rotation, dynamic secrets (DB), lease/TTL view, seal/unseal ops                                             | M      | 3     |
+| 9   | **Unleash real management**                 | read-only eval → real Unleash flag CRUD + variants + gradual rollout (or drop the Unleash label)                          | S/M    | 3     |
 
 **Definition of done per item:** the service's real capability is reachable from the console
 (read + create/update/delete + trigger), pure logic in `src/lib`, thin routes, **tests in `test/`**,
@@ -532,12 +565,13 @@ inline runs.
 
 ## Phase 4.11 — Audit log & accountability (ACTIVE PRIORITY, started 2026-07-05)
 
-**Goal:** an enterprise-grade audit + accounting layer — *who did what*, and *what it cost*. Every
+**Goal:** an enterprise-grade audit + accounting layer — _who did what_, and _what it cost_. Every
 auditable action is attributed to an actor (user or machine) and a project/org, and usage + spend
 roll up per user, per project, per model, and org-wide. This is a first-class governance requirement,
 not analytics polish.
 
 **What we need audit logs / accounting for (the coverage list):**
+
 - **Chats** — who sent which chats (actor, model, tokens, when), per user + per project.
 - **Workflows / agent runs** — who ran which workflow/agent, its steps, outcome, tokens, cost.
 - **Spend** — attributed cost per user, per project/org, per model, and totals (the on-prem $ story).
@@ -548,6 +582,7 @@ not analytics polish.
 - **Data actions** — connector syncs, ingests, retrieval queries (who queried what).
 
 **The audit-event contract (single canonical shape — all producers emit it, all views read it):**
+
 ```
 {
   ts,                       // ISO timestamp
@@ -562,10 +597,12 @@ not analytics polish.
   runId?, ip?
 }
 ```
+
 Stored in Postgres `audit_events` (source of truth) + shipped to OpenSearch `offgrid-audit`
 (full-text + aggregations). Correlated by `runId` where applicable (Phase-C2 already wired this).
 
 **Surfaces to build (full CRUD-console standard — read + filter + export):**
+
 1. **Audit log** — a filterable log: by actor, action type, project, time range, outcome. "Who sent
    what chats / ran what workflows" answered directly. Full-text search + export (CSV/JSON) for
    compliance. Backed by OpenSearch `searchAudit` (extend its filters/facets).
@@ -583,6 +620,7 @@ attributed to X with its tokens/cost). No un-attributed actions.
 ---
 
 ## Phase 4.5 — AI Studio (non-technical builder)
+
 **Goal:** non-technical users — ops, analysts, domain experts — can build AI workflows without knowing routing, policy pipelines, or any technical terminology. They describe what they want in plain language; Studio wires it.
 
 **Context:** the Studio module (`/studio`) exists in the module registry and renders a placeholder. The real builder has never been built out. This phase defines and delivers it properly.
@@ -593,6 +631,7 @@ attributed to X with its tokens/cost). No un-attributed actions.
 ### What non-technical means here
 
 Studio must work for someone who:
+
 - Does not know what a system prompt is
 - Does not know what a temperature or top-k is
 - Cannot distinguish between a RAG pipeline and a chat completion
@@ -618,7 +657,9 @@ Inline test chat with the agent before publishing. One-click save → deploys as
 Publish to the org (all users can find and chat with it), a team, or keep private. Generates a direct link.
 
 ### What's hidden from the builder
+
 All of the following are handled automatically and never exposed in the Studio UI:
+
 - Model selection (Studio picks the best available model from the gateway for the task)
 - Temperature / sampling params
 - Token limits
@@ -627,19 +668,23 @@ All of the following are handled automatically and never exposed in the Studio U
 - API keys / auth tokens for skills (entered once by an admin in Integrations)
 
 ### Technical substrate
+
 Studio agents are `AgentRun` records with a saved `StudioTemplate` config (stored in Postgres, org-scoped). The template resolves to a system prompt + skill list + knowledge collection ID at run time. No new agent runtime — same Temporal worker, different input.
 
 ### Surfaces to build
-| Surface | What |
-|---|---|
-| `/studio` page | Template gallery — browse, duplicate, launch |
-| Studio builder | 4-step flow (Goal → Skills → Data → Try/Publish) |
-| `StudioTemplate` schema | Postgres table, org-scoped, versioned |
-| `/api/v1/studio/*` routes | CRUD for templates, publish/unpublish |
-| Template runner | Resolve template → AgentRun input at chat time |
+
+| Surface                   | What                                             |
+| ------------------------- | ------------------------------------------------ |
+| `/studio` page            | Template gallery — browse, duplicate, launch     |
+| Studio builder            | 4-step flow (Goal → Skills → Data → Try/Publish) |
+| `StudioTemplate` schema   | Postgres table, org-scoped, versioned            |
+| `/api/v1/studio/*` routes | CRUD for templates, publish/unpublish            |
+| Template runner           | Resolve template → AgentRun input at chat time   |
 
 ### Definition of done
+
 A non-technical user with no prior AI experience can:
+
 1. Open Studio
 2. Describe their workflow in plain English
 3. Connect a knowledge base (upload PDFs)
@@ -663,6 +708,7 @@ Beyond compose+run, Studio must be a complete builder. Sequenced sub-milestones:
 
 When launching/deploying a Studio app, the builder must let you route to a **cloud model**
 (OpenAI/Anthropic/etc.), not just local — and supply the **provider API token** required. Flow:
+
 - Studio app config gets a model picker that includes cloud models (from the gateway's leashed-cloud routing) + a field to provide the provider key (stored as a secret via the config service / OpenBao, never in the workflow JSON).
 - The gateway's routing rules already model local↔cloud; wire the app's chosen model + key through `runAgent` → gateway so the deployed app can call the cloud model.
 - **The FinOps layer attributes that cloud spend** — the gateway logs the call (model, tokens, caller `app:<slug>`) to the OpenSearch index that FinOps already reads, so cloud cost per app/user shows up in FinOps automatically (the `(ip, token, meta)` token store + cost pricing already exist).
@@ -684,6 +730,7 @@ The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lova
 **Definition of done:** a non-technical user builds, previews, iteratively refines, and one-click deploys a real working app — parity with bolt.new/Lovable — entirely on-prem and governed.
 
 ### Non-negotiables for all of the above
+
 - SOLID + the ports/adapters discipline in `docs/ENGINEERING.md`.
 - Every underlying service actually alive and exercised (no stubbed blocks presented as working).
 
@@ -694,6 +741,7 @@ The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lova
 **Goal:** nothing shown is fabricated. Two live fabrications removed (`syncConnector` random counts, random latency fallback); seed scripts (`src/db/seed.ts`, `seed-agentic.ts`, `brain.ts` SEED_DOCS) stop pre-populating; real producers wired.
 
 **Real enterprise data sources** (Docker on S1's existing OrbStack — no new node/OrbStack-first-run needed; Snowflake/Databricks aren't self-hostable so use connectable OSS equivalents, labeled honestly):
+
 - **Core Banking** — Postgres with a realistic schema + data (customers, accounts, transactions, claims).
 - **Warehouse** — MinIO (S3) + DuckDB/Trino as the "Snowflake/Databricks" stand-in.
 - **CRM** — a mock Salesforce-style REST API.
@@ -712,6 +760,7 @@ The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lova
 ---
 
 ## Phase 4.6 — Chat feature parity (ChatGPT/Claude-grade UX)
+
 **Goal:** the chat surface is currently thin. Bring it to parity with ChatGPT/Claude so it's a product people actually prefer, not a toy over the gateway.
 
 **Context:** the chat works (streams from the gateway) but is missing table-stakes interaction features. Users notice immediately.
@@ -721,28 +770,33 @@ The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lova
 ### Gaps to close (all confirmed missing today)
 
 **Message actions**
+
 - **Retry** — regenerate the last assistant turn (same or different model).
 - **Stop** — cancel an in-flight stream mid-generation (abort the upstream fetch, keep partial text).
 - **Edit** — edit a previous user message in place and re-run from that point (fork the conversation).
 - Copy, thumbs up/down (feeds Observability), branch/fork a conversation.
 
 **Attachments & images**
+
 - **Drag-and-drop images/files** onto the composer (not there today).
 - **Image gallery** — view all images attached in a conversation in a lightbox/grid; click a thumbnail to expand. Reuse the Storage module's viewer.
 - Paste-from-clipboard image support.
 - Show attached-image thumbnails inline in the message, not just filenames.
 
 **Artifacts**
+
 - **Edit artifact in place** — an inline editor for generated HTML/SVG/React/code artifacts, with live re-render (today artifacts are read-only after generation).
 - Version history + revert on an artifact (schema already supports `chat_artifact_versions`).
 - "Ask AI to change this" on a selected region of an artifact.
 
 **Composer & session**
+
 - Slash-command palette polish, model picker with capabilities, per-message model badge.
 - Regenerate-with-different-model, streaming token counter, stop/continue.
 - Keyboard shortcuts (⌘↵ send, ↑ to edit last, esc to stop).
 
 **Error handling (currently poor)**
+
 - Surface gateway/stream errors **inline in the message** (not a silent empty bubble or a toast that vanishes) — with the actual reason (gateway offline, 401, rate-limited, timeout, model unavailable).
 - **Retry affordance on every failed turn** — one click to re-run the failed generation.
 - Distinguish transient (retryable: timeout, 502) from terminal (401/403/400) errors and message accordingly.
@@ -751,6 +805,7 @@ The bar: Studio should feel as good as the best OSS app-builders (bolt.new, Lova
 - Attachment/upload errors reported per-file with a reason.
 
 ### Definition of done
+
 The chat supports: stop, retry, edit-and-rerun on any message; drag-drop + paste + inline image thumbnails + a per-conversation image gallery; in-place artifact editing with live re-render and version revert. A user coming from ChatGPT/Claude finds nothing obviously missing.
 
 > **Status (2026-07-05): essentially done.** Verified in `ChatWorkspace`/`ArtifactView`: Stop
@@ -762,6 +817,7 @@ The chat supports: stop, retry, edit-and-rerun on any message; drag-drop + paste
 ---
 
 ## Phase 5 — Unified API gateway (`console-api.getoffgridai.co`)
+
 **Goal:** every service's API is discoverable and callable through one surface. Makes the platform buildable-on without touching the console UI.
 **Timeline:** 3–4 weeks (largely config and codegen). Parallelisable with Phase 4.
 **Depends on:** Phase 3 (auth must be org-scoped before public exposure).
@@ -779,26 +835,27 @@ The chat supports: stop, retry, edit-and-rerun on any message; drag-drop + paste
 
 9 of 14 services already publish native OpenAPI specs. A single Swagger UI shell with a service dropdown loads each spec via the Caddy proxy (solves CORS). Services without a machine-readable spec get hand-authored YAML stubs.
 
-| Service | Spec URL | Notes |
-|---|---|---|
-| Console | `/specs/console` | Generated — biggest gap |
-| OpenBao | `/specs/openbao` | Native at `/v1/sys/internal/specs/openapi` |
-| Qdrant | `/specs/qdrant` | Native at `/openapi/openapi-3.1.0.json` |
-| Marquez | `/specs/marquez` | Native at `/api/v1/openapi` |
-| Langfuse | `/specs/langfuse` | Native at `/api/public/openapi.json` |
-| Superset | `/specs/superset` | Native at `/api/v1/openapi.json` |
-| FleetDM | `/specs/fleetdm` | Native at `/api/openapi.json` |
-| Presidio | `/specs/presidio-*` | Native on both analyzer + anonymizer |
-| Unleash | `/specs/unleash` | Native at `/api/swagger.json` |
-| Keycloak | `/specs/keycloak` | Hand-authored (Keycloak has no machine spec) |
-| OPA | `/specs/opa` | Hand-authored |
-| Temporal | `/specs/temporal` | gRPC-only; hand-authored REST bridge spec |
+| Service  | Spec URL            | Notes                                        |
+| -------- | ------------------- | -------------------------------------------- |
+| Console  | `/specs/console`    | Generated — biggest gap                      |
+| OpenBao  | `/specs/openbao`    | Native at `/v1/sys/internal/specs/openapi`   |
+| Qdrant   | `/specs/qdrant`     | Native at `/openapi/openapi-3.1.0.json`      |
+| Marquez  | `/specs/marquez`    | Native at `/api/v1/openapi`                  |
+| Langfuse | `/specs/langfuse`   | Native at `/api/public/openapi.json`         |
+| Superset | `/specs/superset`   | Native at `/api/v1/openapi.json`             |
+| FleetDM  | `/specs/fleetdm`    | Native at `/api/openapi.json`                |
+| Presidio | `/specs/presidio-*` | Native on both analyzer + anonymizer         |
+| Unleash  | `/specs/unleash`    | Native at `/api/swagger.json`                |
+| Keycloak | `/specs/keycloak`   | Hand-authored (Keycloak has no machine spec) |
+| OPA      | `/specs/opa`        | Hand-authored                                |
+| Temporal | `/specs/temporal`   | gRPC-only; hand-authored REST bridge spec    |
 
 **Definition of done:** `https://console-api.getoffgridai.co/docs` loads Swagger UI with all specs selectable. Every console API route documented. Machine client bearer token works on all routes.
 
 ---
 
 ## Phase 6 — Module spine (`defineOffgrid`)
+
 **Goal:** the gateway becomes a true composition root. Add a capability = one config line. The console is the gateway with a fuller config. Enables the SDK in Phase 7.
 **Timeline:** 8–10 weeks.
 **Depends on:** Phase 4 (feature parity must be real before abstracting it) + Phase 5 (the API catalog is what the module manifest routes expose).
@@ -814,23 +871,24 @@ export default defineOffgrid({
     gateway(),
     brain({ vectorStore: qdrant({ url: 'http://qdrant.lan:6333' }) }),
     analytics(),
-    finops({ pricing: { 'gemma-3-9b': { input: 0.10, output: 0.30 } } }),
+    finops({ pricing: { 'gemma-3-9b': { input: 0.1, output: 0.3 } } }),
     proveIt({ provitUrl: 'http://192.168.1.60:7799' }),
     fleet({ fleetdmUrl: 'http://fleet.lan:8070', token: process.env.FLEETDM_TOKEN }),
     observability({ langfuseUrl, langfuseKey }),
   ],
-})
+});
 ```
 
 Each module is a factory returning a manifest:
+
 ```ts
 interface ModuleManifest {
-  id: string
-  nav: NavItem[]
-  routes: RouteDefinition[]
-  settingsPanel?: ReactComponent
-  gatewayHooks?: { sinks?: ObservabilitySink[]; policies?: Policy[] }
-  requires?: Permission[]
+  id: string;
+  nav: NavItem[];
+  routes: RouteDefinition[];
+  settingsPanel?: ReactComponent;
+  gatewayHooks?: { sinks?: ObservabilitySink[]; policies?: Policy[] };
+  requires?: Permission[];
 }
 ```
 
@@ -841,6 +899,7 @@ The host reads the config, mounts everything automatically. Add/remove a module 
 ---
 
 ## Phase 7 — Developer SDK + flywheel
+
 **Goal:** third parties build modules. Managed hosting ships.
 **Timeline:** ongoing from Phase 6.
 **Depends on:** Phase 6 (module spine must exist before it can be an SDK).
@@ -853,6 +912,7 @@ The host reads the config, mounts everything automatically. Add/remove a module 
 ---
 
 ## Phase 8 — The Soul (intelligence layer)
+
 **Goal:** the platform works on your behalf. Context flows in from all sources, synthesis flows out, nodes get smarter over time.
 **Timeline:** after Phase 6. **Explicitly after desktop/mobile capture is built.**
 **Depends on:** `@offgrid/memory` (which depends on desktop/mobile capture — not built yet), Qdrant as default (Phase 4), org-scoped embeddings (Phase 3).
@@ -942,6 +1002,7 @@ CREATE POLICY org_isolation ON agent_runs
 ```
 
 Keycloak JWT claim:
+
 ```json
 {
   "sub": "user-uuid",
@@ -951,6 +1012,7 @@ Keycloak JWT claim:
 ```
 
 File storage (SeaweedFS) namespacing:
+
 ```
 /{org_id}/provit/recordings/{session_id}/{frame}.jpg
 /{org_id}/artifacts/{artifact_id}
@@ -958,6 +1020,7 @@ File storage (SeaweedFS) namespacing:
 ```
 
 The `organizations` table is the anchor:
+
 ```sql
 CREATE TABLE organizations (
   id          text PRIMARY KEY,          -- slug, e.g. "wednesday"
@@ -969,12 +1032,12 @@ CREATE TABLE organizations (
 
 ---
 
-## Phase 9 — Open source + CI/CD deploy (LATER — not now)
+## Phase 9 — Public source + CI/CD deploy (LATER — not now)
 
-**Goal:** make the full console open source and deploy it via GitHub Actions instead of the
+**Goal:** publish the full console source and deploy it via GitHub Actions instead of the
 current manual rsync-over-tunnel. Deferred, but planned.
 
-- **Open-source prep:** license (AGPL-3.0 to match the workspace), scrub the repo of any real
+- **Public-source prep:** Off Grid AI Source-Available License 1.0, scrub the repo of any real
   secrets/hostnames/IPs (move all to env + `.env.example`), CONTRIBUTING + CLA, security policy.
   Nothing in git should be a live secret — audit `deploy/`, `SERVER_STATE.md` (references only),
   and the gateway/keycloak values.
@@ -1003,8 +1066,8 @@ governed OSS, on the enterprise's own hardware. Full mapping: [`platform/DATA_PL
   Debezium/DMS + 300+ connectors), Redpanda (Kinesis/MSK), Great Expectations (DataBrew), SeaweedFS
   lake (S3). Fronted on S1 edge loopbacks 8941–8944; registered in the console health directory.
 - **Console consumers shipped** — ports-and-adapters (`src/lib/adapters/{warehouse,airbyte,data-quality}.ts`)
-  + admin APIs: Catalog, **Query** (read-only SQL = Athena), **Data movement** (trigger sync = Glue/DMS),
-  **Data quality** (checkpoint). The Data-plane management surface (`/data/*`) renders them in product language.
+  - admin APIs: Catalog, **Query** (read-only SQL = Athena), **Data movement** (trigger sync = Glue/DMS),
+    **Data quality** (checkpoint). The Data-plane management surface (`/data/*`) renders them in product language.
 - **Seeded** — 600k-row Indian-BFSI star schema (`deploy/onprem/seed-warehouse.mjs`) so the surfaces show real data.
 - **Governance on the movement path** — PII redaction (Presidio), classification-driven column masking (M4),
   data-allowlist ceiling, data-quality gate, audit + lineage per sync. A data sync IS a governed pipeline.

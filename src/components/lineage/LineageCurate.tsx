@@ -4,6 +4,7 @@ import { Plus, Prohibit, Stack, Tag } from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import { DatasetDetailPanel } from '@/components/lineage/DatasetDetailPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,11 +26,53 @@ interface Props {
   activeNamespace: string | null;
 }
 
-// Curation controls for the Marquez lineage graph: create a namespace, declare tags, tag jobs.
-// Clicking a dataset opens the dataset detail panel (`?dataset=<name>`, a navigational place —
-// Back closes it, the URL is shareable) where its schema/facets/tags are shown and it can be
-// tagged/untagged. Delete is shown but disabled with its reason.
-export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: Readonly<Props>) {
+type GraphProps = Omit<Props, 'datasets'>;
+type DatasetProps = Pick<Props, 'datasets' | 'activeNamespace'>;
+
+// Graph-scoped curation stays with the graph instead of being duplicated across Lineage leaves.
+export function LineageGraphCuration({ namespaces, jobs, activeNamespace }: Readonly<GraphProps>) {
+  const router = useRouter();
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-1.5 text-sm">
+          <Stack className="size-4 text-primary" />
+          Manage graph
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Create namespaces and tag jobs in the lineage store. The graph is append-only, so stored
+          entities cannot be deleted through the API.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <CreateNamespaceForm onDone={() => router.refresh()} />
+        <TagJobForm jobs={jobs} namespace={activeNamespace} onDone={() => router.refresh()} />
+
+        {namespaces.length ? (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Namespaces
+            </span>
+            {namespaces.map((n) => (
+              <Badge
+                key={n}
+                variant={n === activeNamespace ? 'secondary' : 'outline'}
+                className="text-[10px]"
+              >
+                {n}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Clicking a dataset opens the URL-driven detail sheet, where its schema, facets, and tags remain
+// editable. Delete stays visible but disabled because Marquez exposes no delete endpoint.
+export function LineageDatasetCatalog({ datasets, activeNamespace }: Readonly<DatasetProps>) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -46,16 +89,15 @@ export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: R
     <Card className="shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-1.5 text-sm">
-          <Stack className="size-4 text-primary" />
-          Curate lineage
+          <Tag className="size-4 text-primary" />
+          Dataset catalog
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Create namespaces and tag datasets/jobs in the lineage store. Namespace + tag writes are
-          real. Entity deletion is unavailable — the graph is append-only.
+          Inspect schema and facets, declare tags, then apply or remove them from each dataset.
+          Dataset deletion is unavailable because the lineage graph is append-only.
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
-        <CreateNamespaceForm onDone={() => router.refresh()} />
         <DeclareTagForm onDone={() => router.refresh()} />
 
         {/* Datasets — click to tag; delete disabled + explained. */}
@@ -92,25 +134,7 @@ export function LineageCurate({ namespaces, datasets, jobs, activeNamespace }: R
             )}
           </div>
         </div>
-
-        <TagJobForm jobs={jobs} namespace={activeNamespace} onDone={() => router.refresh()} />
-
-        {namespaces.length ? (
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Namespaces
-            </span>
-            {namespaces.map((n) => (
-              <Badge
-                key={n}
-                variant={n === activeNamespace ? 'secondary' : 'outline'}
-                className="text-[10px]"
-              >
-                {n}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
+        <DatasetDetailPanel namespace={activeNamespace} />
       </CardContent>
     </Card>
   );
@@ -306,4 +330,3 @@ function TagJobForm({
     </div>
   );
 }
-

@@ -114,17 +114,25 @@ export interface OrgContext {
 // getters and record it on the context; the global getters are called as-is and will inherit
 // org-scoping for free if/when they gain it.
 export async function getOrgContext(orgId: string = DEFAULT_ORG): Promise<OrgContext> {
-  const [connectors, datasets, tools, routingRules, guardrailRules, policy, brainDocuments, dataDomains] =
-    await Promise.all([
-      listConnectors(orgId),
-      listDatasets(orgId),
-      listTools(orgId),
-      listRoutingRules(orgId),
-      listGuardrailRules(orgId),
-      getOrgPolicy(),
-      listDocuments(),
-      loadDataDomains(orgId),
-    ]);
+  const [
+    connectors,
+    datasets,
+    tools,
+    routingRules,
+    guardrailRules,
+    policy,
+    brainDocuments,
+    dataDomains,
+  ] = await Promise.all([
+    listConnectors(orgId),
+    listDatasets(orgId),
+    listTools(orgId),
+    listRoutingRules(orgId),
+    listGuardrailRules(orgId),
+    getOrgPolicy(),
+    listDocuments(orgId),
+    loadDataDomains(orgId),
+  ]);
 
   return {
     orgId,

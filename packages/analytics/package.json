@@ -2,7 +2,7 @@
   "name": "@offgrid/analytics",
   "version": "0.0.1",
   "description": "Plug-and-play usage analytics layer for the Off Grid AI local gateway: an observability sink that ingests traffic records, plus query helpers and integration adapters (PostHog, Mixpanel, webhook).",
-  "license": "AGPL-3.0-only",
+  "license": "LicenseRef-Off-Grid-AI-1.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import {
   buildSchedulesView,
   isValidCron,
+  namespacedScheduleId,
+  ownsSchedule,
   sanitizeScheduleId,
   scheduleRunIdSeed,
   shapeSchedule,
@@ -30,9 +32,9 @@ test('sanitizeScheduleId: keeps id charset URL/Temporal-safe', () => {
 });
 
 test('toScheduleSpec: validates required fields', () => {
-  assert.throws(() => toScheduleSpec({ query: 'q', cron: '0 9 * * *' }), /agentId required/);
-  assert.throws(() => toScheduleSpec({ agentId: 'a', cron: '0 9 * * *' }), /query required/);
-  assert.throws(() => toScheduleSpec({ agentId: 'a', query: 'q', cron: 'bad' }), /valid cron/);
+  assert.throws(() => toScheduleSpec({ query: 'q', cron: '0 9 * * *' }, 'org_1'), /agentId required/);
+  assert.throws(() => toScheduleSpec({ agentId: 'a', cron: '0 9 * * *' }, 'org_1'), /query required/);
+  assert.throws(() => toScheduleSpec({ agentId: 'a', query: 'q', cron: 'bad' }, 'org_1'), /valid cron/);
 });
 
 test('toScheduleSpec: normalizes + defaults + auto-generates id', () => {
@@ -42,9 +44,9 @@ test('toScheduleSpec: normalizes + defaults + auto-generates id', () => {
     cron: '0 9 * * *',
     caller: 'ops@x.io',
     requireReview: true,
-    orgId: 'org_1',
+    orgId: 'forged_org',
     note: 'daily brief',
-  });
+  }, 'org_1');
   assert.equal(spec.input.agentId, 'support');
   assert.equal(spec.input.query, 'summarize overnight tickets');
   assert.equal(spec.input.caller, 'ops@x.io');
@@ -53,10 +55,15 @@ test('toScheduleSpec: normalizes + defaults + auto-generates id', () => {
   assert.equal(spec.cron, '0 9 * * *');
   assert.equal(spec.note, 'daily brief');
   assert.equal(spec.paused, false);
-  assert.ok(spec.scheduleId.startsWith('agentsched-support-'), spec.scheduleId);
+  assert.equal(spec.orgId, 'org_1');
+  assert.equal(ownsSchedule(spec.scheduleId, 'org_1', 'agent'), true);
+  assert.equal(ownsSchedule(spec.scheduleId, 'org_2', 'agent'), false);
   // Explicit id is honored + sanitized.
-  const withId = toScheduleSpec({ agentId: 'a', query: 'q', cron: '@daily', scheduleId: 'my sched' });
-  assert.equal(withId.scheduleId, 'my-sched');
+  const withId = toScheduleSpec(
+    { agentId: 'a', query: 'q', cron: '@daily', scheduleId: 'my sched' },
+    'org_1',
+  );
+  assert.equal(withId.scheduleId, namespacedScheduleId('org_1', 'agent', 'my-sched'));
 });
 
 test('scheduleRunIdSeed: stable per schedule', () => {

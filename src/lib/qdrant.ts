@@ -8,6 +8,8 @@ import {
   type QdrantFieldCondition,
   type RetrievalOptions,
 } from '@/lib/retrieval/query';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+import { migrateLegacyQdrantPayloads } from '@/lib/qdrant-migration';
 
 // Superuser roles that bypass server-side ACL narrowing (the post-filter also passes them).
 const SUPERUSER_ROLES = ['admin'];
@@ -17,8 +19,7 @@ function aclPayload(acl?: DocAcl): Record<string, unknown> {
   const p: Record<string, unknown> = {};
   if (acl?.owner) p[ACL_FIELDS.owner] = acl.owner;
   if (acl?.allowed_roles?.length) p[ACL_FIELDS.allowedRoles] = acl.allowed_roles;
-  if (acl?.allowed_subjects?.length)
-    p[ACL_FIELDS.allowedSubjects] = acl.allowed_subjects;
+  if (acl?.allowed_subjects?.length) p[ACL_FIELDS.allowedSubjects] = acl.allowed_subjects;
   if (acl?.data_class) p[ACL_FIELDS.dataClass] = acl.data_class;
   return p;
 }
@@ -50,11 +51,21 @@ async function ensureCollection(): Promise<void> {
   if (ready) return ready;
   ready = (async () => {
     const head = await qfetch(`/collections/${COLLECTION}`, 'GET');
-    if (head.ok) return;
-    await qfetch(`/collections/${COLLECTION}`, 'PUT', {
-      vectors: { size: EMBED_DIM, distance: 'Cosine' },
-    });
-  })();
+    if (!head.ok) {
+      const created = await qfetch(`/collections/${COLLECTION}`, 'PUT', {
+        vectors: { size: EMBED_DIM, distance: 'Cosine' },
+      });
+      if (!created.ok) throw new Error(`Qdrant collection create failed (${created.status})`);
+    }
+    // Pre-tenancy points had no org_id. Assign those once to the historic default tenant before
+    // any tenant-scoped list/search can proceed; a failed migration fails closed.
+    await migrateLegacyQdrantPayloads(COLLECTION, DEFAULT_ORG, (path, method, body) =>
+      qfetch(path, method, body),
+    );
+  })().catch((error) => {
+    ready = null;
+    throw error;
+  });
   return ready;
 }
 
@@ -70,19 +81,24 @@ export async function qdrantAdd(
   source: string,
   text: string,
   acl?: DocAcl,
+  orgId: string = DEFAULT_ORG,
 ): Promise<BrainDoc> {
   await ensureCollection();
   const id = randomUUID();
   const vector = await embed(`${title}\n${text}`);
   await qfetch(`/collections/${COLLECTION}/points`, 'PUT', {
-    points: [{ id, vector, payload: { title, source, text, ...aclPayload(acl) } }],
+    points: [{ id, vector, payload: { org_id: orgId, title, source, text, ...aclPayload(acl) } }],
   });
-  return { id, title, source, text, acl };
+  return { id, orgId, title, source, text, acl };
 }
 
-export async function qdrantDelete(id: string): Promise<void> {
+export async function qdrantDelete(id: string, orgId: string = DEFAULT_ORG): Promise<void> {
   await ensureCollection();
-  await qfetch(`/collections/${COLLECTION}/points/delete`, 'POST', { points: [id] });
+  await qfetch(`/collections/${COLLECTION}/points/delete`, 'POST', {
+    filter: {
+      must: [{ key: 'org_id', match: { value: orgId } }, { has_id: [id] }],
+    },
+  });
 }
 
 // Bulk reindex — push a set of already-materialized Brain docs into the Qdrant collection so that
@@ -91,7 +107,14 @@ export async function qdrantDelete(id: string): Promise<void> {
 // Embeddings are recomputed through the inference port; the doc id is preserved so re-runs upsert
 // rather than duplicate. Returns the number of points written.
 export async function qdrantReindex(
-  docs: ReadonlyArray<{ id: string; title: string; source: string; text: string; acl?: DocAcl }>,
+  docs: ReadonlyArray<{
+    id: string;
+    orgId: string;
+    title: string;
+    source: string;
+    text: string;
+    acl?: DocAcl;
+  }>,
 ): Promise<number> {
   await ensureCollection();
   if (docs.length === 0) return 0;
@@ -103,7 +126,13 @@ export async function qdrantReindex(
       slice.map(async (d) => ({
         id: d.id,
         vector: await embed(`${d.title}\n${d.text}`),
-        payload: { title: d.title, source: d.source, text: d.text, ...aclPayload(d.acl) },
+        payload: {
+          org_id: d.orgId,
+          title: d.title,
+          source: d.source,
+          text: d.text,
+          ...aclPayload(d.acl),
+        },
       })),
     );
     const res = await qfetch(`/collections/${COLLECTION}/points`, 'PUT', { points });
@@ -134,7 +163,10 @@ interface ScrollPoint {
   id: string;
   // ACL keys (owner / allowed_roles / allowed_subjects / data_class) ride along in the payload;
   // aclFromPayload() reads them back for the post-filter. Absent keys → un-ACL'd (visible).
-  payload: { title: string; source: string; text: string } & Record<string, unknown>;
+  payload: { org_id?: string; title: string; source: string; text: string } & Record<
+    string,
+    unknown
+  >;
 }
 
 // Full scroll — paginate past Qdrant's per-request page size with the scroll cursor so large
@@ -143,7 +175,7 @@ interface ScrollPoint {
 const SCROLL_PAGE = 1000;
 const MAX_SCROLL = 1_000_000;
 
-export async function qdrantList(): Promise<BrainDoc[]> {
+export async function qdrantList(orgId: string = DEFAULT_ORG): Promise<BrainDoc[]> {
   await ensureCollection();
   const docs: BrainDoc[] = [];
   let offset: unknown = undefined;
@@ -151,6 +183,7 @@ export async function qdrantList(): Promise<BrainDoc[]> {
     const res = await qfetch(`/collections/${COLLECTION}/points/scroll`, 'POST', {
       limit: SCROLL_PAGE,
       with_payload: true,
+      filter: { must: [{ key: 'org_id', match: { value: orgId } }] },
       ...(offset !== undefined && offset !== null ? { offset } : {}),
     });
     const data = (await res.json()) as {
@@ -159,6 +192,7 @@ export async function qdrantList(): Promise<BrainDoc[]> {
     for (const p of data.result?.points ?? []) {
       docs.push({
         id: String(p.id),
+        orgId: typeof p.payload.org_id === 'string' ? p.payload.org_id : orgId,
         title: p.payload.title,
         source: p.payload.source,
         text: p.payload.text,
@@ -177,6 +211,7 @@ interface SearchPoint extends ScrollPoint {
 function toHit(p: SearchPoint): BrainHit {
   return {
     id: String(p.id),
+    orgId: typeof p.payload.org_id === 'string' ? p.payload.org_id : DEFAULT_ORG,
     title: p.payload.title,
     source: p.payload.source,
     text: p.payload.text,
@@ -189,7 +224,7 @@ function toHit(p: SearchPoint): BrainHit {
 // `text` field (needs a full-text payload index on `text`, ensured lazily below). This is the
 // BM25-flavoured lexical leg that RRF fuses with the dense-vector leg.
 function keywordShould(query: string): Array<{ key: string; match: { text: string } }> {
-  const terms = Array.from(new Set((query.toLowerCase().match(/[a-z0-9]{2,}/g) ?? []))).slice(0, 16);
+  const terms = Array.from(new Set(query.toLowerCase().match(/[a-z0-9]{2,}/g) ?? [])).slice(0, 16);
   return terms.map((t) => ({ key: 'text', match: { text: t } }));
 }
 
@@ -229,6 +264,7 @@ export async function qdrantSearch(
   query: string,
   k = 5,
   opts: RetrievalOptions = {},
+  orgId: string = DEFAULT_ORG,
 ): Promise<BrainHit[]> {
   await ensureCollection();
   const vector = await embed(query);
@@ -238,9 +274,10 @@ export async function qdrantSearch(
   // (metadata) AND `should` (≥1 must hold). Post-filter is authoritative regardless.
   const aclShould = opts.asker ? buildAclShouldWithUnAcled(opts.asker) : undefined;
   const baseFilter = buildQdrantFilter(opts.filter);
+  const must = [{ key: 'org_id', match: { value: orgId } }, ...(baseFilter?.must ?? [])];
   const filter =
-    baseFilter || aclShould
-      ? { ...baseFilter, ...(aclShould ? { should: aclShould } : {}) }
+    must.length > 0 || aclShould
+      ? { must, ...(aclShould ? { should: aclShould } : {}) }
       : undefined;
   // When an ACL applies, over-fetch so the post-filter still yields up to k allowed hits.
   const fetchK = opts.asker ? Math.max(k * 4, 20) : k;

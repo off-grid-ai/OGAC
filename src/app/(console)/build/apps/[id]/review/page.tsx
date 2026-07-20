@@ -53,7 +53,7 @@ export default async function AppReviewTab({ params }: Readonly<{ params: Promis
             return (
               <Link
                 key={r.id}
-                href={`/build/apps/${id}/runs/${encodeURIComponent(r.id)}`}
+                href={`/solutions/apps/${id}/runs/${encodeURIComponent(r.id)}`}
                 className="group flex flex-col gap-2 rounded-md border border-amber-500/40 bg-amber-500/[0.05] p-4 hover:border-amber-500/70"
               >
                 <div className="flex items-center justify-between">

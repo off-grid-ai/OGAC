@@ -17,7 +17,7 @@ import {
 // A small "quick add document" affordance on each collection card in the Knowledge LIST. It is a
 // convenience only — index one document into a collection without leaving the list — NOT the way to
 // open a collection (the card links to the deep-linkable detail page for that). Full document
-// management (list + delete + upload) lives on /workspace/knowledge/[id].
+// management (list + delete + upload) lives on /data/knowledge/[id].
 //
 // Which card's quick-add is open lives in the URL (?panel=quick-add-doc&collection=<id>) so Back
 // closes it and it's deep-linkable — never local-only state.
@@ -91,7 +91,7 @@ export function QuickAddDocument({
             <SheetDescription>
               Index a text document into this collection — it&rsquo;s chunked and embedded on-prem.
               To review or remove documents,{' '}
-              <a href={`/workspace/knowledge/${collectionId}`} className="underline">
+              <a href={`/data/knowledge/${collectionId}`} className="underline">
                 open the collection
               </a>.
             </SheetDescription>

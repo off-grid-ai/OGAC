@@ -165,7 +165,7 @@ export function StudioForge({
       if (!res.ok) throw new Error('Could not save the app');
       const app = (await res.json()) as { id: string };
       toast.success(`"${spec.title}" saved`);
-      router.push(`/build/apps/${app.id}`);
+      router.push(`/solutions/apps/${app.id}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed');
       setSaving(false);

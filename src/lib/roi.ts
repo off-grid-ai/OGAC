@@ -49,6 +49,43 @@ export interface RoiResult {
   roiMultiple: number | null;
 }
 
+export interface InvestmentCaseInput {
+  /** Estimated annual gross benefit. */
+  annualBenefit: number;
+  /** One-time implementation cost incurred in year one. */
+  implementationCost: number;
+  /** Recurring annual operating cost. */
+  annualOperatingCost: number;
+}
+
+export interface InvestmentCaseResult {
+  firstYearNetValue: number;
+  /** Gross benefit divided by all first-year costs. Null when no cost was supplied. */
+  benefitCostMultiple: number | null;
+  paybackMonths: number | null;
+}
+
+/** The canonical ROI hypothesis arithmetic used by Blueprint benchmark surfaces. */
+export function computeInvestmentCase(input: InvestmentCaseInput): InvestmentCaseResult {
+  const annualBenefit = clean(input.annualBenefit);
+  const implementationCost = clean(input.implementationCost);
+  const annualOperatingCost = clean(input.annualOperatingCost);
+  const firstYearCost = implementationCost + annualOperatingCost;
+  const firstYearNetValue = round2(annualBenefit - firstYearCost);
+  const recurringMonthlyNet = (annualBenefit - annualOperatingCost) / 12;
+  const paybackMonths =
+    implementationCost > 0 && recurringMonthlyNet > 0
+      ? round2(implementationCost / recurringMonthlyNet)
+      : implementationCost === 0 && annualBenefit > annualOperatingCost
+        ? 0
+        : null;
+  return {
+    firstYearNetValue,
+    benefitCostMultiple: firstYearCost > 0 ? round2(annualBenefit / firstYearCost) : null,
+    paybackMonths,
+  };
+}
+
 // A number that is finite and strictly positive; anything else (NaN, Infinity, ≤0, non-number) → 0.
 // This is what makes zero/missing inputs honest zeros rather than NaN.
 function clean(n: unknown): number {

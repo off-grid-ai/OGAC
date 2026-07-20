@@ -25,7 +25,10 @@ const AUTO_ROLLBACK_ON_DRIFT = process.env.OFFGRID_AUTO_ROLLBACK_ON_DRIFT === '1
 
 export async function runQaSweep(opts: { orgId?: string } = {}): Promise<QaSweep> {
   const at = new Date().toISOString();
-  const [evalRun, drift] = await Promise.all([getEvals().run(), getDrift().analyze()]);
+  const [evalRun, drift] = await Promise.all([
+    getEvals().run(opts.orgId),
+    getDrift().analyze({ orgId: opts.orgId }),
+  ]);
 
   const reasons: string[] = [];
   if (evalRun.score < MIN_SCORE) {
@@ -79,7 +82,12 @@ export async function runQaSweep(opts: { orgId?: string } = {}): Promise<QaSweep
     at,
     degraded,
     reasons,
-    eval: { engine: evalRun.engine, score: evalRun.score, passed: evalRun.passed, total: evalRun.total },
+    eval: {
+      engine: evalRun.engine,
+      score: evalRun.score,
+      passed: evalRun.passed,
+      total: evalRun.total,
+    },
     drift: { engine: drift.engine, status: drift.status, note: drift.note },
     ...(autoRollback ? { autoRollback } : {}),
   };

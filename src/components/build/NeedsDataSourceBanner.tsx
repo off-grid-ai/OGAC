@@ -40,7 +40,7 @@ export function NeedsDataSourceBanner({
         </div>
       </div>
       <Link
-        href={`/build/apps/${appId}`}
+        href={`/solutions/apps/${appId}`}
         className="inline-flex shrink-0 items-center justify-center rounded-md border border-amber-500/50 bg-background px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
       >
         Wire a data source

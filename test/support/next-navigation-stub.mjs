@@ -14,5 +14,5 @@ export function permanentRedirect(url) {
 }
 export const useRouter = () => ({});
 export const useSearchParams = () => new URLSearchParams();
-export const usePathname = () => '/';
+export const usePathname = () => process.env.NEXT_TEST_PATHNAME || '/';
 export const useParams = () => ({});

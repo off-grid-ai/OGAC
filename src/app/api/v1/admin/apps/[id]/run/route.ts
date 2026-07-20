@@ -8,8 +8,10 @@ import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { getApp } from '@/lib/apps-store';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { pipelineRunTag, resolveConsumerPipeline } from '@/lib/chat-pipeline-policy';
-import { resolveContract } from '@/lib/pipeline-contract';
+import { pipelineRunTag } from '@/lib/chat-pipeline-policy';
+import { pipelineBindingHttpFailure } from '@/lib/pipeline-binding-http';
+import { askerFrom } from '@/lib/retrieval/acl';
+import { solutionErrorResponse } from '@/lib/solution-http';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -88,25 +90,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const runId = newAppRunId();
 
-  // PA-16 — resolve the bound-pipeline CONTRACT this run enforces (data allowlist + egress leash +
-  // policy/guardrail overlay), most-specific-wins (app binding → org default). Threaded into the run
-  // context so the inline executor enforces it per step. Null (no binding / unresolvable) ⇒ the run
-  // behaves exactly as before (additive-only). The durable worker path resolves its own contract
-  // (deferred gap — see docs/GAPS_BACKLOG.md PA-16); the inline path is enforced here.
-  const pipelineId = resolveConsumerPipeline(app.pipelineId, null);
-  const contract = await resolveContract(pipelineId, orgId);
-
-  const handle = await submitAppRun(app, input, {
-    orgId,
-    actor: gate.user.email ?? undefined,
-    runId,
-    contract,
-    mode: runMode,
-  });
+  let handle: Awaited<ReturnType<typeof submitAppRun>>;
+  try {
+    handle = await submitAppRun(app, input, {
+      orgId,
+      actor: gate.user.email ?? undefined,
+      runId,
+      asker: askerFrom(gate.user),
+      mode: runMode,
+    });
+  } catch (error) {
+    const solutionFailure = solutionErrorResponse(error);
+    if (solutionFailure) {
+      auditFromSession(gate, orgId, {
+        action: 'solution-deployment.runtime-denied',
+        resource: `app:${id}`,
+        outcome: 'blocked',
+      });
+      return solutionFailure;
+    }
+    const failure = pipelineBindingHttpFailure(error);
+    if (!failure) throw error;
+    auditFromSession(gate, orgId, {
+      action: 'app.run.denied',
+      resource: `app:${id} pipeline-binding:${failure.body.code}`,
+      outcome: 'blocked',
+    });
+    return NextResponse.json(failure.body, { status: failure.status });
+  }
 
   // Tag the run audit with the resolved pipeline so the per-pipeline audit/FinOps lens lights up. The
   // RUN is the join key: stamp runId + a compound resource carrying the pipeline tag.
-  const tag = pipelineRunTag(pipelineId);
+  const tag = pipelineRunTag(app.pipelineId ?? null);
   auditFromSession(gate, orgId, {
     action: 'app.run',
     resource: tag ? `app:${id} ${tag}` : `app:${id}`,

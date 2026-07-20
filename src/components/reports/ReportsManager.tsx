@@ -9,18 +9,13 @@ import {
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -63,8 +58,12 @@ const EMPTY_DRAFT: Draft = {
   schedule: 'none',
 };
 
-export function ReportsManager({ initial }: Readonly<{ initial: Template[] }>) {
+export function ReportsManager({
+  initial,
+  embedded = false,
+}: Readonly<{ initial: Template[]; embedded?: boolean }>) {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useSearchParams();
   const [templates, setTemplates] = useState<Template[]>(initial);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -86,9 +85,10 @@ export function ReportsManager({ initial }: Readonly<{ initial: Template[] }>) {
       const next = new URLSearchParams(params.toString());
       if (value === null) next.delete(key);
       else next.set(key, value);
-      router.push(`/insights/reports?${next.toString()}`);
+      const query = next.toString();
+      router.push(query ? `${pathname}?${query}` : pathname);
     },
-    [params, router],
+    [params, pathname, router],
   );
 
   // Sync the form draft from the URL.
@@ -199,13 +199,18 @@ export function ReportsManager({ initial }: Readonly<{ initial: Template[] }>) {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-mono text-lg font-semibold">Reports</h1>
-          <p className="max-w-2xl text-xs text-muted-foreground">
-            Manage report templates. Each report is generated live from the control plane —
-            traceable end to end — and exported as signed Markdown/PDF you can hand to a regulator.
-          </p>
-        </div>
+        {!embedded ? (
+          <div>
+            <h1 className="font-mono text-lg font-semibold">Reports</h1>
+            <p className="max-w-2xl text-xs text-muted-foreground">
+              Manage report templates. Each report is generated live from the control plane —
+              traceable end to end — and exported as signed Markdown/PDF you can hand to a
+              regulator.
+            </p>
+          </div>
+        ) : (
+          <span />
+        )}
         <Button size="sm" className="gap-1.5" onClick={() => setParam('edit', 'new')}>
           <Plus className="size-4" /> New template
         </Button>
@@ -224,12 +229,24 @@ export function ReportsManager({ initial }: Readonly<{ initial: Template[] }>) {
 
       {customs.length > 0 ? (
         <Section title="Custom templates">
-          <Grid templates={customs} onRun={run} running={running} onEdit={(id) => setParam('edit', id)} onDelete={remove} />
+          <Grid
+            templates={customs}
+            onRun={run}
+            running={running}
+            onEdit={(id) => setParam('edit', id)}
+            onDelete={remove}
+          />
         </Section>
       ) : null}
 
       <Section title="Built-in reports">
-        <Grid templates={builtins} onRun={run} running={running} onEdit={(id) => setParam('edit', id)} onDelete={remove} />
+        <Grid
+          templates={builtins}
+          onRun={run}
+          running={running}
+          onEdit={(id) => setParam('edit', id)}
+          onDelete={remove}
+        />
       </Section>
 
       <Dialog open={!!previewParam} onOpenChange={(o) => !o && setParam('preview', null)}>
@@ -396,7 +413,11 @@ function TemplateForm({
       <CardContent className="space-y-4 p-4">
         <div className="flex items-center justify-between">
           <h2 className="font-mono text-sm font-semibold">{editorHeading}</h2>
-          <button onClick={onCancel} aria-label="Close" className="text-muted-foreground hover:text-foreground">
+          <button
+            onClick={onCancel}
+            aria-label="Close"
+            className="text-muted-foreground hover:text-foreground"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -462,14 +483,18 @@ function TemplateForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Sections {builtin ? '(code-defined)' : '(compose from live data)'}</Label>
+          <Label className="text-xs">
+            Sections {builtin ? '(code-defined)' : '(compose from live data)'}
+          </Label>
           <div className="flex flex-wrap gap-1.5">
             {REPORT_SECTIONS.map((s) => (
               <Badge
                 key={s}
                 variant={draft.sections.includes(s) ? 'default' : 'outline'}
                 className={builtin ? 'opacity-50' : 'cursor-pointer'}
-                onClick={() => !builtin && onChange({ ...draft, sections: toggle(draft.sections, s) })}
+                onClick={() =>
+                  !builtin && onChange({ ...draft, sections: toggle(draft.sections, s) })
+                }
               >
                 {s}
               </Badge>

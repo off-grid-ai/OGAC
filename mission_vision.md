@@ -1,16 +1,19 @@
 # Off Grid AI — Mission & Vision
 
 ## Mission
+
 Turn every organization into an **intelligent enterprise**, running on AI that is reliable, secure, and compliant by default.
 Make it **accessible to every employee, not just engineers** — anyone can describe what they need in plain language and get a working, governed workflow, tested safely in a sandbox.
-Keep it **transparent and open** — every AI action is observable, attributable, and reversible, and the platform is **open source** so anyone can inspect and trust it.
+Keep it **transparent and inspectable** — every AI action is observable, attributable, and reversible, and the platform is **source available** so enterprises can inspect and trust it.
 
 ## What we enable
+
 Empower **non-technical users** in the enterprise to create **workflows, agents, apps, loops, and harnesses** in a
 secure, compliant, governed, and reliable way — **without the enterprise changing anything.** Off Grid AI is a
 **drop-in system that connects to whatever they already have**, and makes it intelligent.
 
 ## Vision
+
 Real change reaches the **population** through the enterprises that serve it — so we make those enterprises intelligent.
 Intelligence woven into how they already operate, **working with the systems they already run, as-is** — without asking them to change a thing.
 Built on **open, transparent foundations** any enterprise can inspect, trust, and run for themselves.
@@ -24,6 +27,7 @@ customer-facing copy (landing, docs, README) is written so that person feels, in
 > the company. These people give me a safe way to do exactly that, without losing out on anything."
 
 That is the whole job. Break it down:
+
 - **The ambition is theirs, not ours.** They want to win their industry. AI is how. Lead with that
   outcome, not with our features.
 - **"Safe" is the unlock, not the pitch.** Governance, security, and compliance are what let them move
@@ -31,8 +35,8 @@ That is the whole job. Break it down:
   sell safety as the headline; sell the speed and reach that safety makes possible.
 - **"Without losing out at all"** is the promise: no rip-and-replace, no lock-in, no giving up control,
   no waiting on a platform team, no choosing between fast and safe. They get all of it.
-- The feeling on the page is confidence and relief: *this solves my problem, and it is obviously the
-  responsible choice.* Simple, proof-first, not busy. Fewer words, more show.
+- The feeling on the page is confidence and relief: _this solves my problem, and it is obviously the
+  responsible choice._ Simple, proof-first, not busy. Fewer words, more show.
 
 ---
 

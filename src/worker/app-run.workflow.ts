@@ -35,6 +35,7 @@ import {
   defineQuery,
   setHandler,
   condition,
+  workflowInfo,
 } from '@temporalio/workflow';
 import type { AppSpec, AppStep } from '../lib/app-model';
 import type { StepResult } from '../lib/app-run';
@@ -49,6 +50,7 @@ import {
 } from '../lib/app-run-plan';
 import type { PipelineContract } from '../lib/pipeline-enforcement';
 import type * as activities from './app-run.activities';
+import { runInputForExecution } from '../lib/scheduled-run-id';
 
 // ─── The resume signal payload (HITL decision from the console) ──────────────────────────────────
 export interface ResumeStepDecision {
@@ -92,11 +94,12 @@ function stepActivities(maxAttempts: number) {
  *                it (the activity is the I/O boundary; the workflow's view stays deterministic).
  */
 export async function AppRunWorkflow(
-  input: AppRunWorkflowInput,
+  submittedInput: AppRunWorkflowInput,
   maxAttempts = 3,
   specArg?: AppSpec,
 ): Promise<AppRunWorkflowResult> {
   const act = stepActivities(maxAttempts);
+  const input = runInputForExecution(submittedInput, workflowInfo().runId);
 
   // Load the spec (via an activity — I/O) if the submitter didn't inline it.
   const spec = specArg ?? (await act.loadAppSpec(input.appId, input.orgId));
@@ -106,9 +109,10 @@ export async function AppRunWorkflow(
 
   // PA-16 — resolve the bound-pipeline CONTRACT ONCE (via the I/O activity, using the SAME resolver
   // the inline route uses), then thread it into every step below so the WORKER path enforces the
-  // data-allowlist ceiling + egress leash + governance overlay identically to inline. No bound
-  // pipeline ⇒ null ⇒ legacy allow (additive-only). This closes the durable governance hole.
-  const contract: PipelineContract | null = await act.resolveContractActivity(
+  // data-allowlist ceiling + egress leash + governance overlay identically to inline. A deliberately
+  // unbound app resolves to null; a stale explicit binding throws before step execution.
+  const contract: PipelineContract | null = await act.resolveAppRunContractActivity(
+    input.appId,
     input.pipelineId,
     input.orgId,
   );

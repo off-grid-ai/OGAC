@@ -7,7 +7,8 @@ export const buildSection: DocSection = {
     {
       slug: 'guides/chat',
       title: 'Chat',
-      description: 'Your org\'s AI, everywhere - grounded, governed, and inside the rules by default.',
+      description:
+        "Your org's AI, everywhere - grounded, governed, and inside the rules by default.",
       body: `**What you'll get:** a chat that already knows your org's rules. Every answer runs through
 the same governed pipeline your admin set up once, grounded in your knowledge - nothing to configure.
 
@@ -73,7 +74,8 @@ routed through the same gateway and governance as chat, so it inherits your org'
     {
       slug: 'guides/agents',
       title: 'Agents',
-      description: 'Assistants that act - grounded, tool-using, and run through the governed pipeline.',
+      description:
+        'Assistants that act - grounded, tool-using, and run through the governed pipeline.',
       body: `**What you'll get:** an assistant with a job, grounded in your knowledge and able to use
 tools - and every run it does flows through the governed pipeline your org set once.
 
@@ -81,9 +83,10 @@ tools - and every run it does flows through the governed pipeline your org set o
 
 ## Create one
 
-On the **Agents** page, describe the agent in plain language. Ground it in your knowledge (on by
-default, so it cites sources and won't hallucinate) and grant it tools - the connectors your org has
-set up. Each granted tool still obeys its action policy: allow, needs approval, or blocked.
+From **Agents**, choose **New agent**. It opens the same Studio builder used for every app: a
+single-step AppSpec is an agent. Describe the job in plain language, ground it in your knowledge
+(on by default), grant tools, and choose its **Runs on** pipeline. Each granted tool still obeys
+its action policy: allow, needs approval, or blocked.
 Capability never bypasses governance.
 
 ## Run and watch it
@@ -101,10 +104,11 @@ inline. Re-run a past run, cancel one in flight, or send a run through human rev
 - **Open** - answers from the model directly, for drafting or brainstorming assistants that don't
   need your documents.
 
-## No special powers
+## One owner, no special powers
 
-A custom agent carries no special access. It runs the same governed path as the built-ins, so it
-inherits every convention set on your console.
+An authored agent is managed through its App lifecycle, not a second runtime-agent editor. It
+carries no special access and runs the same governed path as the built-ins. Direct, scheduled and
+durable runs revalidate its pipeline binding before retrieval or model I/O.
 
 ## What success looks like
 
@@ -115,7 +119,8 @@ with citations inline - and the run shows up in [Agent runs](/docs/guides/agent-
     {
       slug: 'guides/agent-runs',
       title: 'Agent runs',
-      description: 'Every governed run, with its full pipeline trace - re-run, cancel, or send to review.',
+      description:
+        'Every governed run, with its full pipeline trace - re-run, cancel, or send to review.',
       body: `Agent runs is the history and the microscope for everything the agents did. Each run is a
 governed execution you can open and read stage by stage.
 
@@ -208,40 +213,6 @@ disallowed documents never come back) **and** as a post-filter on the results as
 A backend that can't filter server-side still gets the same outcome. Either way, an answer's
 citations are a subset of what the asker could open by hand - grounding is never a way around
 [Policy](/docs/guides/policy).`,
-    },
-    {
-      slug: 'guides/provit',
-      title: 'Provit',
-      description: 'Point it at a repo; it maps every behavior, runs each end to end, and judges the result with vision.',
-      body: `Provit answers a question every team dreads: does the app still do what it's supposed to.
-Point it at a repository and it maps the app into behaviors, runs each one end to end, and judges the
-recording with a vision model - so "it works" becomes evidence, not a hope. Provit is a first-class
-console module, brokered through the console's own auth, fleet, and budgets.
-
-## What you can do here
-
-- **Run its intelligence** - the feature-mapping, test-synthesis, and copilot engine, driven from the
-  console rather than a separate tool.
-- **Upload a file** - send a file to Provit through the console's own [Storage](/docs/guides/storage),
-  so an artifact goes in without leaving your infrastructure.
-- **See your repos and runs** - repos your org maps stay private to your org; free demo runs live in
-  the public gallery.
-- **Open Provit** - jump to the full product with the reachability status shown inline, so you know
-  it's live before you go.
-
-## It rides the console's gateway
-
-Provit does not run its own model gateway. Its intelligence - feature mapping, test synthesis, the
-copilot, and the vision judge - runs on **this console's** [gateway](/docs/guides/gateway). Point a
-Provit instance at the console and every one of those calls inherits the same fleet, routing,
-governance, and [budgets](/docs/guides/budgets) as the rest of the platform. Nothing about Provit
-sits outside the leash.
-
-## Private by default
-
-Repos and runs are scoped by the console's access rules (ABAC on the \`provit\` resource, plus
-tenancy): you see the public library, your own org's repos, and your own private ones - nothing
-else. A fresh account simply shows an empty list, never someone else's work.`,
     },
     {
       slug: 'guides/studio',

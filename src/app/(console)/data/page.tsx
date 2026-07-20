@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
 import { AddConnectorButton } from '@/components/data/AddConnectorButton';
 import { AddMaskingRuleButton } from '@/components/data/AddMaskingRuleButton';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
@@ -19,11 +20,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { listDocuments } from '@/lib/brain';
+import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { toDisplayHost } from '@/lib/display-host';
 import { requireModuleForUser } from '@/lib/module-access';
 import { qdrantCollectionName, qdrantCount } from '@/lib/qdrant';
 import { listConnectors, listDatasets, listIngestJobs, listMaskingRules } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
+import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,184 +51,235 @@ export default async function DataPage() {
     listIngestJobs(org),
     listMaskingRules(org),
     listDatasets(org),
-    listDocuments(),
+    listDocuments(org),
     qdrantCount(),
   ]);
+  const failedJobs = jobs.filter((job) => job.status === 'error' || job.status === 'failed').length;
+  const dashboard = buildDomainDashboard('data', {
+    facts: [
+      {
+        label: 'Connected sources',
+        value: `${connectors.filter((connector) => connector.status === 'connected').length} / ${connectors.length}`,
+        description: 'Configured sources currently marked connected.',
+        href: '/data/sources',
+        state:
+          connectors.length && connectors.every((connector) => connector.status === 'connected')
+            ? 'good'
+            : 'attention',
+      },
+      {
+        label: 'Datasets',
+        value: datasets.length.toLocaleString(),
+        description: `${datasets.reduce((sum, dataset) => sum + dataset.rows, 0).toLocaleString()} cataloged rows.`,
+        href: '/data/catalog',
+      },
+      {
+        label: 'Ingest attention',
+        value: failedJobs.toLocaleString(),
+        description: 'Ingest jobs currently marked failed or error.',
+        href: '/data/flows',
+        state: failedJobs ? 'attention' : 'good',
+      },
+      {
+        label: 'Knowledge index',
+        value: qCount === null ? 'Unavailable' : `${qCount.toLocaleString()} vectors`,
+        description:
+          qCount === null
+            ? 'The vector index did not respond.'
+            : `${brainDocs.length.toLocaleString()} source documents available for indexing.`,
+        href: '/data/knowledge',
+        state: qCount === null ? 'attention' : 'neutral',
+      },
+    ],
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Data-plane engine health — the live warehouse/pipelines/streaming/quality engines. */}
-      <DataPlaneHealthBand />
+    <PageFrame>
+      {
+        <div className="space-y-6">
+          <DomainDashboard model={dashboard} />
 
-      <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm">Connectors</CardTitle>
-          <AddConnectorButton />
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Last sync</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {connectors.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium text-foreground">
-                    <Link
-                      href={`/data/connectors/${c.id}`}
-                      className="hover:text-primary hover:underline"
-                    >
-                      {c.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{c.type}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={STATUS[c.status]}>
-                      {c.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {c.lastSync ? c.lastSync.slice(0, 10) : 'never'}
-                  </TableCell>
-                  <TableCell>
-                    <ConnectorActions id={c.id} name={c.name} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          <div className="border-t border-border pt-6">
+            <h2 className="text-base font-normal text-foreground">Manage the data plane</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Operate connectors, ingest, masking, erasure, and indexes from the live records below.
+            </p>
+          </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Ingest jobs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Connector</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Records</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {jobs.map((j) => (
-                  <TableRow key={j.id}>
-                    <TableCell className="text-foreground">{j.connectorName}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={STATUS[j.status]}>
-                        {j.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {j.records.toLocaleString()}
-                    </TableCell>
+          {/* Data-plane engine health — the live warehouse/pipelines/streaming/quality engines. */}
+          <DataPlaneHealthBand />
+
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm">Connectors</CardTitle>
+              <AddConnectorButton />
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last sync</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {connectors.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium text-foreground">
+                        <Link
+                          href={`/data/connectors/${c.id}`}
+                          className="hover:text-primary hover:underline"
+                        >
+                          {c.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{c.type}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={STATUS[c.status]}>
+                          {c.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {c.lastSync ? c.lastSync.slice(0, 10) : 'never'}
+                      </TableCell>
+                      <TableCell>
+                        <ConnectorActions id={c.id} name={c.name} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Ingest jobs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Connector</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Records</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobs.map((j) => (
+                      <TableRow key={j.id}>
+                        <TableCell className="text-foreground">{j.connectorName}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={STATUS[j.status]}>
+                            {j.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {j.records.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-sm">PII masking rules</CardTitle>
+                <AddMaskingRuleButton />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {rules.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-foreground">{r.kind}</span>
+                      <Badge variant="secondary">{r.action}</Badge>
+                    </div>
+                    <MaskingRuleToggle id={r.id} initial={r.enabled} />
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm">PII masking rules</CardTitle>
-            <AddMaskingRuleButton />
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {rules.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-2"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-foreground">{r.kind}</span>
-                  <Badge variant="secondary">{r.action}</Badge>
-                </div>
-                <MaskingRuleToggle id={r.id} initial={r.enabled} />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Data catalog</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Dataset</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead className="text-right">Rows</TableHead>
+                    <TableHead>Classification</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {datasets.map((d) => (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-medium text-foreground">{d.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{d.source}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {d.rows.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={CLASSIFICATION[d.classification]}>
+                          {d.classification}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Data catalog</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Dataset</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead className="text-right">Rows</TableHead>
-                <TableHead>Classification</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {datasets.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium text-foreground">{d.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{d.source}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {d.rows.toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={CLASSIFICATION[d.classification]}>
-                      {d.classification}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Retention &amp; erasure (DSAR)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <ErasureForm />
+              <p className="text-xs text-muted-foreground">
+                Right-to-erasure propagates across the lake, KB, vector index, memory, and audit.
+              </p>
+            </CardContent>
+          </Card>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Retention &amp; erasure (DSAR)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <ErasureForm />
-          <p className="text-xs text-muted-foreground">
-            Right-to-erasure propagates across the lake, KB, vector index, memory, and audit.
-          </p>
-        </CardContent>
-      </Card>
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Vector index (Qdrant)</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Push the Brain&apos;s documents into Qdrant so switching the retrieval backend to
+                Qdrant lands on a populated store, not an empty one.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ReindexQdrantButton
+                collection={qdrantCollectionName()}
+                qdrantCount={qCount}
+                sourceDocs={brainDocs.length}
+              />
+            </CardContent>
+          </Card>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Vector index (Qdrant)</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Push the Brain&apos;s documents into Qdrant so switching the retrieval backend to Qdrant
-            lands on a populated store, not an empty one.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <ReindexQdrantButton
-            collection={qdrantCollectionName()}
-            qdrantCount={qCount}
-            sourceDocs={brainDocs.length}
+          <VectorDBInspector
+            urlHint={toDisplayHost(process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333')}
           />
-        </CardContent>
-      </Card>
 
-      <VectorDBInspector
-        urlHint={toDisplayHost(process.env.OFFGRID_QDRANT_URL ?? 'http://127.0.0.1:6333')}
-      />
-
-      <PiiScanner />
-    </div>
+          <PiiScanner />
+        </div>
+      }
+    </PageFrame>
   );
 }

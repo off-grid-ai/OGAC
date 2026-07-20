@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { auth } from '@/auth';
 import { CreateCollectionButton } from '@/components/knowledge/CreateCollectionButton';
 import { QuickAddDocument } from '@/components/knowledge/QuickAddDocument';
+import { PageFrame } from '@/components/PageFrame';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CardRail } from '@/components/workspace/CardRail';
@@ -20,7 +21,15 @@ export const dynamic = 'force-dynamic';
 // (/workspace/knowledge/[id]) — the full view of its access, index status and documents. The card's
 // quick-add button is the only Sheet, a convenience for indexing a doc without leaving the list; the
 // collection itself always opens as a real route, never a modal.
-export default async function KnowledgePage() {
+export async function KnowledgeContent({
+  detailBasePath = '/workspace/knowledge',
+  embedded = false,
+  showHeading = true,
+}: Readonly<{
+  detailBasePath?: string;
+  embedded?: boolean;
+  showHeading?: boolean;
+}> = {}) {
   await requireModuleForUser('knowledge');
   const session = await auth();
   const role = session?.user?.role ?? 'viewer';
@@ -34,17 +43,24 @@ export default async function KnowledgePage() {
   );
 
   return (
-    <div className="w-full space-y-6">
+    <PageFrame className="space-y-6" embedded={embedded}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="max-w-3xl">
-          <h1 className="text-lg font-semibold text-foreground">Organization Knowledge</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The org-shared corpus retrieved in <strong>chat</strong> and by your agents: an
-            admin-curated set of collections, indexed on-prem via the gateway and retrieved
-            permission-aware with citations. Turn on &ldquo;Org knowledge&rdquo; in chat to ask it.
-          </p>
-        </div>
-        {isAdmin && <CreateCollectionButton />}
+        {showHeading ? (
+          <div className="max-w-3xl">
+            <h1 className="text-lg font-semibold text-foreground">Organization Knowledge</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              The org-shared corpus retrieved in <strong>chat</strong> and by your agents: an
+              admin-curated set of collections, indexed on-prem via the gateway and retrieved
+              permission-aware with citations. Turn on &ldquo;Org knowledge&rdquo; in chat to ask
+              it.
+            </p>
+          </div>
+        ) : null}
+        {isAdmin ? (
+          <div className={showHeading ? undefined : 'ml-auto'}>
+            <CreateCollectionButton />
+          </div>
+        ) : null}
       </div>
 
       {collections.length === 0 ? (
@@ -70,16 +86,14 @@ export default async function KnowledgePage() {
                   <CardTitle className="line-clamp-2 text-base">
                     {/* The whole card is the way IN: this Link routes to the deep-linkable detail. */}
                     <Link
-                      href={`/workspace/knowledge/${c.id}`}
+                      href={`${detailBasePath}/${c.id}`}
                       className="after:absolute after:inset-0 hover:text-primary"
                     >
                       {c.name}
                     </Link>
                   </CardTitle>
                   {c.description ? (
-                    <CardDescription className="mt-1 line-clamp-2">
-                      {c.description}
-                    </CardDescription>
+                    <CardDescription className="mt-1 line-clamp-2">{c.description}</CardDescription>
                   ) : null}
                 </div>
               </CardHeader>
@@ -116,6 +130,10 @@ export default async function KnowledgePage() {
           ))}
         </CardRail>
       )}
-    </div>
+    </PageFrame>
   );
+}
+
+export default function KnowledgePage() {
+  return <KnowledgeContent />;
 }

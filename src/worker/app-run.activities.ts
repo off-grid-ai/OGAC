@@ -37,16 +37,53 @@ export async function loadAppSpec(appId: string, orgId?: string): Promise<AppSpe
  * step's executeStepActivity, so the WORKER path enforces the identical data-allowlist ceiling + egress
  * leash + policy/guardrail overlay the inline path does.
  *
- * Never throws / degrades to null: no bound pipeline (null id) or an unresolvable/deleted pipeline ⇒
- * null ⇒ legacy allow (the ADDITIVE guarantee — a durable run with no binding behaves exactly as before).
+ * A deliberately unbound app returns null. An explicit id that is missing, deprecated, or cannot be
+ * resolved throws before any step activity runs. This is intentionally fail-closed: otherwise a
+ * pipeline deleted between dispatch and worker execution would silently become an ungoverned run.
  */
 export async function resolveContractActivity(
   pipelineId: string | null | undefined,
   orgId?: string,
 ): Promise<PipelineContract | null> {
-  if (!pipelineId) return null;
-  const { resolveContract } = await import('../lib/pipeline-contract');
-  return resolveContract(pipelineId, orgId ?? 'default');
+  const { requireRunnablePipelineBinding, resolveExplicitPipelineBinding } =
+    await import('../lib/pipeline-run-glue');
+  return requireRunnablePipelineBinding(
+    await resolveExplicitPipelineBinding(pipelineId, orgId ?? 'default'),
+  ).contract;
+}
+
+/**
+ * Revalidate the durable dispatch snapshot against the current App before any step executes.
+ * Schedules and queued runs may wait for minutes or days, so the serialized pipeline id is evidence
+ * of what was authorized at submission time, not an authority forever. A changed/deleted/cross-org
+ * App or a stale pipeline fails closed here.
+ */
+export async function resolveAppRunContractActivity(
+  appId: string,
+  expectedPipelineId: string | null,
+  orgId?: string,
+): Promise<PipelineContract | null> {
+  const resolvedOrgId = orgId ?? 'default';
+  const { getApp } = await import('../lib/apps-store');
+  const app = await getApp(appId, resolvedOrgId);
+  const { requireRunnablePipelineBinding, resolveExplicitPipelineBinding } =
+    await import('../lib/pipeline-run-glue');
+
+  if (!app || (app.pipelineId ?? null) !== expectedPipelineId) {
+    return requireRunnablePipelineBinding({
+      state: 'invalid',
+      pipelineId: expectedPipelineId,
+      contract: null,
+      code: 'binding_changed',
+      reason: !app
+        ? `App '${appId}' is no longer available in org '${resolvedOrgId}'.`
+        : `App '${appId}' pipeline binding changed after durable submission.`,
+    }).contract;
+  }
+
+  return requireRunnablePipelineBinding(
+    await resolveExplicitPipelineBinding(expectedPipelineId, resolvedOrgId),
+  ).contract;
 }
 
 /**
@@ -80,6 +117,8 @@ export async function executeStepActivity(
     actor: input.actor?.id ?? input.caller,
     runId: input.runId,
     contract,
+    pipelineId: input.pipelineId ?? contract?.pipelineId ?? null,
+    asker: input.asker,
     // Thread the run mode so a SHADOW durable run's side-effecting sinks NO-OP on the worker path
     // identically to the inline path (executeStep applies the pure shouldIntercept per step).
     mode: input.mode ?? 'live',

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { syncAppSchedule, unscheduleApp } from '@/lib/app-schedules';
 import {
+  AppAgentOwnershipError,
   AppValidationError,
   deleteApp,
   getApp,
@@ -11,6 +12,7 @@ import {
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
+import { hasSolutionDeploymentsForApp } from '@/lib/solution-blueprints-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +77,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (err instanceof AppValidationError) {
       return NextResponse.json({ error: err.message, errors: err.errors }, { status: 422 });
     }
+    if (err instanceof AppAgentOwnershipError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     throw err;
   }
 }
@@ -85,9 +90,19 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const orgId = await currentOrgId();
+  if (await hasSolutionDeploymentsForApp(id, orgId)) {
+    return NextResponse.json(
+      {
+        error: 'App is retained by solution deployment history',
+        code: 'referenced',
+        action: 'retire the deployment instead',
+      },
+      { status: 409 },
+    );
+  }
   await deleteApp(id, orgId);
   // Tear down any registered cron schedule for this app (idempotent; a missing schedule is fine).
-  await unscheduleApp(id);
+  await unscheduleApp(id, orgId);
   auditFromSession(gate, orgId, {
     action: 'app.delete',
     resource: `app:${id}`,

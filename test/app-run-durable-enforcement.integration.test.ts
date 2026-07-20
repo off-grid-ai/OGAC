@@ -23,20 +23,41 @@ import { executeStepActivity, resolveContractActivity } from '@/worker/app-run.a
 // A connector-query step reading dom_hr (the data ceiling is checked here) and an agent step (the
 // egress leash is checked here). These are the two enforced step kinds, run individually on the
 // worker path below.
-const READ_STEP: AppStep = { id: 's1', label: 'read quota', kind: 'connector-query', domain: 'dom_hr' };
+const READ_STEP: AppStep = {
+  id: 's1',
+  label: 'read quota',
+  kind: 'connector-query',
+  domain: 'dom_hr',
+};
 const AGENT_STEP: AppStep = { id: 's2', label: 'decide', kind: 'agent', agentId: 'ag1' };
 
 function spec(): AppSpec {
   return {
-    id: 'app_dur', orgId: 'default', ownerId: 'u1', title: 'Durable Enforce', summary: '',
-    visibility: 'private', published: false, trigger: { kind: 'on-demand' },
+    id: 'app_dur',
+    orgId: 'default',
+    ownerId: 'u1',
+    title: 'Durable Enforce',
+    summary: '',
+    visibility: 'private',
+    published: false,
+    trigger: { kind: 'on-demand' },
     steps: [READ_STEP, AGENT_STEP, { id: 's3', label: 'out', kind: 'output', sink: 'console' }],
-    edges: [{ from: 's1', to: 's2' }, { from: 's2', to: 's3' }],
+    edges: [
+      { from: 's1', to: 's2' },
+      { from: 's2', to: 's3' },
+    ],
   };
 }
 
 function wfInput(runId: string): AppRunWorkflowInput {
-  return { appId: 'app_dur', runId, input: {}, orgId: 'default', caller: 'tester' };
+  return {
+    appId: 'app_dur',
+    runId,
+    input: {},
+    orgId: 'default',
+    caller: 'tester',
+    pipelineId: null,
+  };
 }
 
 function fakeDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
@@ -51,7 +72,10 @@ function fakeDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
       return { id, type: 'mysql', endpoint: 'mysql://x' };
     },
     async queryDomain() {
-      return { result: { rows: [{ used: 3, cap: 5 }], count: 1, dialect: 'mysql' }, detail: 'read 1 row' };
+      return {
+        result: { rows: [{ used: 3, cap: 5 }], count: 1, dialect: 'mysql' },
+        detail: 'read 1 row',
+      };
     },
     async runGuardrail() {
       return { blocked: false, detail: 'ok' };
@@ -102,14 +126,24 @@ test('durable worker: NO contract ⇒ connector read proceeds (legacy allow, no 
 
 test('durable worker: contract WITH dom_hr allowed ⇒ connector read proceeds', async () => {
   const r = await executeStepActivity(
-    wfInput('r_allow'), spec(), READ_STEP, [], contract({ dataAllowlist: ['dom_hr'] }), fakeDeps(),
+    wfInput('r_allow'),
+    spec(),
+    READ_STEP,
+    [],
+    contract({ dataAllowlist: ['dom_hr'] }),
+    fakeDeps(),
   );
   assert.equal(r.status, 'done');
 });
 
 test('durable worker: contract WITHOUT dom_hr ⇒ connector read DENIED (data ceiling enforced)', async () => {
   const r = await executeStepActivity(
-    wfInput('r_deny'), spec(), READ_STEP, [], contract({ dataAllowlist: ['dom_other'] }), fakeDeps(),
+    wfInput('r_deny'),
+    spec(),
+    READ_STEP,
+    [],
+    contract({ dataAllowlist: ['dom_other'] }),
+    fakeDeps(),
   );
   assert.equal(r.status, 'error');
   assert.match(r.detail ?? '', /data access denied by pipeline/);
@@ -120,7 +154,9 @@ test('durable worker: contract WITHOUT dom_hr ⇒ connector read DENIED (data ce
 test('durable worker: egress OFF + cloud rule for the run data-class ⇒ agent model call BLOCKED', async () => {
   // A prior connector read makes the agent step's data-class 'general'; egress off + a cloud rule
   // matching 'general' → the leash blocks the model call. This is the SAME leash the inline test hits.
-  const prior: StepResult[] = [{ stepId: 's1', kind: 'connector-query', status: 'done', output: 'rows' }];
+  const prior: StepResult[] = [
+    { stepId: 's1', kind: 'connector-query', status: 'done', output: 'rows' },
+  ];
   const r = await executeStepActivity(
     wfInput('r_egress'),
     spec(),
@@ -132,8 +168,15 @@ test('durable worker: egress OFF + cloud rule for the run data-class ⇒ agent m
         egressAllowed: false,
         rules: [
           {
-            name: 'cloud-general', priority: 10, attribute: 'data_class', operator: 'eq',
-            value: 'general', action: 'cloud', model: 'gpt-4o', fallback: '', enabled: true,
+            name: 'cloud-general',
+            priority: 10,
+            attribute: 'data_class',
+            operator: 'eq',
+            value: 'general',
+            action: 'cloud',
+            model: 'gpt-4o',
+            fallback: '',
+            enabled: true,
           },
         ],
       },
@@ -145,9 +188,16 @@ test('durable worker: egress OFF + cloud rule for the run data-class ⇒ agent m
 });
 
 test('durable worker: default (local) routing ⇒ agent runs on-prem, step completes', async () => {
-  const prior: StepResult[] = [{ stepId: 's1', kind: 'connector-query', status: 'done', output: 'rows' }];
+  const prior: StepResult[] = [
+    { stepId: 's1', kind: 'connector-query', status: 'done', output: 'rows' },
+  ];
   const r = await executeStepActivity(
-    wfInput('r_local'), spec(), AGENT_STEP, prior, contract({ dataAllowlist: ['dom_hr'] }), fakeDeps(),
+    wfInput('r_local'),
+    spec(),
+    AGENT_STEP,
+    prior,
+    contract({ dataAllowlist: ['dom_hr'] }),
+    fakeDeps(),
   );
   assert.equal(r.status, 'done');
   assert.match(r.output ?? '', /decided/);

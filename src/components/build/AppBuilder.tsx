@@ -24,7 +24,7 @@ import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains
 import { StudioCanvas } from '@/components/studio/StudioCanvas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -249,7 +249,7 @@ export function AppBuilder({
       const app = (await res.json()) as { id: string };
       toast.success(`"${spec.title}" saved`);
       if (editing) router.refresh();
-      else router.push(`/build/apps/${app.id}`);
+      else router.push(`/solutions/apps/${app.id}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally {
@@ -482,10 +482,10 @@ function GuidedRefine({
               <ListChecks className="size-4 text-primary" />
               The steps
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
+            <CardDescription className="text-xs">
               The process we carved from your description. Reorder, relabel, rebind a data source or
               agent, or add and remove steps. Each step runs governed.
-            </p>
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5">
             {spec.steps.map((step, i) => (
@@ -593,11 +593,11 @@ function GuidedRefine({
               <FlowArrow className="size-4 text-primary" />
               Runs on
             </CardTitle>
-            <p className="text-[11px] text-muted-foreground">
+            <CardDescription className="text-[11px]">
               The governed pipeline this app runs on — its model gateway, data ceiling, policy and
               guardrails. Every run is tagged to it. Leave on the org default unless you need a
               specific one.
-            </p>
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-1.5">
             <SelectRow

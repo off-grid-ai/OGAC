@@ -114,9 +114,21 @@ const INTELLIGENCE: Item[] = [
 ];
 
 const GOVERNANCE: Item[] = [
-  { icon: Lock, name: 'One gateway + kill-switch', body: 'Every AI call on every device routes through one governed chokepoint you can halt instantly.' },
-  { icon: ShieldCheck, name: 'Audit & policy per device', body: 'Append-only audit + ABAC over the whole fleet — defensible to a regulator.' },
-  { icon: Gauge, name: 'Agent QA across the fleet', body: 'Evals, drift, and online scoring keep the on-device intelligence reliable as it scales.' },
+  {
+    icon: Lock,
+    name: 'One gateway + kill-switch',
+    body: 'Every AI call on every device routes through one governed chokepoint you can halt instantly.',
+  },
+  {
+    icon: ShieldCheck,
+    name: 'Audit & policy per device',
+    body: 'Append-only audit + ABAC over the whole fleet — defensible to a regulator.',
+  },
+  {
+    icon: Gauge,
+    name: 'Agent QA across the fleet',
+    body: 'Evals, drift, and online scoring keep the on-device intelligence reliable as it scales.',
+  },
 ];
 
 function Cards({ items, cols }: Readonly<{ items: Item[]; cols: string }>) {
@@ -152,7 +164,7 @@ export default function FleetControlPage() {
               <Link href="/features">All features</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/gateway/fleet">Open console</Link>
+              <Link href="/operations/devices">Open console</Link>
             </Button>
           </div>
         </div>
@@ -171,13 +183,14 @@ export default function FleetControlPage() {
               <span className="text-primary">plus the intelligence only Off Grid AI adds.</span>
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground">
-              Agent-enrolled inventory, live osquery, and software/CVE visibility work today; full MDM
-              control (lock/wipe, config profiles) is coming soon — with Off Grid AI’s field-force
-              intelligence layered on top, across desktop and mobile, on your own infrastructure.
+              Agent-enrolled inventory, live osquery, and software/CVE visibility work today; full
+              MDM control (lock/wipe, config profiles) is coming soon — with Off Grid AI’s
+              field-force intelligence layered on top, across desktop and mobile, on your own
+              infrastructure.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/gateway/fleet">
+                <Link href="/operations/devices">
                   Open the console
                   <ArrowRight className="size-4" />
                 </Link>
@@ -199,8 +212,8 @@ export default function FleetControlPage() {
               The fleet control buyers already expect
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              The baseline a competitive fleet-control system must do — every bit of it delivered on
-              permissive open source, self-hosted, no per-device licence.
+              The baseline a competitive fleet-control system must do — delivered with permissively
+              licensed fleet components, self-hosted and without a separate per-device fee.
             </p>
           </BlurFade>
           <Cards items={BASELINE} cols="sm:grid-cols-2 lg:grid-cols-4" />
@@ -219,9 +232,9 @@ export default function FleetControlPage() {
               Fleet <span className="text-primary">intelligence</span> — desktop & mobile
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              The platform manages the devices. Off Grid AI turns the fleet into a workforce you can coach —
-              on-device intelligence that no MDM gives you, captured (opt-in) on every desktop and
-              phone and grounded in your own knowledge.
+              The platform manages the devices. Off Grid AI turns the fleet into a workforce you can
+              coach — on-device intelligence that no MDM gives you, captured (opt-in) on every
+              desktop and phone and grounded in your own knowledge.
             </p>
           </BlurFade>
           <Cards items={INTELLIGENCE} cols="sm:grid-cols-2 lg:grid-cols-3" />
@@ -249,10 +262,26 @@ export default function FleetControlPage() {
           <h2 className="text-xl font-semibold tracking-tight">How it fits together</h2>
           <div className="mt-6 flex flex-col gap-3 text-sm sm:flex-row sm:items-stretch">
             {[
-              { icon: Desktop, t: 'Device-fleet engine', d: 'Inventory, policy, and compliance — inventory, policy, compliance.' },
-              { icon: DeviceMobile, t: 'Off Grid AI node (desktop + mobile)', d: 'The on-device signal — activity, capture, the copilot.' },
-              { icon: Brain, t: 'Org knowledge base', d: 'Your knowledge — what the intelligence is grounded in.' },
-              { icon: Broadcast, t: 'The console', d: 'One control plane — governance, audit, kill-switch, insight.' },
+              {
+                icon: Desktop,
+                t: 'Device-fleet engine',
+                d: 'Inventory, policy, and compliance — inventory, policy, compliance.',
+              },
+              {
+                icon: DeviceMobile,
+                t: 'Off Grid AI node (desktop + mobile)',
+                d: 'The on-device signal — activity, capture, the copilot.',
+              },
+              {
+                icon: Brain,
+                t: 'Org knowledge base',
+                d: 'Your knowledge — what the intelligence is grounded in.',
+              },
+              {
+                icon: Broadcast,
+                t: 'The console',
+                d: 'One control plane — governance, audit, kill-switch, insight.',
+              },
             ].map((s, i, arr) => (
               <div key={s.t} className="flex flex-1 items-center gap-3">
                 <div className="flex-1 rounded-xl border border-border bg-background p-4">
@@ -276,11 +305,12 @@ export default function FleetControlPage() {
             Fleet control the market knows — intelligence only you have.
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            Open source, self-hosted, no per-device fees. Add the field-force intelligence on top.
+            Built on open-source fleet components and self-hosted. Add the field-force intelligence
+            on top.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button asChild>
-              <Link href="/gateway/fleet">
+              <Link href="/operations/devices">
                 Open the console
                 <ArrowRight className="size-4" />
               </Link>

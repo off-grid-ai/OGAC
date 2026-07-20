@@ -646,16 +646,21 @@ services:
       - --overprovisioned
       - --node-id=0
       - --check=false
-      # Kafka API on 9092 (internal) + 19092 (host); admin 9644; schema-registry 8083.
+      # Kafka API on 9092 (internal) + 19092 (host); admin 9644; Schema Registry 8081.
       - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
       - --advertise-kafka-addr=internal://redpanda:9092,external://127.0.0.1:19092
+      - --schema-registry-addr=0.0.0.0:8081
     ports:
       - '19092:19092' # Kafka API (external)
       - '9644:9644' # admin API / metrics
-      - '18083:8083' # schema registry
+      - '18083:8081' # schema registry
     volumes: [redpanda:/var/lib/redpanda/data]
     healthcheck:
-      test: ['CMD-SHELL', 'rpk cluster health | grep -q "Healthy:.*true" || exit 1']
+      test:
+        [
+          'CMD-SHELL',
+          'rpk cluster health | grep -q "Healthy:.*true" && curl --fail --silent --show-error http://127.0.0.1:8081/subjects >/dev/null',
+        ]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -816,6 +821,7 @@ services:
   kestra:
     image: kestra/kestra:latest
     profiles: [kestra, all]
+    restart: unless-stopped
     user: root
     command: server standalone
     depends_on:
@@ -853,10 +859,13 @@ services:
           url: http://localhost:8090/
     ports: ['8090:8080'] # Kestra UI/API :8080 → host 8090 (edge loopback 8945 → this)
     healthcheck:
-      test: ['CMD-SHELL', 'true'] # Kestra image lacks curl/wget; liveness proven by the console adapter probe
+      # The image has Bash but no curl/wget. Probe the in-container API listener so a running JVM
+      # whose HTTP server failed to start cannot be reported healthy through Docker's host proxy.
+      test: ['CMD-SHELL', 'bash -c "</dev/tcp/127.0.0.1/8080"']
       interval: 15s
       timeout: 5s
       retries: 10
+      start_period: 60s
 
 volumes:
   pgdata:

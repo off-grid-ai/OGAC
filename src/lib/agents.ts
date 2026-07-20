@@ -22,6 +22,8 @@ export interface AgentDef {
   custom?: boolean;
   systemPrompt?: string;
   model?: string;
+  /** Explicit agent-owned pipeline binding. Null/absent means no pipeline contract, never chat default. */
+  pipelineId?: string | null;
   // Management flag: whether a custom agent is currently enabled (runnable). Built-ins are always
   // enabled. Set only by the management listing so the console can show + re-enable disabled agents;
   // the runtime catalog (listAllAgents) excludes disabled agents entirely.
@@ -106,6 +108,7 @@ function toDef(c: CustomAgent): AgentDef {
     custom: true,
     systemPrompt: c.systemPrompt,
     model: c.model || undefined,
+    pipelineId: c.pipelineId,
   };
 }
 

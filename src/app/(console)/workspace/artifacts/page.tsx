@@ -1,4 +1,5 @@
 import { ArtifactsBrowser } from '@/components/artifacts/ArtifactsBrowser';
+import { PageFrame } from '@/components/PageFrame';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -8,5 +9,9 @@ export const dynamic = 'force-dynamic';
 // /api/v1/chat/artifacts. Saving happens in chat on open; this page lists and reopens them.
 export default async function ArtifactsPage() {
   await requireModuleForUser('artifacts');
-  return <ArtifactsBrowser />;
+  return (
+    <PageFrame>
+      <ArtifactsBrowser />
+    </PageFrame>
+  );
 }

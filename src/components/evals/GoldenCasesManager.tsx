@@ -1,9 +1,11 @@
 'use client';
 
-import { PencilSimple, Play, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
+import { PencilSimple, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { RunEvalSuiteButton } from '@/components/evals/RunEvalSuiteButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +37,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { evalEngineLabel } from '@/lib/eval-engine-label';
 
 interface GoldenCase {
   id: string;
@@ -58,7 +59,6 @@ export function GoldenCasesManager() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<GoldenCase | null>(null);
-  const [running, setRunning] = useState(false);
 
   const panel = params.get('panel'); // 'new-goldencase' | 'edit-goldencase' | null
   const editId = params.get('id');
@@ -153,26 +153,6 @@ export function GoldenCasesManager() {
     }
   }
 
-  async function runEvals(engine: string) {
-    setRunning(true);
-    const r = await fetch('/api/v1/admin/evals/run', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ engine }),
-    });
-    setRunning(false);
-    if (r.ok) {
-      const run = await r.json();
-      toast.success(
-        `Ran ${evalEngineLabel(run.engine)}: ${run.passed}/${run.total} passed (${run.score}%)`,
-      );
-      router.refresh(); // re-render the server rollup + recent-runs table with the new run
-    } else {
-      const e = await r.json().catch(() => null);
-      toast.error(e?.error ?? 'Eval run failed');
-    }
-  }
-
   // Save-button label: mid-save, editing an existing case, or adding a new one.
   let saveButtonLabel: string;
   if (saving) saveButtonLabel = 'Saving…';
@@ -184,16 +164,12 @@ export function GoldenCasesManager() {
         <CardTitle className="text-sm">Golden cases ({cases.length})</CardTitle>
         <div className="flex items-center gap-2">
           {RUN_ENGINES.map((eng) => (
-            <Button
+            <RunEvalSuiteButton
               key={eng}
-              size="sm"
+              engine={eng}
               variant={eng === 'golden' ? 'default' : 'outline'}
-              disabled={running || cases.length === 0}
-              onClick={() => runEvals(eng)}
-            >
-              <Play className="mr-1.5 size-3.5" />
-              Run {evalEngineLabel(eng)}
-            </Button>
+              disabled={cases.length === 0}
+            />
           ))}
           <Button
             size="sm"
@@ -226,7 +202,14 @@ export function GoldenCasesManager() {
             <TableBody>
               {cases.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/solutions/quality/golden-cases/${encodeURIComponent(c.id)}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="max-w-[24ch] truncate text-muted-foreground">
                     {c.query}
                   </TableCell>
@@ -330,7 +313,8 @@ export function GoldenCasesManager() {
           <DialogHeader>
             <DialogTitle>Delete golden case?</DialogTitle>
             <DialogDescription>
-              “{pendingDelete?.name}” will be removed from the evaluation set. This cannot be undone.
+              “{pendingDelete?.name}” will be removed from the evaluation set. This cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

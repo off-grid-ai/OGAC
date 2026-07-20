@@ -21,6 +21,37 @@ export interface SamplePipelineSpec {
   guardrailOverlay: Record<string, unknown>;
 }
 
+export type SeedPipelineComparable = Pick<
+  SeedPipelinePlan,
+  | 'name'
+  | 'description'
+  | 'gatewayId'
+  | 'dataAllowlist'
+  | 'routing'
+  | 'policyOverlay'
+  | 'guardrailOverlay'
+  | 'isTemplate'
+  | 'status'
+>;
+
+/** Avoid both stale seed contracts and version churn when an existing deployment is re-seeded. */
+export function seedPipelineNeedsUpdate(
+  current: SeedPipelineComparable,
+  desired: SeedPipelineComparable,
+): boolean {
+  return (
+    current.name !== desired.name ||
+    current.description !== desired.description ||
+    current.gatewayId !== desired.gatewayId ||
+    current.isTemplate !== desired.isTemplate ||
+    current.status !== desired.status ||
+    JSON.stringify(current.dataAllowlist) !== JSON.stringify(desired.dataAllowlist) ||
+    JSON.stringify(current.routing) !== JSON.stringify(desired.routing) ||
+    JSON.stringify(current.policyOverlay) !== JSON.stringify(desired.policyOverlay) ||
+    JSON.stringify(current.guardrailOverlay) !== JSON.stringify(desired.guardrailOverlay)
+  );
+}
+
 // A standard BFSI leash: PII stays on the box, anything classed `restricted` is blocked from egress,
 // everything else may go local. Reused across the templates so the intent is legible + DRY.
 function bfsiRouting(): PipelineRouting {
@@ -64,7 +95,7 @@ function bfsiRouting(): PipelineRouting {
   };
 }
 
-// Six Indian BFSI templates. dataAllowlist ids reference data-domains the org owns (PAN/IFSC/USD
+// Indian BFSI templates. dataAllowlist ids reference data-domains the org owns (PAN/IFSC/USD
 // context). Overlays TIGHTEN org defaults (e.g. force PII masking on).
 export const SAMPLE_PIPELINES: readonly SamplePipelineSpec[] = [
   {
@@ -122,10 +153,43 @@ export const SAMPLE_PIPELINES: readonly SamplePipelineSpec[] = [
     name: 'Cross-Sell Advisor',
     description:
       'Next-best-action advisor for relationship managers — suggests products from the customer holding pattern; aggregate insights only, individual PII masked.',
-    dataAllowlist: ['customer-master', 'product-catalog', 'holdings'],
+    // These are semantic domain references resolved against the tenant registry at run time. Keep
+    // the template aligned with the canonical Bharat seed (`customer data` → CRM accounts) instead
+    // of naming imaginary tables that no connector/domain owns.
+    dataAllowlist: ['customer data', 'pricing rate card'],
     routing: bfsiRouting(),
     policyOverlay: {},
     guardrailOverlay: { requirePiiMasking: { mode: 'default', bool: true } },
+  },
+  {
+    key: 'collections-intervention',
+    name: 'Collections intervention',
+    description:
+      'Early-delinquency prioritisation with grounded treatment recommendations, collector approval, and an auditable report.',
+    dataAllowlist: ['loan accounts', 'repayment history'],
+    routing: bfsiRouting(),
+    policyOverlay: { requireHumanApproval: { mode: 'locked', bool: true } },
+    guardrailOverlay: { requirePiiMasking: { mode: 'locked', bool: true } },
+  },
+  {
+    key: 'indemnity-claims',
+    name: 'Indemnity claims',
+    description:
+      'Indemnity assessment over claim documents and in-force policies with mandatory claims-officer review.',
+    dataAllowlist: ['claim documents', 'policies'],
+    routing: bfsiRouting(),
+    policyOverlay: { requireHumanApproval: { mode: 'locked', bool: true } },
+    guardrailOverlay: { requirePiiMasking: { mode: 'locked', bool: true } },
+  },
+  {
+    key: 'rm-cross-sell',
+    name: 'RM cross-sell',
+    description:
+      'Next-best-action recommendations grounded in CRM customer context, with relationship-manager acceptance to control mis-selling risk.',
+    dataAllowlist: ['customer data', 'pricing rate card'],
+    routing: bfsiRouting(),
+    policyOverlay: { requireHumanApproval: { mode: 'locked', bool: true } },
+    guardrailOverlay: { requirePiiMasking: { mode: 'locked', bool: true } },
   },
 ] as const;
 

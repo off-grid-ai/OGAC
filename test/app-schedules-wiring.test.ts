@@ -35,6 +35,7 @@ test('cronFromTrigger returns null for a schedule trigger with no/blank cron', (
 test('appScheduleId is stable + sanitized per app (re-scheduling replaces, not duplicates)', () => {
   assert.equal(appScheduleId('app123'), appScheduleId('app123'));
   assert.match(appScheduleId('app123'), /appsched-app123/);
+  assert.notEqual(appScheduleId('app123', 'bank'), appScheduleId('app123', 'insurance'));
 });
 
 // ─── scheduleConfigFromTrigger — the FULL {cron,timezone,enabled} the I/O bridge honors ──────────

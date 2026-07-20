@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { CollectionDocuments } from '@/components/knowledge/CollectionDocuments';
+import { PageFrame } from '@/components/PageFrame';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -15,7 +16,9 @@ export const dynamic = 'force-dynamic';
 // and its documents (a real sub-resource, upload/index + delete). Reached by clicking a collection
 // on the Knowledge page (URL-driven, deep-linkable). Visibility is role-gated the same way the list
 // is: a user only reaches a collection their role may retrieve; admins manage documents.
-export default async function CollectionDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
+export default async function CollectionDetailPage({
+  params,
+}: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('knowledge');
   const { id } = await params;
   const session = await auth();
@@ -43,14 +46,14 @@ export default async function CollectionDetailPage({ params }: Readonly<{ params
   }));
 
   return (
-    <div className="space-y-6">
+    <PageFrame className="space-y-6">
       <div className="flex items-start gap-3">
         <div className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
           <Books className="size-5" />
         </div>
         <div>
           <Link
-            href="/workspace/knowledge"
+            href="/data/knowledge"
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3" /> Organization Knowledge
@@ -113,6 +116,6 @@ export default async function CollectionDetailPage({ params }: Readonly<{ params
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageFrame>
   );
 }

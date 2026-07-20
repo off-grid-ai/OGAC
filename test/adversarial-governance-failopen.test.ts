@@ -29,7 +29,11 @@ import { buildErasureWhere, planErasure } from '../src/lib/erasure.ts';
 // can no longer `.catch(() => null)` a would-be block into an allow.
 test('G-ADV-GOV-3a: screenOutcome maps a screen error to a terminal BLOCK (fail-closed)', () => {
   const verdict = screenOutcome('pre', [], new Error('llm-guard engine 503 (cause: ECONNRESET)'));
-  assert.equal(verdict.outcome, 'blocked', 'a thrown guardrail must BLOCK the run, never fall open');
+  assert.equal(
+    verdict.outcome,
+    'blocked',
+    'a thrown guardrail must BLOCK the run, never fall open',
+  );
   assert.equal(verdict.failedClosed, true);
   // The record shows an HONEST blocked check, not an empty screen that reads as "clean".
   assert.equal(verdict.checks.length, 1);
@@ -54,7 +58,11 @@ test('G-ADV-GOV-3b: screenGuardrail times a hung engine out to a BLOCK (never re
   // A tiny timeout budget; runChecks will hit the real PII port (not configured in test ⇒ a fast
   // 'warn'), so to force the timeout we assert the constant is finite and drive screenOutcome with a
   // timeout error directly — the wrapper's catch is exercised in 3c with a throwing port.
-  assert.ok(Number.isFinite(GUARDRAIL_SCREEN_TIMEOUT_MS) && GUARDRAIL_SCREEN_TIMEOUT_MS > 0);
+  assert.equal(
+    GUARDRAIL_SCREEN_TIMEOUT_MS,
+    65_000,
+    'the outer fail-closed envelope must leave headroom for a legitimate 60s scanner request',
+  );
   const timedOut = screenOutcome('pre', [], new Error('guardrail pre screen timed out after 5ms'));
   assert.equal(timedOut.outcome, 'blocked');
 });
@@ -82,12 +90,18 @@ test('G-ADV-GOV-3c: app-run guardrail step ERRORS (halts run) when the guard thr
   };
   const spec = { id: 'app_x', title: 'X', steps: [] } as never;
   const step = { id: 's1', kind: 'guardrail', label: 'screen' } as never;
-  const priorResults = [{ stepId: 's0', kind: 'agent', status: 'done', output: 'my PAN is ABCDE1234F' }] as never;
+  const priorResults = [
+    { stepId: 's0', kind: 'agent', status: 'done', output: 'my PAN is ABCDE1234F' },
+  ] as never;
   const ctx = { orgId: 'org_a', runId: 'run_1' } as never;
 
   const result = await executeStep(spec, step, priorResults, ctx, deps);
   // TERMINAL: the guardrail step is an ERROR — the run halts, the raw output never proceeds.
-  assert.equal(result.status, 'error', 'a thrown guardrail must ERROR the step (fail-closed), not pass through');
+  assert.equal(
+    result.status,
+    'error',
+    'a thrown guardrail must ERROR the step (fail-closed), not pass through',
+  );
 });
 
 // ── #236 fix 2 — PII masker fail-CLOSED (the pure authority) ─────────────────────────────────────
@@ -96,7 +110,11 @@ test('G-ADV-GOV-3c: app-run guardrail step ERRORS (halts run) when the guard thr
 test('PII fix-2: maskOrBlock BLOCKS when masking is required and the masker throws (no raw leak)', () => {
   const raw = 'ship the report; PAN ABCDE1234F, account 000123456789';
   const decision = maskOrBlock(true, raw, { ok: false, error: new Error('presidio 500') });
-  assert.equal(decision.block, true, 'masking required + masker failed ⇒ BLOCK, never emit raw text');
+  assert.equal(
+    decision.block,
+    true,
+    'masking required + masker failed ⇒ BLOCK, never emit raw text',
+  );
   // The forwardable text must not be the raw PAN (the caller must not send `decision.text` on a block,
   // but even so it carries the un-substituted original — the block flag is what holds the run).
   assert.equal(decision.masked, false);
@@ -106,15 +124,38 @@ test('PII fix-2: maskOrBlock BLOCKS when masking is required and the masker thro
 // A successful scan redacts and forwards; masking not required leaves the text untouched (additive).
 test('PII fix-2: maskOrBlock redacts on a good scan, and no-ops when masking not required', () => {
   const raw = 'PAN ABCDE1234F';
-  const good = maskOrBlock(true, raw, { ok: true, scan: { hits: true, redacted: 'PAN <REDACTED>' } });
+  const good = maskOrBlock(true, raw, {
+    ok: true,
+    scan: { hits: true, redacted: 'PAN <REDACTED>' },
+  });
   assert.equal(good.block, false);
   assert.equal(good.masked, true);
   assert.equal(good.text, 'PAN <REDACTED>');
-  assert.doesNotMatch(good.text, /ABCDE1234F/, 'the raw PAN must be substituted before it can leave');
+  assert.doesNotMatch(
+    good.text,
+    /ABCDE1234F/,
+    'the raw PAN must be substituted before it can leave',
+  );
 
   const off = maskOrBlock(false, raw, { ok: false, error: new Error('ignored — not required') });
   assert.equal(off.block, false);
   assert.equal(off.text, raw);
+});
+
+test('PII fix-2: a configured detector unavailable verdict blocks mandatory masking', () => {
+  const raw = 'PAN ABCDE1234F';
+  const decision = maskOrBlock(true, raw, {
+    ok: true,
+    scan: {
+      hits: true,
+      blocked: true,
+      reason: 'guard aggregate unavailable',
+      redacted: '[guardrail unavailable]',
+    },
+  });
+  assert.equal(decision.block, true);
+  assert.equal(decision.masked, false);
+  assert.match(decision.reason ?? '', /could not screen.*guard aggregate unavailable/);
 });
 
 // ── #236 fix 2 (wired) — the app-run agent STEP blocks when masking is required + the scanner dies ─
@@ -177,8 +218,7 @@ test('RTBF fix-3: every plan step is stamped with the org and confined to it', (
     assert.equal(step.orgId, 'org_a', `step ${step.table} must carry the requesting org`);
     const where = buildErasureWhere(step);
     // The confinement is one of: a direct org column, a parent-org subquery, or a membership probe.
-    const confined =
-      where.clause.includes('%ORG%') || where.membershipProbe?.includes('%ORG%');
+    const confined = where.clause.includes('%ORG%') || where.membershipProbe?.includes('%ORG%');
     assert.ok(confined, `step ${step.table} must confine the DELETE to the org (no unscoped wipe)`);
     // The subject is always a bound placeholder — never string-interpolated.
     assert.match(where.clause, /%SUBJECT%/);

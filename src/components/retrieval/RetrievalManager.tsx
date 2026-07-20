@@ -1,6 +1,15 @@
 'use client';
 
-import { Database, Stack, Warning, Plus, Trash, ArrowClockwise, HardDrives, CheckCircle } from '@phosphor-icons/react/dist/ssr';
+import {
+  Database,
+  Stack,
+  Warning,
+  Plus,
+  Trash,
+  ArrowClockwise,
+  HardDrives,
+  CheckCircle,
+} from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -25,8 +34,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { type CollectionStatus, type RetrievalView, retrievalEndpointLabel } from '@/lib/retrieval-view';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  type CollectionStatus,
+  type RetrievalView,
+  retrievalEndpointLabel,
+} from '@/lib/retrieval-view';
 
 const STATUS_CLASS: Record<CollectionStatus, string> = {
   green: 'bg-primary/10 text-primary',
@@ -39,11 +59,18 @@ const STATUS_CLASS: Record<CollectionStatus, string> = {
 const DISTANCES = ['cosine', 'dot', 'euclid'] as const;
 
 interface Props {
+  basePath?: string;
   initialView: RetrievalView;
   initialError: string | null;
+  showHeading?: boolean;
 }
 
-export function RetrievalManager({ initialView, initialError }: Readonly<Props>) {
+export function RetrievalManager({
+  basePath = '/data/retrieval',
+  initialView,
+  initialError,
+  showHeading = true,
+}: Readonly<Props>) {
   const router = useRouter();
   const params = useSearchParams();
   const [view, setView] = useState(initialView);
@@ -61,9 +88,9 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
       if (value === null) next.delete(key);
       else next.set(key, value);
       const qs = next.toString();
-      router.push(qs ? `/data/retrieval?${qs}` : '/data/retrieval', { scroll: false });
+      router.push(qs ? `${basePath}?${qs}` : basePath, { scroll: false });
     },
-    [params, router],
+    [basePath, params, router],
   );
 
   const reload = useCallback(async () => {
@@ -116,7 +143,9 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
   async function confirmDelete(target: string) {
     setBusy(true);
     try {
-      const r = await fetch(`/api/v1/admin/retrieval/${encodeURIComponent(target)}`, { method: 'DELETE' });
+      const r = await fetch(`/api/v1/admin/retrieval/${encodeURIComponent(target)}`, {
+        method: 'DELETE',
+      });
       if (!r.ok) {
         const d = (await r.json().catch(() => null)) as { error?: string } | null;
         setError(d?.error ?? `delete failed: HTTP ${r.status}`);
@@ -133,20 +162,22 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Database className="size-4" />
+        {showHeading ? (
+          <div className="flex items-center gap-3">
+            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Database className="size-4" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">Retrieval</h1>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                Vector store behind the retrieval layer — create, inspect, clear, and delete
+                collections on the active adapter. Pushed directly to the backend; never leaves your
+                infrastructure.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">Retrieval</h1>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              Vector store behind the retrieval layer — create, inspect, clear, and delete
-              collections on the active adapter. Pushed directly to the backend; never leaves your
-              infrastructure.
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+        ) : null}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             {view.adapterId}
           </Badge>
@@ -157,7 +188,9 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
           ) : (
             <Badge
               variant="secondary"
-              className={view.reachable ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}
+              className={
+                view.reachable ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              }
             >
               {view.reachable ? 'reachable' : 'unreachable'}
             </Badge>
@@ -178,10 +211,14 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
           </div>
           <div className="space-y-0.5">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Endpoint</p>
-            <p className="truncate font-mono text-xs text-foreground">{retrievalEndpointLabel(view)}</p>
+            <p className="truncate font-mono text-xs text-foreground">
+              {retrievalEndpointLabel(view)}
+            </p>
           </div>
           <div className="space-y-0.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Total vectors</p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+              Total vectors
+            </p>
             <p className="text-sm text-foreground">{view.totalVectors.toLocaleString()}</p>
           </div>
         </CardContent>
@@ -201,8 +238,9 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
             <p className="max-w-xl text-sm text-muted-foreground">
               This is fully operational — documents indexed through the retrieval layer are stored
               and searched here on your infrastructure. An external vector database (Qdrant) is{' '}
-              <span className="font-medium">optional</span>: connect one in Settings only if you want
-              to manage collections from this screen. The embedded store needs no external service.
+              <span className="font-medium">optional</span>: connect one in Settings only if you
+              want to manage collections from this screen. The embedded store needs no external
+              service.
             </p>
           </CardContent>
         </Card>
@@ -245,8 +283,12 @@ export function RetrievalManager({ initialView, initialError }: Readonly<Props>)
                       <Stack className="size-3.5 text-muted-foreground" />
                       {c.name}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{c.vectorsCount.toLocaleString()}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.pointsCount.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {c.vectorsCount.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {c.pointsCount.toLocaleString()}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Badge variant="secondary" className={STATUS_CLASS[c.status]}>
                         {c.status}

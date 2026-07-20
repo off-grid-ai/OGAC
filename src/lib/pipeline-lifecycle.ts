@@ -25,6 +25,7 @@ import {
 } from '@/lib/pipeline-lifecycle-model';
 import { publishWithGate, type PublishGateResult } from '@/lib/pipeline-release';
 import { getPipeline, updatePipeline, type PipelineView } from '@/lib/pipelines';
+import { listPipelineConsumers, type PipelineConsumer } from '@/lib/pipeline-consumers';
 import { recordAudit } from '@/lib/store';
 import { listMembershipsForUser } from '@/lib/teams';
 import { type ActorContext, resolveLifecycleRole } from '@/lib/teams-policy';
@@ -61,7 +62,11 @@ export async function resolvePipelineRole(
   const ctx = actorContextFrom(actor);
   if (ctx.isAdmin) return 'admin'; // short-circuit — no membership read needed
   const memberships = await listMembershipsForUser(actor.email, orgId);
-  return resolveLifecycleRole(ctx, { ownerId: pipeline.ownerId, teamId: pipeline.teamId }, memberships);
+  return resolveLifecycleRole(
+    ctx,
+    { ownerId: pipeline.ownerId, teamId: pipeline.teamId },
+    memberships,
+  );
 }
 
 // ─── 2. perform a lifecycle transition ────────────────────────────────────────────────────────────
@@ -77,6 +82,7 @@ export interface TransitionResult {
   /** True when the approve was BLOCKED by a failing release gate (no override). */
   blocked?: boolean;
   reason?: string;
+  consumers?: PipelineConsumer[];
 }
 
 // The audit action per lifecycle action — the honest promote/approve/deprecate trail the spec names.
@@ -142,6 +148,19 @@ export async function transitionPipeline(
       outcome: 'ok',
     });
     return { ok: true, pipeline: gate.pipeline, gate };
+  }
+
+  if (action === 'deprecate') {
+    const consumers = await listPipelineConsumers(id, orgId);
+    if (consumers.length > 0) {
+      return {
+        ok: false,
+        pipeline: null,
+        blocked: true,
+        consumers,
+        reason: `Rebind or remove ${consumers.length} consumer(s) before deprecating this pipeline.`,
+      };
+    }
   }
 
   // Every other action → a plain status set to the pure target.

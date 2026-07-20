@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/UserMenu';
 import { drawerReducer } from '@/lib/mobile-nav';
-import { getEnabledModules } from '@/lib/modules';
+import { routeIdentityForPath, type RouteIdentity } from '@/modules/route-identity';
 
 interface SessionUser {
   name?: string | null;
@@ -16,9 +16,35 @@ interface SessionUser {
   role?: string;
 }
 
+export function TopbarIdentity({ identity }: Readonly<{ identity: RouteIdentity }>) {
+  const titleClassName = 'truncate text-sm font-medium text-foreground';
+
+  return (
+    <div
+      data-og-route-identity={identity.ownerId}
+      data-og-heading-owner={identity.headingOwner}
+      className="mr-auto min-w-0 leading-tight"
+    >
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="hidden shrink-0 text-[9px] uppercase tracking-[0.12em] text-muted-foreground sm:inline">
+          {identity.eyebrow}
+        </span>
+        {identity.headingOwner === 'shell' ? (
+          <h1 className={titleClassName}>{identity.title}</h1>
+        ) : (
+          <span className={titleClassName}>{identity.title}</span>
+        )}
+      </div>
+      <p className="mt-1 hidden max-w-[min(54vw,52rem)] truncate text-[10px] text-muted-foreground sm:block">
+        {identity.description}
+      </p>
+    </div>
+  );
+}
+
 export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
   const pathname = usePathname();
-  const mod = getEnabledModules().find((m) => pathname.startsWith(m.route));
+  const identity = routeIdentityForPath(pathname);
 
   // Mobile nav drawer state — owned by the pure reducer so the close-on-nav invariant is
   // unit-tested (see src/lib/mobile-nav.ts). Radix already closes on esc/backdrop; the effect below
@@ -33,36 +59,35 @@ export function Topbar({ user }: Readonly<{ user?: SessionUser }>) {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6">
-      <div className="flex min-w-0 items-center gap-2">
-        {/* Hamburger — mobile only; opens the slide-in nav drawer (same nav as the desktop aside). */}
-        <Sheet open={drawerOpen} onOpenChange={(o) => dispatch({ type: o ? 'open' : 'close' })}>
-          <SheetTrigger
-            aria-label="Open navigation menu"
-            className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
-          >
-            <List className="size-5" />
-          </SheetTrigger>
-          <SheetContent side="left" className="w-72 gap-0 p-0 sm:max-w-72" showCloseButton={false}>
-            <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <SidebarNav onNavigate={() => dispatch({ type: 'close' })} />
-          </SheetContent>
-        </Sheet>
+    <header
+      aria-label="Console header"
+      data-og-shell="topbar"
+      data-og-surface="raised"
+      className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6"
+    >
+      {/* Hamburger — mobile only; opens the slide-in nav drawer (same nav as the desktop aside). */}
+      <Sheet open={drawerOpen} onOpenChange={(o) => dispatch({ type: o ? 'open' : 'close' })}>
+        <SheetTrigger
+          aria-label="Open navigation menu"
+          data-og-interactive
+          className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+        >
+          <List className="size-5" />
+        </SheetTrigger>
+        <SheetContent side="left" className="w-72 gap-0 p-0 sm:max-w-72" showCloseButton={false}>
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SidebarNav onNavigate={() => dispatch({ type: 'close' })} />
+        </SheetContent>
+      </Sheet>
 
-        <div className="min-w-0 leading-tight">
-          <h1 className="truncate text-sm font-medium text-foreground">{mod?.label ?? 'Console'}</h1>
-          {mod ? (
-            <p className="hidden truncate text-xs text-muted-foreground sm:block">
-              {mod.description}
-            </p>
-          ) : null}
-        </div>
-      </div>
+      {identity ? <TopbarIdentity identity={identity} /> : <div className="mr-auto" />}
+
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         {/* Search trigger — icon-only on mobile (label + ⌘K hint appear from `sm`). */}
         <button
           onClick={openSearch}
           aria-label="Search"
+          data-og-interactive
           className="flex min-h-11 items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
         >
           <MagnifyingGlass className="size-3.5" />

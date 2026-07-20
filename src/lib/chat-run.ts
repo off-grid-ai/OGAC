@@ -169,13 +169,34 @@ export function outboundGuardrailBlocks(checks: CheckResult[] | null): boolean {
   return outcomeFromChecks(checks) === 'blocked';
 }
 
-/** Run the outbound guardrail scan on the answer (recorded, non-blocking — mirrors runAgent step 6). */
+export interface OutboundRelease {
+  blocked: boolean;
+  answer: string;
+  reasoning: string;
+}
+
+/**
+ * PURE terminal release decision for generated content. Callers may buffer arbitrary model output,
+ * but they must only emit, persist, trace, sign, or distil the strings returned here. A failed or
+ * blocked screen returns empty strings so raw output cannot escape through a secondary side effect.
+ */
+export function prepareOutboundRelease(
+  answer: string,
+  reasoning: string,
+  checks: CheckResult[] | null,
+): OutboundRelease {
+  if (outboundGuardrailBlocks(checks)) return { blocked: true, answer: '', reasoning: '' };
+  return { blocked: false, answer, reasoning };
+}
+
+/** Run the outbound guardrail scan that gates release of the generated answer. */
 export async function runOutboundGuardrails(
   answer: string,
   model: string,
   orgId?: string,
+  prompt = '',
 ): Promise<CheckResult[]> {
-  return runChecks('post', { phase: 'post', output: answer, model, orgId });
+  return runChecks('post', { phase: 'post', input: prompt, output: answer, model, orgId });
 }
 
 // ─── W2: trust artifacts — lineage + provenance, mirroring agentrun.ts ──────────────────────────

@@ -13,7 +13,7 @@ import {
   type GovernanceControls,
   type PipelineShape,
 } from '../src/lib/pipelines-policy.ts';
-import { planSeedPipelines, samplePipelineId } from '../src/lib/pipelines-seed.ts';
+import { planSeedPipelines, samplePipelineId, seedPipelineNeedsUpdate } from '../src/lib/pipelines-seed.ts';
 
 // ─── validation ────────────────────────────────────────────────────────────────────────────────────
 
@@ -205,9 +205,9 @@ test('nextVersion: increments; guards a bad current', () => {
 
 // ─── seed: stable ids + org isolation ─────────────────────────────────────────────────────────────────
 
-test('planSeedPipelines: stable, org-scoped ids; six BFSI templates bound to the on-prem gateway', () => {
+test('planSeedPipelines: stable, org-scoped ids; BFSI templates bound to the on-prem gateway', () => {
   const def = planSeedPipelines('default');
-  assert.equal(def.length, 6);
+  assert.equal(def.length, 9);
   assert.ok(def.every((p) => p.isTemplate), 'all are templates');
   assert.ok(def.every((p) => p.status === 'published'), 'templates are published');
   assert.equal(def[0].id, samplePipelineId('default', SAMPLE_KEY_OF(def[0].name)));
@@ -217,6 +217,16 @@ test('planSeedPipelines: stable, org-scoped ids; six BFSI templates bound to the
 
   const bharat = planSeedPipelines('org_bharat');
   assert.ok(bharat.every((p) => p.gatewayId === 'gw_seed_org_bharat_onprem-cluster'));
+  assert.deepEqual(
+    bharat.find((pipeline) => pipeline.name === 'Cross-Sell Advisor')?.dataAllowlist,
+    ['customer data', 'pricing rate card'],
+    'cross-sell references both canonical evidence domains, not imaginary tables',
+  );
+  assert.deepEqual(
+    bharat.find((pipeline) => pipeline.name === 'RM cross-sell')?.dataAllowlist,
+    ['customer data', 'pricing rate card'],
+    'the flagship RM pipeline permits the same governed evidence pair',
+  );
   // Org isolation: ids never collide across orgs.
   const defIds = new Set(def.map((p) => p.id));
   assert.ok(bharat.every((p) => !defIds.has(p.id)), 'ids are org-scoped, never shared');
@@ -224,6 +234,16 @@ test('planSeedPipelines: stable, org-scoped ids; six BFSI templates bound to the
 
 test('planSeedPipelines: is deterministic (idempotent re-seed)', () => {
   assert.deepEqual(planSeedPipelines('default'), planSeedPipelines('default'));
+});
+
+test('seedPipelineNeedsUpdate: reconciles stale contracts without rewriting identical seeds', () => {
+  const desired = planSeedPipelines('org_bharat').find((p) => p.name === 'RM cross-sell');
+  assert.ok(desired);
+  assert.equal(seedPipelineNeedsUpdate(desired, desired), false);
+  assert.equal(
+    seedPipelineNeedsUpdate({ ...desired, dataAllowlist: ['customer data'] }, desired),
+    true,
+  );
 });
 
 // gap PA-13 — a fresh seed must be CLEAN: it declares pipeline TEMPLATES only and carries NO API-key
@@ -254,6 +274,9 @@ function SAMPLE_KEY_OF(name: string): string {
     'KYC Verification': 'kyc-verification',
     'Fraud Screening': 'fraud-screening',
     'Cross-Sell Advisor': 'cross-sell-advisor',
+    'Collections intervention': 'collections-intervention',
+    'Indemnity claims': 'indemnity-claims',
+    'RM cross-sell': 'rm-cross-sell',
   };
   return map[name] ?? name;
 }

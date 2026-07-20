@@ -5,14 +5,13 @@ import {
   At,
   Books,
   Warning,
+  CaretDown,
   CaretLeft,
   CaretRight,
   Check,
   ClockCounterClockwise,
   Copy,
-  Cube,
   FileText,
-  FolderOpen,
   FolderSimplePlus,
   GearSix,
   Brain,
@@ -33,16 +32,15 @@ import {
   Sparkle,
   SpeakerHigh,
   Stop,
-  TextAlignLeft,
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
-import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { PipelineChip } from '@/components/pipelines/PipelineChip';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -132,11 +130,105 @@ function streamErrorReason(status: number): string {
   return `Request failed (${status}).`;
 }
 
-function ArtifactChip({ content, onOpen }: Readonly<{ content: string; onOpen: (a: Artifact) => void }>) {
+const OUTBOUND_GUARDRAIL_BLOCKED_MESSAGE =
+  'Response blocked by output guardrails. No generated content was released.';
+
+function isBlockedOutboundGuardrailEvent(event: unknown): boolean {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
+  const guardrail = (event as { guardrail?: unknown }).guardrail;
+  if (!guardrail || typeof guardrail !== 'object' || Array.isArray(guardrail)) return false;
+  const value = guardrail as { phase?: unknown; blocked?: unknown };
+  return value.phase === 'post' && value.blocked === true;
+}
+
+function MentionSuggestionList({
+  matches,
+  activeIndex,
+  onActiveIndexChange,
+  onPick,
+}: Readonly<{
+  matches: MentionCandidate[];
+  activeIndex: number;
+  onActiveIndexChange: (index: number) => void;
+  onPick: (candidate: MentionCandidate) => void;
+}>) {
+  const indexed = matches.map((candidate, index) => ({ candidate, index }));
+  const sections = [
+    {
+      key: 'memory',
+      heading: 'Memories',
+      rows: indexed.filter(({ candidate }) => candidate.kind === 'memory'),
+    },
+    {
+      key: 'knowledge',
+      heading: 'Knowledge',
+      rows: indexed.filter(({ candidate }) => candidate.kind !== 'memory'),
+    },
+  ];
+
+  return (
+    <div
+      id="chat-mention-suggestions"
+      role="listbox"
+      aria-label="Memory and knowledge suggestions"
+      className="mb-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg"
+    >
+      {sections.map((section) =>
+        section.rows.length ? (
+          <div key={section.key} role="group" aria-labelledby={`chat-mention-group-${section.key}`}>
+            <div
+              id={`chat-mention-group-${section.key}`}
+              className="border-b border-border/60 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60"
+            >
+              {section.heading}
+            </div>
+            {section.rows.map(({ candidate, index }) => (
+              <button
+                key={`${candidate.kind}:${candidate.id}`}
+                id={`chat-mention-option-${index}`}
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex}
+                onMouseEnter={() => onActiveIndexChange(index)}
+                onClick={() => onPick(candidate)}
+                className={cn(
+                  'flex w-full items-center gap-2 px-3 py-2 text-left',
+                  index === activeIndex ? 'bg-primary/10' : 'hover:bg-muted',
+                )}
+              >
+                {candidate.kind === 'memory' ? (
+                  <Brain className="size-3.5 shrink-0 text-primary" />
+                ) : candidate.kind === 'doc' ? (
+                  <FileText className="size-3.5 shrink-0 text-primary" />
+                ) : (
+                  <Books className="size-3.5 shrink-0 text-primary" />
+                )}
+                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                  {candidate.label}
+                </span>
+                {candidate.hint ? (
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {candidate.hint}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null,
+      )}
+    </div>
+  );
+}
+
+function ArtifactChip({
+  content,
+  onOpen,
+}: Readonly<{ content: string; onOpen: (a: Artifact) => void }>) {
   const art = parseArtifact(content);
   if (!art) return null;
   return (
     <button
+      type="button"
       onClick={() => onOpen(art)}
       className="mt-2 rounded border border-primary/40 px-2 py-1 text-xs text-primary hover:bg-primary/10"
     >
@@ -156,13 +248,21 @@ function BranchNav({
   if (!m.branchCount || m.branchCount < 2) return null;
   return (
     <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
-      <button onClick={() => onNav(-1)} className="rounded p-0.5 hover:bg-muted hover:text-foreground">
+      <button
+        type="button"
+        onClick={() => onNav(-1)}
+        className="rounded p-0.5 hover:bg-muted hover:text-foreground"
+      >
         <CaretLeft className="size-3" />
       </button>
       <span className="tabular-nums">
         {(m.branchIndex ?? 0) + 1}/{m.branchCount}
       </span>
-      <button onClick={() => onNav(1)} className="rounded p-0.5 hover:bg-muted hover:text-foreground">
+      <button
+        type="button"
+        onClick={() => onNav(1)}
+        className="rounded p-0.5 hover:bg-muted hover:text-foreground"
+      >
         <CaretRight className="size-3" />
       </button>
     </div>
@@ -174,7 +274,11 @@ function BranchNav({
 // answer starts it collapses to a one-line header the reader can re-open. Presentation state is the
 // pure `thinkingState` decision (task rule: "collapsed by default once the answer starts"); the only
 // local state is the reader's manual open/close override, seeded from that default.
-function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
+function ThinkingBlock({
+  reasoning,
+  content,
+  streaming,
+}: Readonly<{
   reasoning: string;
   content: string;
   streaming: boolean;
@@ -186,19 +290,34 @@ function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
   const scrollRef = useRef<HTMLDivElement>(null);
   // Keep the newest reasoning in view while it streams (transform/opacity-only motion elsewhere).
   useEffect(() => {
-    if (open && state.phase === 'streaming') scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    if (open && state.phase === 'streaming')
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [reasoning, open, state.phase]);
   if (!state.hasReasoning) return null;
   return (
-    <div className="mb-2 rounded-md border border-border/60 bg-muted/40">
+    <div
+      data-ai-state={state.phase === 'streaming' ? 'streaming' : 'complete'}
+      aria-busy={state.phase === 'streaming'}
+      className="mb-2 rounded-md border border-border/60 bg-muted/40"
+    >
       <button
         type="button"
         onClick={() => setOverride(!open)}
         className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
       >
-        <Brain className={cn('size-3.5 shrink-0 text-primary', state.phase === 'streaming' && 'animate-pulse')} />
+        <Brain
+          className={cn(
+            'size-3.5 shrink-0 text-primary',
+            state.phase === 'streaming' && 'animate-pulse',
+          )}
+        />
         <span>{thinkingLabel(state.phase)}</span>
-        <CaretRight className={cn('ml-auto size-3 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
+        <CaretRight
+          className={cn(
+            'ml-auto size-3 shrink-0 transition-transform duration-200',
+            open && 'rotate-90',
+          )}
+        />
       </button>
       {open ? (
         <div
@@ -215,7 +334,11 @@ function ThinkingBlock({ reasoning, content, streaming }: Readonly<{
 // "Sources" footer — the numbered, de-duplicated citation list under a grounded answer. Each row is
 // [n] doc · parts · relevance, keyed to the inline [n] chips. Clicking an inline chip scrolls to and
 // briefly highlights the matching row (setActive). No citations → renders nothing (footer absent).
-function SourcesFooter({ citations, activeIndex, registerRef }: Readonly<{
+function SourcesFooter({
+  citations,
+  activeIndex,
+  registerRef,
+}: Readonly<{
   citations: Citation[];
   activeIndex: number | null;
   registerRef: (index: number, el: HTMLLIElement | null) => void;
@@ -238,9 +361,12 @@ function SourcesFooter({ citations, activeIndex, registerRef }: Readonly<{
             )}
           >
             <span className="font-mono text-[10px] font-medium text-primary">[{s.index}]</span>
-            <span className="min-w-0 flex-1 truncate text-foreground" title={s.name}>{s.name}</span>
+            <span className="min-w-0 flex-1 truncate text-foreground" title={s.name}>
+              {s.name}
+            </span>
             <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-              part{s.parts.length > 1 ? 's' : ''} {s.parts.join(', ')} · {(s.score * 100).toFixed(0)}%
+              part{s.parts.length > 1 ? 's' : ''} {s.parts.join(', ')} ·{' '}
+              {(s.score * 100).toFixed(0)}%
             </span>
           </li>
         ))}
@@ -296,23 +422,38 @@ function MessageBubble({
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
     highlightTimer.current = setTimeout(() => setActiveSource(null), 1600);
   }, []);
-  useEffect(() => () => { if (highlightTimer.current) clearTimeout(highlightTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    },
+    [],
+  );
   if (!isAssistant && editing) {
     return (
       <div className="flex justify-end">
         <div className="w-[90%] rounded-lg border border-primary/40 bg-primary/5 p-2">
-          <textarea
+          <Textarea
             autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={Math.min(8, draft.split('\n').length + 1)}
-            className="w-full resize-none bg-transparent text-sm outline-none"
+            aria-label="Edit message"
+            className="w-full resize-none !border-0 !bg-transparent text-sm !shadow-none !outline-none focus-visible:!border-transparent focus-visible:!outline-none"
           />
           <div className="mt-2 flex justify-end gap-2">
-            <Button size="sm" variant="outline" onClick={() => { setEditing(false); setDraft(m.content); }}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditing(false);
+                setDraft(m.content);
+              }}
+            >
               Cancel
             </Button>
             <Button
+              type="button"
               size="sm"
               onClick={() => {
                 const t = draft.trim();
@@ -357,7 +498,9 @@ function MessageBubble({
         {isAssistant ? (
           m.content ? (
             <>
-              <Markdown sourceCount={sourceCount} onCiteClick={jumpToSource}>{m.content}</Markdown>
+              <Markdown sourceCount={sourceCount} onCiteClick={jumpToSource}>
+                {m.content}
+              </Markdown>
               <ArtifactChip content={m.content} onOpen={onOpenArtifact} />
               {m.citations?.length ? (
                 <SourcesFooter
@@ -371,6 +514,7 @@ function MessageBubble({
               ) : null}
               <div className="mt-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <button
+                  type="button"
                   onClick={() => onCopy(m.content)}
                   className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   title="Copy"
@@ -378,6 +522,7 @@ function MessageBubble({
                   <Copy className="size-3.5" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => m.id && onSpeak(m.id, m.content)}
                   className={cn(
                     'rounded p-1 hover:bg-muted hover:text-foreground',
@@ -393,6 +538,7 @@ function MessageBubble({
                 </button>
                 {canRegenerate ? (
                   <button
+                    type="button"
                     onClick={onRegenerate}
                     className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                     title="Regenerate"
@@ -402,7 +548,7 @@ function MessageBubble({
                 ) : null}
               </div>
             </>
-          ) : (
+          ) : m.error ? null : (
             <span className="inline-block h-4 w-2 animate-pulse bg-primary" />
           )
         ) : (
@@ -411,8 +557,15 @@ function MessageBubble({
         {/* Inline generation error + retry (keeps any partial output above). */}
         {isAssistant && m.error ? (
           <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive">
-            <span className="flex items-center gap-1.5"><Warning className="size-3.5 shrink-0" />{m.error}</span>
-            <button onClick={onRegenerate} className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:bg-destructive/10">
+            <span className="flex items-center gap-1.5">
+              <Warning className="size-3.5 shrink-0" />
+              {m.error}
+            </span>
+            <button
+              type="button"
+              onClick={onRegenerate}
+              className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:bg-destructive/10"
+            >
               <ArrowsClockwise className="size-3" /> Retry
             </button>
           </div>
@@ -423,7 +576,11 @@ function MessageBubble({
       {/* Edit affordance on user turns (creates a new branch). */}
       {!isAssistant && canEdit && m.id ? (
         <button
-          onClick={() => { setDraft(m.content); setEditing(true); }}
+          type="button"
+          onClick={() => {
+            setDraft(m.content);
+            setEditing(true);
+          }}
           className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
           title="Edit message"
         >
@@ -513,7 +670,9 @@ export function ChatWorkspace({
   const [lightbox, setLightbox] = useState<string | null>(null);
   useEffect(() => {
     if (!lightbox) return;
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightbox(null); };
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightbox(null);
+    };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [lightbox]);
@@ -527,7 +686,9 @@ export function ChatWorkspace({
   const [toolsOpen, setToolsOpen] = useState(false);
   // Slash styles: RBAC-permitted skills invocable inline via /name. `turnSkill` applies for the
   // next turn only (its system prompt), shown as a chip in the composer.
-  const [skillList, setSkillList] = useState<{ id: string; name: string; description: string }[]>([]);
+  const [skillList, setSkillList] = useState<{ id: string; name: string; description: string }[]>(
+    [],
+  );
   const [turnSkill, setTurnSkill] = useState<{ id: string; name: string } | null>(null);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
@@ -576,6 +737,18 @@ export function ChatWorkspace({
   const mentionMatches = mention
     ? matchMentions(mentionCands, mention.query, { exclude: refs, limit: 8 })
     : [];
+  const suggestionListboxId =
+    mentionOpen && mentionMatches.length
+      ? 'chat-mention-suggestions'
+      : slashOpen && slashMatches.length
+        ? 'chat-skill-suggestions'
+        : undefined;
+  const activeSuggestionId =
+    mentionOpen && mentionMatches.length
+      ? `chat-mention-option-${mentionIndex}`
+      : slashOpen && slashMatches.length
+        ? `chat-skill-option-${slashIndex}`
+        : undefined;
   const activeProject = projects.find((p) => p.id === activeProjectId);
   // The pipeline governing THIS chat: the active project's override (if pinned), else the org default —
   // most-specific-wins, the SAME pure rule the run path uses. Named + linked via the chip by the model
@@ -587,8 +760,7 @@ export function ChatWorkspace({
   const chatPipelineChip = chatPipelineId
     ? {
         id: chatPipelineId,
-        name:
-          chatBinding.pipelines.find((p) => p.id === chatPipelineId)?.name ?? chatPipelineId,
+        name: chatBinding.pipelines.find((p) => p.id === chatPipelineId)?.name ?? chatPipelineId,
         inherited: !activeProject?.pipelineId,
       }
     : { id: null };
@@ -620,7 +792,11 @@ export function ChatWorkspace({
     void (async () => {
       const r = await fetch('/api/v1/chat/models');
       if (r.ok) {
-        const body = await r.json() as { models?: ModelInfo[]; error?: string; gatewayUrl?: string };
+        const body = (await r.json()) as {
+          models?: ModelInfo[];
+          error?: string;
+          gatewayUrl?: string;
+        };
         const list: ModelInfo[] = body.models ?? [];
         setModels(list);
         if (list[0]) setModel(list[0].id);
@@ -655,7 +831,9 @@ export function ChatWorkspace({
       const r = await fetch(`/api/v1/chat/conversations/${activeId}`);
       if (!cancelled && r.ok) setMessages((await r.json()).messages ?? []);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeId, temporary]);
 
   useEffect(() => {
@@ -687,10 +865,15 @@ export function ChatWorkspace({
           out.push({ kind: 'memory', id: m.id, label: m.fact });
         }
       }
-    } catch { /* memory optional */ }
+    } catch {
+      /* memory optional */
+    }
     const projs = projects.length
       ? projects
-      : await fetch('/api/v1/chat/projects').then((r) => (r.ok ? r.json() : { projects: [] })).then((b) => b.projects ?? []).catch(() => []);
+      : await fetch('/api/v1/chat/projects')
+          .then((r) => (r.ok ? r.json() : { projects: [] }))
+          .then((b) => b.projects ?? [])
+          .catch(() => []);
     for (const p of projs as Project[]) {
       out.push({ kind: 'project', id: p.id, label: p.name, hint: 'Knowledge base' });
       try {
@@ -701,7 +884,9 @@ export function ChatWorkspace({
             out.push({ kind: 'doc', id: d.id, label: d.name, projectId: p.id, hint: p.name });
           }
         }
-      } catch { /* project docs optional */ }
+      } catch {
+        /* project docs optional */
+      }
     }
     setMentionCands(out);
   }, [projects]);
@@ -741,6 +926,20 @@ export function ChatWorkspace({
         caretRef.current = pos;
       }
     });
+  }
+
+  function removeImageAt(index: number) {
+    setImages((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function removeFileAt(index: number) {
+    setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function removeReference(reference: MentionRef) {
+    setRefs((current) =>
+      current.filter((item) => !(item.kind === reference.kind && item.id === reference.id)),
+    );
   }
 
   // Composer keydown: drive the slash picker (arrows/enter/tab/escape) when open, else send.
@@ -932,7 +1131,11 @@ export function ChatWorkspace({
 
   // Route dropped/pasted files: images → inline attachments, everything else → text extraction.
   function ingestFiles(list: FileList | File[]) {
-    const toFileList = (fs: File[]) => { const dt = new DataTransfer(); fs.forEach((f) => dt.items.add(f)); return dt.files; };
+    const toFileList = (fs: File[]) => {
+      const dt = new DataTransfer();
+      fs.forEach((f) => dt.items.add(f));
+      return dt.files;
+    };
     const arr = Array.from(list);
     const imgs = arr.filter((f) => f.type.startsWith('image/'));
     const rest = arr.filter((f) => !f.type.startsWith('image/'));
@@ -996,7 +1199,7 @@ export function ChatWorkspace({
         signal: ac.signal,
       });
       if (!r.ok || !r.body) {
-        const detail = await r.json().catch(() => null) as { error?: string } | null;
+        const detail = (await r.json().catch(() => null)) as { error?: string } | null;
         const reason = detail?.error ?? streamErrorReason(r.status);
         throw new Error(reason);
       }
@@ -1013,6 +1216,23 @@ export function ChatWorkspace({
           buf = buf.slice(nl + 2);
           if (!chunk.startsWith('data:')) continue;
           const evt = JSON.parse(chunk.slice(5).trim());
+          if (isBlockedOutboundGuardrailEvent(evt)) {
+            // The server buffers generated output until this terminal verdict. Clear every
+            // content-bearing field defensively as well, so an older/mixed server can never leave
+            // already-received tokens, reasoning, or citations in client state after a block.
+            setMessages((prev) => {
+              const next = [...prev];
+              const last = next.at(-1);
+              if (last?.role === 'assistant') {
+                last.content = '';
+                last.reasoning = null;
+                last.citations = null;
+                last.error = OUTBOUND_GUARDRAIL_BLOCKED_MESSAGE;
+              }
+              return next;
+            });
+            continue;
+          }
           if (evt.error) {
             // Surface inline on the assistant bubble (keeps partial output) instead of a toast.
             setMessages((prev) => {
@@ -1052,8 +1272,9 @@ export function ChatWorkspace({
         setMessages((prev) => {
           const next = [...prev];
           const last = next.at(-1);
-          if (last?.role === 'assistant') { last.error = reason; }
-          else next.push({ role: 'assistant', content: '', error: reason });
+          if (last?.role === 'assistant') {
+            last.error = reason;
+          } else next.push({ role: 'assistant', content: '', error: reason });
           return next;
         });
       }
@@ -1091,7 +1312,11 @@ export function ChatWorkspace({
           if (r.ok && data.url) {
             next[next.length - 1] = { ...last, content: '', images: [data.url] };
           } else {
-            next[next.length - 1] = { ...last, content: '', error: data.error ?? 'Image generation failed' };
+            next[next.length - 1] = {
+              ...last,
+              content: '',
+              error: data.error ?? 'Image generation failed',
+            };
           }
         }
         return next;
@@ -1101,7 +1326,11 @@ export function ChatWorkspace({
         const next = [...prev];
         const last = next.at(-1);
         if (last?.role === 'assistant') {
-          next[next.length - 1] = { ...last, content: '', error: e instanceof Error ? e.message : 'failed' };
+          next[next.length - 1] = {
+            ...last,
+            content: '',
+            error: e instanceof Error ? e.message : 'failed',
+          };
         }
         return next;
       });
@@ -1291,8 +1520,10 @@ export function ChatWorkspace({
   else emptyStateHeading = 'Your own private AI';
   let emptyStateSubtext: string;
   if (temporary)
-    emptyStateSubtext = 'This chat won’t be saved, won’t appear in your history, and won’t update memory.';
-  else if (activeProject) emptyStateSubtext = 'Chats here use this project’s instructions and knowledge.';
+    emptyStateSubtext =
+      'This chat won’t be saved, won’t appear in your history, and won’t update memory.';
+  else if (activeProject)
+    emptyStateSubtext = 'Chats here use this project’s instructions and knowledge.';
   else emptyStateSubtext = 'Answered on-prem by the Off Grid AI gateways. Ask anything.';
   // Mic button tint: recording (destructive, pulsing) → transcribing (primary, pulsing) → idle.
   let micButtonTint: string;
@@ -1302,28 +1533,31 @@ export function ChatWorkspace({
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Mobile backdrop — closes the drawer on tap. Only rendered/interactive below md. */}
+      {/* Narrow-layout backdrop — closes the drawer on tap. The global console rail already uses
+          240px, so the chat rail stays off-canvas until lg; showing both rails at tablet widths
+          leaves the thread toolbar and composer unusably narrow. */}
       {sidebarOpen ? (
         <button
           type="button"
           aria-label="Close chats menu"
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm lg:hidden"
         />
       ) : null}
 
-      {/* Rail: projects + conversations. Inline column on md+; off-canvas drawer below md. */}
+      {/* Rail: projects + conversations. Inline column on lg+; off-canvas drawer below lg. */}
       <aside
         className={cn(
           'flex h-full w-64 shrink-0 flex-col border-r border-border bg-card',
           // Mobile: fixed off-canvas drawer, slid in/out by sidebarOpen.
-          'fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none',
+          'fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out lg:static lg:z-auto lg:translate-x-0 lg:transition-none',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         {/* Top: primary action + search */}
         <div className="space-y-2 p-2.5">
           <Button
+            type="button"
             onClick={newChat}
             className="w-full justify-start gap-2 transition-transform duration-150 active:scale-[0.98]"
             size="sm"
@@ -1348,6 +1582,7 @@ export function ChatWorkspace({
               Projects
             </span>
             <button
+              type="button"
               onClick={newProject}
               aria-label="New project"
               className="text-muted-foreground transition-colors duration-150 hover:text-primary"
@@ -1357,10 +1592,13 @@ export function ChatWorkspace({
           </div>
           <div className="space-y-0.5">
             <button
+              type="button"
               onClick={() => selectProject(null)}
               className={cn(
                 'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
-                !activeProjectId ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                !activeProjectId
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
               All chats
@@ -1368,6 +1606,7 @@ export function ChatWorkspace({
             {projects.map((p) => (
               <button
                 key={p.id}
+                type="button"
                 onClick={() => selectProject(p.id)}
                 className={cn(
                   'group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
@@ -1395,6 +1634,7 @@ export function ChatWorkspace({
             Chats
           </span>
           <button
+            type="button"
             onClick={() => setSkillsOpen(true)}
             className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors duration-150 hover:text-primary"
           >
@@ -1462,114 +1702,163 @@ export function ChatWorkspace({
       {/* Thread — min-h-0 so the flex-1 message list can shrink and scroll internally, pinning the
           composer to the bottom instead of letting it float mid-page with dead space below. */}
       <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-3 sm:px-4">
+        <div className="grid min-h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 border-b border-border px-3 py-1.5 sm:flex sm:px-4 sm:py-0">
           <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
             {/* Mobile-only: open the conversation/project drawer. ≥44px tap target. */}
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
               aria-label="Open chats menu"
-              className="-ml-1.5 flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+              className="-ml-1.5 flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
             >
               <List className="size-5" />
             </button>
-            {temporary ? <Ghost className="size-4 shrink-0 text-primary" /> : <Sparkle className="size-4 shrink-0 text-primary" />}
+            {temporary ? (
+              <Ghost className="size-4 shrink-0 text-primary" />
+            ) : (
+              <Sparkle className="size-4 shrink-0 text-primary" />
+            )}
             <span className="truncate">{headerTitle}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {/* Workspace library — Projects/Prompts/Artifacts are workspace sub-surfaces reached
-                from here (Artifacts has no sidebar row, so this keeps it reachable from chat). */}
-            <div className="mr-1 hidden items-center gap-0.5 border-r border-border pr-2 sm:flex">
-              <Link
-                href="/workspace/projects"
-                title="Projects"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          <div className="col-span-2 flex min-w-0 items-center gap-1.5 sm:col-span-1 sm:ml-auto sm:shrink-0 sm:gap-2">
+            <div className="hidden items-center gap-1 sm:flex">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={toggleTemporary}
+                className={cn(
+                  'size-9 rounded-lg hover:text-foreground',
+                  temporary ? 'text-primary' : 'text-muted-foreground',
+                )}
+                title={temporary ? 'Exit temporary chat' : 'Temporary chat (not saved)'}
+                aria-label={temporary ? 'Exit temporary chat' : 'Start temporary chat'}
+                aria-pressed={temporary}
               >
-                <FolderOpen className="size-4" />
-              </Link>
-              <Link
-                href="/workspace/prompts"
-                title="Prompts library"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                <Ghost className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setPanel('memory')}
+                className="size-9 rounded-lg text-muted-foreground hover:text-foreground"
+                title="Memory"
+                aria-label="Open memory"
               >
-                <TextAlignLeft className="size-4" />
-              </Link>
-              <Link
-                href="/workspace/artifacts"
-                title="Artifacts"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                <Brain className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setPanel('settings')}
+                className="size-9 rounded-lg text-muted-foreground hover:text-foreground"
+                title="Custom instructions"
+                aria-label="Open custom instructions"
               >
-                <Cube className="size-4" />
-              </Link>
+                <SlidersHorizontal className="size-4" />
+              </Button>
             </div>
-            <button
-              onClick={toggleTemporary}
-              className={cn(
-                'hover:text-foreground',
-                temporary ? 'text-primary' : 'text-muted-foreground',
-              )}
-              title={temporary ? 'Exit temporary chat' : 'Temporary chat (not saved)'}
-            >
-              <Ghost className="size-4" />
-            </button>
-            <button
-              onClick={() => setPanel('memory')}
-              className="text-muted-foreground hover:text-foreground"
-              title="Memory"
-            >
-              <Brain className="size-4" />
-            </button>
-            <button
-              onClick={() => setPanel('settings')}
-              className="text-muted-foreground hover:text-foreground"
-              title="Custom instructions"
-            >
-              <SlidersHorizontal className="size-4" />
-            </button>
             {/* The pipeline governing this chat (project override → org default). Names + links it so
                 the join-key is legible in chat, right by the model picker. */}
-            <PipelineChip pipeline={chatPipelineChip} size="xs" />
+            <PipelineChip
+              pipeline={chatPipelineChip}
+              size="xs"
+              containerClassName="min-w-0 shrink"
+              className="min-w-0 max-w-[8rem] shrink sm:max-w-none"
+            />
             {gatewayError ? (
               <a
-                href="/gateway/ai"
+                href="/runtime/models/overview"
                 title={`AI Gateway unreachable at ${toDisplayHost(gatewayError.url)} — check the gateway connection in Settings`}
                 className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-xs text-destructive hover:bg-destructive/10"
               >
-                <span>⚠ gateway offline</span>
+                <Warning className="size-3.5 shrink-0" />
+                <span className="truncate">Gateway offline</span>
               </a>
             ) : (
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="max-w-[8rem] rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground sm:max-w-none"
-              >
-                {models.length === 0 ? <option value="">no models</option> : null}
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {modelLabel(m.id)}
-                    {modelSuffix(m)}
-                  </option>
-                ))}
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-w-0 flex-1 justify-between gap-2 rounded-lg bg-background/80 font-mono text-xs font-normal shadow-sm sm:max-w-[22rem] sm:flex-none"
+                    aria-label="Choose model"
+                    disabled={models.length === 0}
+                  >
+                    <span className="truncate">
+                      {activeModel
+                        ? `${modelLabel(activeModel.id)}${modelSuffix(activeModel)}`
+                        : 'No models available'}
+                    </span>
+                    <CaretDown className="size-3.5 shrink-0 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel>Run this chat with</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
+                    {models.map((candidate) => (
+                      <DropdownMenuRadioItem key={candidate.id} value={candidate.id}>
+                        <span className="min-w-0 truncate font-mono text-xs">
+                          {modelLabel(candidate.id)}
+                          {modelSuffix(candidate)}
+                        </span>
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 shrink-0 rounded-lg text-muted-foreground sm:hidden"
+                  aria-label="Open chat options"
+                >
+                  <GearSix className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 sm:hidden">
+                <DropdownMenuCheckboxItem checked={temporary} onCheckedChange={toggleTemporary}>
+                  <Ghost className="mr-2 size-4" /> Temporary chat
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setPanel('memory')}>
+                  <Brain className="mr-2 size-4" /> Memory
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPanel('settings')}>
+                  <SlidersHorizontal className="mr-2 size-4" /> Custom instructions
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div className={cn('space-y-5 px-4 py-6', messages.length === 0 && !temporary && !activeStarters.length ? 'mx-auto max-w-5xl' : 'mx-auto max-w-3xl')}>
+          <div
+            className={cn(
+              'space-y-5 px-4 py-6',
+              messages.length === 0 && !temporary && !activeStarters.length
+                ? 'mx-auto max-w-5xl'
+                : 'mx-auto max-w-3xl',
+            )}
+          >
             {messages.length === 0 ? (
               <div className="pt-16 text-center text-sm text-muted-foreground">
-                <p className="text-base text-foreground">
-                  {emptyStateHeading}
-                </p>
-                <p className="mt-1">
-                  {emptyStateSubtext}
-                </p>
+                <p className="text-base text-foreground">{emptyStateHeading}</p>
+                <p className="mt-1">{emptyStateSubtext}</p>
                 {activeStarters.length ? (
                   <div className="mx-auto mt-6 grid max-w-lg gap-2 sm:grid-cols-2">
                     {activeStarters.map((s, i) => (
                       <button
                         key={i}
+                        type="button"
                         onClick={() => sendStarter(s)}
                         className="rounded-lg border border-border p-3 text-left text-xs text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
                       >
@@ -1591,6 +1880,7 @@ export function ChatWorkspace({
                       {visibleConversations.slice(0, 9).map((c) => (
                         <button
                           key={c.id}
+                          type="button"
                           onClick={() => openConversation(c.id)}
                           className="group flex flex-col gap-2 rounded-lg border border-border bg-card p-3.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
                         >
@@ -1649,10 +1939,15 @@ export function ChatWorkspace({
                 </div>
               ))}
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => resolveApprovals(true)}>
+                <Button type="button" size="sm" onClick={() => resolveApprovals(true)}>
                   Approve &amp; run
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => resolveApprovals(false)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => resolveApprovals(false)}
+                >
                   Deny
                 </Button>
               </div>
@@ -1663,12 +1958,27 @@ export function ChatWorkspace({
         {/* Composer */}
         <div
           className={`relative shrink-0 border-t border-border p-3 ${dragging ? 'bg-primary/5' : ''}`}
-          onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true); }}
-          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
-          onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!dragging) setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget === e.target) setDragging(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files);
+          }}
           onPaste={(e) => {
-            const imgs = Array.from(e.clipboardData.items).filter((i) => i.type.startsWith('image/')).map((i) => i.getAsFile()).filter((f): f is File => !!f);
-            if (imgs.length) { e.preventDefault(); ingestFiles(imgs); }
+            const imgs = Array.from(e.clipboardData.items)
+              .filter((i) => i.type.startsWith('image/'))
+              .map((i) => i.getAsFile())
+              .filter((f): f is File => !!f);
+            if (imgs.length) {
+              e.preventDefault();
+              ingestFiles(imgs);
+            }
           }}
         >
           {dragging && (
@@ -1682,9 +1992,14 @@ export function ChatWorkspace({
                 {images.map((src, k) => (
                   <div key={k} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" className="h-14 w-14 rounded border border-border object-cover" />
+                    <img
+                      src={src}
+                      alt=""
+                      className="h-14 w-14 rounded border border-border object-cover"
+                    />
                     <button
-                      onClick={() => setImages((p) => p.filter((_, j) => j !== k))}
+                      type="button"
+                      onClick={() => removeImageAt(k)}
                       className="absolute -right-1.5 -top-1.5 rounded-full bg-background p-0.5 text-muted-foreground hover:text-destructive"
                     >
                       <X className="size-3" />
@@ -1706,7 +2021,8 @@ export function ChatWorkspace({
                       {(f.chars / 1000).toFixed(1)}k
                     </span>
                     <button
-                      onClick={() => setFiles((p) => p.filter((_, j) => j !== k))}
+                      type="button"
+                      onClick={() => removeFileAt(k)}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="size-3" />
@@ -1720,11 +2036,17 @@ export function ChatWorkspace({
                 <span className="flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-1 text-xs text-primary">
                   <Sparkle className="size-3.5" />
                   {turnSkill.name}
-                  <button onClick={() => setTurnSkill(null)} className="hover:text-destructive">
+                  <button
+                    type="button"
+                    onClick={() => setTurnSkill(null)}
+                    className="hover:text-destructive"
+                  >
                     <X className="size-3" />
                   </button>
                 </span>
-                <span className="text-[10px] text-muted-foreground">applied to your next message</span>
+                <span className="text-[10px] text-muted-foreground">
+                  applied to your next message
+                </span>
               </div>
             ) : null}
             {/* @-mention reference chips — memories + KBs/docs pulled into this turn as context. */}
@@ -1745,7 +2067,8 @@ export function ChatWorkspace({
                     )}
                     <span className="max-w-[180px] truncate">{r.label}</span>
                     <button
-                      onClick={() => setRefs((prev) => prev.filter((x) => !(x.kind === r.kind && x.id === r.id)))}
+                      type="button"
+                      onClick={() => removeReference(r)}
                       className="hover:text-destructive"
                       aria-label={`Remove reference ${r.label}`}
                     >
@@ -1753,61 +2076,35 @@ export function ChatWorkspace({
                     </button>
                   </span>
                 ))}
-                <span className="text-[10px] text-muted-foreground">referenced for your next message</span>
+                <span className="text-[10px] text-muted-foreground">
+                  referenced for your next message
+                </span>
               </div>
             ) : null}
             {/* @-mention picker — two sections (Memories, Knowledge). Same interaction as slash. */}
             {mentionOpen ? (
-              <div className="mb-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
-                {(() => {
-                  const memRows = mentionMatches.map((c, gi) => ({ c, gi })).filter(({ c }) => c.kind === 'memory');
-                  const kbRows = mentionMatches.map((c, gi) => ({ c, gi })).filter(({ c }) => c.kind !== 'memory');
-                  return [
-                    { key: 'memory', heading: 'Memories', rows: memRows },
-                    { key: 'knowledge', heading: 'Knowledge', rows: kbRows },
-                  ];
-                })().map((section) => {
-                  const rows = section.rows;
-                  if (!rows.length) return null;
-                  return (
-                    <div key={section.key}>
-                      <div className="border-b border-border/60 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
-                        {section.heading}
-                      </div>
-                      {rows.map(({ c, gi }) => (
-                        <button
-                          key={`${c.kind}:${c.id}`}
-                          onMouseEnter={() => setMentionIndex(gi)}
-                          onClick={() => pickMention(c)}
-                          className={cn(
-                            'flex w-full items-center gap-2 px-3 py-2 text-left',
-                            gi === mentionIndex ? 'bg-primary/10' : 'hover:bg-muted',
-                          )}
-                        >
-                          {c.kind === 'memory' ? (
-                            <Brain className="size-3.5 shrink-0 text-primary" />
-                          ) : c.kind === 'doc' ? (
-                            <FileText className="size-3.5 shrink-0 text-primary" />
-                          ) : (
-                            <Books className="size-3.5 shrink-0 text-primary" />
-                          )}
-                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{c.label}</span>
-                          {c.hint ? (
-                            <span className="shrink-0 text-[10px] text-muted-foreground">{c.hint}</span>
-                          ) : null}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
+              <MentionSuggestionList
+                matches={mentionMatches}
+                activeIndex={mentionIndex}
+                onActiveIndexChange={setMentionIndex}
+                onPick={pickMention}
+              />
             ) : null}
             {/* Slash-styles autocomplete — pick a skill to apply for the next turn. */}
             {slashOpen ? (
-              <div className="mb-2 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+              <div
+                id="chat-skill-suggestions"
+                role="listbox"
+                aria-label="Skill suggestions"
+                className="mb-2 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+              >
                 {slashMatches.map((s, i) => (
                   <button
                     key={s.id}
+                    id={`chat-skill-option-${i}`}
+                    type="button"
+                    role="option"
+                    aria-selected={i === slashIndex}
                     onMouseEnter={() => setSlashIndex(i)}
                     onClick={() => pickSkill(s)}
                     className={cn(
@@ -1819,7 +2116,9 @@ export function ChatWorkspace({
                       <Sparkle className="size-3.5 text-primary" />/{s.name.replace(/\s+/g, '-')}
                     </span>
                     {s.description ? (
-                      <span className="line-clamp-1 text-xs text-muted-foreground">{s.description}</span>
+                      <span className="line-clamp-1 text-xs text-muted-foreground">
+                        {s.description}
+                      </span>
                     ) : null}
                   </button>
                 ))}
@@ -1844,163 +2143,227 @@ export function ChatWorkspace({
               hidden
               onChange={(e) => attachImage(e.target.files)}
             />
-            <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2">
-              {/* Consolidated composer actions — "+" Tools menu (ChatGPT-style). */}
-              <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={cn(
-                      'p-1.5 hover:text-foreground',
-                      thinking || orgKnowledge ? 'text-primary' : 'text-muted-foreground',
-                    )}
-                    title="Tools"
-                  >
-                    <Plus className="size-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem
-                    onSelect={() => docRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <Paperclip className="mr-2 size-4" /> Attach file
-                  </DropdownMenuItem>
-                  {activeModel?.vision ? (
-                    <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
-                      <ImageSquare className="mr-2 size-4" /> Attach image
-                    </DropdownMenuItem>
-                  ) : null}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={orgKnowledge}
-                    onCheckedChange={(v) => setOrgKnowledge(Boolean(v))}
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    <Globe className="mr-2 size-4" /> Search org knowledge
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={thinking}
-                    onCheckedChange={(v) => setThinking(Boolean(v))}
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    <Lightning className="mr-2 size-4" /> Extended thinking
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      // Insert an `@` and focus the composer so the mention picker opens.
-                      const next = input && !/\s$/.test(input) ? `${input} @` : `${input}@`;
-                      setInput(next);
-                      requestAnimationFrame(() => {
-                        const el = textareaRef.current;
-                        if (el) {
-                          el.focus();
-                          el.setSelectionRange(next.length, next.length);
-                          caretRef.current = next.length;
-                        }
-                      });
-                    }}
-                  >
-                    <At className="mr-2 size-4" /> Reference memory or knowledge…
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSkillsOpen(true)}>
-                    <Sparkle className="mr-2 size-4" /> Skills &amp; styles…
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <button
-                onClick={audio.toggleRecording}
-                disabled={!audio.sttAvailable || audio.recordPhase === 'transcribing'}
-                className={cn(
-                  'p-1.5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40',
-                  micButtonTint,
-                )}
-                title={audio.micLabel}
-              >
-                <Microphone className="size-5" />
-              </button>
-              {(audio.sttModels.length > 0 || audio.ttsModels.length > 0) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="p-1.5 text-muted-foreground hover:text-foreground"
-                      title="Voice settings — dictation & read-aloud engine"
-                      aria-label="Voice settings"
-                    >
-                      <SpeakerHigh className="size-5" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-64">
-                    {audio.sttModels.length > 0 && (
-                      <>
-                        <DropdownMenuLabel>Dictation engine</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup value={audio.sttModel} onValueChange={audio.setSttModel}>
-                          {audio.sttModels.map((m) => (
-                            <DropdownMenuRadioItem key={m.id} value={m.id} className="flex-col items-start">
-                              <span>{m.label}</span>
-                              <span className="text-[10px] text-muted-foreground">{m.notes}</span>
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                      </>
-                    )}
-                    {audio.ttsModels.length > 0 && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Read-aloud voice</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup value={audio.ttsModel} onValueChange={audio.setTtsModel}>
-                          {audio.ttsModels.map((m) => (
-                            <DropdownMenuRadioItem key={m.id} value={m.id} className="flex-col items-start">
-                              <span>{m.label}</span>
-                              <span className="text-[10px] text-muted-foreground">{m.notes}</span>
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                        {audio.ttsVoices && audio.ttsVoices.length > 0 && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Voice</DropdownMenuLabel>
-                            <DropdownMenuRadioGroup value={audio.ttsVoice} onValueChange={audio.setTtsVoice}>
-                              {audio.ttsVoices.map((v) => (
-                                <DropdownMenuRadioItem key={v.id} value={v.id}>
-                                  {v.label}
-                                </DropdownMenuRadioItem>
-                              ))}
-                            </DropdownMenuRadioGroup>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              <textarea
+            <div
+              data-og-surface="raised"
+              className="rounded-2xl border border-border/80 bg-card/95 shadow-[0_10px_30px_-22px_hsl(var(--foreground)/0.45)] transition-[border-color,box-shadow] focus-within:border-primary/45 focus-within:shadow-[0_14px_36px_-24px_hsl(var(--primary)/0.65)]"
+            >
+              {/* The shared Textarea owns the accessible control/ref contract; this composed
+                  raised surface owns only chat-specific layout and suggestion wiring. */}
+              <Textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => {
                   caretRef.current = e.target.selectionStart ?? e.target.value.length;
                   setInput(e.target.value);
                 }}
-                onKeyUp={(e) => { caretRef.current = e.currentTarget.selectionStart ?? 0; }}
-                onClick={(e) => { caretRef.current = e.currentTarget.selectionStart ?? 0; }}
+                onKeyUp={(e) => {
+                  caretRef.current = e.currentTarget.selectionStart ?? 0;
+                }}
+                onClick={(e) => {
+                  caretRef.current = e.currentTarget.selectionStart ?? 0;
+                }}
                 onKeyDown={onComposerKey}
                 rows={2}
                 placeholder={
                   activeModel?.image
                     ? 'Describe an image to generate…'
-                    : 'Message the model…  (/ for skills, @ to reference memory or knowledge)'
+                    : 'Ask Off Grid AI… Use / for skills and @ for context'
                 }
-                className="max-h-40 min-h-[2.75rem] flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-sm outline-none"
+                aria-label="Message Off Grid AI"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-haspopup="listbox"
+                aria-expanded={Boolean(suggestionListboxId)}
+                aria-controls={suggestionListboxId}
+                aria-activedescendant={activeSuggestionId}
+                className="max-h-48 min-h-16 w-full resize-none overflow-y-auto !border-0 !bg-transparent px-4 pb-2 pt-3.5 text-sm leading-6 !shadow-none !outline-none placeholder:text-muted-foreground/80 focus-visible:!border-transparent focus-visible:!outline-none"
               />
-              {streaming ? (
-                <Button size="icon" variant="outline" onClick={stop} title="Stop">
-                  <Stop className="size-4" />
-                </Button>
-              ) : (
-                <Button size="icon" onClick={send} disabled={!input.trim()} title="Send">
-                  <PaperPlaneRight className="size-4" />
-                </Button>
-              )}
+              <div className="flex items-center justify-between gap-3 px-2 pb-2">
+                <div className="flex min-w-0 items-center gap-0.5">
+                  {/* Consolidated composer actions — "+" Tools menu (ChatGPT-style). */}
+                  <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          'size-8 rounded-lg',
+                          thinking || orgKnowledge ? 'text-primary' : 'text-muted-foreground',
+                        )}
+                        title="Tools"
+                        aria-label="Open chat tools"
+                      >
+                        <Plus className="size-4.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-56">
+                      <DropdownMenuItem
+                        onSelect={() => docRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        <Paperclip className="mr-2 size-4" /> Attach file
+                      </DropdownMenuItem>
+                      {activeModel?.vision ? (
+                        <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                          <ImageSquare className="mr-2 size-4" /> Attach image
+                        </DropdownMenuItem>
+                      ) : null}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuCheckboxItem
+                        checked={orgKnowledge}
+                        onCheckedChange={(v) => setOrgKnowledge(Boolean(v))}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <Globe className="mr-2 size-4" /> Search org knowledge
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={thinking}
+                        onCheckedChange={(v) => setThinking(Boolean(v))}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <Lightning className="mr-2 size-4" /> Extended thinking
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          // Insert an `@` and focus the composer so the mention picker opens.
+                          const next = input && !/\s$/.test(input) ? `${input} @` : `${input}@`;
+                          setInput(next);
+                          requestAnimationFrame(() => {
+                            const el = textareaRef.current;
+                            if (el) {
+                              el.focus();
+                              el.setSelectionRange(next.length, next.length);
+                              caretRef.current = next.length;
+                            }
+                          });
+                        }}
+                      >
+                        <At className="mr-2 size-4" /> Reference memory or knowledge…
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setSkillsOpen(true)}>
+                        <Sparkle className="mr-2 size-4" /> Skills &amp; styles…
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={audio.toggleRecording}
+                    disabled={!audio.sttAvailable || audio.recordPhase === 'transcribing'}
+                    className={cn('size-8 rounded-lg', micButtonTint)}
+                    title={audio.micLabel}
+                    aria-label={audio.micLabel}
+                  >
+                    <Microphone className="size-4.5" />
+                  </Button>
+                  {(audio.sttModels.length > 0 || audio.ttsModels.length > 0) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 rounded-lg text-muted-foreground"
+                          title="Voice settings — dictation & read-aloud engine"
+                          aria-label="Voice settings"
+                        >
+                          <SpeakerHigh className="size-4.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64">
+                        {audio.sttModels.length > 0 && (
+                          <>
+                            <DropdownMenuLabel>Dictation engine</DropdownMenuLabel>
+                            <DropdownMenuRadioGroup
+                              value={audio.sttModel}
+                              onValueChange={audio.setSttModel}
+                            >
+                              {audio.sttModels.map((m) => (
+                                <DropdownMenuRadioItem
+                                  key={m.id}
+                                  value={m.id}
+                                  className="flex-col items-start"
+                                >
+                                  <span>{m.label}</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {m.notes}
+                                  </span>
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </>
+                        )}
+                        {audio.ttsModels.length > 0 && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Read-aloud voice</DropdownMenuLabel>
+                            <DropdownMenuRadioGroup
+                              value={audio.ttsModel}
+                              onValueChange={audio.setTtsModel}
+                            >
+                              {audio.ttsModels.map((m) => (
+                                <DropdownMenuRadioItem
+                                  key={m.id}
+                                  value={m.id}
+                                  className="flex-col items-start"
+                                >
+                                  <span>{m.label}</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {m.notes}
+                                  </span>
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                            {audio.ttsVoices && audio.ttsVoices.length > 0 && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Voice</DropdownMenuLabel>
+                                <DropdownMenuRadioGroup
+                                  value={audio.ttsVoice}
+                                  onValueChange={audio.setTtsVoice}
+                                >
+                                  {audio.ttsVoices.map((v) => (
+                                    <DropdownMenuRadioItem key={v.id} value={v.id}>
+                                      {v.label}
+                                    </DropdownMenuRadioItem>
+                                  ))}
+                                </DropdownMenuRadioGroup>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+                {streaming ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="size-9 rounded-xl"
+                    onClick={stop}
+                    title="Stop"
+                  >
+                    <Stop className="size-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="icon"
+                    className="size-9 rounded-xl shadow-sm"
+                    onClick={send}
+                    disabled={!input.trim()}
+                    title="Send"
+                    aria-label="Send message"
+                  >
+                    <PaperPlaneRight className="size-4" />
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
               Runs on your on-prem gateways · nothing leaves your network
@@ -2009,7 +2372,15 @@ export function ChatWorkspace({
         </div>
       </section>
 
-      {artifact ? <ArtifactView artifact={artifact} onClose={() => setArtifact(null)} title={artifactTitle(artifact)} conversationId={activeId ?? null} onSaved={() => void refreshProjects()} /> : null}
+      {artifact ? (
+        <ArtifactView
+          artifact={artifact}
+          onClose={() => setArtifact(null)}
+          title={artifactTitle(artifact)}
+          conversationId={activeId ?? null}
+          onSaved={() => void refreshProjects()}
+        />
+      ) : null}
       <ProjectDialog
         project={dialogProject}
         open={!!dialogProject}

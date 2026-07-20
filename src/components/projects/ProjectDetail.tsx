@@ -163,7 +163,7 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
       <Link
-        href="/workspace/projects"
+        href="/work/projects"
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" /> All projects
@@ -218,7 +218,7 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
             </Button>
           ) : null}
           <Button asChild size="sm" className="gap-1.5">
-            <Link href={`/workspace/chat?project=${projectId}`}>
+            <Link href={`/work/chat?project=${projectId}`}>
               <ChatCircleDots className="size-4" /> New chat in project
             </Link>
           </Button>
@@ -285,7 +285,7 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
                   chats.map((c) => (
                     <Link
                       key={c.id}
-                      href={`/workspace/chat?c=${c.id}`}
+                      href={`/work/chat?c=${c.id}`}
                       className="flex items-center gap-2 rounded px-1.5 py-1.5 text-xs hover:bg-muted"
                     >
                       <ChatCircleDots className="size-3.5 text-muted-foreground" />

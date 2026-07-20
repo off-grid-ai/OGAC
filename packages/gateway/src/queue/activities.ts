@@ -11,7 +11,23 @@ import type { QueuedInferenceRequest, QueueResult } from './types';
 
 /** Cluster gateway base URL. The worker sets this from QueueConfig via env. */
 function gatewayUrl(): string {
-  return process.env.OFFGRID_QUEUE_GATEWAY_URL || process.env.OFFGRID_GATEWAY_URL || 'http://localhost:8800';
+  return (
+    process.env.OFFGRID_QUEUE_GATEWAY_URL ||
+    process.env.OFFGRID_GATEWAY_URL ||
+    'http://localhost:8800'
+  );
+}
+
+/**
+ * Authentication for the queue worker's gateway hop. The worker is a machine client and cannot use
+ * request-scoped Console credentials. Prefer a queue-specific key when operators isolate it; fall
+ * back to the gateway's canonical static key so existing on-prem deployments remain compatible.
+ */
+export function queueGatewayHeaders(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const bearer = env.OFFGRID_QUEUE_GATEWAY_BEARER_TOKEN?.trim();
+  if (bearer) return { authorization: `Bearer ${bearer}` };
+  const apiKey = (env.OFFGRID_QUEUE_GATEWAY_API_KEY || env.OFFGRID_GATEWAY_API_KEY)?.trim();
+  return apiKey ? { 'x-api-key': apiKey } : {};
 }
 
 /**
@@ -22,7 +38,10 @@ export async function runInference(req: QueuedInferenceRequest): Promise<QueueRe
   const started = Date.now();
   const url = `${gatewayUrl().replace(/\/$/, '')}/v1/chat/completions`;
 
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    ...queueGatewayHeaders(),
+  };
   if (req.caller) headers['x-offgrid-caller'] = req.caller;
   if (req.corrId) headers['x-offgrid-corr-id'] = req.corrId;
 
