@@ -821,6 +821,7 @@ services:
   kestra:
     image: kestra/kestra:latest
     profiles: [kestra, all]
+    restart: unless-stopped
     user: root
     command: server standalone
     depends_on:
@@ -858,10 +859,13 @@ services:
           url: http://localhost:8090/
     ports: ['8090:8080'] # Kestra UI/API :8080 → host 8090 (edge loopback 8945 → this)
     healthcheck:
-      test: ['CMD-SHELL', 'true'] # Kestra image lacks curl/wget; liveness proven by the console adapter probe
+      # The image has Bash but no curl/wget. Probe the in-container API listener so a running JVM
+      # whose HTTP server failed to start cannot be reported healthy through Docker's host proxy.
+      test: ['CMD-SHELL', 'bash -c "</dev/tcp/127.0.0.1/8080"']
       interval: 15s
       timeout: 5s
       retries: 10
+      start_period: 60s
 
 volumes:
   pgdata:
