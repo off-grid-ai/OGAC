@@ -2,34 +2,18 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { EvalsWorkbench } from '@/components/evals/EvalsWorkbench';
 import { GoldenCasesManager } from '@/components/evals/GoldenCasesManager';
+import { QualityExecutionHistory } from '@/components/evals/QualityExecutionHistory';
 import { RunEvalSuiteButton } from '@/components/evals/RunEvalSuiteButton';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { evalEngineLabel } from '@/lib/eval-engine-label';
 import { listGoldenCases } from '@/lib/evals';
 import { isRunnableEngine, RUNNABLE_ENGINES } from '@/lib/evals-golden';
-import { readEvalsView, type EvalsView } from '@/lib/evals-view';
+import { readEvalsView, type EvalRunView, type EvalsView } from '@/lib/evals-view';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
-import {
-  contextualDestinationForPath,
-  contextualModule,
-} from '@/modules/contextual-navigation';
+import { contextualDestinationForPath, contextualModule } from '@/modules/contextual-navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,10 +27,7 @@ export default async function QualityDestinationPage({
   await requireModuleForUser('evals');
   const { destination: rawDestination } = await params;
   const module = contextualModule('solutions-quality');
-  const destination = contextualDestinationForPath(
-    module,
-    `${module.baseRoute}/${rawDestination}`,
-  );
+  const destination = contextualDestinationForPath(module, `${module.baseRoute}/${rawDestination}`);
   if (!destination) notFound();
 
   if (destination.id === 'evaluators') return <EvalsWorkbench />;
@@ -197,53 +178,26 @@ function RunsDestination({
           {runs.length === 0 ? (
             <p className="py-8 text-center text-xs text-muted-foreground">No runs.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Run</TableHead>
-                  <TableHead>Suite</TableHead>
-                  <TableHead className="text-right">Pass rate</TableHead>
-                  <TableHead className="text-right">Passed</TableHead>
-                  <TableHead className="text-right">Failed</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {runs.map((run) => (
-                  <TableRow key={run.id}>
-                    <TableCell className="font-mono text-xs">{run.id}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px]">
-                        {evalEngineLabel(run.engine)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{run.score}%</TableCell>
-                    <TableCell className="text-right text-primary">{run.passed}</TableCell>
-                    <TableCell className="text-right text-destructive">{run.failed}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {run.startedAt ?? '—'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {isRunnableEngine(run.engine) ? (
-                          <RunEvalSuiteButton engine={run.engine} label="Re-run" />
-                        ) : null}
-                        <Link
-                          href={`/solutions/quality/runs/${encodeURIComponent(run.id)}`}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          View run
-                        </Link>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <QualityExecutionHistory runs={runs} actionsFor={(run) => <RunActions run={run} />} />
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function RunActions({ run }: Readonly<{ run: EvalRunView }>) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {isRunnableEngine(run.engine) ? (
+        <RunEvalSuiteButton engine={run.engine} label="Re-run" />
+      ) : null}
+      <Link
+        href={`/solutions/quality/runs/${encodeURIComponent(run.id)}`}
+        className="text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        View run
+      </Link>
     </div>
   );
 }
