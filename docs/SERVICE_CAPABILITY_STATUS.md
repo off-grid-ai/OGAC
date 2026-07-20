@@ -3,33 +3,56 @@
 This is the resume-safe execution ledger for the 48-entry service capability map. Read it before
 starting service discovery. Update it after every committed audit or UI projection. Detailed
 capability facts remain owned by `src/lib/service-capability-map.ts` and its family registries; this
-file records progress and handoffs without creating a second capability denominator.
+file records progress and handoffs without creating a second capability denominator or implying a
+live deployment.
 
 ## Current checkpoint
 
-| Field                       | State                                                          |
-| --------------------------- | -------------------------------------------------------------- |
-| Updated                     | 2026-07-20                                                     |
-| Release branch              | `codex/modernize-console-sidebar`                              |
-| Checkpoint SHA              | integration worktree after `fb66086b`                          |
-| Logical inventory           | 48 entries: 42 platform services + 6 enterprise sources        |
-| Inventory projection        | 48-entry explorer wired in code; production deployment pending |
-| Versioned capability audits | 36 records: 19 current, 17 stale                               |
-| Audit backlog               | 12 entries have no versioned denominator yet                   |
-| Capability-map navigation   | Committed in `9107dd5b`; live verification pending             |
-| Live verification           | Not started for this checkpoint                                |
+| Field                        | State                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| Updated                      | 2026-07-20                                                                     |
+| Release branch               | `codex/modernize-console-sidebar`                                              |
+| Registry checkpoint          | Source snapshot through `7f4f8d61`; this is not a deployed-SHA assertion       |
+| Logical inventory            | 48 entries: 42 platform services + 6 enterprise sources                        |
+| Versioned capability audits  | 36 records: 19 current, 17 stale                                               |
+| Audited denominator          | 151 capability items / 604 four-gate assessments                               |
+| Audit backlog                | 12 entries have no versioned denominator yet                                   |
+| Readiness evidence           | 47 `unverified`, 1 `partial`; no entry is release-verified by this checkpoint  |
+| Enterprise-source projection | Defect repair in progress; release integration and UI confirmation outstanding |
+| Live verification            | Not asserted by this ledger                                                    |
 
 `not-audited` is an honest state, not 0% capability. A service moves to `current` only after its
 pinned upstream denominator and all four gates have evidence. A mutable tag must remain explicit.
 
+## Evidence roll-up
+
+These totals are calculated from the 151 versioned capability records currently owned by the two
+canonical family registries. `yes`, `partial`, and `no` describe retained audit evidence—not fleet
+health. Stale audits are deliberately normalized so their Available gate cannot be treated as
+current. A `no` therefore means "not currently evidenced against the pinned denominator", not
+necessarily "the upstream product can never do this".
+
+| Gate                          |     Yes | Partial |      No |   Total |
+| ----------------------------- | ------: | ------: | ------: | ------: |
+| Available                     |      94 |       0 |      57 |     151 |
+| Integrated                    |      65 |      59 |      27 |     151 |
+| UI exposed                    |      79 |      44 |      28 |     151 |
+| Used in a production workflow |      42 |      44 |      65 |     151 |
+| **All four gates**            | **280** | **147** | **177** | **604** |
+
+Readiness is a separate projection. At this checkpoint, 47 inventory entries have no sufficient
+runtime topology evidence and one has only partial evidence. This is an evidence-state result, not a
+claim that 47 processes are down or that one process is healthy. Optional-service fallbacks, indirect
+forwarders, seeds, images, or a successful ping do not upgrade readiness.
+
 ## Active lanes
 
-| Lane                                                        | Owner                          | File ownership                                                                | State                | Required handoff                                    |
-| ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- | -------------------- | --------------------------------------------------- |
-| Inventory and UI projection                                 | `capability_map_navigation`    | Capability-map page/component and focused UI tests                            | Committed `9107dd5b` | Visual and live verification pending                |
-| Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `f3f081d2` | 12 audited, 12 pending; live evidence gaps retained |
-| Data, streaming, observability, quality, enterprise sources | `ai_qa_operator_loop`          | `src/lib/service-capabilities/data-quality-observability.ts` and its tests    | Committed `64bd00e5` | 24 audited; live attribution gaps retained          |
-| Registry integration and release                            | Root                           | Shared registry projection, this tracker, build, deploy, live verification    | In progress          | Immutable deployed SHA and live fleet evidence      |
+| Lane                                                        | Owner                          | File ownership                                                                | State                | Required handoff                                                    |
+| ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------- |
+| Inventory and UI projection                                 | `capability_map_navigation`    | Capability-map page/component and focused UI tests                            | Committed `9107dd5b` | Visual and live verification pending                                |
+| Runtime, governance, operations                             | `capability_audit_runtime_ops` | `src/lib/service-capabilities/runtime-governance-operations.ts` and its tests | Committed `f3f081d2` | 12 audited, 12 pending; live evidence gaps retained                 |
+| Data, streaming, observability, quality, enterprise sources | `ai_qa_operator_loop`          | `src/lib/service-capabilities/data-quality-observability.ts` and its tests    | Committed `64bd00e5` | 24 audited; live attribution gaps retained                          |
+| Registry integration and release                            | Root                           | Shared registry projection, this tracker, build, deploy, live verification    | In progress          | Fix enterprise-source projection; then verify one immutable release |
 
 ## Per-service ledger
 
@@ -87,9 +110,82 @@ The lane is the work owner. `current` and `stale` reflect the existing versioned
 | Enterprise source | `enterprise-source-minio`       | current              | data/quality                  |
 | Enterprise source | `enterprise-source-crm`         | stale                | data/quality                  |
 
+## Pending audit actions
+
+Each pending service remains `not-audited` until the action below produces a pinned denominator and
+item-level four-gate evidence. Existing code paths, configuration, or indirect downstream success are
+useful discovery evidence but do not satisfy that contract.
+
+| Service                   | Next resumable action                                                                                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gateway-control`         | Pin the first-party control contract to an immutable release, enumerate node/model actions, and retain one reversible enable/disable/restart or model-switch lifecycle with audit and rollback evidence. |
+| `agent-worker`            | Stamp the worker artifact, register its Temporal queue/poller/heartbeat topology, audit the agent execution contract, and retain a durable governed run plus safe drain/restart evidence.                |
+| `app-worker`              | Stamp and audit the `offgrid-apps` worker, then prove a bank or insurance multi-step run through human pause, approval, resume, and restart recovery.                                                    |
+| `chat-worker`             | Stamp and audit the `offgrid-chat` worker, then retain one governed chat correlated across guardrail, citation, lineage, provenance, and audit evidence.                                                 |
+| `llm-guard`               | Audit the pinned `0.3.16` API/scanner denominator item by item, distinguish upstream scanners from first-party sharding, and record the archived/EOL replacement risk.                                   |
+| `edge-gateway`            | Record the exact Caddy build and module list, enumerate the bounded Caddy/Coraza/rate-limit/file-routing denominator, and prove policy, rejection, file, and recovery paths.                             |
+| `cloudflared`             | Record the binary version and live-config checksum, remove duplicate/stale job ambiguity, prove one authoritative replica, and expose per-route readiness and restart evidence.                          |
+| `landing`                 | Bind the public process to a repo-owned launch definition and immutable SHA, define the first-party landing denominator, and verify the complete CTA journey visually and functionally.                  |
+| `status-page`             | Bind the status process to exact source/version, define freshness and dependency semantics, and verify that an operator can move from a reported problem to the owning management surface.               |
+| `litellm-forwarder`       | Replace the unversioned/DHCP-bound forwarding job with a repo-owned, pinned Bonjour route and retain direct, negative, restart, and downstream-completion evidence.                                      |
+| `observability-forwarder` | Repo-own and pin each logs/traces forwarding route, probe them independently, and retain outage/reconnect evidence instead of inferring the forwarder from downstream availability.                      |
+| `fleet-forwarder`         | Stamp the bridge source and runtime version, derive routes from the canonical fleet registry, expose route-level dependencies, and verify target loss, reconnect, and restart.                           |
+
+## Stale audit re-verification recipe
+
+The 17 stale records are `warehouse`, `kestra`, `gateway`, `temporal`, `keycloak`, `opa`, `openbao`,
+`unleash`, `otel-collector`, `console`, `redis`, `superset`, `fleetdm`,
+`enterprise-source-corebank`, `enterprise-source-policyadmin`, `enterprise-source-erp`, and
+`enterprise-source-crm`.
+
+For each stale record:
+
+1. Resolve the immutable version actually selected by the deployment system of record. A mutable tag,
+   package range, image presence, or remembered version is insufficient.
+2. Re-enumerate the relevant operator-outcome denominator from primary version-matched documentation;
+   retain the denominator source in the canonical family registry.
+3. Reassess every capability independently across Available, Integrated, UI exposed, and Used in a
+   workflow. Preserve `partial` and intentional non-support; never copy the prior verdict forward.
+4. Trace every claimed integration from the canonical URL/action through its adapter and authenticated,
+   tenant-safe boundary. A status card or health request is not management integration.
+5. Exercise the real path in a relevant bank or insurance journey and retain correlated evidence. If
+   the workflow is destructive or currently unsafe, record the explicit skip and required fixture.
+6. Update `auditedAt`, version, audit state, recency evidence, gaps, and tests; only then run the shared
+   release gates and change the record from `stale` to `current`.
+
+## Prioritized release gaps
+
+| Priority | Gap                                                                                                                                      | Release acceptance                                                                                                                                                      |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0       | Enterprise-source audit evidence is not yet consistently projected into the selected inventory/detail experience; repair is in progress. | All six sources preserve their canonical audit state, counts, evidence, gaps, and management route in the shared explorer, with focused projection tests.               |
+| P0       | Twelve services have no pinned capability denominator.                                                                                   | Complete the pending actions above without converting `not-audited` into a percentage.                                                                                  |
+| P0       | Seventeen audits are stale.                                                                                                              | Apply the re-verification recipe against immutable selected versions; stale upstream gates remain unavailable until then.                                               |
+| P0       | Readiness is 47 unverified and 1 partial.                                                                                                | Supply signed/timestamped topology evidence for deployment, reachability, functional behavior, seed state, and Console use; do not infer it from optional fallbacks.    |
+| P1       | Only 65/151 capabilities are fully integrated, 79/151 are fully UI-exposed, and 42/151 have full workflow evidence.                      | Prioritize outcome-bearing paths; close partial/error/lifecycle/tenancy gaps before adding decorative breadth.                                                          |
+| P1       | The capability map is an exhaustive ledger but still costly to scan and scroll.                                                          | Add URL-driven family/service local navigation, sticky summary/filter context, progressive disclosure, and direct gap-to-management links while retaining all evidence. |
+| P1       | Workflow evidence is not yet organized as repeatable BFSI proof.                                                                         | Retain deterministic indemnity, delinquency, and cross-sell journeys with before/after operational and financial measures.                                              |
+| P2       | Capability breadth can be mistaken for customer value.                                                                                   | Publish intentional non-support and replacement rationale; product dashboards lead with outcomes, active work, exceptions, next actions, and proof—not service names.   |
+
+## Usable, consumable, sellable priorities
+
+The product is an enterprise AI control plane, not a gallery of upstream tools. Capability expansion
+is valuable only when an operator can use it safely, understand it quickly, and justify it against a
+material business outcome.
+
+| Outcome journey     | Usable                                                                                                                                                                                                | Consumable                                                                                                                                                                     | Sellable proof                                                                                                                                              |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Insurance indemnity | A governed FNOL-to-decision workflow reads policy/claim evidence, detects fraud and leakage, applies human authority limits, records lineage, and can be corrected or resumed.                        | An insurance landing shows claim volume, exceptions, decisions awaiting people, leakage risk, cycle time, and the next action; technical services stay in drill-down evidence. | Baseline vs achieved claims/day, straight-through rate, cycle time, leakage avoided, indemnity accuracy, cost per claim, and same-workforce capacity.       |
+| Lending delinquency | A tenant-safe early-warning and collections workflow identifies risk, prioritizes accounts, recommends compliant action, records contact/decision evidence, and supports human overrides.             | A lender landing groups queues by risk and urgency, explains why an account is prioritized, and links directly to action, evidence, policy, and outcome history.               | Roll-rate reduction, cure rate, days delinquent, promise-to-pay kept, collector cases/day, loss avoided, and cost per resolved account.                     |
+| Banking cross-sell  | A governed customer-360/next-best-action workflow uses permitted holdings and eligibility data, produces a cited recommendation, respects contact/policy constraints, and records acceptance/outcome. | An RM landing leads with opportunity, eligibility, confidence, required review, customer context, and next action—not pipelines, models, or connector internals.               | Incremental conversion/revenue, RM book coverage, time-to-recommendation, offers reviewed per person, acceptance rate, and compliance exceptions prevented. |
+
+Across all three journeys, the release order is: make the complete action path **usable**; organize it
+around a role and decision so it is **consumable**; then attach auditable baseline, outcome, cost, and
+capacity evidence so it is **sellable**. Seeds and screenshots are fixtures, not ROI proof.
+
 ## Release gates
 
-- [x] All 48 entries are visible and selectable in the capability-map UI.
+- [x] All 48 entries are represented by the canonical source projection.
+- [ ] Enterprise-source selected-state projection is repaired and independently verified.
 - [x] Family, owner, audit-state, readiness, and text filters live in the URL/history stack.
 - [ ] Every selected service shows deployment, routes, readiness evidence, workflow evidence, gaps,
       and next action even when its capability denominator is not audited.
