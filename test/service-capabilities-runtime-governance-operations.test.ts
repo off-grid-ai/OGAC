@@ -8,18 +8,63 @@ import {
   RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS,
 } from '../src/lib/service-capabilities/runtime-governance-operations.ts';
 import { CAPABILITY_GATES } from '../src/lib/service-capability-contract.ts';
+import { reconcileServiceInventory } from '../src/lib/service-inventory.ts';
 import { getServices } from '../src/lib/services-directory.ts';
 
-test('runtime, governance, and operations evidence accounts for its 28 disjoint services', () => {
+test('runtime, governance, and operations evidence accounts for its canonical 25 services', () => {
   const ids = [...RUNTIME_GOVERNANCE_OPERATIONS_SERVICE_IDS];
-  assert.equal(ids.length, 28);
+  assert.equal(ids.length, 25);
   assert.equal(new Set(ids).size, ids.length);
+
+  assert.deepEqual(
+    [...ids].sort(),
+    [
+      'agent-worker',
+      'app-worker',
+      'chat-worker',
+      'cloudflared',
+      'console',
+      'edge-gateway',
+      'fleet-forwarder',
+      'fleetdm',
+      'gateway',
+      'gateway-control',
+      'keycloak',
+      'landing',
+      'litellm',
+      'litellm-forwarder',
+      'llm-guard',
+      'observability-forwarder',
+      'opa',
+      'openbao',
+      'presidio',
+      'provit',
+      'redis',
+      'status-page',
+      'superset',
+      'temporal',
+      'unleash',
+    ].sort(),
+  );
 
   const directoryIds = new Set(getServices().map((service) => service.id));
   for (const id of ids)
     assert.ok(directoryIds.has(id), `${id} must exist in the 43-entry directory`);
 
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 13);
+  const selected = reconcileServiceInventory({ platformServices: getServices() }).entries.filter(
+    (entry) => ids.includes(entry.id as (typeof ids)[number]),
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      ['runtime', 'governance', 'operations'].map((family) => [
+        family,
+        selected.filter((entry) => entry.family === family).length,
+      ]),
+    ),
+    { runtime: 7, governance: 6, operations: 12 },
+  );
+
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 10);
   assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 13);
   assert.deepEqual(RUNTIME_GOVERNANCE_OPERATIONS_DELEGATED_SERVICE_IDS, ['litellm', 'presidio']);
 });
