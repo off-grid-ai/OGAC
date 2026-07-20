@@ -52,8 +52,9 @@ test('every contextual leaf is backed by the validated route owner and roots red
     readFile('src/app/(console)/solutions/tools/[destination]/page.tsx', 'utf8'),
     readFile('src/app/(console)/solutions/quality/[destination]/page.tsx', 'utf8'),
   ]);
+  assert.match(tools, /contextualDestination\(/);
+  assert.match(quality, /contextualDestinationForPath\(/);
   for (const source of [tools, quality]) {
-    assert.match(source, /contextualDestination\(/);
     assert.match(source, /notFound\(\)/);
     assert.doesNotMatch(source, /<PageFrame|<h1\b|<SubNav|ToolsNav/);
   }
