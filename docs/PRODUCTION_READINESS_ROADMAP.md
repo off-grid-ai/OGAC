@@ -13,8 +13,9 @@ Last updated: 2026-07-10.
   (no-circular verified 0 dangerous cycles + arch boundaries), jscpd (DRY, 2.08%), production build.
 - **hygiene = quality-as-code:** the skill now has a SETUP mode; run it in any fresh repo to install
   the whole spine (Wednesday web/RN baselines + all the gates).
-- **LLM Guard** is the sole authoritative content guardrail, fail-closed, India recognizers folded
-  in — verified live on the fleet (masked a real PAN + secret).
+- **LLM Guard** is the sole authoritative content guardrail, fail-closed, with India/BFSI formats in
+  the fleet-owned startup scanner policy. The phase-correct input/output contract is code+wired;
+  deployment and live output-redaction verification remain pending.
 - **LiteLLM** router replaces the hand-rolled aggregator (code merged; live cutover pending).
 - **Native BI** — Superset iframe removed, native charts (verified render).
 - **Builder** schedule triggers + output-sink delivery (email/report) landed.
