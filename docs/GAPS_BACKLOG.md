@@ -1114,3 +1114,18 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   assertions prove active ancestor expansion plus collapsed defaults. The consolidated release passed
   3,778 tests (3,771 pass, seven intentional skips, zero failures), typecheck, and the 225-page
   production build before deployment; subsequent IA/UI commits retain focused tests and clean builds.
+
+## CRM governed write-back slice (2026-07-20)
+
+- **[G-CRM-TASKS] PARTIAL — typed opportunity follow-up writes are implemented; standalone CRM task
+  creation remains blocked by the deployed fixture contract.** The Console now has one tenant-scoped,
+  allowlisted and idempotent action seam for bank cross-sell and lender delinquency:
+  `POST /api/v1/admin/connectors/:id/actions/crm-writeback`. It reads the existing opportunity,
+  rejects unsafe fields and conflicting key reuse, PATCHes only `stage`, `next_action`, and
+  `offgrid_writeback`, emits an attributed audit event, and returns a signed receipt. Real HTTP
+  integration evidence covers GET → PATCH → replay with exactly one mutation. The deployed CRM
+  fixture currently declares only `accounts`, `opportunities`, and `contacts`; it has no `tasks`
+  collection or documented durable idempotency/conditional-write API. Therefore generic task create,
+  webhook ingestion, pagination, and concurrent cross-process exactly-once semantics remain OPEN.
+  Close this only after the private fleet fixture/API adds a versioned tasks resource plus an atomic
+  idempotency contract and the Console proves it against that live API.

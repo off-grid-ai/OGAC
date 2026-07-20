@@ -36,6 +36,19 @@ interface ResolvedExecTarget {
   authHeader: Record<string, string>;
 }
 
+export interface RestConnectorRequest {
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  path: string[];
+  body?: Record<string, unknown>;
+  query?: Record<string, string>;
+}
+
+export interface RestConnectorResponse {
+  ok: boolean;
+  status: number;
+  body: unknown;
+}
+
 // Resolve a target's credential from the vault (by `id`) into a ready-to-use exec target. Falls back
 // to the raw endpoint + no header when there's no id / no vaulted secret / the vault is unreachable,
 // so seeded connectors with inline creds keep working. Dynamic import breaks the exec↔secrets cycle.
@@ -282,6 +295,44 @@ export async function execConnectorQuery(
   }
 
   return null;
+}
+
+// Credential-safe REST action seam used by typed domain adapters. Callers supply path SEGMENTS,
+// never a URL, so they cannot redirect a connector to another host or smuggle traversal/slashes.
+// This primitive stays transport-only; business adapters must constrain resources, verbs, fields,
+// tenancy, and idempotency before calling it.
+export async function execRestConnectorRequest(
+  conn: ConnectorTarget,
+  request: RestConnectorRequest,
+): Promise<RestConnectorResponse | null> {
+  if (detectDialect(conn.type, conn.endpoint) !== 'rest') return null;
+  if (!Array.isArray(request.path) || request.path.some((segment) => !segment || segment.length > 128)) {
+    return null;
+  }
+  try {
+    const resolved = await resolveTargetCreds(conn);
+    const base = resolved.endpoint.replace(/\/$/, '');
+    const url = new URL(`${base}/${request.path.map(encodeURIComponent).join('/')}`);
+    for (const [key, value] of Object.entries(request.query ?? {})) {
+      url.searchParams.set(key, value);
+    }
+    const response = await fetch(url, {
+      method: request.method,
+      headers: {
+        ...resolved.authHeader,
+        ...(request.body ? { 'content-type': 'application/json' } : {}),
+      },
+      body: request.body ? JSON.stringify(request.body) : undefined,
+      signal: AbortSignal.timeout(5000),
+    });
+    const contentType = response.headers.get('content-type') ?? '';
+    const body = contentType.includes('application/json')
+      ? await response.json().catch(() => null)
+      : await response.text().catch(() => '');
+    return { ok: response.ok, status: response.status, body };
+  } catch {
+    return null;
+  }
 }
 
 // ─── testConnection — a cheap live probe (SELECT 1 / REST root) ────────────────
