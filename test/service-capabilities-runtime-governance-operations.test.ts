@@ -166,17 +166,23 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
       // task-queue-readiness is fully proven live: a real DescribeTaskQueue poller probe, exposed on
       // the app-worker detail page, verified on the fleet 2026-07-20 (44550@offgrid-s1 on offgrid-apps).
       'task-queue-readiness': ['yes', 'yes', 'yes', 'yes'],
-      'governed-step-execution': ['yes', 'yes', 'yes', 'no'],
-      'human-pause-resume': ['yes', 'yes', 'yes', 'no'],
+      // A live BFSI HITL run (apprun_f339b0ee) on the fleet 2026-07-20 proved these on the durable
+      // worker: governed steps executed, durable pause→approve→resume→complete, output+provenance
+      // persisted. human-pause-resume stays 'partial' (only the approve path was exercised, not reject).
+      'governed-step-execution': ['yes', 'yes', 'yes', 'yes'],
+      'human-pause-resume': ['yes', 'yes', 'yes', 'partial'],
       'failure-recovery': ['yes', 'partial', 'partial', 'no'],
-      'output-persistence': ['yes', 'partial', 'yes', 'no'],
+      'output-persistence': ['yes', 'partial', 'yes', 'yes'],
     },
   );
-  assert.ok(
+  // The only app-worker capabilities WITHOUT any retained live run evidence keep workflow 'no':
+  // immutable-artifact identity and interrupted-restart failure recovery.
+  assert.deepEqual(
     audit.items
-      .filter((item) => item.id !== 'task-queue-readiness')
-      .every((item) => item.gates.workflow.status === 'no'),
-    'code-path evidence must not masquerade as a production app-worker workflow (except the live-proven queue readiness)',
+      .filter((item) => item.gates.workflow.status === 'no')
+      .map((item) => item.id)
+      .sort(),
+    ['artifact-identity', 'failure-recovery'],
   );
 });
 
