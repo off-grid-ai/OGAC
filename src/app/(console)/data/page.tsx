@@ -99,6 +99,13 @@ export default async function DataPage() {
         <div className="space-y-6">
           <DomainDashboard model={dashboard} />
 
+          <div className="border-t border-border pt-6">
+            <h2 className="text-base font-normal text-foreground">Manage the data plane</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Operate connectors, ingest, masking, erasure, and indexes from the live records below.
+            </p>
+          </div>
+
           {/* Data-plane engine health — the live warehouse/pipelines/streaming/quality engines. */}
           <DataPlaneHealthBand />
 

@@ -312,6 +312,13 @@ export default async function ObservabilityPage({
         <div className="space-y-6">
           <DomainDashboard model={dashboard} />
 
+          <div className="border-t border-border pt-6">
+            <h2 className="text-base font-normal text-foreground">Inspect evidence</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Read eval, drift, trace, and threshold evidence from the current measurement window.
+            </p>
+          </div>
+
           <div className="flex items-start justify-between gap-4">
             <p className="max-w-2xl text-sm text-muted-foreground">
               Agent QA &amp; observability. Offline eval scores, drift (PSI), and the online

@@ -125,6 +125,14 @@ export default async function ControlPage() {
         <div className="space-y-6">
           <DomainDashboard model={dashboard} />
 
+          <div className="border-t border-border pt-6">
+            <h2 className="text-base font-normal text-foreground">Manage controls</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Change policy, routing, access, secrets, and audit controls from the live records
+              below.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <PolicyEditor
               initial={policy}
