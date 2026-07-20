@@ -57,6 +57,9 @@ function audit(spec: AuditSpec): ServiceCapabilityAudit {
 const FLEET_EVIDENCE =
   '../onprem-fleet-orchestration/deploy/onprem/SERVICE_MAP.md and SERVER_STATE.md, verified 2026-07-20';
 const PRESIDIO_ROUTE = '/governance/guardrails/overview';
+const GUARDRAILS_ROUTE = '/governance/guardrails/overview';
+const GUARDRAILS_PROTECTIONS_ROUTE = '/governance/guardrails/protections';
+const GUARDRAILS_TEST_ROUTE = '/governance/guardrails/test';
 const ROUTER_ROUTE = '/runtime/models/routing';
 
 export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
@@ -193,6 +196,147 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'Governance and runtime surfaces expose effective controls and evidence.',
           'partial',
           'Governed denial and merged guard scans passed separately, but the retained evidence does not correlate both with the same gateway request and traffic record.',
+        ],
+      ],
+    ],
+  }),
+  audit({
+    serviceId: 'llm-guard',
+    serviceLabel: 'Content guardrails',
+    upstreamVersion:
+      'LLM Guard / llm-guard-api 0.3.16 (tag 32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce; upstream archived and unmaintained)',
+    versionSource:
+      'off-grid-ai/onprem-fleet-orchestration@bc74d828e02db7566b32191650cb58360f9178ae deploy/onprem/services-node-b.yml (laiyer/llm-guard-api:0.3.16), SERVICE_MAP.md, and SERVER_STATE.md; upstream v0.3.16 tag 32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce',
+    denominatorSource:
+      'https://github.com/protectai/llm-guard/tree/32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce/llm_guard_api; https://github.com/protectai/llm-guard/blob/32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce/llm_guard/input_scanners/__init__.py; https://github.com/protectai/llm-guard/blob/32b14a4a2fa398df8b77fd748ee4bd387a4ac5ce/llm_guard/output_scanners/__init__.py; current upstream README archive warning',
+    auditState: 'current',
+    summary:
+      'Relevant 0.3.16 denominator: prompt analysis/redaction, prompt classifiers, output safety/quality scanners, scanner policy, authenticated and bounded API execution, availability controls, and telemetry. Off Grid sharding is a separate first-party integration. The upstream project and its models are archived and no longer maintained, so this deployment needs a migration owner and compensating security controls.',
+    capabilities: [
+      [
+        'prompt-sanitization',
+        'Prompt sanitization and sensitive-data protection',
+        'Detect and redact PII, secrets, credentials, and configured text patterns before a model sees them.',
+        GUARDRAILS_TEST_ROUTE,
+        'Test prompt protection',
+        'Retain one governed bank and insurance run proving raw sensitive input was redacted before inference. The claimed per-request India recognizer configuration is ignored by the stock 0.3.16 API and must move into the deployed shard configuration or a versioned replacement adapter.',
+        [
+          'yes',
+          'LLM Guard 0.3.16 exposes /analyze/prompt and input Anonymize, Regex, and Secrets scanners; the S1 shard has live email/secret redaction evidence.',
+          'yes',
+          'The content-guardrail port calls the authenticated S1 aggregator, normalizes the real verdict and sanitized prompt, and blocks when the required PII shard cannot answer.',
+          'yes',
+          'Guardrails Overview, Protections, Masking, Recognizers, Thresholds, and Test expose prompt protection and a live scan action.',
+          'no',
+          'The retained live proof calls the guard aggregator directly; no flagship governed run retains the pre-model redaction result and downstream inference correlation.',
+        ],
+      ],
+      [
+        'prompt-threat-scanning',
+        'Prompt threat and content classification',
+        'Detect injection, toxicity, gibberish, language, banned content, code, and request-size risks.',
+        GUARDRAILS_PROTECTIONS_ROUTE,
+        'Manage prompt protections',
+        'The deployed g6 shard runs only PromptInjection, Toxicity, Gibberish, and Language from the 15-class 0.3.16 input denominator. Its optional-shard degradation header is discarded by the Console adapter, and catalog entries for other scanners do not reconfigure the static shard.',
+        [
+          'yes',
+          'The pinned input-scanner module exports 15 scanner classes, including injection, toxicity, content restrictions, language, code, regex, secrets, and token limits.',
+          'partial',
+          'The Off Grid aggregator fans out to a required PII shard and an optional g6 classifier shard; g6 statically enables four input classifiers and merged verdicts are normalized.',
+          'partial',
+          'Protections exposes ten scanner cards and pipeline/org scope, but several cards are not present in deployed YAML and an enable action does not change the upstream scanner set.',
+          'partial',
+          'Fleet recovery proved a merged injection/toxicity-classifier plus PII response, but not a seeded bank or insurance journey and not optional-shard degradation visibility.',
+        ],
+      ],
+      [
+        'output-safety-quality',
+        'Output safety and quality scanning',
+        'Evaluate and sanitize model output for bias, sensitive content, relevance, factual consistency, refusal, malicious URLs, language, format, and toxicity.',
+        GUARDRAILS_PROTECTIONS_ROUTE,
+        'Inspect output protections',
+        'Wire /scan/output and /analyze/output with the prompt context, configure the intended output scanner set, and expose truthful per-scanner scope/results. The current post-answer path sends output text through /analyze/prompt, so it does not exercise this upstream capability.',
+        [
+          'yes',
+          'LLM Guard 0.3.16 exposes /scan/output and /analyze/output and exports 22 output scanner classes/variants spanning safety, policy, and quality.',
+          'no',
+          'The content-guardrail adapter only calls /analyze/prompt; post-answer checks therefore reuse input scanners rather than the upstream output-scanner contract.',
+          'partial',
+          'The catalog names PII, toxicity, bias, and banned-topic output outcomes, but it does not manage or display actual output scanner configuration and results.',
+          'no',
+          'No production workflow is retained against /scan/output or /analyze/output.',
+        ],
+      ],
+      [
+        'scanner-policy-lifecycle',
+        'Scanner configuration and lifecycle',
+        'Select scanners, tune thresholds and parameters, suppress scanners per request, and roll out policy safely.',
+        GUARDRAILS_PROTECTIONS_ROUTE,
+        'Manage protection policy',
+        'Make deployed YAML or its replacement policy store the single lifecycle owner. In 0.3.16 scanner definitions are static configuration and requests only support scanners_suppress; the Console currently sends an unsupported scanners object, so catalog scope and custom India recognizers do not alter the stock service.',
+        [
+          'yes',
+          'The 0.3.16 API loads ordered input/output scanners and parameters from CONFIG_FILE, supports lazy loading and per-request scanners_suppress, and has no scanner CRUD API.',
+          'partial',
+          'The fleet owns versioned classifier YAML and first-party shard merge policy, but the S1 PII configuration is not represented here and request-body scanner configuration is ignored upstream.',
+          'partial',
+          'Console rules, recognizers, thresholds, and pipeline scope are CRUD-capable product state, but they are not reconciled into the selected upstream 0.3.16 static configuration.',
+          'no',
+          'No retained workflow proves that changing a Console scanner rule changes the scanners or parameters executed by either shard.',
+        ],
+      ],
+      [
+        'api-auth-rate-limits',
+        'Authenticated and bounded scan API',
+        'Protect scan endpoints with bearer/basic authentication and configurable request limits.',
+        '/governance/secrets',
+        'Manage service credentials',
+        'Expose guard service credential rotation and effective rate-limit posture without leaking secrets; retain valid/invalid credential and throttling evidence.',
+        [
+          'yes',
+          'The 0.3.16 API supports HTTP bearer or basic auth and configurable per-client rate limiting.',
+          'yes',
+          'The Console and aggregator send bearer credentials from protected deployment configuration; shard tokens remain node-local.',
+          'no',
+          'The Console has no LLM-Guard-specific credential rotation or effective rate-limit management surface.',
+          'partial',
+          'Authenticated live scan evidence exists, but invalid-token, rotation, and throttling behavior are not retained as one governed workflow.',
+        ],
+      ],
+      [
+        'availability-failure-policy',
+        'Availability, timeouts, and failure policy',
+        'Probe liveness/readiness, bound scanner latency, and choose fail-fast or aggregate behavior.',
+        GUARDRAILS_ROUTE,
+        'Inspect guardrail posture',
+        'Expose required versus optional shard readiness and degradation. Today /healthz only proves the aggregator process, /readyz is not consumed, and an optional classifier outage is hidden from the normalized Console verdict.',
+        [
+          'yes',
+          'LLM Guard 0.3.16 provides /healthz and /readyz, prompt/output timeouts, scan_fail_fast, lazy loading, and deterministic HTTP errors.',
+          'partial',
+          'The Console bounds requests and fails closed on adapter/required-shard failure; Off Grid adds required/optional shard policy, but optional degradation is not propagated to the port result.',
+          'partial',
+          'Overview shows configured/reachable state, but not readiness, per-shard health, model load state, degradation, latency, or recovery actions.',
+          'partial',
+          'Fleet recovery proves merged service behavior and required-shard recovery mechanics; it does not retain a governed-run outage/recovery journey.',
+        ],
+      ],
+      [
+        'telemetry',
+        'Scanner telemetry',
+        'Observe scanner verdict counts, latency, errors, traces, and service saturation.',
+        '/insights/ai/overview',
+        'Inspect AI behavior',
+        'Configure and attribute the 0.3.16 Prometheus/OTel signals, retain per-scanner and per-shard evidence, and connect them to actionable Console diagnostics. Console logs alone are not this upstream telemetry path.',
+        [
+          'yes',
+          'LLM Guard 0.3.16 supports Prometheus or OTLP metrics, OTLP/console tracing, structured logs, and per-scanner validity counters.',
+          'no',
+          'No production adapter reads or attributes LLM Guard metrics/traces; the deployed classifier config defaults traces to console and has no retained telemetry pipeline proof.',
+          'no',
+          'AI behavior and platform health do not expose LLM Guard scanner metrics, shard saturation, or trace evidence.',
+          'no',
+          'No bank or insurance journey links a guardrail verdict to upstream scanner telemetry.',
         ],
       ],
     ],
@@ -1193,7 +1337,6 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
  */
 export const RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS = [
   'edge-gateway',
-  'llm-guard',
   'gateway-control',
   'agent-worker',
   'chat-worker',

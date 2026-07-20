@@ -93,8 +93,8 @@ test('the explorer renders the exact 48-entry audit contract without inventing p
   );
 
   assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 48);
-  assert.equal(SERVICE_CAPABILITY_AUDITS.length, 37);
-  assert.deepEqual(auditCounts, { current: 20, stale: 17, pending: 11 });
+  assert.equal(SERVICE_CAPABILITY_AUDITS.length, 38);
+  assert.deepEqual(auditCounts, { current: 21, stale: 17, pending: 10 });
   assert.equal((html.match(/data-inventory-stat=/g) ?? []).length, 4);
   assert.match(html, /Inventory<\/p><p[^>]*>48<\/p>/);
   assert.match(html, new RegExp(`Current audits<\\/p><p[^>]*>${auditCounts.current}<\\/p>`));

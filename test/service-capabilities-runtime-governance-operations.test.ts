@@ -62,8 +62,70 @@ test('runtime, governance, and operations evidence accounts for its canonical 24
     { runtime: 7, governance: 6, operations: 11 },
   );
 
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 13);
-  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 11);
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.length, 14);
+  assert.equal(RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS.length, 10);
+});
+
+test('LLM Guard has a pinned archived denominator without conflating Off Grid sharding', () => {
+  const audit = RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.find(
+    (record) => record.serviceId === 'llm-guard',
+  );
+  assert.ok(audit);
+  assert.equal(audit.auditState, 'current');
+  assert.equal(audit.auditStateEvidence, null);
+  assert.match(audit.upstreamVersion, /0\.3\.16/);
+  assert.match(audit.upstreamVersion, /32b14a4a/);
+  assert.match(audit.upstreamVersion, /archived and unmaintained/);
+  assert.match(audit.versionSource, /bc74d828/);
+  assert.match(audit.denominatorSource, /input_scanners/);
+  assert.match(audit.denominatorSource, /output_scanners/);
+  assert.deepEqual(
+    audit.items.map((item) => item.id),
+    [
+      'prompt-sanitization',
+      'prompt-threat-scanning',
+      'output-safety-quality',
+      'scanner-policy-lifecycle',
+      'api-auth-rate-limits',
+      'availability-failure-policy',
+      'telemetry',
+    ],
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      audit.items.map((item) => [
+        item.id,
+        [
+          item.gates.upstream.status,
+          item.gates.adapter.status,
+          item.gates.ui.status,
+          item.gates.workflow.status,
+        ],
+      ]),
+    ),
+    {
+      'prompt-sanitization': ['yes', 'yes', 'yes', 'no'],
+      'prompt-threat-scanning': ['yes', 'partial', 'partial', 'partial'],
+      'output-safety-quality': ['yes', 'no', 'partial', 'no'],
+      'scanner-policy-lifecycle': ['yes', 'partial', 'partial', 'no'],
+      'api-auth-rate-limits': ['yes', 'yes', 'no', 'partial'],
+      'availability-failure-policy': ['yes', 'partial', 'partial', 'partial'],
+      telemetry: ['yes', 'no', 'no', 'no'],
+    },
+  );
+  assert.match(
+    audit.items.find((item) => item.id === 'scanner-policy-lifecycle')?.gap ?? '',
+    /scanners_suppress/,
+  );
+  assert.match(
+    audit.items.find((item) => item.id === 'output-safety-quality')?.gap ?? '',
+    /\/analyze\/output/,
+  );
+  assert.equal(
+    audit.items.some((item) => item.summary.includes('shard')),
+    false,
+    'first-party sharding must not be described as an upstream capability',
+  );
 });
 
 test('app-worker has a pinned six-item denominator without inflating live proof', () => {
