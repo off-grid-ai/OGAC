@@ -186,7 +186,7 @@ export const SAMPLE_PIPELINES: readonly SamplePipelineSpec[] = [
     name: 'RM cross-sell',
     description:
       'Next-best-action recommendations grounded in CRM customer context, with relationship-manager acceptance to control mis-selling risk.',
-    dataAllowlist: ['customer data'],
+    dataAllowlist: ['customer data', 'pricing rate card'],
     routing: bfsiRouting(),
     policyOverlay: { requireHumanApproval: { mode: 'locked', bool: true } },
     guardrailOverlay: { requirePiiMasking: { mode: 'locked', bool: true } },

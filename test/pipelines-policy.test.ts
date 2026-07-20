@@ -222,6 +222,11 @@ test('planSeedPipelines: stable, org-scoped ids; BFSI templates bound to the on-
     ['customer data', 'pricing rate card'],
     'cross-sell references both canonical evidence domains, not imaginary tables',
   );
+  assert.deepEqual(
+    bharat.find((pipeline) => pipeline.name === 'RM cross-sell')?.dataAllowlist,
+    ['customer data', 'pricing rate card'],
+    'the flagship RM pipeline permits the same governed evidence pair',
+  );
   // Org isolation: ids never collide across orgs.
   const defIds = new Set(def.map((p) => p.id));
   assert.ok(bharat.every((p) => !defIds.has(p.id)), 'ids are org-scoped, never shared');
@@ -232,7 +237,7 @@ test('planSeedPipelines: is deterministic (idempotent re-seed)', () => {
 });
 
 test('seedPipelineNeedsUpdate: reconciles stale contracts without rewriting identical seeds', () => {
-  const desired = planSeedPipelines('org_bharat').find((p) => p.name === 'Cross-Sell Advisor');
+  const desired = planSeedPipelines('org_bharat').find((p) => p.name === 'RM cross-sell');
   assert.ok(desired);
   assert.equal(seedPipelineNeedsUpdate(desired, desired), false);
   assert.equal(
