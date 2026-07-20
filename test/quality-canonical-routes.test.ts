@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
+import {
+  contextualDestinationForPath,
+  contextualModule,
+} from '../src/modules/contextual-navigation.ts';
 
 const root = new URL('../', import.meta.url);
 const source = (path: string) => readFileSync(new URL(path, root), 'utf8');
@@ -35,6 +39,18 @@ test('canonical Quality routes expose executions, drift, performance, and releas
 test('Quality root reveals current posture before configuration CRUD', () => {
   const rootPage = source('src/app/(console)/solutions/quality/page.tsx');
   assert.match(rootPage, /redirect\('\/solutions\/quality\/performance'\)/);
+});
+
+test('Quality executions resolves its canonical runs segment instead of treating it as a menu id', () => {
+  const module = contextualModule('solutions-quality');
+  assert.equal(
+    contextualDestinationForPath(module, '/solutions/quality/runs')?.id,
+    'executions',
+  );
+
+  const destinationPage = source('src/app/(console)/solutions/quality/[destination]/page.tsx');
+  assert.match(destinationPage, /contextualDestinationForPath/);
+  assert.doesNotMatch(destinationPage, /contextualDestination\(contextualModule/);
 });
 
 test('Quality card guidance uses the shared description row without header overlap', () => {

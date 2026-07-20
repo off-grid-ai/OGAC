@@ -20,7 +20,10 @@ import { readEvalsView, type EvalsView } from '@/lib/evals-view';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelines } from '@/lib/pipelines';
 import { currentOrgId } from '@/lib/tenancy';
-import { contextualDestination, contextualModule } from '@/modules/contextual-navigation';
+import {
+  contextualDestinationForPath,
+  contextualModule,
+} from '@/modules/contextual-navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +36,11 @@ export default async function QualityDestinationPage({
 }>) {
   await requireModuleForUser('evals');
   const { destination: rawDestination } = await params;
-  const destination = contextualDestination(contextualModule('solutions-quality'), rawDestination);
+  const module = contextualModule('solutions-quality');
+  const destination = contextualDestinationForPath(
+    module,
+    `${module.baseRoute}/${rawDestination}`,
+  );
   if (!destination) notFound();
 
   if (destination.id === 'evaluators') return <EvalsWorkbench />;
