@@ -147,3 +147,12 @@ test('gatewayFromHost: rejects the SHARED gateway + non-matching hosts (null)', 
   assert.equal(gatewayFromHost(null), null);
   assert.equal(gatewayFromHost(''), null);
 });
+
+test('isPublicPath: webhook ingress is public (per-trigger HMAC auth, no session)', () => {
+  // The inbound consumption primitive authenticates by HMAC signature, not a session — middleware
+  // must let it through to its own verifier (else every webhook fire 401s before the signature check).
+  assert.equal(isPublicPath('/api/v1/triggers/wht_abc123'), true);
+  assert.equal(isPublicPath('/api/v1/triggers/'), true);
+  // but the ADMIN CRUD for provisioning triggers still requires auth
+  assert.equal(isPublicPath('/api/v1/admin/triggers/webhooks'), false);
+});

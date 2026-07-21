@@ -26,6 +26,7 @@ export const PUBLIC_PREFIX = [
   '/api/waitlist', // public request-access capture from the signin page
   '/app/', // deployed Studio apps — public shareable surfaces
   '/api/v1/app/', // their public run endpoint
+  '/api/v1/triggers/', // public webhook ingress — authed by its own per-trigger HMAC signature, not a session
   '/api/v1/status', // public service status (uptime monitors)
   '/invite/accept', // an invitee accepts BEFORE they have a session — the page is public
   '/api/v1/invites/accept', // the public accept endpoint (validates the single-use token itself)
