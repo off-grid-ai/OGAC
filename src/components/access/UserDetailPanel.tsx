@@ -4,12 +4,16 @@ import {
   Check,
   Eye,
   EyeSlash,
+  ListChecks,
   Monitor,
+  PencilSimple,
+  Prohibit,
   ShieldCheck,
   ShieldWarning,
   SignOut,
   Trash,
 } from '@phosphor-icons/react/dist/ssr';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { diffRoles, userDisplayName, userSubtitle } from '@/lib/user-detail';
+import { KNOWN_REQUIRED_ACTIONS } from '@/lib/keycloak-realm';
+import { formatAge, formatExpiry } from '@/lib/session-view';
+import { diffRoles, userDisplayName, userSubtitle, validateUserEdit } from '@/lib/user-detail';
 
 interface KcRole {
   id: string;
@@ -40,6 +46,7 @@ interface KcUser {
   enabled?: boolean;
   emailVerified?: boolean;
   realmRoles?: string[];
+  requiredActions?: string[];
 }
 interface Session {
   id: string;
@@ -49,6 +56,9 @@ interface Session {
   lastAccess: number;
   clients: string[];
   offline: boolean;
+  ageMs?: number;
+  ttlMs?: number | null;
+  expired?: boolean;
 }
 interface Credential {
   id: string;
@@ -533,7 +543,9 @@ function SessionsCard({ userId, label }: Readonly<{ userId: string; label: strin
                   <TableHead>IP address</TableHead>
                   <TableHead>Kind</TableHead>
                   <TableHead>Started</TableHead>
+                  <TableHead>Age</TableHead>
                   <TableHead>Last access</TableHead>
+                  <TableHead>Expires</TableHead>
                   <TableHead>Clients</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -542,7 +554,7 @@ function SessionsCard({ userId, label }: Readonly<{ userId: string; label: strin
                 {sessions.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={8}
                       className="py-6 text-center text-xs text-muted-foreground"
                     >
                       No active sessions for this user. The console signs in with
@@ -561,7 +573,15 @@ function SessionsCard({ userId, label }: Readonly<{ userId: string; label: strin
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{fmt(s.start)}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
+                        {s.ageMs === undefined ? '—' : formatAge(s.ageMs)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
                         {fmt(s.lastAccess)}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <span className={s.expired ? 'text-destructive' : 'text-muted-foreground'}>
+                          {formatExpiry(s.ttlMs ?? null)}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -595,14 +615,175 @@ function SessionsCard({ userId, label }: Readonly<{ userId: string; label: strin
   );
 }
 
+// ─── Login-requirements card (generalized required actions, minus OTP) ─────────
+// OTP lives in the MFA card; this card toggles the other curated required actions a BFSI access
+// admin sets on a person (verify email, force a password rotation, complete the profile). Controlled
+// by the parent's user.requiredActions so it never drifts from the identity load.
+
+const LOGIN_REQUIREMENT_ACTIONS = KNOWN_REQUIRED_ACTIONS.filter((a) => a.alias !== 'CONFIGURE_TOTP');
+
+function RequiredActionsCard({
+  userId,
+  active,
+  onChanged,
+}: Readonly<{ userId: string; active: string[]; onChanged: () => void }>) {
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const toggle = async (alias: string, on: boolean) => {
+    setBusy(alias);
+    try {
+      const res = await fetch(
+        on
+          ? `/api/v1/admin/access/users/${userId}/required-actions`
+          : `/api/v1/admin/access/users/${userId}/required-actions?action=${encodeURIComponent(alias)}`,
+        on
+          ? {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: alias }),
+            }
+          : { method: 'DELETE' },
+      );
+      const d = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(d.error ?? 'Failed to update login requirement.');
+      toast.success(on ? 'Requirement added.' : 'Requirement cleared.');
+      onChanged();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <ListChecks className="size-4 text-primary" />
+          Login requirements
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {LOGIN_REQUIREMENT_ACTIONS.map((a) => {
+          const on = active.includes(a.alias);
+          return (
+            <div
+              key={a.alias}
+              className="flex items-center justify-between gap-3 rounded border border-border px-3 py-2"
+            >
+              <div>
+                <p className="text-xs font-medium text-foreground">
+                  {a.label}
+                  {on && (
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      required
+                    </Badge>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">{a.help}</p>
+              </div>
+              <Button
+                size="sm"
+                variant={on ? 'ghost' : 'default'}
+                disabled={busy === a.alias}
+                onClick={() => void toggle(a.alias, !on)}
+              >
+                {on ? 'Clear' : 'Require'}
+              </Button>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Identity edit form ────────────────────────────────────────────────────────
+
+function IdentityEditForm({
+  user,
+  onSaved,
+  onCancel,
+}: Readonly<{ user: KcUser; onSaved: () => void; onCancel: () => void }>) {
+  const [firstName, setFirstName] = useState(user.firstName ?? '');
+  const [lastName, setLastName] = useState(user.lastName ?? '');
+  const [email, setEmail] = useState(user.email ?? '');
+  const [emailVerified, setEmailVerified] = useState(Boolean(user.emailVerified));
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    // Validate with the same pure rule the route enforces (email shape, boolean flags).
+    const validated = validateUserEdit({ firstName, lastName, email, emailVerified });
+    if ('error' in validated) {
+      toast.error(validated.error);
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/v1/admin/access/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validated.patch),
+      });
+      const d = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(d.error ?? 'Failed to save changes.');
+      toast.success('User updated.');
+      onSaved();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Edit identity
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <Input placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+        <Input placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+        <Input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </div>
+      <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={emailVerified}
+          onChange={(e) => setEmailVerified(e.target.checked)}
+          className="accent-primary"
+        />
+        <span>Email verified</span>
+      </label>
+      <div className="flex gap-2">
+        <Button size="sm" className="gap-1.5" onClick={save} disabled={saving}>
+          {saving ? (
+            <>
+              <Spinner /> Saving…
+            </>
+          ) : (
+            'Save changes'
+          )}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Panel ───────────────────────────────────────────────────────────────────
 
 export function UserDetailPanel({ userId }: Readonly<{ userId: string }>) {
+  const router = useRouter();
   const [user, setUser] = useState<KcUser | null>(null);
   const [allRoles, setAllRoles] = useState<KcRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [acting, setActing] = useState(false);
 
   const loadUser = useCallback(async () => {
     setLoading(true);
@@ -676,27 +857,95 @@ export function UserDetailPanel({ userId }: Readonly<{ userId: string }>) {
 
   const name = userDisplayName(user);
   const subtitle = userSubtitle(user);
+  const enabled = Boolean(user.enabled);
   const facts = [
     { label: 'Username', value: user.username || '—' },
     { label: 'Email', value: user.email || '—' },
     { label: 'Email verified', value: user.emailVerified ? 'yes' : 'no' },
-    { label: 'Status', value: user.enabled ? 'enabled' : 'disabled' },
+    { label: 'Status', value: enabled ? 'enabled' : 'disabled' },
   ];
+
+  // Enable/disable reuses the identity PATCH route (a single { enabled } patch), never deleting.
+  const toggleEnabled = async () => {
+    const next = !enabled;
+    if (
+      !next &&
+      !window.confirm(`Disable ${name}? They will be blocked from signing in until re-enabled.`)
+    )
+      return;
+    setActing(true);
+    try {
+      const res = await fetch(`/api/v1/admin/access/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const d = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(d.error ?? 'Failed to update status.');
+      toast.success(next ? 'User enabled.' : 'User disabled.');
+      void loadUser();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    if (!window.confirm(`Delete ${name}? This permanently removes the account and cannot be undone.`))
+      return;
+    setActing(true);
+    try {
+      const res = await fetch(`/api/v1/admin/access/users/${user.id}`, { method: 'DELETE' });
+      const d = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(d.error ?? 'Failed to delete user.');
+      toast.success(`Deleted ${name}.`);
+      router.push('/governance/access/users');
+    } catch (err) {
+      toast.error((err as Error).message);
+      setActing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold text-foreground">{name}</h1>
-            <Badge variant={user.enabled ? 'default' : 'destructive'} className="text-xs">
-              {user.enabled ? 'enabled' : 'disabled'}
+            <Badge variant={enabled ? 'default' : 'destructive'} className="text-xs">
+              {enabled ? 'enabled' : 'disabled'}
             </Badge>
           </div>
           <p className="mt-1 font-mono text-xs text-muted-foreground">{subtitle}</p>
           <p className="font-mono text-[10px] text-muted-foreground/70">{user.id}</p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setEditing((v) => !v)}>
+            <PencilSimple className="size-3.5 mr-1" />
+            {editing ? 'Close' : 'Edit'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={toggleEnabled} disabled={acting}>
+            <Prohibit className="size-3.5 mr-1" />
+            {enabled ? 'Disable' : 'Enable'}
+          </Button>
+          <Button size="sm" variant="destructive" onClick={deleteUser} disabled={acting}>
+            <Trash className="size-3.5 mr-1" />
+            Delete
+          </Button>
+        </div>
       </div>
+
+      {editing && (
+        <IdentityEditForm
+          user={user}
+          onSaved={() => {
+            setEditing(false);
+            void loadUser();
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {facts.map((f) => (
@@ -722,6 +971,11 @@ export function UserDetailPanel({ userId }: Readonly<{ userId: string }>) {
         />
         <PasswordCard userId={user.id} />
         <MfaCard userId={user.id} />
+        <RequiredActionsCard
+          userId={user.id}
+          active={user.requiredActions ?? []}
+          onChanged={loadUser}
+        />
         <SessionsCard userId={user.id} label={name} />
       </div>
     </div>

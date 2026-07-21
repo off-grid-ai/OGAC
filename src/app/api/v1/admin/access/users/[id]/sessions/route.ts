@@ -2,7 +2,14 @@ import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { KeycloakError, keycloakAdmin } from '@/lib/keycloak-admin';
-import { forbiddenGrantMessage, mergeUserSessions, type KcRawSession } from '@/lib/keycloak-realm';
+import {
+  extractLifetimes,
+  forbiddenGrantMessage,
+  mergeUserSessions,
+  type KcRawSession,
+  type KcRealmLifetimes,
+} from '@/lib/keycloak-realm';
+import { annotateSessionLifetimes } from '@/lib/session-view';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +43,24 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       offline = [];
     }
 
-    return NextResponse.json({ configured: true, sessions: mergeUserSessions(online, offline) });
+    const sessions = mergeUserSessions(online, offline);
+
+    // Annotate each session with age + projected expiry, derived from the realm's configured
+    // session/token lifetimes. Keycloak's session list carries start/lastAccess but not expiry, so
+    // it's computed here (pure) from the realm rep. Best-effort: if the lifetime read fails (e.g. the
+    // SA lacks realm-view), sessions still list with age; expiry falls back to unknown ("—").
+    let lifetimes: KcRealmLifetimes | null = null;
+    try {
+      lifetimes = extractLifetimes(await kc.getRealm());
+    } catch {
+      lifetimes = null;
+    }
+
+    return NextResponse.json({
+      configured: true,
+      lifetimes,
+      sessions: annotateSessionLifetimes(sessions, lifetimes, Date.now()),
+    });
   } catch (err) {
     const status = err instanceof KeycloakError ? err.status : 500;
     const message = forbiddenGrantMessage('view-users', status, (err as Error).message);
