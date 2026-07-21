@@ -476,11 +476,11 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
         'yes', 'AI Traces provides URL-driven trace and observation detail.',
         'yes', 'The fleet records one Langfuse organization/project and live trace integration.',
       ]),
-      capability('scores-evaluations', 'Scores and evaluation annotations', 'Attach numeric, categorical, or boolean evaluation scores to traces and observations.', '/solutions/quality/runs', 'Inspect evaluation runs', 'Console evals exist, but score write-back and trace-level attribution to Langfuse are not comprehensively verified.', [
+      capability('scores-evaluations', 'Scores and evaluation annotations', 'Attach numeric, categorical, or boolean evaluation scores to traces and observations.', '/solutions/quality/runs', 'Inspect evaluation runs', 'Online LLM-as-judge scoring writes trace-attributed quality/faithfulness scores to Langfuse through the governed judge chain; console-side annotation management is still partial.', [
         'yes', 'Langfuse supports score configs and trace/observation scores.',
-        'partial', 'Evaluation results can be correlated, but complete Langfuse score lifecycle is not adapted.',
+        'yes', 'The QA scoring adapter judges each interaction through the governed judge agent→pipeline→gateway (no pinned model) and writes a trace + quality/faithfulness scores to the Langfuse ingestion API.',
         'partial', 'Quality runs show scores without full Langfuse annotation management.',
-        'partial', 'Evaluation workflows run; persisted Langfuse score attribution is not fleet-proven.',
+        'yes', 'Fleet-proven: two production-style interactions scored live on-prem via judge=agent_system_ai_quality_judge → pl_system_ai_quality_judge → gw_seed_default_onprem-cluster (gemma-4-e4b) — grounded answer 1/1, contradicted answer 0/0 with correct reasoning, both posted to Langfuse (posted:true) with trace attribution.',
       ]),
       capability('prompts-datasets', 'Prompt and dataset lifecycle', 'Version prompts, manage labels, create datasets, and run dataset experiments.', '/solutions/quality/evaluators', 'Open quality tooling', 'The console owns separate prompt and eval stores. No Langfuse prompt/dataset CRUD adapter reconciles the two systems.', [
         'yes', 'Langfuse 3.30.0 provides prompt management, datasets, items, and experiment runs.',
