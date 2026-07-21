@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { searchDocuments } from '@/lib/brain';
 import { capEvalSamples } from '@/lib/eval-sampling';
+import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
 import { listGoldenCases, runEval } from '@/lib/evals';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Evals adapters. The golden set (recall over the Brain) is the always-on first-party default and
 // runs fully in-process. promptfoo and Ragas/DeepEval are real swap-ins that invoke their tool /
@@ -209,13 +211,13 @@ function ragasScore(faithfulness: number | undefined, passed: number, total: num
   return 0;
 }
 
-async function generateAnswer(question: string, contexts: string[]): Promise<string> {
+async function generateAnswer(question: string, contexts: string[], model: string): Promise<string> {
   const ctx = contexts.map((c, i) => `[${i + 1}] ${c}`).join('\n');
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
     body: JSON.stringify({
-      model: EVAL_MODEL,
+      model,
       temperature: 0,
       messages: [
         { role: 'system', content: 'Answer only from the provided context. Be concise.' },
@@ -232,7 +234,7 @@ async function generateAnswer(question: string, contexts: string[]): Promise<str
 
 // Build the RAG eval dataset the console owns (Brain for contexts, gateway for answers, the golden
 // `expected` as ground truth), then let the sidecar score it with Ragas.
-async function buildDataset(): Promise<RagasSample[]> {
+async function buildDataset(model: string): Promise<RagasSample[]> {
   const cases = capEvalSamples(await listGoldenCases());
   const samples: RagasSample[] = [];
   for (const c of cases) {
@@ -240,7 +242,7 @@ async function buildDataset(): Promise<RagasSample[]> {
     const contexts = hits.map((h) => h.text);
     samples.push({
       question: c.query,
-      answer: await generateAnswer(c.query, contexts),
+      answer: await generateAnswer(c.query, contexts, model),
       contexts,
       ground_truth: c.expected,
     });
@@ -248,12 +250,12 @@ async function buildDataset(): Promise<RagasSample[]> {
   return samples;
 }
 
-async function runRagas(): Promise<EvalRunResult> {
-  const dataset = await buildDataset();
+async function runRagas(model: string): Promise<EvalRunResult> {
+  const dataset = await buildDataset(model);
   const res = await fetch(`${RAGAS_URL}/evaluate`, {
     method: 'POST',
     headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
-    body: JSON.stringify({ model: EVAL_MODEL, gateway: `${GATEWAY_URL}/v1`, dataset }),
+    body: JSON.stringify({ model, gateway: `${GATEWAY_URL}/v1`, dataset }),
     signal: AbortSignal.timeout(180_000),
   });
   if (!res.ok) throw new Error('ragas sidecar error');
@@ -286,7 +288,10 @@ export const ragasEvals: EvalsPort = {
   async run(orgId?: string) {
     if (!RAGAS_URL) return goldenEvals.run(orgId);
     try {
-      return await runRagas();
+      // GOVERNING INVARIANT: resolve the judge model through the judge agent→pipeline→gateway, never
+      // a pinned env model. The sidecar (and answer-generation) use whatever the hierarchy resolves.
+      const judge = await loadJudgeRouting(orgId ?? DEFAULT_ORG);
+      return await runRagas(judge.model);
     } catch {
       return goldenEvals.run(orgId);
     }

@@ -103,6 +103,6 @@ export async function POST(req: Request) {
     );
   }
   if (!d.run) return NextResponse.json({ error: 'unknown agent' }, { status: 404 });
-  after(() => scoreRun(d.run!));
+  after(() => scoreRun(d.run!, orgId));
   return NextResponse.json(d.run, { status: 201 });
 }

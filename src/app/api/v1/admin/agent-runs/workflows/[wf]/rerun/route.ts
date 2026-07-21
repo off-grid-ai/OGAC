@@ -54,6 +54,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ wf: str
     );
   }
   if (!d.run) return NextResponse.json({ error: 'unknown agent' }, { status: 404 });
-  after(() => scoreRun(d.run!));
+  after(() => scoreRun(d.run!, orgId));
   return NextResponse.json({ ok: true, run: d.run, sourceWorkflowId: workflowId }, { status: 201 });
 }

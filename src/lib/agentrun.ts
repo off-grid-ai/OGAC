@@ -1132,7 +1132,7 @@ export async function runAgent(
 // Online QA score for a completed run — LLM-as-judge → Langfuse. Called OUT OF BAND (e.g. via
 // next/server `after()`), gated by the `online-evals` flag and OFFGRID_QA_SAMPLE_RATE, so it never
 // adds latency to the response. Best-effort: all failures are swallowed.
-export async function scoreRun(run: AgentRun): Promise<void> {
+export async function scoreRun(run: AgentRun, orgId: string = DEFAULT_ORG): Promise<void> {
   try {
     if (run.status !== 'done') return;
     if (!(await getFlags().isEnabled('online-evals', true))) return;
@@ -1144,6 +1144,7 @@ export async function scoreRun(run: AgentRun): Promise<void> {
       sources: run.citations.map((c) => c.snippet),
       name: `agent:${run.agentId}`,
       traceId: correlationIds(run.id).traceId,
+      orgId,
     });
   } catch {
     /* best-effort online scoring */

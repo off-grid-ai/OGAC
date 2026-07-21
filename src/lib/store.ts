@@ -1962,6 +1962,7 @@ export async function createCustomAgent(
     grounded?: boolean;
     trigger?: string;
     pipelineId?: string | null;
+    id?: string; // stable id for seeded system agents (e.g. the AI-quality judge); random otherwise
   },
   orgId: string = DEFAULT_ORG,
 ): Promise<CustomAgent> {
@@ -1969,7 +1970,7 @@ export async function createCustomAgent(
   const [row] = await db
     .insert(customAgents)
     .values({
-      id: `agent_${randomUUID().slice(0, 8)}`,
+      id: input.id ?? `agent_${randomUUID().slice(0, 8)}`,
       orgId,
       pipelineId: input.pipelineId ?? null,
       name: input.name,

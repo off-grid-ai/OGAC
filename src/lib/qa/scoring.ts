@@ -6,7 +6,8 @@ import { randomUUID } from 'node:crypto';
 // ingestion API as a trace + numeric scores. Best-effort: a Langfuse outage never throws to the
 // caller, it just returns posted:false.
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
-const JUDGE_MODEL = process.env.OFFGRID_EVAL_MODEL ?? 'gemma-local';
+import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 const LANGFUSE_URL = process.env.OFFGRID_LANGFUSE_URL;
 const LANGFUSE_AUTH = process.env.OFFGRID_LANGFUSE_AUTH; // base64("public-key:secret-key")
 
@@ -16,6 +17,7 @@ export interface Interaction {
   sources?: string[];
   traceId?: string; // attach scores to an existing trace if known; otherwise one is created
   name?: string;
+  orgId?: string; // resolves the judge agent→pipeline→gateway for this org (governing invariant)
 }
 
 export interface JudgeVerdict {
@@ -50,11 +52,13 @@ function clamp01(v: unknown): number {
 }
 
 async function judge(i: Interaction): Promise<JudgeVerdict> {
+  // GOVERNING INVARIANT: resolve the judge model through the judge agent→pipeline→gateway, per-org.
+  const judgeRouting = await loadJudgeRouting(i.orgId ?? DEFAULT_ORG);
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: gatewayHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({
-      model: JUDGE_MODEL,
+      model: judgeRouting.model,
       temperature: 0,
       messages: [
         { role: 'system', content: 'You are a strict evaluator of AI agent outputs.' },

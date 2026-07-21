@@ -15,6 +15,7 @@ import {
 } from '@/lib/eval-metrics';
 import type { EvalEngine } from '@/lib/eval-templates';
 import { capEvalSamples } from '@/lib/eval-sampling';
+import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
 import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -30,7 +31,6 @@ import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 //      with the engine that ACTUALLY computed the score (honest: 'ragas' vs 'heuristic').
 // No fabricated scores: if an external engine isn't configured we say so by tagging 'heuristic'.
 
-const EVAL_MODEL = process.env.OFFGRID_EVAL_MODEL ?? 'gemma-local';
 const RAGAS_URL = process.env.OFFGRID_RAGAS_URL;
 
 interface Sample {
@@ -40,13 +40,13 @@ interface Sample {
   groundTruth: string;
 }
 
-async function generateAnswer(question: string, contexts: string[]): Promise<string> {
+async function generateAnswer(question: string, contexts: string[], model: string): Promise<string> {
   const ctx = contexts.map((c, i) => `[${i + 1}] ${c}`).join('\n');
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
     body: JSON.stringify({
-      model: EVAL_MODEL,
+      model,
       temperature: 0,
       messages: [
         { role: 'system', content: 'Answer only from the provided context. Be concise.' },
@@ -61,7 +61,7 @@ async function generateAnswer(question: string, contexts: string[]): Promise<str
   return data.choices?.[0]?.message?.content ?? '';
 }
 
-async function buildSamples(): Promise<Sample[]> {
+async function buildSamples(model: string): Promise<Sample[]> {
   const cases = capEvalSamples(await listGoldenCases());
   const samples: Sample[] = [];
   for (const c of cases) {
@@ -69,7 +69,7 @@ async function buildSamples(): Promise<Sample[]> {
     const contexts = hits.map((h) => h.text);
     let answer = '';
     try {
-      answer = await generateAnswer(c.query, contexts);
+      answer = await generateAnswer(c.query, contexts, model);
     } catch {
       // Gateway unreachable — fall back to the expected text so the heuristic still scores something
       // rather than crashing the whole run. The score is honestly low; never fabricated high.
@@ -84,7 +84,8 @@ async function buildSamples(): Promise<Sample[]> {
 // null if the sidecar is unset/unreachable — the caller then degrades to the heuristic honestly.
 async function ragasMetrics(
   samples: Sample[],
-  metrics?: string[],
+  metrics: string[] | undefined,
+  model: string,
 ): Promise<Record<string, number> | null> {
   if (!RAGAS_URL) return null;
   try {
@@ -101,7 +102,7 @@ async function ragasMetrics(
       method: 'POST',
       headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
       body: JSON.stringify({
-        model: EVAL_MODEL,
+        model,
         gateway: `${GATEWAY_URL}/v1`,
         dataset,
         ...(metrics?.length ? { metrics } : {}),
@@ -138,7 +139,7 @@ function gatewayJudgeConfigured(): boolean {
 // G-EVAL judge (I/O): send the operator's plain-English criteria + one sample to the gateway as an
 // LLM-as-judge, parse a 1..5 verdict back to 0..1. NEVER fabricates: on no-gateway/failure/unparseable
 // text it returns a `parsed:false` result so the caller records no score and surfaces the reason.
-async function gEvalJudge(criteria: string, s: Sample): Promise<GEvalResult> {
+async function gEvalJudge(criteria: string, s: Sample, model: string): Promise<GEvalResult> {
   if (!gatewayJudgeConfigured()) {
     return gEvalUnavailable('No gateway judge configured (set OFFGRID_GATEWAY_URL) — G-Eval needs one.');
   }
@@ -153,7 +154,7 @@ async function gEvalJudge(criteria: string, s: Sample): Promise<GEvalResult> {
       method: 'POST',
       headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
       body: JSON.stringify({
-        model: EVAL_MODEL,
+        model,
         temperature: 0,
         messages: [
           { role: 'system', content: prompt.system },
@@ -187,7 +188,12 @@ export async function runEvalDef(
   def: EvalDef,
   orgId: string = DEFAULT_ORG,
 ): Promise<EvalDefRunResult> {
-  const samples = await buildSamples();
+  // GOVERNING INVARIANT: the judge is a system agent on a pipeline — resolve its model through
+  // agent→pipeline→gateway, never a pinned env model. Both answer-generation and the judge use it.
+  const judge = await loadJudgeRouting(orgId);
+  // eslint-disable-next-line no-console
+  console.log(`[eval] ${def.metric} via ${judge.attribution}`);
+  const samples = await buildSamples(judge.model);
   const tpl = { metric: def.metric, direction: def.direction, defaultThreshold: def.threshold };
   const perSample: MetricScore[] = [];
 
@@ -200,7 +206,7 @@ export async function runEvalDef(
     let anyParsed = false;
     let reason = '';
     for (const s of samples) {
-      const r = await gEvalJudge(criteria, s);
+      const r = await gEvalJudge(criteria, s, judge.model);
       if (r.parsed) {
         anyParsed = true;
         perSample.push(scoreMetric(tpl, r.score, 'deepeval', def.threshold));
@@ -237,7 +243,7 @@ export async function runEvalDef(
   }
 
   // ── ragas (real sidecar) or first-party heuristic for everything else ────────────────────────────
-  const ragas = usesRagas(def) ? await ragasMetrics(samples, [def.metric]) : null;
+  const ragas = usesRagas(def) ? await ragasMetrics(samples, [def.metric], judge.model) : null;
   const computedBy: EvalEngine | 'heuristic' =
     ragas?.[def.metric] !== undefined ? 'ragas' : 'heuristic';
 
