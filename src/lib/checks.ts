@@ -217,14 +217,14 @@ async function resolveCheckOrg(explicitOrgId: string | undefined): Promise<strin
 // The masked text a guardrail rule produced is threaded back to the run path via this sentinel
 // prefix on the CheckResult.detail, so callers can recover the substituted input WITHOUT changing
 // the CheckResult shape (which is persisted). `parseGuardrailMaskedText` reads it back.
-const MASKED_PREFIX = ' masked:';
+const MASKED_PREFIX = 'masked:';
 export function encodeMaskedDetail(maskedText: string, human: string): string {
-  return `${MASKED_PREFIX}${encodeURIComponent(maskedText)} ${human}`;
+  return `${MASKED_PREFIX}${encodeURIComponent(maskedText)}${human}`;
 }
 export function parseGuardrailMaskedText(detail: string | undefined): string | null {
   if (!detail?.startsWith(MASKED_PREFIX)) return null;
   const rest = detail.slice(MASKED_PREFIX.length);
-  const end = rest.indexOf(' ');
+  const end = rest.indexOf('');
   const enc = end >= 0 ? rest.slice(0, end) : rest;
   try {
     return decodeURIComponent(enc);
@@ -237,7 +237,7 @@ export function humanizeCheckDetail(detail: string | undefined): string | undefi
   if (!detail) return detail;
   if (!detail.startsWith(MASKED_PREFIX)) return detail;
   const rest = detail.slice(MASKED_PREFIX.length);
-  const end = rest.indexOf(' ');
+  const end = rest.indexOf('');
   return end >= 0 ? rest.slice(end + 1) : undefined;
 }
 

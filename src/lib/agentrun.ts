@@ -37,6 +37,7 @@ import { cacheLookup, cacheStore } from '@/lib/cache';
 import { estimateTokens, projectBudget } from '@/lib/chat-governance';
 import { emitRunTrace } from '@/lib/chat-trace';
 import { type CheckResult } from '@/lib/checks';
+import { deepStripNul, stripNul } from '@/lib/jsonb-safe';
 import { correlationIds } from '@/lib/correlation';
 import { costForTokens } from '@/lib/finops';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
@@ -354,13 +355,16 @@ async function persist(
       id,
       orgId,
       agentId: v.agentId,
-      query: v.query,
-      answer: v.answer,
+      // Postgres text/jsonb cannot store NUL (U+0000): a guardrail masked-text sentinel, model
+      // output, guard sanitized text, or a retrieved doc carrying a NUL would make this INSERT throw
+      // and silently LOSE the run. Strip NULs from every persisted string first.
+      query: stripNul(v.query),
+      answer: stripNul(v.answer),
       status: v.status,
-      steps: v.steps,
-      citations: v.citations,
-      checks: v.checks,
-      provenance: v.provenance,
+      steps: deepStripNul(v.steps),
+      citations: deepStripNul(v.citations),
+      checks: deepStripNul(v.checks),
+      provenance: deepStripNul(v.provenance),
     })
     .returning();
   return toRun(row, v);
