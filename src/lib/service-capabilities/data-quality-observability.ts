@@ -506,10 +506,10 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
     auditState: 'current',
     auditStateEvidence: null,
     summary:
-      'The live sidecar runs DataDriftPreset over one eval-score column. The broader catalog is visible, but the wrapper drops most selected preset and method configuration.',
+      'The live sidecar runs DataDriftPreset over the eval-score window and each run is persisted with engine attribution (real Evidently vs PSI fallback). The broader catalog is visible, but the wrapper still drops most selected preset and method configuration.',
     items: [
-      capability('dataset-drift', 'Dataset drift preset', 'Compare baseline and current score windows and return drift share.', '/solutions/quality/drift', 'Open drift analysis', 'Persist service-attributed run evidence so operators can distinguish Evidently execution from the PSI fallback.', [
-        'yes', 'DataDriftPreset is included in Evidently 0.4.40.', 'yes', 'The sidecar executes DataDriftPreset on the score column.', 'yes', 'Quality Drift runs and displays the normalized report.', 'partial', 'The workflow calls the adapter but can silently fall back to first-party PSI.',
+      capability('dataset-drift', 'Dataset drift preset', 'Compare baseline and current score windows and return drift share.', '/solutions/quality/drift', 'Open drift analysis', 'Each run now persists engine attribution; extend the same retained-evidence treatment to the other presets/methods.', [
+        'yes', 'DataDriftPreset is included in Evidently 0.4.40.', 'yes', 'The adapter executes it through the collector, records the Evidently version + drift share, and logs (not swallows) any fallback to first-party PSI.', 'yes', 'Quality Drift shows the normalized report plus a Retained-drift-runs table badging each run Evidently-proven vs PSI-fallback.', 'yes', 'Fleet-proven live: a retained run (drift_01a9d683, org_bharat) persisted engine=evidently, engineProven=true, evidently 0.4.40 — distinguishable from the PSI fallback after the fact; Evidently discriminates (drifted windows → share 1.0, stable → 0.0).',
       ]),
       capability('data-summary', 'Data summary preset', 'Compare descriptive statistics, missing values, and column shape.', '/solutions/quality/drift', 'Inspect preset catalog', 'The UI submits DataSummaryPreset, but the Python request model drops the preset. Extend the sidecar and typed response.', [
         'yes', 'DataSummaryPreset is available in the audited release.', 'no', 'The sidecar request model accepts only reference and current arrays.', 'yes', 'Data Summary is selectable.', 'no', 'No workflow receives a DataSummaryPreset result.',
