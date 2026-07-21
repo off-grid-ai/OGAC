@@ -1141,3 +1141,6 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   connector and a fixed, parameterized `claims` statement. It never mutates PolicyAdmin MySQL.
   Console-owned `claim_disposition_commands` records authority attribution, leased idempotency and
   the source-result receipt without adding integration columns/tables to the customer's source.
+
+## Pre-existing per-file coverage debt (logged 2026-07-21)
+- c8 `--per-file` fails on files NOT in recent diffs: `lib/reports/model.ts` (62.5% br), `lib/reports/validate.ts` (61.9% br), `lib/retrieval/types.ts` (0% — type-only file, c8 quirk; should be excluded), `lib/qa/status.ts` (0%), `lib/exporters/openlineage.ts` (76%) + `store.ts` (68.5% br), `lib/service-capabilities/data-quality-observability.ts` (71.4% br, data file). Global aggregate is 95.71%/88.37% (passes). Fix: add tests or add type-only/excluded files to `.c8rc` exclusions. Pre-existing — not introduced by the parallel-3 merge.
