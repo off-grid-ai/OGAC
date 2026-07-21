@@ -317,7 +317,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Detect and redact PII, secrets, credentials, and configured text patterns before a model sees them.',
         GUARDRAILS_TEST_ROUTE,
         'Test prompt protection',
-        'Retain one governed bank and insurance run proving raw sensitive input was redacted before inference. The claimed per-request India recognizer configuration is ignored by the stock 0.3.16 API and must move into the deployed shard configuration or a versioned replacement adapter.',
+        'A governed run now retains the pre-model redaction correlated to inference; per-request India recognizer config is still ignored by the stock 0.3.16 API (needs the deployed shard config or a versioned replacement adapter).',
         [
           'yes',
           'LLM Guard 0.3.16 exposes /analyze/prompt and input Anonymize, Regex, and Secrets scanners; the S1 shard has live email/secret redaction evidence.',
@@ -325,8 +325,8 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'The content-guardrail port calls the authenticated S1 aggregator, normalizes the real verdict and sanitized prompt, and blocks when the required PII shard cannot answer.',
           'yes',
           'Guardrails Overview, Protections, Masking, Recognizers, Thresholds, and Test expose prompt protection and a live scan action.',
-          'no',
-          'The retained live proof calls the guard aggregator directly; no flagship governed run retains the pre-model redaction result and downstream inference correlation.',
+          'yes',
+          'Fleet-proven live: governed agent run run_b542fcf7 (org_bharat) redacted the raw PAN/email BEFORE the model (pre-guard pii:redacted + guardrail-rules masked "My PAN is ABCDE1234F"→"****"), then the model answered only from the redacted input — the pre-model redaction + downstream inference are retained together on the signed run. (This path 500-crashed at persist until the guardrail NUL-sentinel fix — the reason durable redacting runs never completed.)',
         ],
       ],
       [
