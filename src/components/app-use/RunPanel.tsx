@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { AppSurface } from '@/lib/app-surface';
@@ -174,12 +174,12 @@ function SendReportCard({ surface }: Readonly<{ surface: AppSurface }>) {
     <Card className="h-fit shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-sm">
-          <EnvelopeSimple className="size-4 text-primary" weight="duotone" />
-          Send report now
+          <EnvelopeSimple size={16} className="shrink-0 text-primary" weight="duotone" />
+          <span>Send report now</span>
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
+        <CardDescription className="text-xs">
           Email this cockpit as a governed report. It also goes out weekly on Monday 9:00 IST.
-        </p>
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
