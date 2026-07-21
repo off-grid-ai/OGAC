@@ -72,27 +72,43 @@ test('non-conformant with no model anywhere → env fallback model', () => {
 });
 
 // ─── pickJudgeGateway (seed target selection) ───────────────────────────────────────────────────
-test('pickJudgeGateway: prefers an enabled gateway that already has a defaultModel', () => {
+test('pickJudgeGateway: prefers an enabled on-prem gateway that already has a defaultModel', () => {
   const g = pickJudgeGateway([
-    { id: 'a', defaultModel: '', enabled: true },
-    { id: 'b', defaultModel: 'gemma-4-e4b', enabled: true },
-    { id: 'c', defaultModel: 'x', enabled: false },
+    { id: 'a', defaultModel: '', enabled: true, egressClass: 'on-prem' },
+    { id: 'b', defaultModel: 'gemma-4-e4b', enabled: true, egressClass: 'on-prem' },
+    { id: 'c', defaultModel: 'x', enabled: false, egressClass: 'on-prem' },
   ]);
   assert.equal(g?.id, 'b');
 });
 
+test('pickJudgeGateway: prefers on-prem over a cloud gateway even when only cloud has a model', () => {
+  const g = pickJudgeGateway([
+    { id: 'cloud', defaultModel: 'claude-3-5-haiku-latest', enabled: true, egressClass: 'cloud' },
+    { id: 'local', defaultModel: '', enabled: true, egressClass: 'on-prem' },
+  ]);
+  assert.equal(g?.id, 'local'); // judge must not silently egress when a local gateway exists
+});
+
+test('pickJudgeGateway: uses a cloud gateway with a model only when no on-prem exists', () => {
+  const g = pickJudgeGateway([
+    { id: 'c1', defaultModel: '', enabled: true, egressClass: 'cloud' },
+    { id: 'c2', defaultModel: 'claude-3-5-haiku-latest', enabled: true, egressClass: 'cloud' },
+  ]);
+  assert.equal(g?.id, 'c2');
+});
+
 test('pickJudgeGateway: falls back to any enabled gateway when none advertise a model', () => {
   const g = pickJudgeGateway([
-    { id: 'a', defaultModel: 'x', enabled: false },
-    { id: 'b', defaultModel: '', enabled: true },
+    { id: 'a', defaultModel: 'x', enabled: false, egressClass: 'cloud' },
+    { id: 'b', defaultModel: '', enabled: true, egressClass: 'cloud' },
   ]);
   assert.equal(g?.id, 'b');
 });
 
 test('pickJudgeGateway: falls back to the first gateway when none are enabled', () => {
   const g = pickJudgeGateway([
-    { id: 'a', defaultModel: '', enabled: false },
-    { id: 'b', defaultModel: '', enabled: false },
+    { id: 'a', defaultModel: '', enabled: false, egressClass: 'cloud' },
+    { id: 'b', defaultModel: '', enabled: false, egressClass: 'on-prem' },
   ]);
   assert.equal(g?.id, 'a');
 });

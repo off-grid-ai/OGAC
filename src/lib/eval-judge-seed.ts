@@ -12,7 +12,7 @@ import {
   resolveJudgeRouting,
 } from '@/lib/eval-judge';
 import { listGatewayRows } from '@/lib/gateways';
-import { createPipeline } from '@/lib/pipelines';
+import { createPipeline, updatePipeline } from '@/lib/pipelines';
 import { createCustomAgent, getCustomAgent } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
@@ -39,7 +39,12 @@ export interface JudgeSeedResult {
 export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<JudgeSeedResult> {
   const gateways = await listGatewayRows(orgId);
   const gateway = pickJudgeGateway(
-    gateways.map((g) => ({ id: g.id, defaultModel: g.defaultModel, enabled: g.enabled })),
+    gateways.map((g) => ({
+      id: g.id,
+      defaultModel: g.defaultModel,
+      enabled: g.enabled,
+      egressClass: g.egressClass,
+    })),
   );
 
   if (!gateway) {
@@ -55,7 +60,11 @@ export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<Judg
   }
 
   // Pipeline: bound to the gateway, model inherited from the gateway's defaultModel (single source).
-  const pipeline = await createPipeline(
+  // createPipeline is onConflictDoNothing by stable id, so on a re-seed it returns the EXISTING row
+  // (possibly bound to a now-less-preferred gateway, e.g. cloud before an on-prem was added). Rebind
+  // the pipeline whenever the preferred gateway/model has drifted so re-seeding actually re-governs.
+  const desiredModel = gateway.defaultModel || null;
+  let pipeline = await createPipeline(
     {
       id: AI_QUALITY_JUDGE_PIPELINE_ID,
       name: 'AI Quality Judge',
@@ -63,13 +72,22 @@ export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<Judg
         'System pipeline fronting the AI-quality judge (evals, online QA scoring, RAG metrics). ' +
         'Routes judge calls through the governed gateway — the invariant applies to internal services too.',
       gatewayId: gateway.id,
-      defaultModel: gateway.defaultModel || null,
+      defaultModel: desiredModel,
       visibility: 'private',
       status: 'published',
     },
     'system',
     orgId,
   );
+  if (pipeline.gatewayId !== gateway.id || pipeline.defaultModel !== desiredModel) {
+    pipeline =
+      (await updatePipeline(
+        AI_QUALITY_JUDGE_PIPELINE_ID,
+        { gatewayId: gateway.id, defaultModel: desiredModel },
+        orgId,
+        'system',
+      )) ?? pipeline;
+  }
 
   // Agent: bound to the pipeline. Only create when absent (createCustomAgent is not upsert).
   let agent = await getCustomAgent(AI_QUALITY_JUDGE_AGENT_ID, orgId);

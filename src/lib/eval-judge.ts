@@ -82,19 +82,30 @@ export interface GatewayChoice {
   id: string;
   defaultModel: string | null;
   enabled: boolean;
+  /** 'on-prem' ⇒ data stays local; 'cloud' ⇒ egresses. The judge prefers on-prem. */
+  egressClass: string;
 }
 
 /**
- * Pick the gateway to bind the seeded judge pipeline to. PURE. Prefers an enabled gateway that
- * already advertises a defaultModel (so the chain resolves a real model), then any enabled gateway,
- * then the first of whatever exists. Returns null when the org has no gateway to seed against — the
- * caller then leaves the judge chain unseeded (honest bootstrap fallback) rather than binding to a
- * dead gateway.
+ * Pick the gateway to bind the seeded judge pipeline to. PURE. The AI-quality judge sees real
+ * production I/O (prompts + outputs + sources), so on a private deployment it must NOT silently
+ * egress to a cloud model when a local one exists. Preference order, most-preferred first:
+ *   1. enabled + on-prem + advertises a model  (governed AND local AND resolvable)
+ *   2. enabled + on-prem                        (local, model inherited later)
+ *   3. enabled + advertises a model             (cloud fallback only when no local gateway)
+ *   4. enabled
+ *   5. the first gateway that exists
+ * Returns null when the org has no gateway — the caller keeps the honest bootstrap fallback rather
+ * than binding the judge to a dead gateway.
  */
 export function pickJudgeGateway(gateways: GatewayChoice[]): GatewayChoice | null {
   if (gateways.length === 0) return null;
+  const onPrem = (g: GatewayChoice) => g.egressClass === 'on-prem';
+  const hasModel = (g: GatewayChoice) => !!g.defaultModel?.trim();
   return (
-    gateways.find((g) => g.enabled && !!g.defaultModel?.trim()) ??
+    gateways.find((g) => g.enabled && onPrem(g) && hasModel(g)) ??
+    gateways.find((g) => g.enabled && onPrem(g)) ??
+    gateways.find((g) => g.enabled && hasModel(g)) ??
     gateways.find((g) => g.enabled) ??
     gateways[0]
   );

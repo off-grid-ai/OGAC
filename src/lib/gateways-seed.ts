@@ -25,7 +25,10 @@ export const SAMPLE_GATEWAYS: readonly SampleGatewaySpec[] = [
     name: 'On-Prem Cluster',
     kind: 'on-prem',
     baseUrl: '', // the aggregator — reached via GATEWAY_URL, not a stored URL
-    defaultModel: '',
+    // The default model the on-prem aggregator serves. A gateway must advertise a default so the
+    // hierarchy (pipeline.defaultModel ?? gateway.defaultModel) always resolves a real, local model —
+    // e.g. the AI-quality judge pipeline inherits this rather than egressing to a cloud gateway.
+    defaultModel: 'gemma-4-e4b',
   },
   {
     key: 'openai',
