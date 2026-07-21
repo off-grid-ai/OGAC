@@ -37,3 +37,47 @@ export function userDisplayName(u: {
 export function userSubtitle(u: { email?: string; username?: string; id: string }): string {
   return u.email || u.username || u.id;
 }
+
+// ── User edit (identity) ─────────────────────────────────────────────────────────
+// The editable identity fields the console exposes on the user detail page. `username` is NOT
+// editable here — it is the login handle (and, in this realm, the email), changed only by recreating
+// the user. `enabled` is toggled by the disable/enable action, which reuses the same PATCH route.
+export interface UserEditInput {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  emailVerified?: boolean;
+  enabled?: boolean;
+}
+
+// A permissive email shape check — enough to catch a fat-fingered address before it reaches
+// Keycloak, without pretending to be RFC 5322. Keycloak enforces its own policy on top.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Validate + normalize an edit into the minimal Keycloak user patch to PUT. Only provided fields are
+// included (so a partial edit never clears untouched fields). Trims strings; an empty first/last
+// name is allowed (clears the field) but an empty/invalid email is rejected. Returns { error } on a
+// bad value so the route + form stay thin. Pure — unit-testable, zero-IO.
+export function validateUserEdit(
+  input: UserEditInput,
+): { patch: UserEditInput } | { error: string } {
+  const patch: UserEditInput = {};
+  if (input.firstName !== undefined) patch.firstName = input.firstName.trim();
+  if (input.lastName !== undefined) patch.lastName = input.lastName.trim();
+  if (input.email !== undefined) {
+    const email = input.email.trim();
+    if (!email) return { error: 'email cannot be empty' };
+    if (!EMAIL_RE.test(email)) return { error: 'email is not a valid address' };
+    patch.email = email;
+  }
+  if (input.emailVerified !== undefined) {
+    if (typeof input.emailVerified !== 'boolean') return { error: 'emailVerified must be a boolean' };
+    patch.emailVerified = input.emailVerified;
+  }
+  if (input.enabled !== undefined) {
+    if (typeof input.enabled !== 'boolean') return { error: 'enabled must be a boolean' };
+    patch.enabled = input.enabled;
+  }
+  if (Object.keys(patch).length === 0) return { error: 'no fields to update' };
+  return { patch };
+}
