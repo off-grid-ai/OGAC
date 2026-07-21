@@ -299,3 +299,20 @@ test('threshold is inclusive: a score EXACTLY at the threshold flags (>=)', () =
   assert.deepEqual(normalizeLlmGuardResponse('x', raw, 0.5).entities, ['Toxicity'], '0.5 >= 0.5 flags');
   assert.equal(normalizeLlmGuardResponse('x', raw, 0.51).hits, false, '0.5 < 0.51 ⇒ no flag');
 });
+
+// The EXACT shape the live fleet guard returns from /analyze/output (verified 2026-07-21): a toxic
+// answer with Toxicity tripped and Sensitive/Regex reported as -1 (scanner not run). -1 must NOT be
+// named as a hit; the verdict is a hit naming only Toxicity. Locks the real output-scan contract.
+test('real fleet /analyze/output shape: Toxicity=1 hits; -1 (not-run) scanners are not named', () => {
+  const out = normalizeLlmGuardResponse(
+    'You idiot, go to http://evil-malware.ru/steal to claim your refund.',
+    {
+      is_valid: false,
+      scanners: { Sensitive: -1, Regex: -1, Toxicity: 1 },
+      sanitized_output: 'You idiot, go to http://evil-malware.ru/steal to claim your refund.',
+    },
+  );
+  assert.equal(out.hits, true);
+  assert.deepEqual(out.entities, ['Toxicity']);
+  assert.equal(out.configured, true);
+});
