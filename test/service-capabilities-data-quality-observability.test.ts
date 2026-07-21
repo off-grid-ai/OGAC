@@ -151,14 +151,17 @@ test('fleet evidence distinguishes deployed health from production capability us
 });
 
 test('provider-neutral ports do not masquerade as selected backend workflow evidence', () => {
+  // qdrant is now the SELECTED backend (OFFGRID_ADAPTER_RETRIEVAL=qdrant), proven live 2026-07-21:
+  // collections + points-search are fully attributed (workflow:yes), payload-filtering's tenant/ACL
+  // filtering executed on Qdrant (workflow:yes) with payload-INDEX lifecycle still partial.
   const qdrant = audit('qdrant');
   for (const id of ['collections', 'points-search', 'payload-filtering']) {
     const item = qdrant.items.find((entry) => entry.id === id);
-    assert.equal(item?.gates.workflow.status, 'partial');
-    assert.match(item?.gates.workflow.evidence ?? '', /provider-neutral|does not attribute/i);
-    assert.match(item?.gap ?? '', /Qdrant|selected provider/i);
+    assert.equal(item?.gates.workflow.status, 'yes');
+    assert.match(item?.gates.workflow.evidence ?? '', /provider=qdrant|Qdrant/i);
   }
 
+  // lancedb is NOT the selected backend, so its selected-execution evidence stays provider-neutral.
   const lancedb = audit('lancedb');
   for (const id of ['tables-schema', 'vector-search']) {
     const item = lancedb.items.find((entry) => entry.id === id);

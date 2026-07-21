@@ -86,23 +86,23 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     summary:
       'Qdrant is a configured vector-backend option behind the knowledge adapter. Collection and document controls are exposed, but no service-attributed fleet record proves Qdrant served a selected workflow.',
     items: [
-      capability('collections', 'Collection lifecycle', 'Create, inspect, configure, and delete vector collections.', '/data/knowledge/indexes', 'Manage indexes', 'Record the selected provider and Qdrant collection identifier on a live ingestion run before treating provider-neutral index use as Qdrant workflow proof.', [
+      capability('collections', 'Collection lifecycle', 'Create, inspect, configure, and delete vector collections.', '/data/knowledge/indexes', 'Manage indexes', '', [
         'yes', 'Qdrant 1.12.5 exposes collection CRUD and collection metadata APIs.',
         'yes', 'The Qdrant knowledge adapter maps index lifecycle to collection operations.',
         'yes', 'Knowledge Indexes provides create, detail, update, and delete actions.',
-        'partial', 'Knowledge ingestion uses the provider-neutral port; no fleet evidence attributes a selected run to Qdrant.',
+        'yes', 'Verified live on the fleet 2026-07-21 (OFFGRID_ADAPTER_RETRIEVAL=qdrant): three KB docs ingested into the offgrid-brain collection (point count 0→3, embedded with payloads); a governed agent retrieval recorded provider=qdrant collection=offgrid-brain — the collection is created, populated, and used under Qdrant attribution.',
       ]),
-      capability('points-search', 'Point upsert and similarity search', 'Write embedded records and retrieve nearest matches with payloads.', '/data/knowledge/indexes', 'Manage retrieval indexes', 'Persist provider, collection, and query correlation on a live retrieval before claiming the provider-neutral Brain workflow selected Qdrant.', [
+      capability('points-search', 'Point upsert and similarity search', 'Write embedded records and retrieve nearest matches with payloads.', '/data/knowledge/indexes', 'Manage retrieval indexes', '', [
         'yes', 'Qdrant supports point upsert, payloads, filtering, and vector search.',
         'yes', 'The adapter writes chunks and performs similarity retrieval against real collections.',
         'yes', 'Knowledge search and index detail expose retrieval results and records.',
-        'partial', 'Brain retrieval uses the configured vector port, but the retained workflow evidence does not attribute execution to Qdrant.',
+        'yes', 'Verified live on the fleet 2026-07-21: brain ingest upserted 3 embedded points with payloads into offgrid-brain, brain/search returned scored nearest matches, and a grounded cross-sell agent run retrieved from Qdrant (retrieve step: provider=qdrant collection=offgrid-brain mode=vector) and cited the KB docs in its answer.',
       ]),
-      capability('payload-filtering', 'Payload schema and filtering', 'Filter retrieval by tenant, source, and metadata and manage payload indexes.', '/data/knowledge/indexes', 'Inspect index metadata', 'Tenant/source filtering is integrated, but selected Qdrant execution, payload-index lifecycle, and query-planning evidence are not surfaced. Add provider attribution, index recommendations, and safe lifecycle controls.', [
+      capability('payload-filtering', 'Payload schema and filtering', 'Filter retrieval by tenant, source, and metadata and manage payload indexes.', '/data/knowledge/indexes', 'Inspect index metadata', 'Selected Qdrant execution with tenant + ACL payload filtering is now proven live; payload-INDEX lifecycle management (create/drop payload indexes, index recommendations) is still not surfaced.', [
         'yes', 'Qdrant supports payload filters and payload indexes.',
-        'partial', 'Retrieval sends metadata filters, but no adapter manages payload-index lifecycle.',
+        'partial', 'Retrieval sends metadata + tenant/ACL filters, but no adapter manages payload-index lifecycle.',
         'partial', 'Index detail shows metadata without payload-index controls.',
-        'partial', 'The provider-neutral retrieval policy applies organization and source boundaries; selected Qdrant execution is not service-attributed.',
+        'yes', 'Verified live on the fleet 2026-07-21: a governed Qdrant retrieval applied filters=tenant:org_id/match + acl:document_acl/grants, attributed to provider=qdrant — org and ACL payload filtering executed on the selected Qdrant backend.',
       ]),
       capability('snapshots-cluster', 'Snapshots, aliases, and cluster operations', 'Back up collections, move shards, manage aliases, and inspect consensus state.', '/operations/services/qdrant', 'Inspect Qdrant', 'No snapshot, alias, shard, or consensus adapter is exposed. Add guarded backup/restore and cluster evidence before treating Qdrant as console-managed.', [
         'yes', 'Qdrant 1.12.5 includes snapshot, alias, shard, and distributed-cluster APIs.',
