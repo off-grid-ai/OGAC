@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { evalEngineLabel } from '@/lib/eval-engine-label';
 import { getEvalRun } from '@/lib/evals';
+import { describeRagasAttribution } from '@/lib/ragas-run';
 import { isRunnableEngine } from '@/lib/evals-golden';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
@@ -76,6 +77,8 @@ export default async function QualityExecutionDetailPage({
           )}
         </Metric>
       </div>
+
+      {run.attribution ? <EngineAttribution attribution={run.attribution} /> : null}
 
       <Card>
         <CardHeader>
@@ -150,5 +153,87 @@ function Metric({ label, children }: Readonly<{ label: string; children: React.R
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
+  );
+}
+
+// The retained engine-attribution card — proves HOW an engine-scored run (e.g. Ragas) was produced:
+// the engine + version, the governed judge chain (agent→pipeline→gateway→model), and exactly which
+// metrics the engine returned vs omitted. Renders only for runs that carry an attribution blob.
+function EngineAttribution({
+  attribution,
+}: Readonly<{ attribution: Record<string, unknown> }>) {
+  const v = describeRagasAttribution(attribution);
+  if (!v) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-sm">Engine attribution</CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge variant={v.engineProven ? 'default' : 'destructive'}>
+              {v.engineProven ? 'Engine path proven' : 'Engine path unproven'}
+            </Badge>
+            {v.degraded ? <Badge variant="outline">Degraded</Badge> : null}
+            <Badge variant={v.judgeConformant ? 'default' : 'destructive'}>
+              {v.judgeConformant ? 'Governed judge' : 'Bootstrap judge'}
+            </Badge>
+          </div>
+        </div>
+        {v.note ? <p className="text-xs text-muted-foreground">{v.note}</p> : null}
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <AttrField label="Engine" value={`${v.engine} ${v.ragasVersion}`} />
+          <AttrField label="Sidecar" value={v.sidecarService} />
+          <AttrField label="Judge model" value={v.judgeModel} />
+          <AttrField label="Gateway" value={v.gatewayId ?? '—'} />
+          <AttrField label="Judge agent" value={v.agentId ?? '—'} />
+          <AttrField label="Judge pipeline" value={v.pipelineId ?? '—'} />
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Metrics returned
+          </p>
+          {v.metrics.length === 0 ? (
+            <p className="text-xs text-muted-foreground">The engine returned no metric scores.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {v.metrics.map((m) => (
+                <div
+                  key={m.name}
+                  className="flex items-center justify-between rounded-md border px-3 py-2"
+                >
+                  <span className="font-mono text-xs">{m.name}</span>
+                  <span className="font-mono text-sm font-medium">{m.pct}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {v.omitted.length > 0 ? (
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Metrics omitted (engine could not compute)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {v.omitted.map((m) => (
+                <Badge key={m} variant="outline" className="font-mono">
+                  {m}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AttrField({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 break-all font-mono text-xs">{value}</p>
+    </div>
   );
 }

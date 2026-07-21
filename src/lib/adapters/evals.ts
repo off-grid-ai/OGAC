@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { searchDocuments } from '@/lib/brain';
+import type { JudgeRouting } from '@/lib/eval-judge';
 import { capEvalSamples } from '@/lib/eval-sampling';
 import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
+import { RAGAS_METRIC_SET, summarizeRagasRun } from '@/lib/ragas-run';
 import { listGoldenCases, runEval } from '@/lib/evals';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
@@ -204,11 +206,21 @@ interface RagasSample {
   ground_truth: string;
 }
 
-// Generate an answer for one query, grounded in the retrieved contexts, through the gateway.
-function ragasScore(faithfulness: number | undefined, passed: number, total: number): number {
-  if (faithfulness !== undefined) return Math.round(faithfulness * 100);
-  if (total) return Math.round((passed / total) * 100);
-  return 0;
+// The pinned Ragas library version the sidecar runs (deploy/onprem/ragas-sidecar/requirements.txt).
+// Recorded in every run's attribution so a retained result names the engine version that produced it.
+const RAGAS_VERSION = '0.2.6';
+
+// Best-effort read of the sidecar's service identity from /health so the attribution names the real
+// service that scored the run (falls back to the canonical id if health is unreachable mid-run).
+async function ragasSidecarService(): Promise<string> {
+  try {
+    const res = await fetch(`${RAGAS_URL}/health`, { signal: AbortSignal.timeout(2500) });
+    if (!res.ok) return 'ragas-sidecar';
+    const data = (await res.json()) as { service?: string };
+    return typeof data.service === 'string' && data.service ? data.service : 'ragas-sidecar';
+  } catch {
+    return 'ragas-sidecar';
+  }
 }
 
 async function generateAnswer(question: string, contexts: string[], model: string): Promise<string> {
@@ -250,27 +262,46 @@ async function buildDataset(model: string): Promise<RagasSample[]> {
   return samples;
 }
 
-async function runRagas(model: string): Promise<EvalRunResult> {
-  const dataset = await buildDataset(model);
+async function runRagas(judge: JudgeRouting): Promise<EvalRunResult> {
+  const dataset = await buildDataset(judge.model);
   const res = await fetch(`${RAGAS_URL}/evaluate`, {
     method: 'POST',
     headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
-    body: JSON.stringify({ model, gateway: `${GATEWAY_URL}/v1`, dataset }),
+    // Request the FULL canonical metric set so the sidecar scores each one; any it cannot compute is
+    // omitted from the response and surfaced as a degraded metric in the attribution below.
+    body: JSON.stringify({
+      model: judge.model,
+      gateway: `${GATEWAY_URL}/v1`,
+      dataset,
+      metrics: [...RAGAS_METRIC_SET],
+    }),
     signal: AbortSignal.timeout(180_000),
   });
   if (!res.ok) throw new Error('ragas sidecar error');
   const data = (await res.json()) as RagasResponse;
   const total = data.total ?? dataset.length;
   const passed = data.passed ?? 0;
-  const faithfulness = data.metrics?.faithfulness;
+  const sidecarService = await ragasSidecarService();
+  // PURE summarizer decides the score + full attribution (requested vs returned, omitted, judge
+  // routing, engineProven/degraded). A reachable sidecar that omits metrics returns a DEGRADED but
+  // attributed result — it is never silently masked as a golden run.
+  const summary = summarizeRagasRun({
+    requested: RAGAS_METRIC_SET,
+    metrics: data.metrics ?? {},
+    judge,
+    sidecarService,
+    ragasVersion: RAGAS_VERSION,
+    passed,
+    total,
+  });
   return {
     id: `ragas_${Date.now().toString(36)}`,
     engine: 'ragas',
-    score: ragasScore(faithfulness, passed, total),
+    score: summary.score,
     total,
     passed,
     startedAt: iso(),
-    detail: { metrics: data.metrics },
+    detail: { ...summary.attribution, faithfulness: summary.faithfulness },
   };
 }
 
@@ -291,7 +322,7 @@ export const ragasEvals: EvalsPort = {
       // GOVERNING INVARIANT: resolve the judge model through the judge agent→pipeline→gateway, never
       // a pinned env model. The sidecar (and answer-generation) use whatever the hierarchy resolves.
       const judge = await loadJudgeRouting(orgId ?? DEFAULT_ORG);
-      return await runRagas(judge.model);
+      return await runRagas(judge);
     } catch {
       return goldenEvals.run(orgId);
     }

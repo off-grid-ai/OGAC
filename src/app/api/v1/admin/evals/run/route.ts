@@ -41,6 +41,9 @@ export async function POST(req: Request) {
         score: result.score,
         total: result.total,
         passed: result.passed,
+        // Persist the engine attribution (Ragas records version + judge routing + returned/omitted
+        // metrics in detail) so the retained run proves HOW it was produced, not just its score.
+        attribution: result.detail ?? null,
       },
       orgId,
     );

@@ -45,6 +45,9 @@ export interface EvalRun {
   results?: EvalResult[];
   // PA-12 — the pipeline this run executed in the context of (null = an org-wide/library run).
   pipelineId: string | null;
+  // Engine attribution (how the run was produced) — present for engine-attributed runs (e.g. Ragas
+  // records its version, the governed judge routing, and returned-vs-omitted metrics). null = none.
+  attribution?: Record<string, unknown> | null;
 }
 
 function iso(v: Date | string): string {
@@ -85,6 +88,10 @@ export async function ensureEvalsSchema(): Promise<void> {
     await db.execute(
       sql`CREATE INDEX IF NOT EXISTS eval_runs_pipeline_idx ON eval_runs (pipeline_id);`,
     );
+    // Engine attribution — the retained, service-attributed record of HOW a run was produced (which
+    // engine + version, the governed judge routing, which metrics returned vs were omitted). Lets a
+    // persisted Ragas run prove the engine path rather than merely asserting an aggregate score.
+    await db.execute(sql`ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS attribution jsonb;`);
     // Pipeline-owns-governance: a golden case belongs to a pipeline (app). Self-migrate app_id/org_id
     // (same idempotent pattern) so the raw INSERT/SELECT never references a missing column.
     await db.execute(sql`ALTER TABLE golden_cases ADD COLUMN IF NOT EXISTS app_id text;`);
@@ -246,6 +253,7 @@ interface EvalRunRow {
   started_at: Date | string;
   results: EvalResult[] | null;
   pipeline_id: string | null;
+  attribution: Record<string, unknown> | null;
   [k: string]: unknown;
 }
 
@@ -259,6 +267,7 @@ function toEvalRun(r: EvalRunRow): EvalRun {
     startedAt: iso(r.started_at),
     results: r.results ?? undefined,
     pipelineId: r.pipeline_id ?? null,
+    attribution: r.attribution ?? null,
   };
 }
 
@@ -279,7 +288,7 @@ export async function listEvalRuns(
   if (pipelineId === null) pipelineWhere = sql` AND pipeline_id IS NULL`;
   else if (pipelineId !== undefined) pipelineWhere = sql` AND pipeline_id = ${pipelineId}`;
   const { rows } = await db.execute<EvalRunRow>(
-    sql`SELECT id, engine, score, total, passed, started_at, results, pipeline_id
+    sql`SELECT id, engine, score, total, passed, started_at, results, pipeline_id, attribution
         FROM eval_runs WHERE org_id = ${orgId}${pipelineWhere} ORDER BY started_at DESC LIMIT ${limit};`,
   );
   return rows.map(toEvalRun);
@@ -290,7 +299,7 @@ export async function listEvalRuns(
 export async function getEvalRun(id: string, orgId: string = DEFAULT_ORG): Promise<EvalRun | null> {
   await ensureEvalsSchema();
   const { rows } = await db.execute<EvalRunRow>(
-    sql`SELECT id, engine, score, total, passed, started_at, results, pipeline_id
+    sql`SELECT id, engine, score, total, passed, started_at, results, pipeline_id, attribution
         FROM eval_runs WHERE id = ${id} AND org_id = ${orgId} LIMIT 1;`,
   );
   return rows[0] ? toEvalRun(rows[0]) : null;
@@ -310,15 +319,19 @@ export async function recordEvalRun(
     // Omitted/null ⇒ an org-wide/library run (unchanged). Trimmed to null so an empty string never
     // becomes a bogus pipeline id.
     pipelineId?: string | null;
+    // Engine attribution (how the run was produced) — Ragas records its version + judge routing +
+    // returned/omitted metrics here so the retained row proves the engine path. Omitted ⇒ null.
+    attribution?: Record<string, unknown> | null;
   },
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
   await ensureEvalsSchema();
   const results = run.results ? JSON.stringify(run.results) : null;
   const pipelineId = (run.pipelineId ?? '').trim() || null;
+  const attribution = run.attribution ? JSON.stringify(run.attribution) : null;
   await db.execute(
-    sql`INSERT INTO eval_runs (id, org_id, pipeline_id, engine, score, total, passed, results)
-        VALUES (${run.id}, ${orgId}, ${pipelineId}, ${run.engine}, ${run.score}, ${run.total}, ${run.passed}, ${results}::jsonb);`,
+    sql`INSERT INTO eval_runs (id, org_id, pipeline_id, engine, score, total, passed, results, attribution)
+        VALUES (${run.id}, ${orgId}, ${pipelineId}, ${run.engine}, ${run.score}, ${run.total}, ${run.passed}, ${results}::jsonb, ${attribution}::jsonb);`,
   );
 }
 
