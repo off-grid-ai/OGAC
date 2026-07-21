@@ -264,35 +264,57 @@ async function buildDataset(model: string): Promise<RagasSample[]> {
   return samples;
 }
 
+// Score ONE ragas metric over the dataset. Kept to a single-metric /evaluate call because the
+// sidecar computes synchronously and only sends response headers once the WHOLE call finishes — a
+// 5-metric call on slow on-prem models exceeds Node/undici's default ~300s headers timeout
+// (UND_ERR_HEADERS_TIMEOUT) even though every metric succeeds. One metric per call returns in
+// ~1–2 min, well inside that budget, and gives per-metric resilience (a slow/failed metric is
+// omitted, never dropping the whole run to the golden fallback). Returns the metric's score, or
+// null when the sidecar omitted/failed it.
+async function scoreOneMetric(
+  metric: string,
+  model: string,
+  dataset: RagasSample[],
+): Promise<number | null> {
+  try {
+    const res = await fetch(`${RAGAS_URL}/evaluate`, {
+      method: 'POST',
+      headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
+      body: JSON.stringify({ model, gateway: `${GATEWAY_URL}/v1`, dataset, metrics: [metric] }),
+      signal: AbortSignal.timeout(Number(process.env.OFFGRID_RAGAS_CLIENT_TIMEOUT_MS ?? '280000')),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as RagasResponse;
+    const v = data.metrics?.[metric];
+    return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  } catch (e) {
+    const err = e as Error & { cause?: { code?: string } };
+    console.error(
+      `[evals] ragas metric ${metric} omitted: ${err?.message ?? e}` +
+        (err?.cause?.code ? ` (${err.cause.code})` : ''),
+    );
+    return null;
+  }
+}
+
 async function runRagas(judge: JudgeRouting): Promise<EvalRunResult> {
   const dataset = await buildDataset(judge.model);
-  const res = await fetch(`${RAGAS_URL}/evaluate`, {
-    method: 'POST',
-    headers: await gatewayHeadersAsync({ 'content-type': 'application/json' }),
-    // Request the FULL canonical metric set so the sidecar scores each one; any it cannot compute is
-    // omitted from the response and surfaced as a degraded metric in the attribution below.
-    body: JSON.stringify({
-      model: judge.model,
-      gateway: `${GATEWAY_URL}/v1`,
-      dataset,
-      metrics: [...RAGAS_METRIC_SET],
-    }),
-    // A real ragas metric is a chain of gateway LLM calls; on slow on-prem models a multi-metric run
-    // legitimately runs for minutes. The sidecar raises ragas' own executor timeout in step, so the
-    // client must wait rather than abort mid-run and fall back. Env-tunable for faster fleets.
-    signal: AbortSignal.timeout(Number(process.env.OFFGRID_RAGAS_CLIENT_TIMEOUT_MS ?? '900000')),
-  });
-  if (!res.ok) throw new Error('ragas sidecar error');
-  const data = (await res.json()) as RagasResponse;
-  const total = data.total ?? dataset.length;
-  const passed = data.passed ?? 0;
   const sidecarService = await ragasSidecarService();
+  // Score each metric in its own call; merge the ones that came back. Sequential so a small on-prem
+  // gateway isn't stampeded with concurrent judge chains.
+  const metrics: Record<string, number> = {};
+  for (const metric of RAGAS_METRIC_SET) {
+    const score = await scoreOneMetric(metric, judge.model, dataset);
+    if (score !== null) metrics[metric] = score;
+  }
+  const total = dataset.length;
+  const passed = 0; // the sidecar scores metrics, not pass/fail; ragasScore means the returned metrics
   // PURE summarizer decides the score + full attribution (requested vs returned, omitted, judge
   // routing, engineProven/degraded). A reachable sidecar that omits metrics returns a DEGRADED but
   // attributed result — it is never silently masked as a golden run.
   const summary = summarizeRagasRun({
     requested: RAGAS_METRIC_SET,
-    metrics: data.metrics ?? {},
+    metrics,
     judge,
     sidecarService,
     ragasVersion: RAGAS_VERSION,
