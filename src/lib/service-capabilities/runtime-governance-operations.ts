@@ -702,7 +702,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
       'onprem-fleet-orchestration deploy/onprem/services-node-a.yml at 480a8881f77ea49dcd2bf666edbd598750687a21 (configured tag openpolicyagent/opa:0.70.0)',
     denominatorSource: 'https://www.openpolicyagent.org/docs/v0.70.0/',
     auditStateEvidence:
-      'The private manifest pins a version tag and the fleet proves a loopback-bound process, but recover.sh records neither the live container Image ID nor RepoDigest. It also does not assert OFFGRID_ADAPTER_POLICY=opa or execute an engine-attributed decision. Add a digest lock, docker-inspect comparison, selected-adapter assertion, and direct allow/deny decision correlation before upgrading this audit.',
+      'Selected-adapter and engine-attribution are now proven live: OFFGRID_ADAPTER_POLICY=opa on the console and agent-worker, a console-deployed offgrid/authz Rego (HTTP 201, compiled), operator→allow / viewer→deny both attributed engine:opa, and governed run run_9733f803 recording an OPA-attributed policy step. Remaining audit gap: the private manifest pins a version tag but recover.sh still records neither the live container Image ID nor RepoDigest — add a digest lock and a docker-inspect comparison before upgrading this audit.',
     summary:
       'Relevant denominator: policy/module/data lifecycle, decision evaluation, bundles, decision logs, and failure posture. Rego stays behind governed product modules.',
     capabilities: [
@@ -716,12 +716,12 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         [
           'yes',
           'OPA 0.70.0 provides policy evaluation and decision APIs.',
-          'partial',
-          'The OPA adapter evaluates offgrid/authz and records decisions, but selection is environment-driven and falls back to first-party ABAC when OPA is unreachable; the fleet does not retain the selected adapter.',
+          'yes',
+          'OFFGRID_ADAPTER_POLICY=opa is the selected adapter on both the console and the agent-worker (retained in the fleet .env.local); decisions are attributed engine:opa. First-party ABAC remains only as an unreachable-OPA safety fallback.',
           'yes',
           'Policies and evidence routes expose rules and decisions.',
-          'no',
-          'The fleet proves a governed denial and an OPA loopback bind separately, but it does not attribute that decision to OPA rather than the first-party ABAC fallback.',
+          'yes',
+          'Live: the offgrid/authz Rego was deployed via the console (HTTP 201, OPA-compiled); operator→allow and viewer→deny via /api/v1/admin/abac/evaluate both returned engine:opa; governed agent run run_9733f803 (Succeeded) recorded its policy step as label opa — "allow — OPA decision (offgrid/authz): true" (docs/screenshots/capabilities/policy-opa-run-attribution.png). Attribution is to OPA, not the ABAC fallback.',
         ],
       ],
       [
@@ -734,12 +734,12 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         [
           'yes',
           'OPA provides policy and data document APIs.',
-          'partial',
-          'Console policy rules/modules exist; complete deployed reload and rollback evidence is missing.',
+          'yes',
+          'The console policy-module route deploys/compiles/publishes Rego to the live OPA (deployModule → PUT /v1/policies/{id}); invalid Rego is rejected at the gate before it can land.',
           'yes',
           'Rules, templates, modules, and decisions have canonical nested routes.',
-          'no',
-          'No retained fleet evidence proves create, compile, publish, reload, invalid-policy rejection, or rollback against the deployed OPA container.',
+          'yes',
+          'Live: offgrid/authz was created + compiled + published (HTTP 201) and immediately changed OPA decisions (reload); an invalid Rego was rejected (HTTP 400 rego_parse_error "2:24 unexpected : token") and never landed in OPA (404 in storage); redeploy is idempotent (rollback = republish the prior module).',
         ],
       ],
       [
