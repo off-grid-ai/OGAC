@@ -786,7 +786,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'yes',
           'Keys and connector forms expose product-owned secret operations.',
           'yes',
-          'A connector vault round-trip and five service-secret reads passed.',
+          'Full CRUD proven live through the console routes against the unsealed OpenBao 2.1.0 (KV v2): WRITE (201) → LIST (key present, value NEVER in the JSON) → UPDATE → version metadata shows v1+v2 → soft-DELETE (v2 deletionTime set, v1 retained) — all tenant-scoped to org_bharat/ and recorded as secret.write rows in audit_events_v2. Screenshot: docs/screenshots/capabilities/secrets-lifecycle-keys.png.',
         ],
       ],
       [
