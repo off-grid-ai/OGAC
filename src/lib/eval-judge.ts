@@ -7,9 +7,16 @@
 // that pipeline's gateway (loaded by the I/O caller), decide the model to use and whether the call
 // is hierarchy-conformant. A fallback is only used when the judge chain is unseeded (bootstrap).
 
-/** Stable ids for the seeded system judge agent + pipeline (created per org). */
-export const AI_QUALITY_JUDGE_AGENT_ID = 'agent_system_ai_quality_judge';
-export const AI_QUALITY_JUDGE_PIPELINE_ID = 'pl_system_ai_quality_judge';
+// Stable, ORG-SCOPED ids for the seeded system judge agent + pipeline. The agents/pipelines tables
+// key on a GLOBAL id PK, so the judge entities must carry the org in their id (same convention as the
+// seeded gateways, e.g. gw_seed_org_bharat_onprem-cluster) — otherwise a second tenant collides with
+// the first tenant's row and the seed fails. PURE (string building only).
+export function judgeAgentId(orgId: string): string {
+  return `agent_system_ai_quality_judge__${orgId}`;
+}
+export function judgePipelineId(orgId: string): string {
+  return `pl_system_ai_quality_judge__${orgId}`;
+}
 
 export interface JudgeAgentLike {
   id: string;

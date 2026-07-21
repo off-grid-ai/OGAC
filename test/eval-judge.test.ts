@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pickJudgeGateway, resolveJudgeRouting } from '../src/lib/eval-judge.ts';
+import {
+  judgeAgentId,
+  judgePipelineId,
+  pickJudgeGateway,
+  resolveJudgeRouting,
+} from '../src/lib/eval-judge.ts';
 
 const agent = { id: 'agent_system_ai_quality_judge', pipelineId: 'pl_system_ai_quality_judge' };
 const pipeline = {
@@ -115,4 +120,11 @@ test('pickJudgeGateway: falls back to the first gateway when none are enabled', 
 
 test('pickJudgeGateway: returns null when the org has no gateway', () => {
   assert.equal(pickJudgeGateway([]), null);
+});
+
+// ─── org-scoped judge ids (multi-tenant: no cross-org PK collision) ─────────────────────────────
+test('judge ids embed the org so two tenants never collide on the global id PK', () => {
+  assert.equal(judgeAgentId('default'), 'agent_system_ai_quality_judge__default');
+  assert.equal(judgePipelineId('org_bharat'), 'pl_system_ai_quality_judge__org_bharat');
+  assert.notEqual(judgeAgentId('default'), judgeAgentId('org_bharat'));
 });

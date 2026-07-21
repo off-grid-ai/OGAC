@@ -5,11 +5,7 @@
 // invariant). Never throws: on any load failure it returns the pure resolver's non-conformant
 // bootstrap fallback so a missing seed degrades honestly rather than crashing an eval.
 
-import {
-  AI_QUALITY_JUDGE_AGENT_ID,
-  type JudgeRouting,
-  resolveJudgeRouting,
-} from '@/lib/eval-judge';
+import { judgeAgentId, type JudgeRouting, resolveJudgeRouting } from '@/lib/eval-judge';
 import { getGatewayRow } from '@/lib/gateways';
 import { getPipeline } from '@/lib/pipelines';
 import { getCustomAgent } from '@/lib/store';
@@ -21,7 +17,7 @@ function fallbackModel(): string {
 
 export async function loadJudgeRouting(orgId: string): Promise<JudgeRouting> {
   try {
-    const agent = (await getCustomAgent(AI_QUALITY_JUDGE_AGENT_ID, orgId)) ?? null;
+    const agent = (await getCustomAgent(judgeAgentId(orgId), orgId)) ?? null;
     const pipeline = agent?.pipelineId ? await getPipeline(agent.pipelineId, orgId) : null;
     const gateway = pipeline?.gatewayId ? await getGatewayRow(pipeline.gatewayId, orgId) : null;
     return resolveJudgeRouting({

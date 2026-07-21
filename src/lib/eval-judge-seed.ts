@@ -5,12 +5,7 @@
 // is onConflictDoNothing by stable id; the agent is only created when absent). Returns what it wired
 // so the caller/route can report whether the judge chain is now conformant.
 
-import {
-  AI_QUALITY_JUDGE_AGENT_ID,
-  AI_QUALITY_JUDGE_PIPELINE_ID,
-  pickJudgeGateway,
-  resolveJudgeRouting,
-} from '@/lib/eval-judge';
+import { judgeAgentId, judgePipelineId, pickJudgeGateway, resolveJudgeRouting } from '@/lib/eval-judge';
 import { listGatewayRows } from '@/lib/gateways';
 import { createPipeline, updatePipeline } from '@/lib/pipelines';
 import { createCustomAgent, getCustomAgent } from '@/lib/store';
@@ -37,6 +32,8 @@ export interface JudgeSeedResult {
  * keeps using the bootstrap fallback — an honest degrade, not a fake binding.
  */
 export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<JudgeSeedResult> {
+  const agentId = judgeAgentId(orgId);
+  const pipelineId = judgePipelineId(orgId);
   const gateways = await listGatewayRows(orgId);
   const gateway = pickJudgeGateway(
     gateways.map((g) => ({
@@ -51,8 +48,8 @@ export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<Judg
     return {
       seeded: false,
       conformant: false,
-      agentId: AI_QUALITY_JUDGE_AGENT_ID,
-      pipelineId: AI_QUALITY_JUDGE_PIPELINE_ID,
+      agentId: agentId,
+      pipelineId: pipelineId,
       gatewayId: null,
       model: '',
       attribution: 'no gateway for org — judge chain unseeded (bootstrap fallback in effect)',
@@ -66,7 +63,7 @@ export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<Judg
   const desiredModel = gateway.defaultModel || null;
   let pipeline = await createPipeline(
     {
-      id: AI_QUALITY_JUDGE_PIPELINE_ID,
+      id: pipelineId,
       name: 'AI Quality Judge',
       description:
         'System pipeline fronting the AI-quality judge (evals, online QA scoring, RAG metrics). ' +
@@ -82,7 +79,7 @@ export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<Judg
   if (pipeline.gatewayId !== gateway.id || pipeline.defaultModel !== desiredModel) {
     pipeline =
       (await updatePipeline(
-        AI_QUALITY_JUDGE_PIPELINE_ID,
+        pipelineId,
         { gatewayId: gateway.id, defaultModel: desiredModel },
         orgId,
         'system',
@@ -90,11 +87,11 @@ export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<Judg
   }
 
   // Agent: bound to the pipeline. Only create when absent (createCustomAgent is not upsert).
-  let agent = await getCustomAgent(AI_QUALITY_JUDGE_AGENT_ID, orgId);
+  let agent = await getCustomAgent(agentId, orgId);
   if (!agent) {
     agent = await createCustomAgent(
       {
-        id: AI_QUALITY_JUDGE_AGENT_ID,
+        id: agentId,
         name: 'AI Quality Judge',
         role: 'System',
         description: 'Scores AI outputs for quality and faithfulness. Fronts the eval/QA judge.',
@@ -117,8 +114,8 @@ export async function seedJudgeForOrg(orgId: string = DEFAULT_ORG): Promise<Judg
   return {
     seeded: true,
     conformant: routing.conformant,
-    agentId: routing.agentId ?? AI_QUALITY_JUDGE_AGENT_ID,
-    pipelineId: routing.pipelineId ?? AI_QUALITY_JUDGE_PIPELINE_ID,
+    agentId: routing.agentId ?? agentId,
+    pipelineId: routing.pipelineId ?? pipelineId,
     gatewayId: routing.gatewayId,
     model: routing.model,
     attribution: routing.attribution,
