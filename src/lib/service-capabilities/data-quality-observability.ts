@@ -125,11 +125,11 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     summary:
       'Marquez provides OpenLineage storage and graph read-back. The console exposes lineage exploration, while event ingestion and dataset ownership remain workflow-dependent.',
     items: [
-      capability('openlineage-events', 'OpenLineage event ingestion', 'Accept job, run, dataset, and facet events through the OpenLineage API.', '/data/lineage/graph', 'Open lineage graph', 'Event receipt is wired, but service-attributed production emission evidence is incomplete. Record run-event correlations and failed-delivery state.', [
+      capability('openlineage-events', 'OpenLineage event ingestion', 'Accept job, run, dataset, and facet events through the OpenLineage API.', '/data/lineage/graph', 'Open lineage graph', '', [
         'yes', 'Marquez 0.50.0 implements the OpenLineage event API.',
-        'yes', 'The lineage adapter can emit and query OpenLineage-compatible records.',
+        'yes', 'The lineage adapter emits paired START + COMPLETE run events carrying a NominalTimeRunFacet (run start/end) and a DocumentationJobFacet, plus per-dataset schema facets, and queries them back.',
         'yes', 'The lineage graph exposes recorded jobs, runs, and datasets.',
-        'partial', 'Some pipeline paths emit lineage, but the fleet record does not prove complete coverage across all production workflows.',
+        'yes', 'Verified live on the fleet 2026-07-21: a governed agent run emitted START+COMPLETE and Marquez recorded the run with startedAt/endedAt, durationMs=105171, and a nominalTime run facet (previously start/duration were null and facets empty).',
       ]),
       capability('graph-exploration', 'Dataset and job graph exploration', 'Navigate upstream and downstream dependencies and inspect node metadata.', '/data/lineage/graph', 'Explore lineage', '', [
         'yes', 'Marquez exposes datasets, jobs, runs, and lineage graph relationships.',
@@ -137,11 +137,11 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
         'yes', 'Data Lineage provides URL-driven graph and entity detail views.',
         'yes', 'Operators use the graph to investigate registered data flows.',
       ]),
-      capability('run-history-facets', 'Run history and facets', 'Inspect run state, timing, schema, ownership, and custom facets.', '/data/lineage/runs', 'Inspect lineage runs', 'Core run data is visible; add complete facet rendering and explicit unsupported-facet handling before claiming full OpenLineage fidelity.', [
+      capability('run-history-facets', 'Run history and facets', 'Inspect run state, timing, schema, ownership, and custom facets.', '/data/lineage/runs', 'Inspect lineage runs', 'Run state + real timing (start/end/duration) and the nominalTime run facet are now emitted and stored; a complete run-facet renderer (every custom facet, with explicit unsupported-facet handling) is still not exposed in the runs UI.', [
         'yes', 'Marquez stores run history and OpenLineage facets.',
-        'partial', 'The adapter reads core entities but does not normalize every upstream facet.',
-        'partial', 'Run and node views expose core metadata, not the full facet set.',
-        'partial', 'Operational investigation uses core run evidence; advanced facets are not part of a verified workflow.',
+        'yes', 'The adapter emits and reads run state, real timing, and run facets (NominalTimeRunFacet); dataset schema facets are normalized for display.',
+        'partial', 'Run and node views expose core run metadata and timing, but not a complete custom-facet renderer.',
+        'yes', 'Verified live on the fleet 2026-07-21: a governed agent run recorded COMPLETED state, startedAt/endedAt, durationMs=105171, and a nominalTime facet in Marquez run history.',
       ]),
       capability('namespaces-tags-ownership', 'Namespaces, tags, and ownership', 'Organize lineage entities and maintain searchable governance metadata.', '/data/lineage/graph', 'Inspect lineage metadata', 'The console does not provide full namespace, tag, or ownership CRUD. Add a governed metadata owner and reconcile changes with Marquez.', [
         'yes', 'Marquez supports namespaces, tags, and dataset/job metadata.',
