@@ -195,3 +195,49 @@ export async function safeRouterView(fetcher: Fetcher = fetch): Promise<LiteLLMR
 
   return { configured: true, live, deployments, budgets };
 }
+
+// ─── virtual-key lifecycle (management writes) ──────────────────────────────────────────────────
+// LiteLLM's DB-backed FinOps: create/update/delete/list virtual keys with per-key budget + rpm/tpm.
+// These POST to the /key/* management API with the master key. They THROW on failure so the route
+// surfaces a real error (unlike safeRouterView which is a never-throw read for a page).
+
+async function mgmt(path: string, body: unknown, fetcher: Fetcher = fetch): Promise<unknown> {
+  if (!BASE) throw new Error('LiteLLM not configured (OFFGRID_LITELLM_URL unset)');
+  const res = await fetcher(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`LiteLLM ${path} ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
+  }
+  return res.json().catch(() => ({}));
+}
+
+/** List virtual keys (raw rows for the pure shaper). Never throws → [] on any failure. */
+export async function listVirtualKeys(fetcher: Fetcher = fetch): Promise<unknown> {
+  if (!BASE) return [];
+  try {
+    // return_full_object gives budgets/limits per key; large deployments would paginate.
+    return await get(BASE, fetcher, '/key/list?return_full_object=true&size=100');
+  } catch {
+    return [];
+  }
+}
+
+/** Create a virtual key. Returns the raw response (contains the generated `key`). Throws on failure. */
+export function generateVirtualKey(body: Record<string, unknown>, fetcher: Fetcher = fetch): Promise<unknown> {
+  return mgmt('/key/generate', body, fetcher);
+}
+
+/** Update a virtual key's budget/limits. Throws on failure. */
+export function updateVirtualKey(body: Record<string, unknown>, fetcher: Fetcher = fetch): Promise<unknown> {
+  return mgmt('/key/update', body, fetcher);
+}
+
+/** Delete virtual keys by token. Throws on failure. */
+export function deleteVirtualKeys(keys: string[], fetcher: Fetcher = fetch): Promise<unknown> {
+  return mgmt('/key/delete', { keys }, fetcher);
+}

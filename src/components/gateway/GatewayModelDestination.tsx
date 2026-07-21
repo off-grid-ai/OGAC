@@ -4,13 +4,21 @@ import { GatewayLogs } from '@/components/gateway/GatewayLogs';
 import { GatewayOverview } from '@/components/gateway/GatewayOverview';
 import { GatewayProviders } from '@/components/gateway/GatewayProviders';
 import { GatewayRouter } from '@/components/gateway/GatewayRouter';
+import { GatewayVirtualKeys } from '@/components/gateway/GatewayVirtualKeys';
 import { GatewayTraffic } from '@/components/gateway/GatewayTraffic';
 import { GatewayTuning } from '@/components/gateway/GatewayTuning';
 
 /** Compose one route-owned Models place without recreating a second navigation system. */
 export function GatewayModelDestination({ destination }: Readonly<{ destination: string }>) {
   if (destination === 'overview') return <GatewayOverview />;
-  if (destination === 'routing') return <GatewayRouter />;
+  if (destination === 'routing') {
+    return (
+      <>
+        <GatewayRouter />
+        <GatewayVirtualKeys />
+      </>
+    );
+  }
   if (destination === 'traffic') return <GatewayTraffic />;
   if (destination === 'logs') return <GatewayLogs />;
   if (destination === 'fleet-control') {
