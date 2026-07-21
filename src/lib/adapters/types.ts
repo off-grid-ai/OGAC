@@ -183,6 +183,13 @@ export interface LineageEvent {
   // producers with no facet info simply omit them and a bare dataset is emitted. See
   // `src/lib/lineage-facets.ts` (DatasetFacetSpec) for the shape.
   facets?: import('@/lib/lineage-facets').DatasetFacetSpec[];
+  // Optional run-level timing (OpenLineage NominalTimeRunFacet). Supplying nominalStartTime on the
+  // COMPLETE event (and emitting a prior START event) gives Marquez a real run start + duration
+  // instead of a bare terminal event. nominalEndTime is set on the COMPLETE.
+  nominalStartTime?: string;
+  nominalEndTime?: string;
+  // Optional job description (OpenLineage DocumentationJobFacet) — a human label for the job node.
+  jobDescription?: string;
 }
 
 export interface LineagePort {

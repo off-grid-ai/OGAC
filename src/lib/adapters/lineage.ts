@@ -42,15 +42,46 @@ function datasets(names: string[] | undefined, specs: DatasetFacetSpec[] | undef
   return (names ?? []).map((name) => buildDatasetObject(NAMESPACE, name, specs));
 }
 
+const OL_FACET = 'https://openlineage.io/spec/facets';
+
+// Run-level facets: NominalTimeRunFacet carries the run's start (+ end on COMPLETE) so Marquez
+// records a real run history with duration rather than a bare terminal event. Returns undefined
+// when the producer supplied no timing, keeping a bare run object (back-compat).
+function runFacets(event: LineageEvent) {
+  if (!event.nominalStartTime) return undefined;
+  return {
+    nominalTime: {
+      _producer: PRODUCER,
+      _schemaURL: `${OL_FACET}/1-0-0/NominalTimeRunFacet.json`,
+      nominalStartTime: event.nominalStartTime,
+      ...(event.nominalEndTime ? { nominalEndTime: event.nominalEndTime } : {}),
+    },
+  };
+}
+
+// Job-level facets: DocumentationJobFacet gives the job node a human description.
+function jobFacets(event: LineageEvent) {
+  if (!event.jobDescription) return undefined;
+  return {
+    documentation: {
+      _producer: PRODUCER,
+      _schemaURL: `${OL_FACET}/1-0-0/DocumentationJobFacet.json`,
+      description: event.jobDescription,
+    },
+  };
+}
+
 // One OpenLineage RunEvent — the open standard Marquez ingests at POST /api/v1/lineage.
 // Exported (pure, no I/O) so the facet-attachment shape is unit-testable without a live Marquez.
 export function runEvent(event: LineageEvent, eventTime: string) {
+  const rf = runFacets(event);
+  const jf = jobFacets(event);
   return {
     eventType: event.status === 'FAIL' ? 'FAIL' : event.status,
     eventTime,
     producer: PRODUCER,
-    run: { runId: event.run },
-    job: { namespace: NAMESPACE, name: event.job },
+    run: { runId: event.run, ...(rf ? { facets: rf } : {}) },
+    job: { namespace: NAMESPACE, name: event.job, ...(jf ? { facets: jf } : {}) },
     inputs: datasets(event.inputs, event.facets),
     outputs: datasets(event.outputs, event.facets),
   };

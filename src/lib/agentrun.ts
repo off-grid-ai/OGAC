@@ -521,6 +521,21 @@ export async function runAgent(
     emitSpan(`agent.${kind}`, { agentId, label, ms: step.ms });
   };
 
+  // Lineage START (best-effort): pairs with the COMPLETE at the end so Marquez records a real run
+  // start + duration (NominalTimeRunFacet) and a named job (DocumentationJobFacet), not a bare
+  // terminal event. runStartedAt is reused as nominalStartTime on the COMPLETE below.
+  const runStartedAt = new Date().toISOString();
+  const lineageJobDescription = `Governed agent run: ${agent.name}`;
+  void getLineage()
+    .emit({
+      job: `agent:${agentId}`,
+      run: correlationIds(runId).lineageRunId,
+      status: 'START',
+      nominalStartTime: runStartedAt,
+      jobDescription: lineageJobDescription,
+    })
+    .catch(() => {});
+
   // 1. Policy gate — deny-overrides ABAC (or OPA). A denial short-circuits the run.
   let t = Date.now();
   const decision = await getPolicy().evaluate({
@@ -1077,6 +1092,9 @@ export async function runAgent(
       status: 'COMPLETE',
       inputs: citations.map((c) => c.ref),
       outputs: [runId],
+      nominalStartTime: runStartedAt,
+      nominalEndTime: new Date().toISOString(),
+      jobDescription: lineageJobDescription,
     })
     .catch(() => {});
 

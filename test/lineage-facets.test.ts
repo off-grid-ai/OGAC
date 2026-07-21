@@ -135,3 +135,43 @@ test('runEvent: FAIL status maps to FAIL eventType', () => {
   assert.deepEqual(ev.inputs, []);
   assert.deepEqual(ev.outputs, []);
 });
+
+test('runEvent: nominalStartTime attaches a NominalTimeRunFacet (run start + duration in Marquez)', () => {
+  const ev = runEvent(
+    { job: 'agent:a', run: 'r', status: 'START', nominalStartTime: '2026-07-05T00:00:00Z' },
+    '2026-07-05T00:00:00Z',
+  ) as { run: { facets?: { nominalTime?: { nominalStartTime?: string; nominalEndTime?: string } } } };
+  assert.equal(ev.run.facets?.nominalTime?.nominalStartTime, '2026-07-05T00:00:00Z');
+  assert.equal(ev.run.facets?.nominalTime?.nominalEndTime, undefined);
+});
+
+test('runEvent: nominalEndTime is added on the COMPLETE', () => {
+  const ev = runEvent(
+    {
+      job: 'agent:a',
+      run: 'r',
+      status: 'COMPLETE',
+      nominalStartTime: '2026-07-05T00:00:00Z',
+      nominalEndTime: '2026-07-05T00:00:09Z',
+    },
+    '2026-07-05T00:00:09Z',
+  ) as { run: { facets?: { nominalTime?: { nominalEndTime?: string } } } };
+  assert.equal(ev.run.facets?.nominalTime?.nominalEndTime, '2026-07-05T00:00:09Z');
+});
+
+test('runEvent: jobDescription attaches a DocumentationJobFacet', () => {
+  const ev = runEvent(
+    { job: 'agent:a', run: 'r', status: 'START', jobDescription: 'Governed agent run: Triage' },
+    '2026-07-05T00:00:00Z',
+  ) as { job: { facets?: { documentation?: { description?: string } } } };
+  assert.equal(ev.job.facets?.documentation?.description, 'Governed agent run: Triage');
+});
+
+test('runEvent: no timing/description → bare run + job (back-compat)', () => {
+  const ev = runEvent({ job: 'j', run: 'r', status: 'COMPLETE' }, '2026-07-05T00:00:00Z') as {
+    run: { facets?: unknown };
+    job: { facets?: unknown };
+  };
+  assert.equal(ev.run.facets, undefined);
+  assert.equal(ev.job.facets, undefined);
+});
