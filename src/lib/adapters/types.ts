@@ -4,6 +4,8 @@
 // rewrite. `render` declares how the tool's own UI is surfaced: we build it native, embed it
 // behind SSO, or it has no UI at all (headless). This is what keeps the OSS swappable and in
 // sync without us maintaining a fork.
+import type { DriftAttribution } from '@/lib/drift-run';
+
 export type Capability =
   | 'inference'
   | 'observability'
@@ -251,6 +253,8 @@ export interface DriftReport {
   baseline: number; // samples in the baseline window
   current: number; // samples in the current window
   note?: string;
+  // Retained engine attribution (how the verdict was produced — real Evidently vs PSI fallback).
+  attribution?: DriftAttribution;
 }
 
 // Optional run config produced by the standard drift catalog (src/lib/drift-catalog.ts). A selected

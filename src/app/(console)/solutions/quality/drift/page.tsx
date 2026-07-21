@@ -10,6 +10,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getDrift } from '@/lib/adapters/registry';
+import { describeDriftAttribution } from '@/lib/drift-run';
+import { listDriftRuns } from '@/lib/drift-runs';
 import { readDriftView, type DriftDisplayStatus } from '@/lib/drift-view';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
@@ -24,7 +26,9 @@ const STATUS_CLASS: Record<DriftDisplayStatus, string> = {
 
 export default async function QualityDriftPage() {
   await requireModuleForUser('drift');
-  const { data, error } = await readDriftView({ orgId: await currentOrgId() });
+  const orgId = await currentOrgId();
+  const { data, error } = await readDriftView({ orgId });
+  const retained = await listDriftRuns(10, orgId);
   const adapter = getDrift().meta;
   const engineStatus = {
     evidentlySelected: adapter.id === 'evidently',
@@ -103,6 +107,73 @@ export default async function QualityDriftPage() {
             {engineStatus.evidentlySelected && engineStatus.evidentlyConfigured
               ? 'Evidently is selected and configured. Catalog selections run through the collector.'
               : 'Evidently is not the verified active path. Checks run with the built-in eval-score PSI and mean-degradation fallback, and results remain attributed to that engine.'}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Retained drift runs</CardTitle>
+            <CardDescription className="text-xs">
+              Each run is persisted with its engine attribution, so a genuine Evidently execution is
+              distinguishable from the PSI fallback after the fact.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {retained.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                No drift runs recorded yet — run a drift check to start the history.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Engine</TableHead>
+                      <TableHead className="text-right">Drift</TableHead>
+                      <TableHead className="text-right">Verdict</TableHead>
+                      <TableHead className="text-right">Provenance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {retained.map((run) => {
+                      const a = describeDriftAttribution(
+                        run.attribution as Record<string, unknown> | null,
+                      );
+                      return (
+                        <TableRow key={run.id}>
+                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                            {run.startedAt.slice(0, 19).replace('T', ' ')}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {a?.engineLabel ?? run.engine}
+                            {a?.evidentlyVersion ? (
+                              <span className="text-muted-foreground"> {a.evidentlyVersion}</span>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs">
+                            {run.driftShare === null ? '—' : `${Math.round(run.driftShare * 100)}%`}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              variant="secondary"
+                              className={STATUS_CLASS[run.status as DriftDisplayStatus] ?? ''}
+                            >
+                              {run.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={a?.engineProven ? 'default' : 'outline'}>
+                              {a?.engineProven ? 'Evidently proven' : 'PSI fallback'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

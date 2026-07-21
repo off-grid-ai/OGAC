@@ -228,6 +228,9 @@ export function normalizeDrift(input: RawDriftInput): DriftView {
 export interface DriftReadResult {
   data: DriftView | null;
   error: string | null;
+  // The raw engine attribution from the adapter (drift-run.DriftAttribution shape) — carried through
+  // so the run route can persist a retained, service-attributed drift run. null when unavailable.
+  attribution?: Record<string, unknown> | null;
 }
 
 // Options forwarded to the drift run — a selection from the standard drift catalog (preset /
@@ -245,8 +248,9 @@ export async function readDriftView(options?: ReadDriftOptions): Promise<DriftRe
   try {
     const { getDrift } = await import('@/lib/adapters/registry');
     const report = await getDrift().analyze(options);
-    return { data: normalizeDrift(report as RawDriftInput), error: null };
+    const attribution = (report as { attribution?: Record<string, unknown> }).attribution ?? null;
+    return { data: normalizeDrift(report as RawDriftInput), error: null, attribution };
   } catch (err) {
-    return { data: null, error: err instanceof Error ? err.message : 'drift analysis failed' };
+    return { data: null, error: err instanceof Error ? err.message : 'drift analysis failed', attribution: null };
   }
 }

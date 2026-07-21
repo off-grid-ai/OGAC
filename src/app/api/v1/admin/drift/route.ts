@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { buildDriftRunConfig, type DriftMethodOverride } from '@/lib/drift-catalog';
 import { readDriftView } from '@/lib/drift-view';
+import { recordDriftRun } from '@/lib/drift-runs';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -49,12 +51,33 @@ export async function POST(req: Request) {
       typeof body.driftShareThreshold === 'number' ? body.driftShareThreshold : undefined,
   });
 
+  const orgId = await currentOrgId();
   const result = await readDriftView({
-    orgId: await currentOrgId(),
+    orgId,
     preset: config.preset,
     method: config.method,
     columnMethods: config.columnMethods,
     driftShareThreshold: config.driftShareThreshold,
   });
-  return NextResponse.json({ ...result, config });
+
+  // Persist a RETAINED, engine-attributed drift run so operators can later distinguish a genuine
+  // Evidently execution from the PSI fallback (the attribution carries engineProven + the reason).
+  let runId: string | null = null;
+  const attr = result.attribution;
+  if (result.data && attr) {
+    runId = `drift_${randomUUID().slice(0, 12)}`;
+    await recordDriftRun(
+      {
+        id: runId,
+        engine: typeof attr.engine === 'string' ? attr.engine : result.data.engine,
+        status: result.data.status,
+        driftShare: typeof attr.driftShare === 'number' ? attr.driftShare : result.data.driftScore,
+        baseline: result.data.baseline,
+        current: result.data.current,
+        attribution: attr,
+      },
+      orgId,
+    );
+  }
+  return NextResponse.json({ ...result, config, runId });
 }

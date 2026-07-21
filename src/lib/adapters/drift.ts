@@ -1,3 +1,4 @@
+import { summarizeDrift } from '@/lib/drift-run';
 import { listEvalRuns } from '@/lib/evals';
 import type {
   DriftMetric,
@@ -6,6 +7,10 @@ import type {
   DriftRunOptions,
   DriftStatus,
 } from './types';
+
+// The pinned Evidently library version the sidecar runs — recorded in each run's attribution so a
+// retained drift run names the engine version that produced it (mirrors RAGAS_VERSION).
+const EVIDENTLY_VERSION = '0.4.40';
 
 // Drift / degradation detection. The signal is the eval-score history: we split it into a baseline
 // window (older runs) and a current window (recent runs) and ask two questions — has the score
@@ -92,15 +97,33 @@ function overallStatus(metrics: DriftMetric[], driftShareThreshold?: number): Dr
   return stat;
 }
 
-function analyzeFirstParty(scores: number[], options?: DriftRunOptions): DriftReport {
+// `fallbackReason` is set when this native run is a FALLBACK from a failed Evidently attempt (so the
+// attribution records WHY Evidently didn't run); undefined for the always-on native engine.
+function analyzeFirstParty(
+  scores: number[],
+  options?: DriftRunOptions,
+  fallbackReason?: string,
+): DriftReport {
   if (scores.length < 4) {
+    const note = 'Not enough eval-run history yet (need ≥4 runs) — run more evals to enable drift.';
     return {
       engine: 'native',
       status: 'stable',
       metrics: [],
       baseline: 0,
       current: scores.length,
-      note: 'Not enough eval-run history yet (need ≥4 runs) — run more evals to enable drift.',
+      note,
+      attribution: summarizeDrift({
+        engine: 'native',
+        evidentlyVersion: null,
+        method: options?.preset ?? options?.method ?? null,
+        driftShare: null,
+        status: 'stable',
+        baseline: 0,
+        current: scores.length,
+        fallbackReason: fallbackReason ?? null,
+        note,
+      }),
     };
   }
   // listEvalRuns returns newest-first; current = recent window, baseline = the window before it.
@@ -114,19 +137,35 @@ function analyzeFirstParty(scores: number[], options?: DriftRunOptions): DriftRe
     { name: 'mean_delta', value: delta, status: statusFromDelta(delta) },
   ];
   const selected = options?.preset ?? options?.method;
+  const status = overallStatus(metrics, options?.driftShareThreshold);
+  const note =
+    (selected
+      ? `Evidently not configured — ran the built-in PSI heuristic for "${selected}". `
+      : '') +
+    (delta < 0
+      ? `Mean eval score down ${Math.abs(delta)} pts vs the prior window.`
+      : 'No degradation detected in the eval-score history.');
   return {
     engine: 'native',
-    status: overallStatus(metrics, options?.driftShareThreshold),
+    status,
     metrics,
     baseline: baseline.length,
     current: current.length,
-    note:
-      (selected
-        ? `Evidently not configured — ran the built-in PSI heuristic for "${selected}". `
-        : '') +
-      (delta < 0
-        ? `Mean eval score down ${Math.abs(delta)} pts vs the prior window.`
-        : 'No degradation detected in the eval-score history.'),
+    note,
+    attribution: summarizeDrift({
+      engine: 'native',
+      evidentlyVersion: null,
+      method: selected ?? null,
+      // native PSI: expose the share of drifted metrics as the drift share for a comparable number.
+      driftShare: metrics.length
+        ? Number((metrics.filter((m) => m.status === 'drift').length / metrics.length).toFixed(3))
+        : null,
+      status,
+      baseline: baseline.length,
+      current: current.length,
+      fallbackReason: fallbackReason ?? null,
+      note,
+    }),
   };
 }
 
@@ -195,7 +234,7 @@ export const evidentlyDrift: DriftPort = {
         }),
         signal: AbortSignal.timeout(10_000),
       });
-      if (!res.ok) throw new Error('evidently collector error');
+      if (!res.ok) throw new Error(`evidently collector error (${res.status})`);
       const data = (await res.json()) as EvidentlyResponse;
       const share = data.share_drifted ?? 0;
       // Honor the operator's drift-share threshold for the verdict when supplied; else Evidently's
@@ -203,16 +242,36 @@ export const evidentlyDrift: DriftPort = {
       const t = options?.driftShareThreshold;
       const status: DriftStatus = statusFromEvidently(Boolean(data.drift_detected), share, t);
       const selected = options?.preset ?? options?.method;
+      const baseline = scores.slice(n, n * 2).length;
+      const current = scores.slice(0, n).length;
+      const note = selected ? `Evidently ran "${selected}".` : 'Evidently drift run.';
       return {
         engine: 'evidently',
         status,
         metrics: [{ name: 'share_drifted', value: Number(share.toFixed(3)), status }],
-        baseline: scores.slice(n, n * 2).length,
-        current: scores.slice(0, n).length,
-        ...(selected ? { note: `Evidently ran "${selected}".` } : {}),
+        baseline,
+        current,
+        note,
+        attribution: summarizeDrift({
+          engine: 'evidently',
+          evidentlyVersion: EVIDENTLY_VERSION,
+          method: selected ?? 'DataDriftPreset',
+          driftShare: Number(share.toFixed(3)),
+          status,
+          baseline,
+          current,
+          fallbackReason: null, // real Evidently execution
+          note,
+        }),
       };
-    } catch {
-      return analyzeFirstParty(scores, options);
+    } catch (e) {
+      // Surface WHY drift fell back to PSI — a silent fallback hid Evidently outages and made the
+      // PSI heuristic indistinguishable from a governed Evidently run.
+      const err = e as Error & { cause?: { code?: string } };
+      const reason =
+        `${err?.message ?? e}` + (err?.cause?.code ? ` (${err.cause.code})` : '');
+      console.error(`[drift] evidently run failed → PSI fallback: ${reason}`);
+      return analyzeFirstParty(scores, options, reason);
     }
   },
   async health() {
