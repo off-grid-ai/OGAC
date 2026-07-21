@@ -237,7 +237,9 @@ async function generateAnswer(question: string, contexts: string[], model: strin
       ],
       chat_template_kwargs: { enable_thinking: false },
     }),
-    signal: AbortSignal.timeout(60_000),
+    // Answer generation on slow/loaded on-prem models can exceed a minute; env-tunable so it doesn't
+    // abort mid-generation and drop the whole ragas run to the golden fallback.
+    signal: AbortSignal.timeout(Number(process.env.OFFGRID_EVAL_ANSWER_TIMEOUT_MS ?? '180000')),
   });
   if (!res.ok) throw new Error('gateway answer generation failed');
   const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
@@ -326,7 +328,15 @@ export const ragasEvals: EvalsPort = {
       // a pinned env model. The sidecar (and answer-generation) use whatever the hierarchy resolves.
       const judge = await loadJudgeRouting(orgId ?? DEFAULT_ORG);
       return await runRagas(judge);
-    } catch {
+    } catch (e) {
+      // Surface WHY the sidecar path failed — a silent golden fallback hid real errors (401 auth,
+      // timeouts, sidecar down) and made the engine look "wired" when it never ran. cause carries the
+      // undici network reason (ECONNREFUSED / UND_ERR_*) when the fetch itself failed.
+      const err = e as Error & { cause?: { code?: string } };
+      console.error(
+        `[evals] ragas run failed → golden fallback: ${err?.message ?? e}` +
+          (err?.cause?.code ? ` (cause: ${err.cause.code})` : ''),
+      );
       return goldenEvals.run(orgId);
     }
   },
