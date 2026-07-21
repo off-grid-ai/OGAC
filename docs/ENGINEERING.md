@@ -4,6 +4,21 @@ These rules are non-negotiable. Every engineer who touches this codebase must re
 
 ---
 
+## THE GOVERNING INVARIANT — the consumption hierarchy
+
+**`agent/app → pipeline → gateway → model`. Strict layering, no skips. This is the guiding principle for everything.**
+
+- Nothing talks to a **model** except a **gateway** — the gateway owns model routing, health-aware failover, budget, and caching across the model pool.
+- Nothing talks to a **gateway** except a **pipeline** — the pipeline is the governed access contract (data allowlist, egress leash, routing, policy + guardrail overlays, immutable versions).
+- Only **agents/apps** talk to a **pipeline**.
+- Therefore **every AI-using service — including internal ones** (eval / LLM-judge, grounding NLI, guardrail LLM calls, embeddings, QA scoring) — must be fronted by an **agent/app that runs a pipeline**. No component may reference a model id or a gateway directly.
+
+**Why:** governance (policy, guardrails, routing, cost, failover, attribution) is only inheritable and non-bypassable if there is exactly one consumption path and nothing skips a layer. "Governed AI, without compromising" holds only under this invariant.
+
+**Any code that pins a model id and calls the gateway directly is a layering violation.** (Known offenders being retired: `OFFGRID_EVAL_MODEL`, `JUDGE_MODEL`, `OFFGRID_GROUNDING_MODEL`/`ANSWER_MODEL` — replace with pipeline-routed system agents/apps.)
+
+---
+
 ## The Architecture You Must Understand First
 
 Off Grid Console is not a collection of pages. It is a **module system** sitting in front of a set of headless services. Every surface you see in the console is a **thin UI layer** over an API-first backend. Nothing in the UI should contain business logic.
