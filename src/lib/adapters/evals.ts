@@ -247,9 +247,11 @@ async function generateAnswer(question: string, contexts: string[], model: strin
 }
 
 // Build the RAG eval dataset the console owns (Brain for contexts, gateway for answers, the golden
-// `expected` as ground truth), then let the sidecar score it with Ragas.
-async function buildDataset(model: string): Promise<RagasSample[]> {
-  const cases = capEvalSamples(await listGoldenCases());
+// `expected` as ground truth), then let the sidecar score it with Ragas. Org-scoped: a tenant's eval
+// runs ITS OWN golden cases — before this, listGoldenCases() was unscoped and every tenant scored the
+// default org's golden set (wrong data + cross-tenant leak).
+async function buildDataset(model: string, orgId: string): Promise<RagasSample[]> {
+  const cases = capEvalSamples(await listGoldenCases({ orgId }));
   const samples: RagasSample[] = [];
   for (const c of cases) {
     const hits = await searchDocuments(c.query, 3);
@@ -297,8 +299,8 @@ async function scoreOneMetric(
   }
 }
 
-async function runRagas(judge: JudgeRouting): Promise<EvalRunResult> {
-  const dataset = await buildDataset(judge.model);
+async function runRagas(judge: JudgeRouting, orgId: string): Promise<EvalRunResult> {
+  const dataset = await buildDataset(judge.model, orgId);
   const sidecarService = await ragasSidecarService();
   // Score each metric in its own call; merge the ones that came back. Sequential so a small on-prem
   // gateway isn't stampeded with concurrent judge chains.
@@ -348,8 +350,9 @@ export const ragasEvals: EvalsPort = {
     try {
       // GOVERNING INVARIANT: resolve the judge model through the judge agent→pipeline→gateway, never
       // a pinned env model. The sidecar (and answer-generation) use whatever the hierarchy resolves.
-      const judge = await loadJudgeRouting(orgId ?? DEFAULT_ORG);
-      return await runRagas(judge);
+      const org = orgId ?? DEFAULT_ORG;
+      const judge = await loadJudgeRouting(org);
+      return await runRagas(judge, org);
     } catch (e) {
       // Surface WHY the sidecar path failed — a silent golden fallback hid real errors (401 auth,
       // timeouts, sidecar down) and made the engine look "wired" when it never ran. cause carries the
