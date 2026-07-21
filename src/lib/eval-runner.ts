@@ -14,6 +14,7 @@ import {
   type MetricScore,
 } from '@/lib/eval-metrics';
 import type { EvalEngine } from '@/lib/eval-templates';
+import { capEvalSamples } from '@/lib/eval-sampling';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
 import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -61,7 +62,7 @@ async function generateAnswer(question: string, contexts: string[]): Promise<str
 }
 
 async function buildSamples(): Promise<Sample[]> {
-  const cases = await listGoldenCases();
+  const cases = capEvalSamples(await listGoldenCases());
   const samples: Sample[] = [];
   for (const c of cases) {
     const hits = await searchDocuments(c.query, 3);

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { searchDocuments } from '@/lib/brain';
+import { capEvalSamples } from '@/lib/eval-sampling';
 import { listGoldenCases, runEval } from '@/lib/evals';
 
 // Evals adapters. The golden set (recall over the Brain) is the always-on first-party default and
@@ -232,7 +233,7 @@ async function generateAnswer(question: string, contexts: string[]): Promise<str
 // Build the RAG eval dataset the console owns (Brain for contexts, gateway for answers, the golden
 // `expected` as ground truth), then let the sidecar score it with Ragas.
 async function buildDataset(): Promise<RagasSample[]> {
-  const cases = await listGoldenCases();
+  const cases = capEvalSamples(await listGoldenCases());
   const samples: RagasSample[] = [];
   for (const c of cases) {
     const hits = await searchDocuments(c.query, 3);
