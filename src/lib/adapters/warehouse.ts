@@ -76,6 +76,11 @@ export interface WarehousePort {
   // Operator-typed READ-ONLY SQL. Returns the parsed rows, or a rejection reason (guard failure /
   // engine error) — never throws.
   query(sql: string): Promise<{ ok: true; result: ParsedClickHouse } | { ok: false; reason: string }>;
+  // Run a sequence of GOVERNED DDL statements (built + validated by src/lib/schema-model.ts) in
+  // order. Every statement must be pre-validated by the pure model — this method does NOT guard, it
+  // only executes. Stops at the first failure and returns the reason. Used by the analytical-model
+  // management surface, never for arbitrary operator input.
+  execDdl(statements: string[]): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
 // Run a statement over the ClickHouse HTTP interface. POST the SQL as the body (GET query-string has
@@ -201,5 +206,25 @@ export const clickhouseWarehouse: WarehousePort = {
     } catch (err) {
       return { ok: false, reason: describeError(err) };
     }
+  },
+
+  async execDdl(statements) {
+    // Governed DDL only — the caller (schema-model routes) validates each statement through the
+    // pure model before this runs. We execute in order and fail at the first error so a broken
+    // migration doesn't leave a half-applied model silently.
+    if (!Array.isArray(statements) || statements.length === 0) {
+      return { ok: false, reason: 'no statements to run' };
+    }
+    for (const stmt of statements) {
+      if (typeof stmt !== 'string' || !stmt.trim()) {
+        return { ok: false, reason: 'empty DDL statement' };
+      }
+      try {
+        await runSql(stmt);
+      } catch (err) {
+        return { ok: false, reason: describeError(err) };
+      }
+    }
+    return { ok: true };
   },
 };
