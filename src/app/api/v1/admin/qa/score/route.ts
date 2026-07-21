@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getFlags } from '@/lib/adapters/registry';
 import { requireAdmin } from '@/lib/authz';
 import { type Interaction, scoreInteraction, scoringConfigured } from '@/lib/qa/scoring';
+import { currentOrgId } from '@/lib/tenancy';
 
 // Online eval — judge one production interaction (LLM-as-judge via the gateway) and push the
 // quality + faithfulness scores to Langfuse, where they trend over time. Gated by the
@@ -24,6 +25,7 @@ export async function POST(req: Request) {
     sources: Array.isArray(b.sources) ? b.sources.filter((s) => typeof s === 'string') : undefined,
     traceId: typeof b.traceId === 'string' ? b.traceId : undefined,
     name: typeof b.name === 'string' ? b.name : undefined,
+    orgId: await currentOrgId(),
   });
   return NextResponse.json({ ...result, langfuse: scoringConfigured() }, { status: 201 });
 }
