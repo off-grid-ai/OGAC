@@ -275,7 +275,10 @@ async function runRagas(judge: JudgeRouting): Promise<EvalRunResult> {
       dataset,
       metrics: [...RAGAS_METRIC_SET],
     }),
-    signal: AbortSignal.timeout(180_000),
+    // A real ragas metric is a chain of gateway LLM calls; on slow on-prem models a multi-metric run
+    // legitimately runs for minutes. The sidecar raises ragas' own executor timeout in step, so the
+    // client must wait rather than abort mid-run and fall back. Env-tunable for faster fleets.
+    signal: AbortSignal.timeout(Number(process.env.OFFGRID_RAGAS_CLIENT_TIMEOUT_MS ?? '900000')),
   });
   if (!res.ok) throw new Error('ragas sidecar error');
   const data = (await res.json()) as RagasResponse;
