@@ -175,18 +175,19 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
       // approve + reject both proven live via durable signal (apprun_f339b0ee / apprun_4440547c),
       // duplicate → 409; approve-authority covered by app-access tests.
       'human-pause-resume': ['yes', 'yes', 'yes', 'yes'],
-      'failure-recovery': ['yes', 'partial', 'partial', 'no'],
+      // worker-loss recovery proven live (apprun_fe17e9f5 survived kill+restart → resumed → done);
+      // adapter/ui stay partial (safe-drain + build-compat + idempotency contract outstanding).
+      'failure-recovery': ['yes', 'partial', 'partial', 'yes'],
       'output-persistence': ['yes', 'partial', 'yes', 'yes'],
     },
   );
   // The only app-worker capabilities WITHOUT any retained live run evidence keep workflow 'no':
   // immutable-artifact identity and interrupted-restart failure recovery.
+  // Every app-worker capability now has at least a live workflow proof (worker-loss recovery for
+  // failure-recovery landed 2026-07-21); none remain workflow:'no'.
   assert.deepEqual(
-    audit.items
-      .filter((item) => item.gates.workflow.status === 'no')
-      .map((item) => item.id)
-      .sort(),
-    ['failure-recovery'],
+    audit.items.filter((item) => item.gates.workflow.status === 'no').map((item) => item.id),
+    [],
   );
 });
 
