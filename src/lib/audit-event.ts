@@ -37,6 +37,9 @@ export type AuditAction =
   | 'pipeline.publish'
   | 'pipeline.publish.override'
   | 'pipeline.autorollback'
+  // targeted rollback (operator promotes a chosen prior version back to active) + version annotation
+  | 'pipeline.rollback'
+  | 'pipeline.version.annotate'
   // pipeline lifecycle + ownership (M2): promotion gate, sign-off, deprecation, owner/team moves
   | 'pipeline.promote'
   | 'pipeline.withdraw'
