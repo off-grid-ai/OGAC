@@ -195,17 +195,65 @@ export function deriveMfaStatus(creds: KcRawCredential[]): KcMfaStatus {
   };
 }
 
-// Build the requiredActions array to PUT on a user to enable "Configure OTP". Merges with any
-// existing required actions (idempotent — never duplicates CONFIGURE_TOTP), preserving the rest.
-export function withConfigureOtp(existing: string[] | undefined): string[] {
+// The user required-actions the console lets an operator toggle. Keycloak defines these built-in
+// action aliases; we surface a curated, human-labelled subset (the ones a BFSI access admin actually
+// sets on a person: prove the email, rotate the password, set up 2FA, complete the profile). The
+// catalog is the single source of truth for both validation (only a known action may be set) and the
+// UI labels — no drift between the route and the panel.
+export interface RequiredActionSpec {
+  alias: string;
+  label: string;
+  help: string;
+}
+
+export const KNOWN_REQUIRED_ACTIONS: readonly RequiredActionSpec[] = [
+  {
+    alias: 'VERIFY_EMAIL',
+    label: 'Verify email',
+    help: 'User must confirm their email address on next login.',
+  },
+  {
+    alias: 'UPDATE_PASSWORD',
+    label: 'Update password',
+    help: 'User must set a new password on next login.',
+  },
+  {
+    alias: 'CONFIGURE_TOTP',
+    label: 'Configure OTP (2FA)',
+    help: 'User must set up a one-time-password authenticator on next login.',
+  },
+  {
+    alias: 'UPDATE_PROFILE',
+    label: 'Update profile',
+    help: 'User must review and complete their profile on next login.',
+  },
+] as const;
+
+// Is `alias` one the console is allowed to toggle? Guards the route against arbitrary writes.
+export function isKnownRequiredAction(alias: string): boolean {
+  return KNOWN_REQUIRED_ACTIONS.some((a) => a.alias === alias);
+}
+
+// Build the requiredActions array to PUT on a user with `action` ENABLED. Merges with any existing
+// required actions (idempotent — never duplicates), preserving the rest.
+export function withRequiredAction(existing: string[] | undefined, action: string): string[] {
   const set = new Set(existing ?? []);
-  set.add('CONFIGURE_TOTP');
+  set.add(action);
   return [...set];
 }
 
-// Build the requiredActions array with "Configure OTP" removed (undo the enablement).
+// Build the requiredActions array with `action` REMOVED (undo the enablement), preserving the rest.
+export function withoutRequiredAction(existing: string[] | undefined, action: string): string[] {
+  return (existing ?? []).filter((a) => a !== action);
+}
+
+// Back-compat wrappers for the OTP-specific MFA route (delegate to the generic helpers — DRY).
+export function withConfigureOtp(existing: string[] | undefined): string[] {
+  return withRequiredAction(existing, 'CONFIGURE_TOTP');
+}
+
 export function withoutConfigureOtp(existing: string[] | undefined): string[] {
-  return (existing ?? []).filter((a) => a !== 'CONFIGURE_TOTP');
+  return withoutRequiredAction(existing, 'CONFIGURE_TOTP');
 }
 
 // ── Identity-provider federation ─────────────────────────────────────────────────

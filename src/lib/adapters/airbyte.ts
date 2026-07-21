@@ -39,6 +39,15 @@ export interface EtlPort {
   listJobs(connectionId?: string): Promise<EtlJob[]>;
   triggerSync(connectionId: string): Promise<EtlJob | null>;
   jobStatus(jobId: number): Promise<EtlJob | null>;
+  // Raw ConnectionRead for a single connection (the schedule/sync-mode management surface reads it,
+  // reshapes it via the pure airbyte-schedule-model, and posts it back). null when unreachable /
+  // not found.
+  getConnectionRaw(connectionId: string): Promise<Record<string, unknown> | null>;
+  // Post a ConnectionUpdate (built by the pure model) to /connections/update. Returns true on 2xx.
+  updateConnection(update: Record<string, unknown>): Promise<boolean>;
+  // Reset (clear) a connection's replication state so the next sync re-reads from scratch. Returns
+  // the reset job, or null on failure.
+  resetConnection(connectionId: string): Promise<EtlJob | null>;
 }
 
 function baseUrl(): string {
@@ -157,6 +166,29 @@ export const airbyteEtl: EtlPort = {
 
   async jobStatus(jobId: number) {
     const data = await post<unknown>('jobs/get', buildJobGetBody(jobId));
+    if (!data) return null;
+    return summarizeJob(data);
+  },
+
+  async getConnectionRaw(connectionId: string) {
+    // /connections/get → the full ConnectionRead (schedule, syncCatalog, status, …). The pure model
+    // reshapes it; this adapter only fetches. null on any failure so the route returns an honest 404.
+    if (!connectionId) return null;
+    return post<Record<string, unknown>>('connections/get', { connectionId });
+  },
+
+  async updateConnection(update: Record<string, unknown>) {
+    // /connections/update takes a ConnectionUpdate (pre-shaped by pickConnectionUpdateFields so it
+    // carries no read-only field). A 2xx means the change landed.
+    const data = await post<unknown>('connections/update', update);
+    return data !== null;
+  },
+
+  async resetConnection(connectionId: string) {
+    // /connections/reset clears the connection's saved state (full re-read on next sync) and returns
+    // a JobInfoRead wrapper, exactly like /connections/sync.
+    if (!connectionId) return null;
+    const data = await post<unknown>('connections/reset', { connectionId });
     if (!data) return null;
     return summarizeJob(data);
   },

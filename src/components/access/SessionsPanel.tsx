@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatAge, formatExpiry } from '@/lib/session-view';
 
 interface Session {
   id: string;
@@ -26,6 +27,9 @@ interface Session {
   lastAccess: number;
   clients: string[];
   offline: boolean;
+  ageMs?: number;
+  ttlMs?: number | null;
+  expired?: boolean;
 }
 
 function fmt(ms: number): string {
@@ -146,7 +150,9 @@ export function SessionsPanel() {
                       <TableHead>IP address</TableHead>
                       <TableHead>Kind</TableHead>
                       <TableHead>Started</TableHead>
+                      <TableHead>Age</TableHead>
                       <TableHead>Last access</TableHead>
+                      <TableHead>Expires</TableHead>
                       <TableHead>Clients</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -154,7 +160,7 @@ export function SessionsPanel() {
                   <TableBody>
                     {sessions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
+                        <TableCell colSpan={8} className="py-6 text-center text-xs text-muted-foreground">
                           No active sessions for this user. The console signs in with
                           short-lived direct-grant tokens, so an idle online session may have already
                           expired even though the operator is still signed into the console.
@@ -171,7 +177,15 @@ export function SessionsPanel() {
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{fmt(s.start)}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
+                            {s.ageMs === undefined ? '—' : formatAge(s.ageMs)}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
                             {fmt(s.lastAccess)}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <span className={s.expired ? 'text-destructive' : 'text-muted-foreground'}>
+                              {formatExpiry(s.ttlMs ?? null)}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">

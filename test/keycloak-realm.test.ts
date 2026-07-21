@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  KNOWN_REQUIRED_ACTIONS,
   REALM_MANAGEMENT_CLIENT,
   buildOidcIdpRep,
   deriveMfaStatus,
@@ -8,6 +9,7 @@ import {
   federationGrantCommand,
   federationGrantRoleNames,
   forbiddenGrantMessage,
+  isKnownRequiredAction,
   serviceAccountUsername,
   formatDuration,
   mergeRealmLifetimes,
@@ -18,7 +20,9 @@ import {
   normalizeSessions,
   validateLifetimesPatch,
   withConfigureOtp,
+  withRequiredAction,
   withoutConfigureOtp,
+  withoutRequiredAction,
 } from '../src/lib/keycloak-realm.ts';
 
 // ── Sessions ─────────────────────────────────────────────────────────────────
@@ -49,7 +53,8 @@ test('normalizeSessions: shapes raw sessions, sorts most-recent first, flattens 
 test('normalizeSession: mDNS-maps the session IP — never leaks a raw loopback/LAN address', () => {
   // Loopback → S1 (the console reaches Keycloak over loopback, so a same-host login logs 127.0.0.1).
   assert.equal(normalizeSession({ id: 's', ipAddress: '127.0.0.1' }).ipAddress, 'offgrid-s1.local');
-  // Known fleet IP → its mDNS host.
+  // Known fleet IP → its mDNS host (topology seeded in test/support/register-alias.mjs from the
+  // onprem-fleet-orchestration map; production sets OFFGRID_FLEET_HOST_MAP in .env.local).
   assert.equal(normalizeSession({ id: 's', ipAddress: '192.168.1.66' }).ipAddress, 'offgrid-g6.local');
   // Unknown private IP → S1 (defensive: still no raw IP leaks).
   assert.equal(normalizeSession({ id: 's', ipAddress: '10.0.0.5' }).ipAddress, 'offgrid-s1.local');
@@ -275,4 +280,45 @@ test('formatDuration: human-readable seconds', () => {
   assert.equal(formatDuration(90), '1m 30s');
   assert.equal(formatDuration(3600), '1h');
   assert.equal(formatDuration(5430), '1h 30m 30s');
+});
+
+// ── Required actions (generalized) ─────────────────────────────────────────────
+
+test('withRequiredAction: adds the action, idempotent, preserves the rest', () => {
+  assert.deepEqual(withRequiredAction([], 'VERIFY_EMAIL'), ['VERIFY_EMAIL']);
+  assert.deepEqual(withRequiredAction(undefined, 'VERIFY_EMAIL'), ['VERIFY_EMAIL']);
+  assert.deepEqual(
+    withRequiredAction(['UPDATE_PASSWORD'], 'VERIFY_EMAIL').sort(),
+    ['UPDATE_PASSWORD', 'VERIFY_EMAIL'],
+  );
+  // idempotent — no duplicate
+  assert.deepEqual(withRequiredAction(['VERIFY_EMAIL'], 'VERIFY_EMAIL'), ['VERIFY_EMAIL']);
+});
+
+test('withoutRequiredAction: removes only the target, preserves the rest', () => {
+  assert.deepEqual(
+    withoutRequiredAction(['VERIFY_EMAIL', 'UPDATE_PASSWORD'], 'VERIFY_EMAIL'),
+    ['UPDATE_PASSWORD'],
+  );
+  assert.deepEqual(withoutRequiredAction(undefined, 'VERIFY_EMAIL'), []);
+  assert.deepEqual(withoutRequiredAction(['UPDATE_PASSWORD'], 'VERIFY_EMAIL'), ['UPDATE_PASSWORD']);
+});
+
+test('withConfigureOtp/withoutConfigureOtp: delegate to the generic helper (CONFIGURE_TOTP)', () => {
+  assert.deepEqual(withConfigureOtp(['VERIFY_EMAIL']).sort(), ['CONFIGURE_TOTP', 'VERIFY_EMAIL']);
+  assert.deepEqual(withoutConfigureOtp(['CONFIGURE_TOTP', 'VERIFY_EMAIL']), ['VERIFY_EMAIL']);
+});
+
+test('isKnownRequiredAction: only curated aliases are writable', () => {
+  assert.equal(isKnownRequiredAction('VERIFY_EMAIL'), true);
+  assert.equal(isKnownRequiredAction('CONFIGURE_TOTP'), true);
+  assert.equal(isKnownRequiredAction('DELETE_ACCOUNT'), false);
+  assert.equal(isKnownRequiredAction(''), false);
+});
+
+test('KNOWN_REQUIRED_ACTIONS: every entry has alias + label + help', () => {
+  assert.ok(KNOWN_REQUIRED_ACTIONS.length >= 3);
+  for (const a of KNOWN_REQUIRED_ACTIONS) {
+    assert.ok(a.alias && a.label && a.help, `spec ${a.alias} is complete`);
+  }
 });

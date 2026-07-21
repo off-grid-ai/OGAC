@@ -12,7 +12,7 @@
 // The governance correctness (validation, effectiveGovernance, canReachData, snapshotOf) lives in the
 // PURE pipelines-policy.ts; this file only persists + reads facts.
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { pipelines, pipelineVersions } from '@/db/schema';
 import type { Pipeline as PipelineRowDb } from '@/db/schema';
@@ -98,9 +98,12 @@ export async function ensurePipelinesSchema(): Promise<void> {
         version integer NOT NULL,
         snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
         note text NOT NULL DEFAULT '',
+        label text NOT NULL DEFAULT '',
         created_at timestamptz NOT NULL DEFAULT now(),
         created_by text NOT NULL DEFAULT '');
     `);
+      // Operator-supplied annotation column — additive over an existing pre-label table.
+      await tx.execute(sql.raw(`ALTER TABLE pipeline_versions ADD COLUMN IF NOT EXISTS label text NOT NULL DEFAULT '';`));
       await tx.execute(
         sql`CREATE INDEX IF NOT EXISTS pipeline_versions_pipeline_idx ON pipeline_versions (pipeline_id);`,
       );
@@ -579,29 +582,77 @@ export interface PipelineVersionView {
   pipelineId: string;
   version: number;
   note: string;
+  /** Operator-supplied annotation on this version (empty when never labelled). */
+  label: string;
   snapshot: Record<string, unknown>;
   createdAt: string | null;
   createdBy: string;
 }
 
-/** List a pipeline's version history, newest first. Org-scoped. */
+// Map a raw pipeline_versions row (from a `sql` select — the `label` column is not in the drizzle
+// schema type, so we read the whole row raw) into the view. Column names are snake_case from PG.
+function rowToVersionView(r: Record<string, unknown>): PipelineVersionView {
+  return {
+    id: String(r.id),
+    pipelineId: String(r.pipeline_id),
+    version: Number(r.version),
+    note: typeof r.note === 'string' ? r.note : '',
+    label: typeof r.label === 'string' ? r.label : '',
+    snapshot: (r.snapshot as Record<string, unknown>) ?? {},
+    createdAt: iso(r.created_at as string | Date | null),
+    createdBy: typeof r.created_by === 'string' ? r.created_by : '',
+  };
+}
+
+/** List a pipeline's version history, newest first. Org-scoped. Reads raw so the operator `label`
+ *  column (not in the drizzle schema type) is included. */
 export async function listPipelineVersions(
   pipelineId: string,
   orgId: string = DEFAULT_ORG,
 ): Promise<PipelineVersionView[]> {
   await ensurePipelinesSchema();
-  const rows = await db
-    .select()
-    .from(pipelineVersions)
-    .where(and(eq(pipelineVersions.pipelineId, pipelineId), eq(pipelineVersions.orgId, orgId)))
-    .orderBy(desc(pipelineVersions.version), desc(pipelineVersions.createdAt));
-  return rows.map((r) => ({
-    id: r.id,
-    pipelineId: r.pipelineId,
-    version: r.version,
-    note: r.note,
-    snapshot: (r.snapshot as Record<string, unknown>) ?? {},
-    createdAt: iso(r.createdAt),
-    createdBy: r.createdBy,
-  }));
+  const { sql } = await import('drizzle-orm');
+  const res = await db.execute(sql`
+    SELECT id, pipeline_id, org_id, version, snapshot, note, label, created_at, created_by
+    FROM pipeline_versions
+    WHERE pipeline_id = ${pipelineId} AND org_id = ${orgId}
+    ORDER BY version DESC, created_at DESC`);
+  return (res.rows as Record<string, unknown>[]).map(rowToVersionView);
+}
+
+/** One version of a pipeline by version number, org-scoped. Null if absent. Powers the version
+ *  detail (full frozen contract) view + the annotate route's existence check. */
+export async function getPipelineVersion(
+  pipelineId: string,
+  version: number,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineVersionView | null> {
+  await ensurePipelinesSchema();
+  const { sql } = await import('drizzle-orm');
+  const res = await db.execute(sql`
+    SELECT id, pipeline_id, org_id, version, snapshot, note, label, created_at, created_by
+    FROM pipeline_versions
+    WHERE pipeline_id = ${pipelineId} AND org_id = ${orgId} AND version = ${version}
+    ORDER BY created_at DESC
+    LIMIT 1`);
+  const row = (res.rows as Record<string, unknown>[])[0];
+  return row ? rowToVersionView(row) : null;
+}
+
+/** Set (or clear, with '') the operator label/annotation on a version. Org-scoped. Returns the
+ *  updated view, or null when no such version exists. The caller validates the label (pure) + audits. */
+export async function annotatePipelineVersion(
+  pipelineId: string,
+  version: number,
+  label: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<PipelineVersionView | null> {
+  await ensurePipelinesSchema();
+  const { sql } = await import('drizzle-orm');
+  const res = await db.execute(sql`
+    UPDATE pipeline_versions SET label = ${label}
+    WHERE pipeline_id = ${pipelineId} AND org_id = ${orgId} AND version = ${version}
+    RETURNING id, pipeline_id, org_id, version, snapshot, note, label, created_at, created_by`);
+  const row = (res.rows as Record<string, unknown>[])[0];
+  return row ? rowToVersionView(row) : null;
 }
