@@ -53,7 +53,8 @@ test('normalizeSessions: shapes raw sessions, sorts most-recent first, flattens 
 test('normalizeSession: mDNS-maps the session IP — never leaks a raw loopback/LAN address', () => {
   // Loopback → S1 (the console reaches Keycloak over loopback, so a same-host login logs 127.0.0.1).
   assert.equal(normalizeSession({ id: 's', ipAddress: '127.0.0.1' }).ipAddress, 'offgrid-s1.local');
-  // Known fleet IP → its mDNS host.
+  // Known fleet IP → its mDNS host (topology seeded in test/support/register-alias.mjs from the
+  // onprem-fleet-orchestration map; production sets OFFGRID_FLEET_HOST_MAP in .env.local).
   assert.equal(normalizeSession({ id: 's', ipAddress: '192.168.1.66' }).ipAddress, 'offgrid-g6.local');
   // Unknown private IP → S1 (defensive: still no raw IP leaks).
   assert.equal(normalizeSession({ id: 's', ipAddress: '10.0.0.5' }).ipAddress, 'offgrid-s1.local');
