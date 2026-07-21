@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { RunsMonitor } from '@/components/operations/RunsMonitor';
+import { WorkerReadinessPanel } from '@/components/services/WorkerReadinessPanel';
 import { requireModuleForUser } from '@/lib/module-access';
 import { filterRuns, paginate, parseKind, parseStatus, summarizeRuns } from '@/lib/runs-monitor';
 import { listAllRuns } from '@/lib/runs-monitor-reader';
@@ -39,11 +40,15 @@ export default async function RunsPage({
 
   return (
     <PageFrame>
-      {
+      <div className="space-y-4">
+        {/* Durable-worker health up top: when runs pile up in `running`, this immediately shows
+            WHETHER a worker is actually draining each queue (e.g. agent-worker: no poller) — the
+            signal that was previously buried in the per-service detail page. */}
+        <WorkerReadinessPanel />
         <Suspense fallback={null}>
           <RunsMonitor initial={initial} />
         </Suspense>
-      }
+      </div>
     </PageFrame>
   );
 }
