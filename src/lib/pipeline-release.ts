@@ -41,7 +41,9 @@ import {
   rollbackNote,
   type RollbackCandidate,
   type RollbackReason,
+  type RollbackTarget,
 } from '@/lib/rollback-policy';
+import { manualRollbackNote, pickVersionTarget } from '@/lib/pipeline-version';
 import { recordAudit } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
@@ -266,8 +268,25 @@ export async function rollbackToLastGood(
     };
   }
 
-  const snap = target.snapshot as Record<string, unknown>;
   const note = rollbackNote(reason, pipeline.version, target.version, opts.detail);
+  return restoreVersion(id, target, {
+    note,
+    orgId,
+    by,
+    fromVersion: pipeline.version,
+    audit: 'pipeline.autorollback',
+  });
+}
+
+// Map a frozen version snapshot back onto the live pipeline row and audit the restore. Shared by BOTH
+// rollbackToLastGood (auto) and rollbackToVersion (targeted) so the restore semantics + the RollbackResult
+// shape can never diverge (DRY). The caller has already PICKED the target (pure) + built the note.
+async function restoreVersion(
+  id: string,
+  target: RollbackTarget,
+  opts: { note: string; orgId: string; by: string; fromVersion: number; audit: 'pipeline.autorollback' | 'pipeline.rollback' },
+): Promise<RollbackResult> {
+  const snap = target.snapshot as Record<string, unknown>;
   const restored = await rollbackPipeline(
     id,
     {
@@ -288,19 +307,19 @@ export async function rollbackToLastGood(
           : undefined,
       isTemplate: typeof snap.isTemplate === 'boolean' ? snap.isTemplate : undefined,
     },
-    note,
-    orgId,
-    by,
+    opts.note,
+    opts.orgId,
+    opts.by,
   );
 
   if (!restored) {
-    return { rolledBack: false, pipeline: null, toVersion: null, fromVersion: pipeline.version, reason: 'restore failed' };
+    return { rolledBack: false, pipeline: null, toVersion: null, fromVersion: opts.fromVersion, reason: 'restore failed' };
   }
 
   recordAudit({
-    actor: actorFrom({ email: by }),
-    org: orgId,
-    action: 'pipeline.autorollback',
+    actor: actorFrom({ email: opts.by }),
+    org: opts.orgId,
+    action: opts.audit,
     resource: `pipeline:${id}`,
     outcome: 'ok',
   });
@@ -309,8 +328,56 @@ export async function rollbackToLastGood(
     rolledBack: true,
     pipeline: restored,
     toVersion: target.version,
-    fromVersion: pipeline.version,
+    fromVersion: opts.fromVersion,
   };
+}
+
+/**
+ * Roll a pipeline back to a SPECIFIC prior version the operator explicitly chose (targeted rollback).
+ * Unlike rollbackToLastGood (which auto-picks the last-good published), this restores exactly the
+ * version `toVersion`, GUARDED by the pure pickVersionTarget (must exist, be strictly older, carry a
+ * snapshot). Restores its config as live (status → published, version bumped), freezes a `Rollback
+ * (manual)` snapshot carrying the restored config + a reason, and audits `pipeline.rollback`. Honest:
+ * returns { rolledBack:false, reason } when the target is invalid — never fabricates a rollback.
+ */
+export async function rollbackToVersion(
+  id: string,
+  toVersion: number,
+  opts: { orgId?: string; by?: string; detail?: string } = {},
+): Promise<RollbackResult> {
+  const orgId = opts.orgId ?? DEFAULT_ORG;
+  const by = opts.by ?? 'system@offgrid.local';
+  const pipeline = await getPipeline(id, orgId);
+  if (!pipeline) {
+    return { rolledBack: false, pipeline: null, toVersion: null, fromVersion: null, reason: 'unknown pipeline' };
+  }
+
+  const versions = await listPipelineVersions(id, orgId);
+  const candidates: RollbackCandidate[] = versions.map((v) => ({
+    version: v.version,
+    note: v.note,
+    snapshot: v.snapshot as RollbackCandidate['snapshot'],
+  }));
+
+  const picked = pickVersionTarget(toVersion, pipeline.version, candidates);
+  if (!picked.ok || !picked.target) {
+    return {
+      rolledBack: false,
+      pipeline: null,
+      toVersion: null,
+      fromVersion: pipeline.version,
+      reason: picked.reason ?? 'invalid rollback target',
+    };
+  }
+
+  const note = manualRollbackNote(pipeline.version, picked.target.version, opts.detail);
+  return restoreVersion(id, picked.target, {
+    note,
+    orgId,
+    by,
+    fromVersion: pipeline.version,
+    audit: 'pipeline.rollback',
+  });
 }
 
 // ─── Rollback history read (for the Quality / Versions tab) ──────────────────────────────────────────
