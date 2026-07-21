@@ -1303,7 +1303,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Enforce spend and request limits on virtual keys.',
         ROUTER_ROUTE,
         'Inspect key budget',
-        'Full key + budget/RPM/TPM CRUD is live over LiteLLM DB-backed FinOps, and rate enforcement is fleet-verified. Next: surface per-key spend analytics trends + audit records on the key mutations.',
+        'Full key + budget/RPM/TPM CRUD is live over LiteLLM DB-backed FinOps, and REQUEST-RATE enforcement (RPM) is fleet-verified. IMPORTANT honesty caveat: LiteLLM dollar-budgets are cost-based, so they only bite when the routed model carries a per-token price — on the on-prem/free models the demo runs, every call computes $0 spend, so a dollar max_budget never trips (verified: two calls on a $1e-7-budget key both returned 200 and key spend stayed 0.0). For free local models RPM/TPM are the effective control; dollar-budgets bind cloud/cost-bearing routes. Next: register model cost for cost-bearing routes + surface per-key spend trends + audit records on key mutations.',
         [
           'yes',
           'LiteLLM supports per-key budget, RPM, and TPM controls.',
@@ -1312,7 +1312,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'yes',
           'The Routing view Virtual-keys panel manages budgets + RPM/TPM (create, edit-budget, revoke) with live spend/utilization + over-budget badges.',
           'yes',
-          'Fleet-proven live: a key with rpm_limit=1 admitted request 1 (HTTP 200) and BLOCKED requests 2-3 (HTTP 429) — the gateway enforces the limit; console-created keys carry real budgets (ogac-verify $3/rpm5, ogac-probe $5/rpm10).',
+          'Fleet-proven live: a key with rpm_limit=2 admitted requests 1-2 (HTTP 200) and BLOCKED requests 3-6 (HTTP 429 "Rate limit exceeded ... Current limit: 2, Remaining: 0") — REQUEST-RATE enforcement is real. Dollar-budget enforcement was NOT observed on free on-prem models: a $1e-7-budget key served calls with spend stuck at 0.0 (no model cost → no spend → budget never trips). Dollar-budgets require cost-bearing/cloud routes to bind.',
         ],
       ),
       defineCapability(
