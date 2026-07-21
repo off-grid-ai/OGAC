@@ -333,6 +333,55 @@ export function normalizeConnectionDetail(raw: unknown): ConnectionDetail {
   return detail;
 }
 
+// ─── Compose helpers — the whole get→pick→validate→apply decision, pure ───────
+// A route hands the raw ConnectionRead + the requested change here and gets back either a ready-to-
+// POST ConnectionUpdate or a reason. This keeps the route a thin I/O shell (fetch → build → post).
+export type BuildResult =
+  | { ok: true; update: Record<string, unknown> }
+  | { ok: false; error: string };
+
+export function buildScheduleUpdate(raw: unknown, input: ScheduleInput): BuildResult {
+  const valid = validateScheduleInput(input);
+  if (!valid.ok) return { ok: false, error: valid.errors.join('; ') };
+  const picked = pickConnectionUpdateFields(raw);
+  if (!picked) return { ok: false, error: 'connection not found' };
+  return { ok: true, update: applyScheduleToUpdate(picked, input) };
+}
+
+export function buildSyncModeUpdate(
+  raw: unknown,
+  streamName: string,
+  choice: SyncModeChoice,
+): BuildResult {
+  if (typeof streamName !== 'string' || !streamName.trim()) {
+    return { ok: false, error: 'streamName is required' };
+  }
+  if (!SYNC_MODE_CHOICES.includes(choice)) {
+    return { ok: false, error: `mode must be one of: ${SYNC_MODE_CHOICES.join(', ')}` };
+  }
+  const picked = pickConnectionUpdateFields(raw);
+  if (!picked) return { ok: false, error: 'connection not found' };
+  // Guard: incremental modes need a cursor already configured on the stream (Airbyte rejects an
+  // incremental stream with no cursor). Read the current detail to check.
+  const detail = normalizeConnectionDetail(raw);
+  const stream = detail.streams.find((s) => s.name === streamName);
+  if (!stream) return { ok: false, error: `stream not found: ${streamName}` };
+  const isIncremental = choice === 'incremental_append' || choice === 'incremental_dedup';
+  if (isIncremental && !(stream.cursorField && stream.cursorField.length)) {
+    return {
+      ok: false,
+      error: `stream "${streamName}" has no cursor field — incremental sync needs one`,
+    };
+  }
+  if (choice === 'incremental_dedup' && !(stream.primaryKey && stream.primaryKey.length)) {
+    return {
+      ok: false,
+      error: `stream "${streamName}" has no primary key — deduped sync needs one`,
+    };
+  }
+  return { ok: true, update: applySyncModeToStream(picked, streamName, choice) };
+}
+
 // Fold Airbyte's scheduleType (+ legacy schedule presence) onto our three-value vocabulary.
 function normalizeScheduleType(rawType: unknown, legacySchedule: unknown): ScheduleType {
   const t = String(rawType ?? '').toLowerCase();

@@ -11,11 +11,35 @@ import {
   classifySyncMode,
   applySyncModeToStream,
   normalizeConnectionDetail,
+  buildScheduleUpdate,
+  buildSyncModeUpdate,
   isTimeUnit,
   TIME_UNITS,
   SYNC_MODE_CHOICES,
   CRON_PRESETS,
 } from '../src/lib/airbyte-schedule-model.ts';
+
+const RAW_CONN = {
+  connectionId: 'conn-1',
+  name: 'CoreBank → Lake',
+  sourceId: 'src-1',
+  status: 'active',
+  scheduleType: 'manual',
+  syncCatalog: {
+    streams: [
+      {
+        stream: { name: 'loan_accounts' },
+        config: {
+          syncMode: 'incremental',
+          destinationSyncMode: 'append',
+          cursorField: ['updated_at'],
+          primaryKey: [['loan_id']],
+        },
+      },
+      { stream: { name: 'branches' }, config: { syncMode: 'full_refresh', destinationSyncMode: 'overwrite' } },
+    ],
+  },
+};
 
 // ─── validateCron ─────────────────────────────────────────────────────────────
 test('validateCron accepts 6- and 7-field Quartz expressions', () => {
@@ -270,4 +294,68 @@ test('normalizeConnectionDetail: defensive defaults on junk', () => {
 
 test('CRON_PRESETS are all valid cron', () => {
   for (const p of CRON_PRESETS) assert.equal(validateCron(p.expression), true, p.label);
+});
+
+// ─── buildScheduleUpdate ────────────────────────────────────────────────────
+test('buildScheduleUpdate: valid change → ready ConnectionUpdate without read-only fields', () => {
+  const r = buildScheduleUpdate(RAW_CONN, { type: 'cron', cronExpression: '0 0 2 * * ?' });
+  assert.equal(r.ok, true);
+  if (r.ok) {
+    assert.equal(r.update.scheduleType, 'cron');
+    assert.equal(r.update.connectionId, 'conn-1');
+    assert.ok(!('sourceId' in r.update));
+  }
+});
+
+test('buildScheduleUpdate: invalid input / missing connection → error', () => {
+  const bad = buildScheduleUpdate(RAW_CONN, { type: 'cron', cronExpression: 'nope' });
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.match(bad.error, /Quartz/);
+  const missing = buildScheduleUpdate({ name: 'x' }, { type: 'manual' });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.match(missing.error, /not found/);
+});
+
+// ─── buildSyncModeUpdate ────────────────────────────────────────────────────
+test('buildSyncModeUpdate: full-refresh needs no cursor', () => {
+  const r = buildSyncModeUpdate(RAW_CONN, 'branches', 'full_refresh_append');
+  assert.equal(r.ok, true);
+  if (r.ok) {
+    const s = (r.update.syncCatalog as { streams: Array<{ stream: { name: string }; config: Record<string, unknown> }> }).streams.find(
+      (x) => x.stream.name === 'branches',
+    );
+    assert.equal(s!.config.destinationSyncMode, 'append');
+  }
+});
+
+test('buildSyncModeUpdate: incremental requires a cursor; dedup requires a primary key', () => {
+  // branches has no cursor → incremental rejected
+  const noCursor = buildSyncModeUpdate(RAW_CONN, 'branches', 'incremental_append');
+  assert.equal(noCursor.ok, false);
+  if (!noCursor.ok) assert.match(noCursor.error, /cursor/);
+
+  // loan_accounts has cursor + pk → both allowed
+  assert.equal(buildSyncModeUpdate(RAW_CONN, 'loan_accounts', 'incremental_append').ok, true);
+  assert.equal(buildSyncModeUpdate(RAW_CONN, 'loan_accounts', 'incremental_dedup').ok, true);
+
+  // a stream with cursor but no PK → dedup rejected
+  const conn = {
+    connectionId: 'c',
+    syncCatalog: {
+      streams: [{ stream: { name: 's' }, config: { syncMode: 'incremental', destinationSyncMode: 'append', cursorField: ['u'] } }],
+    },
+  };
+  const noPk = buildSyncModeUpdate(conn, 's', 'incremental_dedup');
+  assert.equal(noPk.ok, false);
+  if (!noPk.ok) assert.match(noPk.error, /primary key/);
+});
+
+test('buildSyncModeUpdate: guards bad stream name and mode', () => {
+  assert.equal(buildSyncModeUpdate(RAW_CONN, '', 'full_refresh_overwrite').ok, false);
+  assert.equal(
+    buildSyncModeUpdate(RAW_CONN, 'branches', 'bogus' as unknown as 'full_refresh_append').ok,
+    false,
+  );
+  assert.equal(buildSyncModeUpdate(RAW_CONN, 'ghost', 'full_refresh_overwrite').ok, false);
+  assert.equal(buildSyncModeUpdate({ name: 'x' }, 's', 'full_refresh_overwrite').ok, false);
 });
