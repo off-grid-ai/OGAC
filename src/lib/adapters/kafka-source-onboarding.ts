@@ -8,12 +8,7 @@ import {
   resolveConnectorSecret,
 } from '@/lib/connector-secrets';
 import { getConnector } from '@/lib/connector-detail';
-import {
-  createDomain,
-  deleteDomain,
-  listDomains,
-  updateDomain,
-} from '@/lib/data-domains-store';
+import { createDomain, deleteDomain, listDomains, updateDomain } from '@/lib/data-domains-store';
 import {
   redactedKafkaSecurity,
   validateKafkaSource,
@@ -23,11 +18,7 @@ import {
 import { createConnector, deleteConnector, updateConnector } from '@/lib/store';
 
 export type KafkaSourceOnboardingFailure =
-  | 'invalid-input'
-  | 'unknown-source'
-  | 'not-kafka'
-  | 'ambiguous-binding'
-  | 'source-unavailable';
+  'invalid-input' | 'unknown-source' | 'not-kafka' | 'ambiguous-binding' | 'source-unavailable';
 
 export class KafkaSourceOnboardingError extends Error {
   readonly code: KafkaSourceOnboardingFailure;
@@ -132,10 +123,7 @@ async function assembleView(connectorId: string, orgId: string): Promise<KafkaSo
   };
 }
 
-export async function getKafkaSource(
-  connectorId: string,
-  orgId: string,
-): Promise<KafkaSourceView> {
+export async function getKafkaSource(connectorId: string, orgId: string): Promise<KafkaSourceView> {
   return assembleView(connectorId, orgId);
 }
 
@@ -175,8 +163,21 @@ export async function createKafkaSource(
     domainId = domain.id;
     return await assembleView(connector.id, orgId);
   } catch (error) {
-    if (domainId) await deleteDomain(domainId, orgId).catch(() => false);
-    if (connectorId) await deleteConnector(connectorId, orgId).catch(() => undefined);
+    const cleanup = await Promise.allSettled([
+      ...(domainId ? [deleteDomain(domainId, orgId)] : []),
+      ...(connectorId ? [deleteConnector(connectorId, orgId)] : []),
+    ]);
+    if (
+      cleanup.some(
+        (result) =>
+          result.status === 'rejected' || (result.status === 'fulfilled' && result.value === false),
+      )
+    ) {
+      throw new KafkaSourceOnboardingError(
+        'source-unavailable',
+        'The source could not be saved and its partial binding could not be fully removed. Stop using it until an operator repairs it.',
+      );
+    }
     if (error instanceof KafkaSourceOnboardingError) throw error;
     throw new KafkaSourceOnboardingError(
       'source-unavailable',
@@ -260,7 +261,12 @@ export async function updateKafkaSource(
       ),
       persistConnectorSecret(connectorId, oldSecret),
     ]);
-    if (rollback.some((result) => result.status === 'rejected')) {
+    if (
+      rollback.some(
+        (result) =>
+          result.status === 'rejected' || (result.status === 'fulfilled' && result.value === null),
+      )
+    ) {
       throw new KafkaSourceOnboardingError(
         'source-unavailable',
         'The update failed and the previous binding could not be fully restored. Stop using this source until an operator repairs it.',
@@ -291,7 +297,14 @@ export async function deleteKafkaSource(connectorId: string, orgId: string): Pro
       'The secret store is not writable. Nothing was deleted.',
     );
   }
-  await openBaoSecrets.remove(secretRef);
+  try {
+    await openBaoSecrets.remove(secretRef);
+  } catch {
+    throw new KafkaSourceOnboardingError(
+      'source-unavailable',
+      'The stored credential could not be removed. Nothing was deleted.',
+    );
+  }
   try {
     await db.transaction(async (tx) => {
       await tx
@@ -307,7 +320,14 @@ export async function deleteKafkaSource(connectorId: string, orgId: string): Pro
       if (deleted.length !== 1) throw new Error('connector disappeared during delete');
     });
   } catch {
-    await openBaoSecrets.set(secretRef, oldSecret).catch(() => undefined);
+    try {
+      await openBaoSecrets.set(secretRef, oldSecret);
+    } catch {
+      throw new KafkaSourceOnboardingError(
+        'source-unavailable',
+        'The delete failed and the previous credential could not be restored. Stop using this source until an operator repairs it.',
+      );
+    }
     throw new KafkaSourceOnboardingError(
       'source-unavailable',
       'The source could not be deleted. Its previous binding was retained.',

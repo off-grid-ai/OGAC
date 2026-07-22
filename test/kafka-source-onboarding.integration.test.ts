@@ -38,6 +38,7 @@ test(
   async (t) => {
     const vault = new Map<string, string>();
     let failNextWrite = false;
+    let failNextDelete = false;
     const server = createServer(async (request, response) => {
       const url = new URL(request.url ?? '/', 'http://vault');
       const match = url.pathname.match(/^\/v1\/secret\/data\/(.+)$/);
@@ -71,6 +72,11 @@ test(
         return response.end(JSON.stringify({ data: { data: { value } } }));
       }
       if (request.method === 'DELETE') {
+        if (failNextDelete) {
+          failNextDelete = false;
+          response.statusCode = 503;
+          return response.end();
+        }
         vault.delete(key);
         response.statusCode = 204;
         return response.end();
@@ -107,12 +113,8 @@ test(
     const { listConnectors, deleteConnector } = await import('@/lib/store');
     const { listDomains, deleteDomain } = await import('@/lib/data-domains-store');
     const { connectorSecretKey } = await import('@/lib/connector-secrets');
-    const {
-      createKafkaSource,
-      getKafkaSource,
-      updateKafkaSource,
-      KafkaSourceOnboardingError,
-    } = await import('@/lib/adapters/kafka-source-onboarding');
+    const { createKafkaSource, getKafkaSource, updateKafkaSource, KafkaSourceOnboardingError } =
+      await import('@/lib/adapters/kafka-source-onboarding');
     const collectionRoute = await import('@/app/api/v1/admin/kafka-sources/route');
     const sourceRoute = await import('@/app/api/v1/admin/kafka-sources/[id]/route');
     const genericConnectorRoute = await import('@/app/api/v1/admin/connectors/[id]/route');
@@ -256,6 +258,16 @@ test(
     await assert.rejects(createKafkaSource(sourceInput({ name: 'No partial source' }), ORG));
     assert.equal((await listConnectors(ORG)).length, 1);
     assert.equal((await listDomains(ORG)).length, 1);
+
+    failNextDelete = true;
+    const refusedDelete = await sourceRoute.DELETE(
+      request(`/api/v1/admin/kafka-sources/${created.connectorId}`, { method: 'DELETE' }),
+      { params: Promise.resolve({ id: created.connectorId }) },
+    );
+    assert.equal(refusedDelete.status, 502);
+    assert.equal((await listConnectors(ORG)).length, 1);
+    assert.equal((await listDomains(ORG)).length, 1);
+    assert.equal(vault.has(key), true);
 
     const deleteResponse = await sourceRoute.DELETE(
       request(`/api/v1/admin/kafka-sources/${created.connectorId}`, { method: 'DELETE' }),
