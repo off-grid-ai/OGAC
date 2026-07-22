@@ -253,13 +253,11 @@ function CatalogTab({
               {group.servers.map((server) => (
                 <Card key={server.id} className="flex flex-col">
                   <CardHeader className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base">{server.name}</CardTitle>
-                      <Badge variant="outline" className="shrink-0 font-mono text-[10px] uppercase">
+                    <CardTitle className="text-base leading-snug">{server.name}</CardTitle>
+                    <div className="flex flex-wrap items-center gap-1.5 [grid-column:1/-1]">
+                      <Badge variant="outline" className="font-mono text-[10px] uppercase">
                         {server.transport}
                       </Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
                       {server.reachesInternet ? (
                         <Badge variant="outline" className="border-amber-500/40 text-amber-700">
                           <GlobeHemisphereWest className="size-3" /> reaches internet
@@ -339,20 +337,20 @@ function PrimitivesTab() {
         {primitives.map((p) => (
           <Card key={p.id} className="flex flex-col">
             <CardHeader className="space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">{p.name}</CardTitle>
+              <div className="flex items-start justify-between gap-2 [grid-column:1/-1]">
+                <CardTitle className="text-base leading-snug">{p.name}</CardTitle>
                 <Badge
                   variant="secondary"
                   className={
                     p.enabled
-                      ? 'bg-emerald-500/10 text-emerald-600'
-                      : 'bg-muted text-muted-foreground'
+                      ? 'shrink-0 bg-emerald-500/10 text-emerald-600'
+                      : 'shrink-0 bg-muted text-muted-foreground'
                   }
                 >
                   {p.enabled ? 'enabled' : 'off (air-gap)'}
                 </Badge>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 [grid-column:1/-1]">
                 {p.reachesInternet ? (
                   <Badge variant="outline" className="border-amber-500/40 text-amber-700">
                     <GlobeHemisphereWest className="size-3" /> reaches internet
