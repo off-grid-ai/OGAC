@@ -1188,6 +1188,10 @@ export const actionOutcomeObservations = pgTable(
       sql`(${t.kind} = 'withdrawn' AND ${t.outcomeCode} IS NULL) OR (${t.kind} <> 'withdrawn' AND ${t.outcomeCode} IN ('accepted', 'rejected', 'converted', 'cured', 'settled'))`,
     ),
     check(
+      'action_outcome_observations_lifecycle_check',
+      sql`(${t.kind} = 'observed' AND ${t.supersedesId} IS NULL) OR (${t.kind} = 'corrected' AND ${t.supersedesId} IS NOT NULL) OR (${t.kind} = 'withdrawn' AND ${t.supersedesId} IS NOT NULL AND ${t.measurement} IS NULL)`,
+    ),
+    check(
       'action_outcome_observations_source_check',
       sql`${t.sourceKind} IN ('human', 'system', 'import')`,
     ),

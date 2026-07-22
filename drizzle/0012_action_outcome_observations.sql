@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS "action_outcome_observations" (
   CONSTRAINT "action_outcome_observations_outcome_check"
     CHECK (("kind" = 'withdrawn' AND "outcome_code" IS NULL)
       OR ("kind" <> 'withdrawn' AND "outcome_code" IN ('accepted', 'rejected', 'converted', 'cured', 'settled'))),
+  CONSTRAINT "action_outcome_observations_lifecycle_check"
+    CHECK (("kind" = 'observed' AND "supersedes_id" IS NULL)
+      OR ("kind" = 'corrected' AND "supersedes_id" IS NOT NULL)
+      OR ("kind" = 'withdrawn' AND "supersedes_id" IS NOT NULL AND "measurement" IS NULL)),
   CONSTRAINT "action_outcome_observations_source_check"
     CHECK ("source_kind" IN ('human', 'system', 'import')),
   CONSTRAINT "action_outcome_observations_evidence_check"
