@@ -241,3 +241,33 @@ export function updateVirtualKey(body: Record<string, unknown>, fetcher: Fetcher
 export function deleteVirtualKeys(keys: string[], fetcher: Fetcher = fetch): Promise<unknown> {
   return mgmt('/key/delete', { keys }, fetcher);
 }
+
+// ─── model deployment / provider-pool lifecycle (management writes) ─────────────────────────────
+// DB-backed model management (the g5 proxy runs STORE_MODEL_IN_DB=True): add/remove fleet + cloud
+// model deployments in the routing pool as VALIDATED transactions via /model/new + /model/delete
+// (master-key auth). This is the console-owned "publish" the routing surface needs — config-file
+// models stay the base; these layer on top and persist in the LiteLLM DB (creds encrypted by the
+// salt key). Writes THROW so the route surfaces a real error; the list is a never-throw read.
+
+/** List model deployments (raw /model/info for the pure shaper). Never throws → {data:[]}. */
+export async function listModelDeployments(fetcher: Fetcher = fetch): Promise<unknown> {
+  if (!BASE) return { data: [] };
+  try {
+    return await get(BASE, fetcher, '/model/info');
+  } catch {
+    return { data: [] };
+  }
+}
+
+/** Add a model deployment to the pool (/model/new). Returns the raw response. Throws on failure. */
+export function addModelDeployment(
+  body: Record<string, unknown>,
+  fetcher: Fetcher = fetch,
+): Promise<unknown> {
+  return mgmt('/model/new', body, fetcher);
+}
+
+/** Remove a model deployment by its LiteLLM model id (/model/delete). Throws on failure. */
+export function deleteModelDeployment(id: string, fetcher: Fetcher = fetch): Promise<unknown> {
+  return mgmt('/model/delete', { id }, fetcher);
+}

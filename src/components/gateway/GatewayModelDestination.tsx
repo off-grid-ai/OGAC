@@ -2,6 +2,7 @@ import { GatewayControl } from '@/components/gateway/GatewayControl';
 import { GatewayFleetConfig } from '@/components/gateway/GatewayFleetConfig';
 import { GatewayLogs } from '@/components/gateway/GatewayLogs';
 import { GatewayOverview } from '@/components/gateway/GatewayOverview';
+import { GatewayProviderPool } from '@/components/gateway/GatewayProviderPool';
 import { GatewayProviders } from '@/components/gateway/GatewayProviders';
 import { GatewayRouter } from '@/components/gateway/GatewayRouter';
 import { GatewayVirtualKeys } from '@/components/gateway/GatewayVirtualKeys';
@@ -15,6 +16,7 @@ export function GatewayModelDestination({ destination }: Readonly<{ destination:
     return (
       <>
         <GatewayRouter />
+        <GatewayProviderPool />
         <GatewayVirtualKeys />
       </>
     );
