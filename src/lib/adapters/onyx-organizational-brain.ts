@@ -4,6 +4,7 @@ import {
   requireBrainIngestionConnection,
   resolveBrainSourceBinding,
   selectAuthorizedBrainDocumentSet,
+  validateBrainDocument,
   type BrainAuthorizationContext,
   type BrainCitation,
   type BrainDocument,
@@ -221,11 +222,8 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
     document: BrainDocument,
   ): Promise<{ id: string; created: boolean; provenanceUri: string; originalSourceUri?: string }> {
     const connectionId = requireBrainIngestionConnection(context);
-    if (!document.sections.length || document.sections.some((section) => !section.text.trim())) {
-      throw new OnyxOrganizationalBrainError('document must contain non-empty text sections');
-    }
+    validateBrainDocument(document);
     const updatedAt = new Date(document.updatedAt);
-    if (Number.isNaN(updatedAt.valueOf())) throw new OnyxOrganizationalBrainError('document updatedAt is invalid');
     const provenanceUri = buildBrainProvenanceUri(context, document);
     const providerDocumentId = `ogac:${context.tenantId}:${document.id}`;
     const metadata: Record<string, string | readonly string[]> = {
@@ -440,7 +438,20 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
         connectionConfigured: true,
       };
     } catch (error) {
-      await this.rollbackSourceCreation(connectorId, binding.providerCredentialId, connectionId);
+      try {
+        await this.rollbackSourceCreation(connectorId, binding.providerCredentialId, connectionId);
+      } catch (cleanupError) {
+        throw new OnyxOrganizationalBrainError(
+          `Onyx source creation failed and connector ${connectorId ?? 'unknown'} cleanup also failed`,
+          undefined,
+          {
+            creation: error instanceof Error ? error.message : 'unknown creation failure',
+            cleanup: cleanupError instanceof Error ? cleanupError.message : 'unknown cleanup failure',
+            orphanConnectorId: connectorId,
+            orphanConnectionId: connectionId,
+          },
+        );
+      }
       throw error;
     }
   }
@@ -451,15 +462,20 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
     connectionId: number | undefined,
   ): Promise<void> {
     if (!connectorId) return;
-    try {
-      if (connectionId) {
+    const failures: string[] = [];
+    if (connectionId) {
+      try {
         await this.request(`/manage/connector/${connectorId}/credential/${credentialId}`, { method: 'DELETE' });
+      } catch (error) {
+        failures.push(`association cleanup: ${error instanceof Error ? error.message : 'unknown failure'}`);
       }
-      await this.request(`/manage/admin/connector/${connectorId}`, { method: 'DELETE' });
-    } catch {
-      // Preserve the original failure. Onyx exposes the partially-created connector to its own admin
-      // lifecycle; the integration owner records cleanup as a release blocker instead of hiding it.
     }
+    try {
+      await this.request(`/manage/admin/connector/${connectorId}`, { method: 'DELETE' });
+    } catch (error) {
+      failures.push(`connector cleanup: ${error instanceof Error ? error.message : 'unknown failure'}`);
+    }
+    if (failures.length) throw new OnyxOrganizationalBrainError(failures.join('; '));
   }
 
   private async authorizedDescriptor(

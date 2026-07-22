@@ -10,6 +10,7 @@ import {
   resolveBrainAuthorization,
   resolveBrainSourceBinding,
   selectAuthorizedBrainDocumentSet,
+  validateBrainDocument,
   type BrainAuthorizationContext,
 } from '../src/lib/organizational-brain/contracts.ts';
 
@@ -186,4 +187,35 @@ test('issued source policy and resolved nested config are immutable snapshots', 
     () => resolveBrainSourceBinding(grant, 'salesforce-main', { api_token: 'still-denied' }),
     BrainAuthorizationError,
   );
+});
+
+test('document ingestion validation bounds identifiers, content, metadata, time, and source URI', () => {
+  const valid = {
+    id: 'doc-1',
+    title: 'Policy',
+    semanticIdentifier: 'Policy v1',
+    sections: [{ text: 'Approved policy text.' }],
+    sourceType: 'policy',
+    sourceUri: 'https://policies.example/doc-1',
+    version: '1',
+    checksum: 'a'.repeat(64),
+    updatedAt: '2026-07-23T00:00:00Z',
+    metadata: { classification: 'internal' },
+  } as const;
+  assert.doesNotThrow(() => validateBrainDocument(valid));
+
+  const invalid = [
+    { ...valid, id: '' },
+    { ...valid, title: 'x'.repeat(513) },
+    { ...valid, semanticIdentifier: 'bad\u0000name' },
+    { ...valid, sourceUri: '/relative' },
+    { ...valid, sections: [] },
+    { ...valid, sections: [{ text: 'x'.repeat(256 * 1024 + 1) }] },
+    { ...valid, sections: Array.from({ length: 65 }, () => ({ text: 'x' })) },
+    { ...valid, metadata: Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`key${index}`, 'x'])) },
+    { ...valid, metadata: { key: 'x'.repeat(4097) } },
+    { ...valid, version: 'x'.repeat(129) },
+    { ...valid, updatedAt: 'not-a-date' },
+  ];
+  for (const document of invalid) assert.throws(() => validateBrainDocument(document), BrainPolicyError);
 });

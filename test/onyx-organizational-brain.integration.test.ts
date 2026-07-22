@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   mapOnyxSourceState,
   OnyxOrganizationalBrain,
+  OnyxOrganizationalBrainError,
 } from '../src/lib/adapters/onyx-organizational-brain.ts';
 import {
   BrainAuthorizationError,
@@ -389,4 +390,106 @@ test('nested source config mutation cannot alter the already-resolved Onyx reque
     ((fake.calls[0]?.body as Record<string, unknown>).connector_specific_config as Record<string, unknown>).objects,
     [{ name: 'Account' }],
   );
+});
+
+test('invalid and oversized ingestion is rejected before Onyx network I/O', async () => {
+  const fake = boundary(() => json({ detail: 'must not be reached' }, 500));
+  await assert.rejects(
+    () => adapter(fake.fetch).upsertDocument(manager, { ...document, id: 'x'.repeat(513) }),
+    /document id/,
+  );
+  assert.equal(fake.calls.length, 0);
+});
+
+test('source creation preserves the original failure when rollback succeeds', async () => {
+  const fake = boundary((call) => {
+    const path = new URL(call.url).pathname;
+    if (call.method === 'POST' && path === '/api/manage/admin/connector') return json({ id: 30 });
+    if (call.method === 'PUT' && path === '/api/manage/connector/30/credential/7') {
+      return json({ detail: 'association rejected' }, 400);
+    }
+    if (call.method === 'DELETE' && path === '/api/manage/admin/connector/30') return json({ success: true });
+    return json({ detail: 'unexpected' }, 500);
+  });
+
+  await assert.rejects(
+    () =>
+      adapter(fake.fetch).createSource(manager, {
+        name: 'CRM',
+        inputType: 'poll',
+        providerConfig: { objects: ['Account'] },
+        connectionBindingId: 'salesforce-main',
+        documentSetSlug: 'policies',
+      }),
+    (error: unknown) => error instanceof OnyxOrganizationalBrainError && error.status === 400,
+  );
+  assert.equal(fake.calls.some((call) => call.method === 'DELETE' && call.url.endsWith('/connector/30')), true);
+});
+
+test('source creation reports the orphan ids when compensating cleanup also fails', async () => {
+  const fake = boundary((call) => {
+    const path = new URL(call.url).pathname;
+    if (call.method === 'POST' && path === '/api/manage/admin/connector') return json({ id: 30 });
+    if (call.method === 'PUT' && path === '/api/manage/connector/30/credential/7') {
+      return json({ success: true, data: 31 });
+    }
+    if (call.method === 'GET' && path === '/api/manage/document-set') return json(documentSets());
+    if (call.method === 'PATCH' && path === '/api/manage/admin/document-set') {
+      return json({ detail: 'document set update failed' }, 500);
+    }
+    if (call.method === 'DELETE') return json({ detail: 'cleanup failed' }, 500);
+    return json({ detail: 'unexpected' }, 500);
+  });
+
+  await assert.rejects(
+    () =>
+      adapter(fake.fetch).createSource(manager, {
+        name: 'CRM',
+        inputType: 'poll',
+        providerConfig: { objects: ['Account'] },
+        connectionBindingId: 'salesforce-main',
+        documentSetSlug: 'policies',
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof OnyxOrganizationalBrainError);
+      assert.match(error.message, /connector 30 cleanup also failed/);
+      assert.deepEqual(error.detail, {
+        creation: 'Onyx request failed with 500',
+        cleanup: 'association cleanup: Onyx request failed with 500; connector cleanup: Onyx request failed with 500',
+        orphanConnectorId: 30,
+        orphanConnectionId: 31,
+      });
+      return true;
+    },
+  );
+});
+
+test('adapter bounds timeout and malformed provider responses', async () => {
+  const abortingFetch = ((_input: URL | RequestInfo, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+    })) as typeof fetch;
+  const timed = new OnyxOrganizationalBrain({
+    apiBaseUrl: 'http://onyx.internal/api',
+    apiToken: 'private-onyx-pat',
+    fetchImpl: abortingFetch,
+    timeoutMs: 5,
+  });
+  await assert.rejects(() => timed.search(manager, { query: 'policy' }), /timed out/);
+
+  const malformed = boundary(() => new Response('{not-json', { status: 200 }));
+  await assert.rejects(() => adapter(malformed.fetch).search(manager, { query: 'policy' }), /malformed JSON/);
+});
+
+test('foreign source mutation returns not found after a scoped read and performs no write', async () => {
+  const fake = boundary((call) => {
+    if (call.method === 'GET' && call.url.endsWith('/manage/document-set')) return json(documentSets());
+    return json({ detail: 'write must not be reached' }, 500);
+  });
+
+  await assert.rejects(
+    () => adapter(fake.fetch).deleteSource(manager, '21'),
+    (error: unknown) => error instanceof OnyxOrganizationalBrainError && error.status === 404,
+  );
+  assert.deepEqual(fake.calls.map((call) => call.method), ['GET']);
 });

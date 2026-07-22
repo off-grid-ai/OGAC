@@ -315,6 +315,66 @@ export type BrainDocument = Readonly<{
   metadata?: Readonly<Record<string, string | readonly string[]>>;
 }>;
 
+const DOCUMENT_FIELD_LIMIT = 512;
+const DOCUMENT_SOURCE_URI_LIMIT = 4096;
+const DOCUMENT_SECTION_LIMIT = 64;
+const DOCUMENT_SECTION_TEXT_LIMIT = 256 * 1024;
+const DOCUMENT_TOTAL_TEXT_LIMIT = 1024 * 1024;
+const DOCUMENT_METADATA_ENTRY_LIMIT = 64;
+const DOCUMENT_METADATA_KEY_LIMIT = 128;
+const DOCUMENT_METADATA_VALUE_LIMIT = 4096;
+const DOCUMENT_METADATA_ARRAY_LIMIT = 64;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+
+function boundedDocumentField(value: string, label: string, limit = DOCUMENT_FIELD_LIMIT): void {
+  if (!value.trim() || value.length > limit || CONTROL_CHARACTER_PATTERN.test(value)) {
+    throw new BrainPolicyError(`${label} is missing, too long, or contains control characters`);
+  }
+}
+
+/** Pure request-boundary validation shared by every future organizational-brain provider. */
+export function validateBrainDocument(document: BrainDocument): void {
+  boundedDocumentField(document.id, 'document id');
+  boundedDocumentField(document.title, 'document title');
+  boundedDocumentField(document.semanticIdentifier, 'document semantic identifier');
+  boundedDocumentField(document.sourceType, 'document source type', 128);
+  boundedDocumentField(document.version, 'document version', 128);
+  if (document.sourceUri !== undefined) {
+    boundedDocumentField(document.sourceUri, 'document source URI', DOCUMENT_SOURCE_URI_LIMIT);
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(document.sourceUri)) {
+      throw new BrainPolicyError('document source URI must be absolute');
+    }
+  }
+  if (!document.sections.length || document.sections.length > DOCUMENT_SECTION_LIMIT) {
+    throw new BrainPolicyError(`document must contain between 1 and ${DOCUMENT_SECTION_LIMIT} sections`);
+  }
+  let totalText = 0;
+  for (const section of document.sections) {
+    if (!section.text.trim() || section.text.length > DOCUMENT_SECTION_TEXT_LIMIT) {
+      throw new BrainPolicyError('document section text is missing or too long');
+    }
+    totalText += section.text.length;
+    if (section.heading !== undefined) boundedDocumentField(section.heading, 'document section heading');
+    if (totalText > DOCUMENT_TOTAL_TEXT_LIMIT) throw new BrainPolicyError('document text exceeds the total size limit');
+  }
+  const metadata = Object.entries(document.metadata ?? {});
+  if (metadata.length > DOCUMENT_METADATA_ENTRY_LIMIT) throw new BrainPolicyError('document has too many metadata fields');
+  for (const [key, raw] of metadata) {
+    boundedDocumentField(key, 'document metadata key', DOCUMENT_METADATA_KEY_LIMIT);
+    const values = Array.isArray(raw) ? raw : [raw];
+    if (values.length > DOCUMENT_METADATA_ARRAY_LIMIT) {
+      throw new BrainPolicyError('document metadata array has too many values');
+    }
+    for (const value of values) {
+      if (value.length > DOCUMENT_METADATA_VALUE_LIMIT || CONTROL_CHARACTER_PATTERN.test(value)) {
+        throw new BrainPolicyError('document metadata value is too long or contains control characters');
+      }
+    }
+  }
+  const updatedAt = new Date(document.updatedAt);
+  if (Number.isNaN(updatedAt.valueOf())) throw new BrainPolicyError('document updatedAt is invalid');
+}
+
 export type BrainCitation = Readonly<{
   citationId?: number;
   documentId?: string;
