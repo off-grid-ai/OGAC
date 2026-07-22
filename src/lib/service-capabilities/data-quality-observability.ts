@@ -473,8 +473,8 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
       capability('traces-observations', 'Traces, observations, and generations', 'Capture LLM spans, tokens, latency, models, inputs, outputs, and metadata.', '/insights/ai/traces', 'Open AI traces', '', [
         'yes', 'Langfuse 3.30.0 exposes trace, span, event, and generation ingestion and query APIs.',
         'yes', 'The observability adapters emit and read Langfuse trace records.',
-        'yes', 'AI Traces provides URL-driven trace and observation detail.',
-        'yes', 'The fleet records one Langfuse organization/project and live trace integration.',
+        'yes', 'AI Traces provides URL-driven trace and observation detail, and every entity (pipeline/agent/app) has an OBSERVE tab that matches its own traces by the pipeline:<id> tag stamped at emission — rollup traceCount/cost/latency + a per-trace table.',
+        'yes', 'Fleet-proven: a governed agent-run of pl_seed_org_bharat_rm-cross-sell emits a Langfuse trace tagged pipeline:pl_seed_org_bharat_rm-cross-sell, and the pipeline OBSERVE tab reads it back live (traceCount=3 over 30d) via exact tag-match, not name/userId guessing.',
       ]),
       capability('scores-evaluations', 'Scores and evaluation annotations', 'Attach numeric, categorical, or boolean evaluation scores to traces and observations.', '/solutions/quality/runs', 'Inspect evaluation runs', 'Online LLM-as-judge scoring writes trace-attributed quality/faithfulness scores to Langfuse through the governed judge chain; console-side annotation management is still partial.', [
         'yes', 'Langfuse supports score configs and trace/observation scores.',
