@@ -73,6 +73,51 @@ test('runtime spec creates a bounded CRM task against the real account id after 
   ]);
 });
 
+test('runtime spec refuses a recommendation that is not proven ready for action', () => {
+  for (const recommendation of [
+    null,
+    { ...OPPORTUNITY.recommendation!, eligible: false },
+    { ...OPPORTUNITY.recommendation!, constraints: ['Needs evidence'] },
+    { ...OPPORTUNITY.recommendation!, citations: [] },
+  ]) {
+    assert.throws(
+      () => buildBankCrossSellRuntimeSpec(APP, { ...OPPORTUNITY, recommendation }, 'crm'),
+      /not eligible for governed action/,
+    );
+  }
+});
+
+test('runtime insertion preserves unrelated actions and graph edges', () => {
+  const unrelated = {
+    id: 'existing-action',
+    label: 'Existing action',
+    kind: 'action' as const,
+    actionId: 'crm.create-task' as const,
+    connectorId: 'crm',
+    approvalStepId: 'review',
+    command: {
+      operation: 'create-task',
+      subject: 'Existing',
+      useCase: 'bank-cross-sell',
+      kind: 'call',
+      accountId: 'existing',
+    },
+  };
+  const app = {
+    ...APP,
+    steps: [APP.steps[0], unrelated, APP.steps[1], APP.steps[2]],
+    edges: [
+      { from: 'read', to: 'existing-action' },
+      { from: 'existing-action', to: 'review' },
+      { from: 'review', to: 'output' },
+    ],
+  };
+  const runtime = buildBankCrossSellRuntimeSpec(app, OPPORTUNITY, 'crm');
+  assert.ok(runtime.steps.some((step) => step.id === 'existing-action'));
+  assert.ok(runtime.edges.some((edge) => edge.from === 'read' && edge.to === 'existing-action'));
+  assert.ok(runtime.edges.some((edge) => edge.from === 'existing-action' && edge.to === 'review'));
+});
+
 test('canonical run evidence advances through approval and action receipt', () => {
   const receipt = {
     actionId: 'crm.create-task' as const,

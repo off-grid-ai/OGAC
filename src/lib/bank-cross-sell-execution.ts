@@ -44,22 +44,55 @@ export function buildBankCrossSellRuntimeSpec(
   opportunity: CrossSellOpportunityView,
   connectorId: string,
 ): AppSpec {
-  const approvalIndex = app.steps.findIndex((step) => step.kind === 'human');
-  if (approvalIndex < 0) throw new Error('Cross-sell App requires a relationship-manager review');
-  const withoutPriorAction = app.steps.filter(
-    (step) => step.id !== 'cross-sell-writeback' && step.kind !== 'action',
-  );
-  const humanIndex = withoutPriorAction.findIndex((step) => step.kind === 'human');
-  const approval = withoutPriorAction[humanIndex];
+  const recommendation = opportunity.recommendation;
+  if (
+    !recommendation?.eligible ||
+    recommendation.constraints.length > 0 ||
+    recommendation.citations.length === 0
+  ) {
+    throw new Error('Cross-sell recommendation is not eligible for governed action');
+  }
+  const approvals = app.steps.filter((step) => step.kind === 'human');
+  if (approvals.length !== 1) {
+    throw new Error('Cross-sell App requires exactly one relationship-manager review');
+  }
+  const approval = approvals[0];
+  const action = actionStepFor(opportunity, connectorId, approval.id);
+  const existingIndex = app.steps.findIndex((step) => step.id === action.id);
+  if (existingIndex >= 0) {
+    const incoming = app.edges.filter((edge) => edge.to === action.id);
+    if (incoming.length !== 1 || incoming[0].from !== approval.id) {
+      throw new Error('Cross-sell action is not attached to the approved review seam');
+    }
+    return {
+      ...app,
+      steps: app.steps.map((step, index) => (index === existingIndex ? action : step)),
+      edges: app.edges.map((edge) => ({ ...edge })),
+    };
+  }
+  const outgoing = app.edges.filter((edge) => edge.from === approval.id);
+  if (outgoing.length !== 1) {
+    throw new Error('Cross-sell review must have one supported successor');
+  }
+  const successor = outgoing[0].to;
+  const approvalIndex = app.steps.findIndex((step) => step.id === approval.id);
   const steps = [
-    ...withoutPriorAction.slice(0, humanIndex + 1),
-    actionStepFor(opportunity, connectorId, approval.id),
-    ...withoutPriorAction.slice(humanIndex + 1),
+    ...app.steps.slice(0, approvalIndex + 1),
+    action,
+    ...app.steps.slice(approvalIndex + 1),
   ];
+  const edges = app.edges.flatMap((edge) =>
+    edge === outgoing[0]
+      ? [
+          { ...edge, to: action.id },
+          { from: action.id, to: successor },
+        ]
+      : [{ ...edge }],
+  );
   return {
     ...app,
     steps,
-    edges: steps.slice(1).map((step, index) => ({ from: steps[index].id, to: step.id })),
+    edges,
   };
 }
 
