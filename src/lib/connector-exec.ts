@@ -77,13 +77,15 @@ export interface ConnectorQuery {
   op?: 'read' | 'count'; // default 'read'
   limit?: number; // row cap for reads (default 100)
   params?: Record<string, unknown>; // reserved for equality filters (applied where safe)
+  /** Server-resolved domain identity required by policy-bound source dialects such as S3. */
+  binding?: { orgId: string; domainId: string };
 }
 
 // The result of a READ: the rows plus the row count that came back and the dialect used.
 export interface ConnectorQueryResult {
   rows: Record<string, unknown>[];
   count: number;
-  dialect: 'postgres' | 'mysql' | 'mssql' | 'rest';
+  dialect: 'postgres' | 'mysql' | 'mssql' | 'rest' | 's3';
 }
 
 // ─── Dialect detection (pure) ─────────────────────────────────────────────────
@@ -188,6 +190,27 @@ export async function execConnectorQuery(
   conn: ConnectorTarget,
   query: ConnectorQuery,
 ): Promise<ConnectorQueryResult | null> {
+  // S3 cannot be selected from an endpoint alone: the persisted org/domain binding owns the bucket
+  // and prefix, and the connector id owns the vaulted keypair. Dispatch before generic dialect
+  // detection, but fail closed unless all three trusted identities are present.
+  if ((conn.type ?? '').trim().toLowerCase() === 's3') {
+    if (!conn.id || !query.binding?.orgId || !query.binding.domainId) return null;
+    const { queryGovernedObjectSource } = await import('@/lib/adapters/s3-object-query');
+    const outcome = await queryGovernedObjectSource({
+      orgId: query.binding.orgId,
+      connectorId: conn.id,
+      domainId: query.binding.domainId,
+      op: query.op,
+      limit: query.limit,
+      params: query.params,
+    });
+    if (!outcome.ok) return null;
+    return {
+      rows: outcome.result.rows.map((row) => ({ ...row })),
+      count: outcome.result.count,
+      dialect: 's3',
+    };
+  }
   const dialect = detectDialect(conn.type, conn.endpoint);
   if (!dialect) return null;
   const op = query.op ?? 'read';

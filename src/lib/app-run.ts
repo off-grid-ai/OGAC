@@ -181,7 +181,13 @@ export interface AppRunDeps {
   queryDomain: (
     domain: DomainLike,
     connector: ConnectorLike,
-    opts: { op?: 'read' | 'count'; limit?: number; params?: Record<string, unknown> },
+    opts: {
+      op?: 'read' | 'count';
+      limit?: number;
+      params?: Record<string, unknown>;
+      /** Trusted run tenant; never sourced from the App step or browser. */
+      orgId?: string;
+    },
   ) => Promise<{
     result: { rows: unknown[]; count: number; dialect: string } | null;
     detail: string;
@@ -309,7 +315,7 @@ export function defaultDeps(): AppRunDeps {
         // The adapter's DataDomain requires orgId/aliases; fill defensively from the structural shape.
         {
           id: domain.id,
-          orgId: '',
+          orgId: opts.orgId ?? '',
           label: domain.label,
           aliases: [],
           connectorId: domain.connectorId,
@@ -755,6 +761,7 @@ async function executeConnectorStep(
   const { result, detail } = await deps.queryDomain(resolved, connector, {
     op: step.op ?? 'read',
     params: step.params,
+    orgId: ctx.orgId,
   });
   if (!result) {
     // A miss (unreachable / bad binding) — recorded honestly, not fabricated. This does not error

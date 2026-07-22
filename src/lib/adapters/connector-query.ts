@@ -72,6 +72,7 @@ export async function queryDomain(
     op,
     limit,
     params: opts.params,
+    binding: { orgId: domain.orgId, domainId: domain.id },
   });
 
   if (result) {
