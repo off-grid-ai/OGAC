@@ -1,0 +1,29 @@
+# LEARNINGS — hard-won gotchas (read before you start, append when you hit one)
+
+Append-only log of non-obvious things that cost someone time. **Every agent: grep this file before starting work; append any new gotcha the moment you hit it** (mid-task, not batched at the end — your run may die first, and a parallel agent may hit the same wall while you work). One entry = the trap + the WHY + the fix. Newest at top of each section.
+
+Cross-session design decisions and fleet realities live in the orchestrator's auto-memory; this file is the in-repo mirror for anything a subagent needs and can't see there.
+
+## Build / deploy
+
+- **Build ON the server before restart — local node hides a real prod failure.** Circular imports produce a TDZ crash only under the server's node22; local node26 masks it. `npm test`/`typecheck` do NOT catch build/route errors — always run `npm run build` before calling work done and before deploy.
+- **Never full-`push.sh` per edit ("no more 8-minute bullshit").** Iterate via `next dev` hot-reload on the box (port 3005, rsync src → recompile in seconds). Run the full production build ONCE per slice, at the end.
+- **A deploy can silently no-op.** `git` is dead on the server (no Xcode CLT) so `git pull` fails silently — deploy via rsync (`push.sh`), never git. The `shared/` monorepo must be rsync'd too or `@offgrid/*` file: deps fail with "Module not found". Non-interactive SSH has a minimal PATH — call node by absolute path.
+- **`git push` can exit 0 having pushed nothing** when the branch has no upstream. Confirm `git rev-parse HEAD == git rev-parse origin/main` after pushing.
+
+## Tests / coverage
+
+- **Coverage bar is ≥85% on branches/statements/lines/functions/conditions**, enforced by the pre-push hook (`npm run coverage:check`). Measured on the unit-testable logic layer (`src/lib` pure logic + adapters' pure paths); pure-I/O glue and `.tsx` are excluded and verified by integration + build + vision instead. A file that's hard to cover usually needs a cleaner pure/I/O seam.
+- **No mocks of our own code.** Mock only at the true device/IO boundary (outbound HTTP/socket, DB client). Assert the terminal artifact, not an intermediate call. If you're mocking a lot, the code needs a cleaner seam.
+
+## Verification honesty (recurring defect)
+
+- **A probe/badge/row-existing ≠ enforced.** Exercise the REAL path and read the terminal artifact before flipping any capability gate. Restart the agent-worker too after env changes (not just the console). Dollar-budgets are $0 no-ops on free models.
+- **Report status as a gate — code / wired / verified.** "Done" means VERIFIED live, not merely merged. A premature "complete" is a defect.
+
+## Architecture invariants
+
+- **Consumption hierarchy (governing):** agent/app → pipeline → gateway → model, no skips. Internal services (eval judge, grounding, guardrails) must be agents/apps on a pipeline, never pin a model directly.
+- **Outbound sinks reuse ONE governance rail:** shadow-mode dry-run → egress leash → PII-mask-before-send → honest-degrade → ed25519 signed receipt. New sinks plug into it (pattern: `src/lib/adapters/sinks/email-resend.ts`); never fake success when unconfigured.
+- **Navigation lives in the URL/history** (route + searchParams), never client-only `useState` for a navigational position. Every entity collection is list → deep-linkable detail. Every module is full CRUD, not a read-only dashboard.
+- **Per-tenant values in the shared layout key off the signed-in org** (`currentTenantSlug`), NOT `headers().get('host')` — host flaps during client RSC nav.
