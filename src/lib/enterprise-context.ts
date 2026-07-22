@@ -649,7 +649,7 @@ export async function getEnterpriseContext(
     appEditAccessComplete = access.ok;
     appEditAllowed = access.ok && access.value.allow;
   } else if (request.appId) {
-    appEditAccessComplete = false;
+    appEditAccessComplete = requestedApp.ok && caller.ok;
     appEditAllowed = false;
   }
 
