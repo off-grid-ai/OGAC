@@ -71,7 +71,7 @@ export interface OutputStep {
   id: string;
   label: string;
   kind: 'output';
-  sink: 'console' | 'report' | 'email' | 'whatsapp';
+  sink: 'console' | 'report' | 'email' | 'whatsapp' | 'webhook' | 'slack';
   config?: Record<string, unknown>;
 }
 

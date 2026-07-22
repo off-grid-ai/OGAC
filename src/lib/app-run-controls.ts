@@ -41,7 +41,13 @@ export interface StepShape {
 }
 
 /** The output sinks that actually LEAVE THE BOX or make a durable/crypto side effect. PURE. */
-const SIDE_EFFECTING_SINKS = new Set<string>(['report', 'email', 'whatsapp']);
+const SIDE_EFFECTING_SINKS = new Set<string>([
+  'report',
+  'email',
+  'whatsapp',
+  'webhook',
+  'slack',
+]);
 
 /**
  * Is this step side-effecting (would it ACT on the outside world)? PURE. Only `output` steps can be —
@@ -101,7 +107,10 @@ export function buildWouldPerform(
     typeof v === 'string' && v.trim() ? v.trim() : undefined;
   return {
     sink,
-    recipient: str(cfg.to) ?? str(cfg.recipient) ?? str(cfg.number),
+    // Destination per sink: email/whatsapp `to`, webhook `url`, Slack `channel` (fall back to the
+    // webhook's default channel), plus the legacy recipient/number aliases.
+    recipient:
+      str(cfg.to) ?? str(cfg.url) ?? str(cfg.channel) ?? str(cfg.recipient) ?? str(cfg.number),
     subject: str(cfg.subject) ?? str(cfg.filename),
     payloadPreview: previewPayload(outcome),
   };

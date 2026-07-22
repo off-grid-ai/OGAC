@@ -53,11 +53,15 @@ export function getSinkDescriptor(kind: DeliverSinkKind): SinkDescriptor {
   return SINK_REGISTRY[kind];
 }
 
-/** One audit event the pipeline decided to emit; the caller performs the I/O (auditEnforcement). */
+/**
+ * One audit event the pipeline decided to emit; the caller performs the I/O (auditEnforcement). The
+ * outcome vocabulary matches auditEnforcement's union exactly so the caller passes it through as-is.
+ */
+export type SinkAuditOutcome = 'ok' | 'blocked' | 'redacted' | 'error';
 export interface SinkAudit {
   action: string;
   resource: string;
-  outcome: string;
+  outcome: SinkAuditOutcome;
   reason: string;
 }
 
@@ -133,12 +137,13 @@ export function planSinkGovernance(args: PlanSinkGovernanceArgs): SinkGovernance
           ],
         };
       }
-      // air-gapped: proceed unmasked (on-prem only) — record honestly that masking was skipped.
+      // air-gapped: proceed unmasked (on-prem only) — record honestly that masking was skipped. Uses
+      // outcome 'ok' (the send proceeds); the reason makes the skip explicit in the ledger.
       audits.push({
         action: 'pipeline.pii.mask',
         resource: resource(descriptor),
-        outcome: 'skipped',
-        reason: `PII detector unavailable — ${descriptor.label} is air-gapped, body stays on-prem`,
+        outcome: 'ok',
+        reason: `PII detector unavailable — ${descriptor.label} is air-gapped, masking skipped (body stays on-prem)`,
       });
     } else {
       const masked = maskTextForSend(outcome, true, args.scan);

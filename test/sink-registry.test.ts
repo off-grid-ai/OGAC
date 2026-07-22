@@ -142,7 +142,11 @@ test('air-gapped sink proceeds unmasked when detector unavailable — skipped au
   assert.equal(d.verdict, 'deliver');
   if (d.verdict !== 'deliver') return;
   assert.equal(d.body, 'secret');
-  assert.ok(d.audits.some((a) => a.action === 'pipeline.pii.mask' && a.outcome === 'skipped'));
+  assert.ok(
+    d.audits.some(
+      (a) => a.action === 'pipeline.pii.mask' && a.outcome === 'ok' && /skipped/.test(a.reason),
+    ),
+  );
 });
 
 test('no contract → deliver, no masking (legacy permissive)', () => {

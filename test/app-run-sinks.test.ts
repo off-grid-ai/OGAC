@@ -2,6 +2,27 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { AppSpec } from '@/lib/app-model';
 import { type AppRunDeps, buildInRunView, executeStep, type StepResult } from '@/lib/app-run';
+import type { PipelineContract } from '@/lib/pipeline-enforcement';
+
+// Contract builder (same as the governance unit tests): a routing leash for 'general' + an optional
+// PII-mask overlay, so the SHARED governance rail is exercised through the real executeStep path.
+function contractFor(egress: 'local' | 'cloud' | 'block', maskOn = false): PipelineContract {
+  const cloudRule = {
+    name: 'r', priority: 1, enabled: true, attribute: 'data_class',
+    operator: 'eq', value: 'general', action: 'cloud', model: '', fallback: '',
+  };
+  const routing =
+    egress === 'local'
+      ? { egressAllowed: true, rules: [] }
+      : egress === 'cloud'
+        ? { egressAllowed: true, rules: [cloudRule] }
+        : { egressAllowed: false, rules: [cloudRule] };
+  return {
+    pipelineId: 'pl_test', dataAllowlist: [], routing: routing as never,
+    orgPolicyDefaults: {}, orgGuardrailDefaults: { requirePiiMasking: { mode: 'default', bool: false } },
+    policyOverlay: {}, guardrailOverlay: maskOn ? { requirePiiMasking: { bool: true } } : {},
+  } as PipelineContract;
+}
 
 // A minimal spec whose only step we exercise is the output sink; prior results are injected directly.
 function spec(): AppSpec {
@@ -38,11 +59,17 @@ function stubDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
       };
     },
     async sendEmail() { return { ok: false, configured: false, reason: 'not configured' }; },
+    async sendWebhook() { return { ok: false, configured: false, reason: 'not configured' }; },
+    async sendSlack() { return { ok: false, configured: false, reason: 'not configured' }; },
+    async sendWhatsApp() { return { ok: false, configured: false, reason: 'not configured' }; },
   };
   return { ...base, ...over };
 }
 
-function outStep(sink: 'console' | 'report' | 'email' | 'whatsapp', config?: Record<string, unknown>) {
+function outStep(
+  sink: 'console' | 'report' | 'email' | 'whatsapp' | 'webhook' | 'slack',
+  config?: Record<string, unknown>,
+) {
   return { id: 'out', label: 'Deliver', kind: 'output' as const, sink, config };
 }
 
@@ -145,4 +172,119 @@ test('console sink is unchanged — records the outcome, no external delivery', 
   assert.equal(res.status, 'done');
   assert.equal(res.output, 'The answer is 42.');
   assert.equal(res.detail, 'sink: console');
+});
+
+// ─── outbound ACTION sinks (webhook / slack / whatsapp) — routed through deliverGovernedSink ──────
+
+test('webhook sink dispatches the run outcome + threads runId/orgId/appId, reports delivered', async () => {
+  let sent: { config: Record<string, unknown> | undefined; input: { runId: string; orgId: string; appId: string; outcome: string } } | null = null;
+  const deps = stubDeps({
+    async sendWebhook(config, input) {
+      sent = { config, input };
+      return { ok: true, configured: true, reason: 'delivered to webhook (200)' };
+    },
+  });
+  const res = await executeStep(spec(), outStep('webhook', { url: 'https://hooks.corp/in' }), PRIOR, CTX, deps);
+  assert.equal(res.status, 'done');
+  assert.equal(sent!.input.outcome, 'The answer is 42.');
+  assert.equal(sent!.input.runId, 'apprun_test1');
+  assert.equal(sent!.input.appId, 'app_sink');
+  assert.equal((sent!.config as { url: string }).url, 'https://hooks.corp/in');
+  assert.match(res.detail!, /sink: webhook — delivered/);
+});
+
+test('webhook sink — NOT CONFIGURED reports honestly (no fake success), run stays done', async () => {
+  const res = await executeStep(spec(), outStep('webhook', { url: 'https://hooks.corp/in' }), PRIOR, CTX, stubDeps());
+  assert.equal(res.status, 'done');
+  assert.match(res.detail!, /NOT CONFIGURED/);
+  assert.match(res.detail!, /not sent/);
+});
+
+test('webhook sink — a genuine send failure (configured but failed) errors the step', async () => {
+  const deps = stubDeps({
+    async sendWebhook() { return { ok: false, configured: true, reason: 'webhook POST failed (503)' }; },
+  });
+  const res = await executeStep(spec(), outStep('webhook', { url: 'https://hooks.corp/in' }), PRIOR, CTX, deps);
+  assert.equal(res.status, 'error');
+  assert.match(res.detail!, /webhook sink failed: webhook POST failed \(503\)/);
+});
+
+test('slack sink passes the outcome + channel override through, reports posted', async () => {
+  let sent: { text: string; channel?: string } | null = null;
+  const deps = stubDeps({
+    async sendSlack(input) { sent = input; return { ok: true, configured: true, reason: 'posted to Slack' }; },
+  });
+  const res = await executeStep(spec(), outStep('slack', { channel: '#ops' }), PRIOR, CTX, deps);
+  assert.equal(res.status, 'done');
+  assert.equal(sent!.text, 'The answer is 42.');
+  assert.equal(sent!.channel, '#ops');
+  assert.match(res.detail!, /sink: slack — posted to Slack/);
+});
+
+test('whatsapp sink now DELIVERS through the on-prem gateway dep (no longer "not wired")', async () => {
+  let sent: { to: string; text: string } | null = null;
+  const deps = stubDeps({
+    async sendWhatsApp(input) { sent = input; return { ok: true, configured: true, reason: 'sent via on-prem WhatsApp gateway (200)' }; },
+  });
+  const res = await executeStep(spec(), outStep('whatsapp', { to: '+919999' }), PRIOR, CTX, deps);
+  assert.equal(res.status, 'done');
+  assert.equal(sent!.to, '+919999');
+  assert.equal(sent!.text, 'The answer is 42.');
+  assert.match(res.detail!, /sink: whatsapp — sent via on-prem WhatsApp gateway/);
+  assert.doesNotMatch(res.detail!, /not wired/);
+});
+
+test('whatsapp sink — unconfigured gateway degrades honestly (not a fake send)', async () => {
+  const res = await executeStep(spec(), outStep('whatsapp', { to: '+919999' }), PRIOR, CTX, stubDeps());
+  assert.equal(res.status, 'done');
+  assert.match(res.detail!, /NOT CONFIGURED/);
+});
+
+// ─── governance parity: the shared rail gates the new cloud sinks through the real executeStep ─────
+
+test('webhook (cloud) is EGRESS-BLOCKED when the pipeline is leashed on-prem — never delivers', async () => {
+  let called = false;
+  const deps = stubDeps({ async sendWebhook() { called = true; return { ok: true, configured: true, reason: 'x' }; } });
+  const ctx = { ...CTX, contract: contractFor('block') };
+  const res = await executeStep(spec(), outStep('webhook', { url: 'https://hooks.corp/in' }), PRIOR, ctx, deps);
+  assert.equal(res.status, 'error');
+  assert.match(res.detail!, /blocked by pipeline egress leash/);
+  assert.equal(called, false); // the deliver fn is NEVER reached on a block
+});
+
+test('slack (cloud) is HELD when masking required but the PII detector throws — never delivers', async () => {
+  let called = false;
+  const deps = stubDeps({
+    async scanPii() { throw new Error('detector down'); },
+    async sendSlack() { called = true; return { ok: true, configured: true, reason: 'x' }; },
+  });
+  const ctx = { ...CTX, contract: contractFor('cloud', true) };
+  const res = await executeStep(spec(), outStep('slack', { channel: '#ops' }), PRIOR, ctx, deps);
+  assert.equal(res.status, 'error');
+  assert.match(res.detail!, /send held/);
+  assert.equal(called, false);
+});
+
+test('webhook (cloud) masks the outcome BEFORE it is handed to the deliver fn when required', async () => {
+  let deliveredBody = '';
+  const deps = stubDeps({
+    async scanPii() { return { hits: true, redacted: '[REDACTED]', entities: ['pan'], engine: 'regex' }; },
+    async sendWebhook(_c, input) { deliveredBody = input.outcome; return { ok: true, configured: true, reason: 'ok (200)' }; },
+  });
+  const ctx = { ...CTX, contract: contractFor('cloud', true) };
+  const res = await executeStep(spec(), outStep('webhook', { url: 'https://hooks.corp/in' }), PRIOR, ctx, deps);
+  assert.equal(res.status, 'done');
+  assert.equal(deliveredBody, '[REDACTED]'); // the raw outcome NEVER reaches the wire unmasked
+  assert.match(res.detail!, /PII masked before send/);
+});
+
+test('whatsapp (air-gapped) still DELIVERS even under a block leash (no cloud egress to leash)', async () => {
+  let called = false;
+  const deps = stubDeps({
+    async sendWhatsApp() { called = true; return { ok: true, configured: true, reason: 'sent (200)' }; },
+  });
+  const ctx = { ...CTX, contract: contractFor('block') };
+  const res = await executeStep(spec(), outStep('whatsapp', { to: '+919999' }), PRIOR, ctx, deps);
+  assert.equal(res.status, 'done');
+  assert.equal(called, true);
 });

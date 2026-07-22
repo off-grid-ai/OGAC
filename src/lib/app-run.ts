@@ -41,6 +41,12 @@ import {
   type AppRunState,
 } from '@/lib/app-run-plan';
 import {
+  getSinkDescriptor,
+  planSinkGovernance,
+  type DeliverSinkKind,
+  type SinkAudit,
+} from '@/lib/adapters/sinks/registry';
+import {
   emailEgressVerdict,
   emailMaskingRequired,
   maskEmailForSend,
@@ -226,6 +232,30 @@ export interface AppRunDeps {
     },
     provider?: import('@/lib/email-sink-governance').EmailProvider,
   ) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  /**
+   * OUTPUT SINK — POST the run's outcome as a SIGNED JSON payload to an operator-configured webhook
+   * URL (Phase: actions-out). Injected so the executor is unit-testable without a socket. Production
+   * wires postWebhook. The run path has already egress-leashed + PII-masked the body; this delivers it.
+   * HONEST: unconfigured (no url / no signing secret) → { configured:false }.
+   */
+  sendWebhook: (
+    config: Record<string, unknown> | undefined,
+    input: { runId: string; orgId: string; appId: string; outcome: string },
+  ) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  /**
+   * OUTPUT SINK — post the run's outcome to Slack via a vaulted incoming-webhook URL. Injected for
+   * unit-testability; production wires postSlack. The body is already masked/leash-approved.
+   */
+  sendSlack: (
+    input: { text: string; channel?: string },
+  ) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  /**
+   * OUTPUT SINK — send the run's outcome via the on-prem WhatsApp gateway (air-gapped). Injected for
+   * unit-testability; production wires sendWhatsApp. HONEST: no gateway URL → { configured:false }.
+   */
+  sendWhatsApp: (
+    input: { to: string; text: string },
+  ) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
 }
 
 // ─── defaultDeps — wire the real subsystems (lazy imports keep this module light + test-friendly) ─
@@ -329,6 +359,21 @@ export function defaultDeps(): AppRunDeps {
       }
       const { sendEmail } = await import('@/lib/adapters/sinks/email-smtp');
       return sendEmail(msg);
+    },
+    async sendWebhook(config, input) {
+      const { postWebhook } = await import('@/lib/adapters/sinks/webhook');
+      const res = await postWebhook(config, input);
+      return { ok: res.ok, configured: res.configured, reason: res.reason };
+    },
+    async sendSlack(input) {
+      const { postSlack } = await import('@/lib/adapters/sinks/slack');
+      const res = await postSlack(input);
+      return { ok: res.ok, configured: res.configured, reason: res.reason };
+    },
+    async sendWhatsApp(input) {
+      const { sendWhatsApp } = await import('@/lib/adapters/sinks/whatsapp');
+      const res = await sendWhatsApp(input.to, input.text);
+      return { ok: res.ok, configured: res.configured, reason: res.reason };
     },
   };
 }
@@ -840,7 +885,14 @@ async function executeOutputStep(
     };
   }
 
-  // whatsapp (and any future sink) — no on-prem gateway sink wired this round. Recorded honestly.
+  // webhook / slack / whatsapp — the outbound ACTION sinks. All three run the SAME governed pipeline
+  // (egress leash → PII mask → deliver → honest record) via the pure planSinkGovernance orchestrator,
+  // dispatching the actual delivery by sink type. This is the DRY seam: no per-sink governance here.
+  if (step.sink === 'webhook' || step.sink === 'slack' || step.sink === 'whatsapp') {
+    return deliverGovernedSink(step.sink, spec, step, outcome, ctx, deps);
+  }
+
+  // Any future sink not yet wired — recorded honestly, never a fake success.
   return {
     stepId: step.id,
     kind: 'output',
@@ -848,6 +900,89 @@ async function executeOutputStep(
     output: outcome,
     detail: `sink: ${step.sink} — delivery not wired (outcome available, not sent)`,
   };
+}
+
+// ─── deliverGovernedSink — the ONE governed delivery path for webhook/slack/whatsapp (DRY) ────────
+// Runs the pure planSinkGovernance decision, performs the audit I/O it prescribes, then dispatches the
+// leash-approved + masked body to the sink's injected deliver fn. HONEST-degrade + block/held are
+// recorded truthfully — never a fake success. Mirrors the email path's governance sequence exactly.
+async function deliverGovernedSink(
+  sink: DeliverSinkKind,
+  spec: AppSpec,
+  step: Extract<AppStep, { kind: 'output' }>,
+  outcome: string,
+  ctx: AppRunContext,
+  deps: AppRunDeps,
+): Promise<StepResult> {
+  const descriptor = getSinkDescriptor(sink);
+  const contract = ctx.contract ?? null;
+  const enforceCtx = { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract };
+  const emit = (audits: SinkAudit[]) => {
+    for (const a of audits) auditEnforcement(enforceCtx, a.action, a.resource, a.outcome, a.reason);
+  };
+
+  // PII scan is I/O — run it ONLY when masking is required, so the pure planner gets a real scan (or
+  // null when the detector is down, which the planner turns into a cloud HOLD / air-gapped skip).
+  let scan: Awaited<ReturnType<AppRunDeps['scanPii']>> | null | undefined;
+  if (emailMaskingRequired(contract)) {
+    try {
+      scan = await deps.scanPii(outcome, ctx.orgId);
+    } catch {
+      scan = null; // detector unavailable → the planner decides hold (cloud) vs skip (air-gapped)
+    }
+  }
+
+  const decision = planSinkGovernance({ descriptor, contract, outcome, scan });
+  emit(decision.audits);
+  if (decision.verdict === 'blocked') {
+    return errorResult(step, `${descriptor.label} delivery blocked by pipeline egress leash: ${decision.reason}`);
+  }
+  if (decision.verdict === 'held') {
+    return errorResult(step, `${descriptor.label} send held: ${decision.reason}`);
+  }
+
+  const body = decision.body;
+  const result = await dispatchSinkDelivery(sink, step, body, spec, ctx, deps);
+  if (!result.configured) {
+    return {
+      stepId: step.id,
+      kind: 'output',
+      status: 'done',
+      output: outcome,
+      detail: `sink: ${sink} — NOT CONFIGURED (${result.reason}). Outcome available, not sent.`,
+    };
+  }
+  if (!result.ok) {
+    return errorResult(step, `${descriptor.label} sink failed: ${result.reason}`);
+  }
+  return {
+    stepId: step.id,
+    kind: 'output',
+    status: 'done',
+    output: outcome,
+    detail: `sink: ${sink} — ${result.reason}${decision.masked ? ' (PII masked before send)' : ''}`,
+  };
+}
+
+// Dispatch the leash-approved, masked body to the concrete sink deps fn. THIN — no governance here.
+function dispatchSinkDelivery(
+  sink: DeliverSinkKind,
+  step: Extract<AppStep, { kind: 'output' }>,
+  body: string,
+  spec: AppSpec,
+  ctx: AppRunContext,
+  deps: AppRunDeps,
+): Promise<{ ok: boolean; configured: boolean; reason: string }> {
+  const cfg = step.config ?? {};
+  const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+  if (sink === 'webhook') {
+    return deps.sendWebhook(cfg, { runId: ctx.runId, orgId: ctx.orgId, appId: spec.id, outcome: body });
+  }
+  if (sink === 'slack') {
+    return deps.sendSlack({ text: body, channel: str(cfg.channel) });
+  }
+  // whatsapp
+  return deps.sendWhatsApp({ to: str(cfg.to) ?? str(cfg.number) ?? '', text: body });
 }
 
 // ─── runApp — run the whole spec inline to completion (or to the first human pause) ───────────────
