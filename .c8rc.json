@@ -1,17 +1,8 @@
 {
-  "reporter": [
-    "text-summary",
-    "text",
-    "json-summary",
-    "lcov"
-  ],
+  "reporter": ["text-summary", "text", "json-summary", "lcov"],
   "all": true,
-  "src": [
-    "src/lib"
-  ],
-  "include": [
-    "src/lib/**/*.ts"
-  ],
+  "src": ["src/lib"],
+  "include": ["src/lib/**/*.ts"],
   "exclude": [
     "**/*.test.ts",
     "**/*.d.ts",
@@ -204,7 +195,10 @@
     "src/lib/warehouse-model-service.ts",
     "src/lib/opa-decision-log-store.ts",
     "src/lib/adapters/opa-audit.ts",
-    "src/lib/adapters/litellm-callbacks.ts"
+    "src/lib/adapters/litellm-callbacks.ts",
+    "src/lib/egress-dlp-run.ts",
+    "src/lib/egress-policy-store.ts",
+    "src/lib/adapters/opensearch-admin.ts"
   ],
   "excludeNodeModules": true,
   "skip-full": false,
