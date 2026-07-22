@@ -140,6 +140,10 @@ test('fieldToText pretty-prints objects, passes strings, empties null', () => {
   assert.equal(fieldToText({ a: 1 }), '{\n  "a": 1\n}');
 });
 
+test('fieldToText falls back to String() when JSON.stringify throws (BigInt)', () => {
+  assert.equal(fieldToText(10n), '10');
+});
+
 // ─── shapeDatasets / shapeDataset ─────────────────────────────────────────────
 test('shapeDatasets normalizes + sorts newest-created first', () => {
   const rows: RawDataset[] = [
@@ -152,6 +156,14 @@ test('shapeDatasets normalizes + sorts newest-created first', () => {
   assert.equal(out[0].description, 'desc');
   assert.ok(out.some((d) => d.name === 'unnamed'));
   assert.deepEqual(shapeDatasets(undefined as unknown as RawDataset[]), []);
+});
+
+test('shapeDatasets tie-breaks equal createdAt by name', () => {
+  const out = shapeDatasets([
+    { id: '2', name: 'zebra', createdAt: '2026-01-01' },
+    { id: '1', name: 'alpha', createdAt: '2026-01-01' },
+  ]);
+  assert.deepEqual(out.map((d) => d.name), ['alpha', 'zebra']);
 });
 
 test('shapeDataset single row + null', () => {
@@ -172,6 +184,14 @@ test('shapeDatasetItems renders fields to text + sorts', () => {
   assert.equal(out[1].input, '{\n  "q": 1\n}');
   assert.equal(shapeDatasetItem(null), null);
   assert.equal(shapeDatasetItem(rows[0])!.id, 'i1');
+});
+
+test('shapeDatasetItems tie-breaks equal createdAt by id', () => {
+  const out = shapeDatasetItems([
+    { id: 'b', input: 'x', createdAt: '2026-01-01' },
+    { id: 'a', input: 'y', createdAt: '2026-01-01' },
+  ]);
+  assert.deepEqual(out.map((i) => i.id), ['a', 'b']);
 });
 
 // ─── shapeDatasetRuns ─────────────────────────────────────────────────────────
