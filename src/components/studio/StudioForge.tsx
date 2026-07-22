@@ -17,6 +17,10 @@ import {
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  BuilderCapabilityContext,
+  useBuilderCapabilityContext,
+} from '@/components/build/BuilderCapabilityContext';
 import { InheritanceBanner } from '@/components/build/InheritanceBanner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +29,10 @@ import {
   forgePreviewHref,
   type ForgePreview,
 } from '@/lib/builder-navigation';
+import {
+  resolveBuilderSurfaceAccess,
+  type BuilderSurfaceAccess,
+} from '@/lib/builder-surface-access';
 import type { OrgContextSummary } from '@/lib/org-context';
 
 // ─── Studio Forge — the conversational app builder (bolt.new / lovable pattern, governed) ──────────
@@ -98,6 +106,8 @@ export function StudioForge({
   const pathname = usePathname();
   const params = useSearchParams();
   const preview = forgePreviewFromQuery(params);
+  const capabilityContext = useBuilderCapabilityContext();
+  const access = resolveBuilderSurfaceAccess(capabilityContext.state, false);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [brief, setBrief] = useState(''); // accumulated description the compiler sees
   const [input, setInput] = useState('');
@@ -116,7 +126,7 @@ export function StudioForge({
 
   async function send(text: string) {
     const msg = text.trim();
-    if (msg.length < 4 || busy) return;
+    if (!access.canCreate || msg.length < 4 || busy) return;
     // First message = the brief; subsequent = refinements appended to the same brief so the compiler
     // re-plans with the full intent (reuses the one compiler; no separate refine engine to drift).
     const nextBrief = brief ? `${brief}\n\nAlso: ${msg}` : msg;
@@ -156,7 +166,7 @@ export function StudioForge({
   }
 
   async function save() {
-    if (!spec || saving) return;
+    if (!access.canSave || !spec || saving) return;
     setSaving(true);
     try {
       const res = await fetch('/api/v1/admin/apps', {
@@ -201,19 +211,7 @@ export function StudioForge({
 
         <div ref={threadRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
           {turns.length === 0 ? (
-            <div className="space-y-3 pt-2">
-              <p className="text-xs text-muted-foreground">Tell Forge what you want to build. Try:</p>
-              {EXAMPLES.map((ex) => (
-                <button
-                  key={ex}
-                  type="button"
-                  onClick={() => send(ex)}
-                  className="block w-full rounded-md border border-border px-3 py-2 text-left text-xs leading-relaxed text-muted-foreground transition-colors duration-150 hover:border-primary hover:text-foreground active:scale-[0.99]"
-                >
-                  {ex}
-                </button>
-              ))}
-            </div>
+            <ForgeExamplePrompts access={access} onSend={send} />
           ) : (
             turns.map((t, i) => (
               <div key={i} className={t.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
@@ -237,31 +235,14 @@ export function StudioForge({
           ) : null}
         </div>
 
-        <div className="border-t border-border p-3">
-          <div className="flex items-end gap-2 rounded-lg border border-border bg-background px-3 py-2 focus-within:border-primary">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  send(input);
-                }
-              }}
-              rows={Math.min(4, input.split('\n').length)}
-              placeholder={spec ? 'Refine it… (e.g. "email the result instead")' : 'Describe the app you want…'}
-              className="max-h-28 flex-1 resize-none bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-            />
-            <button
-              type="button"
-              onClick={() => send(input)}
-              disabled={busy || input.trim().length < 4}
-              className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition-all duration-150 hover:opacity-90 active:scale-95 disabled:opacity-40"
-            >
-              <ArrowUp weight="bold" className="size-4" />
-            </button>
-          </div>
-        </div>
+        <ForgeComposer
+          access={access}
+          busy={busy}
+          input={input}
+          hasSpec={Boolean(spec)}
+          onInput={setInput}
+          onSend={() => send(input)}
+        />
       </div>
 
       {/* ── RIGHT: live preview ────────────────────────────────────────────────────── */}
@@ -289,12 +270,21 @@ export function StudioForge({
               </button>
             ))}
           </div>
-          <Button size="sm" className="h-7 text-xs" disabled={!spec || saving} onClick={save}>
-            {saving ? 'Saving…' : 'Save & open'}
-          </Button>
+          <ForgeSaveControl
+            access={access}
+            hasSpec={Boolean(spec)}
+            saving={saving}
+            onSave={save}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
+          <div className="mb-4">
+            <BuilderCapabilityContext
+              state={capabilityContext.state}
+              onRetry={capabilityContext.retry}
+            />
+          </div>
           {!spec ? (
             <div className="mx-auto max-w-xl space-y-4 pt-6">
               <div className="text-center text-sm text-muted-foreground">
@@ -437,6 +427,124 @@ function GovernancePane({
           <p className="mt-2 text-[11px] text-muted-foreground/70">Save &amp; open to resolve these in the full builder.</p>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+export function ForgeExamplePrompts({
+  access,
+  onSend,
+}: Readonly<{
+  access: BuilderSurfaceAccess;
+  onSend: (example: string) => void;
+}>) {
+  return (
+    <div className="space-y-3 pt-2">
+      <p className="text-xs text-muted-foreground">Tell Forge what you want to build. Try:</p>
+      {EXAMPLES.map((example) => (
+        <button
+          key={example}
+          type="button"
+          onClick={() => onSend(example)}
+          disabled={!access.canCreate}
+          title={!access.canCreate ? access.createExplanation : undefined}
+          className="block w-full rounded-md border border-border px-3 py-2 text-left text-xs leading-relaxed text-muted-foreground transition-colors duration-150 hover:border-primary hover:text-foreground active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {example}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function ForgeComposer({
+  access,
+  busy,
+  input,
+  hasSpec,
+  onInput,
+  onSend,
+}: Readonly<{
+  access: BuilderSurfaceAccess;
+  busy: boolean;
+  input: string;
+  hasSpec: boolean;
+  onInput: (value: string) => void;
+  onSend: () => void;
+}>) {
+  const explanationId = 'forge-create-explanation';
+  return (
+    <div className="border-t border-border p-3">
+      <div className="flex items-end gap-2 rounded-lg border border-border bg-background px-3 py-2 focus-within:border-primary">
+        <textarea
+          value={input}
+          onChange={(event) => onInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              if (access.canCreate) onSend();
+            }
+          }}
+          rows={Math.min(4, input.split('\n').length)}
+          placeholder={
+            hasSpec
+              ? 'Refine it (for example, "email the result instead")'
+              : 'Describe the app you want'
+          }
+          aria-describedby={!access.canCreate ? explanationId : undefined}
+          className="max-h-28 flex-1 resize-none bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+        />
+        <button
+          type="button"
+          aria-label="Build app"
+          onClick={onSend}
+          disabled={!access.canCreate || busy || input.trim().length < 4}
+          title={!access.canCreate ? access.createExplanation : undefined}
+          className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition-all duration-150 hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ArrowUp weight="bold" className="size-4" />
+        </button>
+      </div>
+      {!access.canCreate ? (
+        <p
+          id={explanationId}
+          role="status"
+          className="mt-2 text-[11px] leading-relaxed text-muted-foreground"
+        >
+          {access.createExplanation}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function ForgeSaveControl({
+  access,
+  hasSpec,
+  saving,
+  onSave,
+}: Readonly<{
+  access: BuilderSurfaceAccess;
+  hasSpec: boolean;
+  saving: boolean;
+  onSave: () => void;
+}>) {
+  return (
+    <div className="flex max-w-sm flex-wrap items-center justify-end gap-x-2 gap-y-1">
+      {!access.canSave ? (
+        <p role="status" className="text-right text-[11px] leading-relaxed text-muted-foreground">
+          {access.saveExplanation}
+        </p>
+      ) : null}
+      <Button
+        size="sm"
+        className="h-7 shrink-0 text-xs"
+        disabled={!access.canSave || !hasSpec || saving}
+        title={!access.canSave ? access.saveExplanation : undefined}
+        onClick={onSave}
+      >
+        {saving ? 'Saving...' : 'Save and open'}
+      </Button>
     </div>
   );
 }
