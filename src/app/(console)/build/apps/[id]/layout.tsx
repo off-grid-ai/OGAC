@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AppLifecycleNav } from '@/components/build/AppLifecycleNav';
+import { AppReuseActions } from '@/components/build/AppReuseActions';
 import { PageFrame } from '@/components/PageFrame';
-import { getApp } from '@/lib/apps-store';
+import { getApp, getAppReuseMeta } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { resolveConsumerChip } from '@/lib/pipeline-chip';
 import { currentOrgId } from '@/lib/tenancy';
@@ -27,11 +28,22 @@ export default async function AppShellLayout({
   const orgId = await currentOrgId();
   const app = await getApp(id, orgId);
   if (!app) notFound();
-  const pipeline = await resolveConsumerChip(app.pipelineId ?? null, orgId).catch(() => null);
+  const [pipeline, reuse] = await Promise.all([
+    resolveConsumerChip(app.pipelineId ?? null, orgId).catch(() => null),
+    getAppReuseMeta(id, orgId).catch(() => null),
+  ]);
 
   return (
     <PageFrame className="space-y-6">
       <AppLifecycleNav appId={app.id} title={app.title} pipeline={pipeline} />
+      <div className="flex justify-end">
+        <AppReuseActions
+          appId={app.id}
+          isTemplate={reuse?.isTemplate ?? false}
+          templateVars={reuse?.templateVars ?? { vars: [] }}
+          lineage={reuse?.lineage ?? null}
+        />
+      </div>
       {children}
     </PageFrame>
   );
