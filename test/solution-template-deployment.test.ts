@@ -5,6 +5,7 @@ import type { DataDomain } from '../src/lib/data-domains.ts';
 import {
   bindSolutionActionConnector,
   capabilitySelectionProjection,
+  isCompensableSolutionClone,
   registeredTemplateMatches,
   solutionAppRequirements,
 } from '../src/lib/solution-template-deployment.ts';
@@ -106,6 +107,30 @@ test('registered template matching is exact by id or canonical published slug', 
   assert.equal(registeredTemplateMatches('collections-template-abc123', template), true);
   assert.equal(registeredTemplateMatches('collections-template', template), false);
   assert.equal(registeredTemplateMatches('', template), false);
+});
+
+test('compensation can target only the newly minted App identity in the adopting tenant', () => {
+  assert.equal(
+    isCompensableSolutionClone(app, 'org_target', {
+      id: 'app_new',
+      orgId: 'org_target',
+    }),
+    true,
+  );
+  assert.equal(
+    isCompensableSolutionClone(app, 'org_target', {
+      id: app.id,
+      orgId: 'org_target',
+    }),
+    false,
+  );
+  assert.equal(
+    isCompensableSolutionClone(app, 'org_target', {
+      id: 'app_new',
+      orgId: 'org_other',
+    }),
+    false,
+  );
 });
 
 test('solution requirements preserve data and governed action intent while rebinding the tenant connector', () => {

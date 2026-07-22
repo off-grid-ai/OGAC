@@ -124,6 +124,15 @@ export function bindSolutionActionConnector(app: AppSpec, connectorId: string): 
   };
 }
 
+/** Compensation is allowed only for the new tenant-owned identity returned by the clone boundary. */
+export function isCompensableSolutionClone(
+  source: Pick<AppSpec, 'id'>,
+  targetOrgId: string,
+  clone: Pick<AppSpec, 'id' | 'orgId'>,
+): boolean {
+  return clone.id !== source.id && clone.orgId === targetOrgId;
+}
+
 /**
  * The App runtime accepts a data-domain id, label or alias; the Enterprise Context catalogue uses
  * canonical ids. Project only the policy check to ids while preserving the human-readable runtime
@@ -201,6 +210,12 @@ export async function deployRegisteredSolutionTemplate(
       varSchema: template.templateVars,
       provided: request.values,
     });
+    if (!isCompensableSolutionClone(source, orgId, clone)) {
+      throw new SolutionTemplateDeploymentError(
+        'The template clone boundary returned an unsafe App identity',
+        'cleanup-failed',
+      );
+    }
     createdAppId = clone.id;
 
     const connectors = await listConnectors(orgId);
