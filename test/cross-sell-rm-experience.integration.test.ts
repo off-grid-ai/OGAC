@@ -6,6 +6,7 @@ import {
   CrossSellOpportunityQueue,
   type CrossSellQueueRow,
 } from '@/components/app-use/CrossSellOpportunityQueue';
+import { CrossSellCustomerJourney } from '@/components/app-use/CrossSellCustomerJourney';
 
 function row(): CrossSellQueueRow {
   return {
@@ -74,4 +75,23 @@ test('RM queue fails honestly when no live opportunities are available', () => {
   assert.match(html, /No live customer opportunities are available/);
   assert.match(html, /customer and eligibility source bindings/);
   assert.doesNotMatch(html, /Customer 1001|Aarav Sharma/);
+});
+
+test('customer journey explains recommendation, citations, governance and the human decision', () => {
+  const data = row();
+  const html = renderToStaticMarkup(
+    createElement(CrossSellCustomerJourney, {
+      slug: 'cross-sell',
+      opportunity: data.opportunity,
+      evidence: data.evidence,
+    }),
+  );
+  assert.match(html, /Recommended customer conversation/);
+  assert.match(html, /Nothing is written to CRM until a relationship manager approves/);
+  assert.match(html, /Customer relationship/);
+  assert.match(html, /Eligibility rule/);
+  assert.match(html, /Your decision/);
+  assert.match(html, /Approve and create CRM task/);
+  assert.match(html, /Governed journey/);
+  assert.doesNotMatch(html, /sample|synthetic|fallback/i);
 });

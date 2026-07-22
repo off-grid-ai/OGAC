@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation';
 import { AppUseShell } from '@/components/app-use/AppUseShell';
+import { CrossSellOpportunityQueue } from '@/components/app-use/CrossSellOpportunityQueue';
 import type { RunField } from '@/components/app-use/RunPanel';
+import { readBankCrossSellOpportunityBook } from '@/lib/adapters/bank-cross-sell-execution';
 import { sharedSurface } from '@/lib/app-surface';
 import { getAppBySlug } from '@/lib/apps-store';
-import { computeCockpitMetrics } from '@/lib/cockpit-metrics';
-import { cockpitRows, cockpitTrend } from '@/lib/cockpit-fixtures';
 import { resolveDeployedApp } from '@/lib/deployed-app';
 import type { FormField } from '@/lib/app-model';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,20 +21,40 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
   const resolved = resolveDeployedApp(app);
   if (!resolved || !app) notFound();
 
-  // The run form: whatever the app declares, else a sensible cross-sell default (never one bare box).
-  const fields = deriveRunFields(app.inputForm);
-  // The cockpit dashboard is the front door for the cross-sell app; other apps land on Run. Detect it
-  // by slug/title so we never render a cross-sell cockpit over an unrelated published app.
+  // Cross-sell is the first reference solution: its USE surface is live enterprise context, not a
+  // sample dashboard or a generic run form. Every other App retains the shared generated surface.
   const isCockpit = /cross[-\s]?sell/i.test(resolved.slug) || /cross[-\s]?sell/i.test(resolved.title);
-  // Dashboard data: live from the bound data domain when present, else the deterministic sample.
-  const metrics = isCockpit ? computeCockpitMetrics(cockpitRows()) : null;
+  if (isCockpit) {
+    const orgId = await currentOrgId();
+    const book = await readBankCrossSellOpportunityBook(resolved.slug, orgId);
+    const rows = book.opportunities.map((opportunity, index) => ({
+      opportunity,
+      evidence: book.evidence[index],
+    }));
+    return (
+      <main className="min-h-screen w-full bg-background px-4 py-6 md:px-8">
+        <div className="w-full max-w-[110rem] space-y-5">
+          <header className="flex flex-wrap items-end justify-between gap-4 border-b pb-5">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-primary">Live App</p>
+              <h1 className="mt-2 text-2xl font-semibold text-foreground">{resolved.title}</h1>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{resolved.summary}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Governed context → RM decision → CRM receipt → customer result
+            </p>
+          </header>
+          <CrossSellOpportunityQueue
+            rows={rows}
+            customerHrefBase={`/app/${encodeURIComponent(resolved.slug)}/customers/`}
+          />
+        </div>
+      </main>
+    );
+  }
 
-  // The cockpit runs its own governed next-best-action computation (deterministic, no model
-  // dependency); other apps use the generic governed run endpoint.
-  const base = sharedSurface(resolved.slug);
-  const surface = isCockpit
-    ? { ...base, runUrl: `/api/v1/app/${encodeURIComponent(resolved.slug)}/cockpit-run` }
-    : base;
+  const fields = deriveRunFields(app.inputForm);
+  const surface = sharedSurface(resolved.slug);
 
   return (
     <div className="min-h-screen w-full bg-background px-4 py-6 md:px-8">
@@ -42,8 +63,8 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           title={resolved.title}
           summary={resolved.summary}
           live={false}
-          metrics={metrics}
-          trend={cockpitTrend()}
+          metrics={null}
+          trend={[]}
           fields={fields}
           surface={surface}
         />
