@@ -10,7 +10,7 @@ live deployment.
 
 | Field                       | State                                                                                 |
 | --------------------------- | ------------------------------------------------------------------------------------- |
-| Updated                     | 2026-07-22                                                                            |
+| Updated                     | 2026-07-23                                                                            |
 | Release branch              | `main`                                                                                |
 | Registry checkpoint         | Cloud-egress DLP live proof captured from deployed `c5e8e01e1852da63a7094ca99745fb0830af7710` |
 | Logical inventory           | 48 entries: 42 platform services + 6 enterprise sources                               |
@@ -18,7 +18,7 @@ live deployment.
 | Audited denominator         | 171 capability items / 684 four-gate assessments                                      |
 | Audit backlog               | 9 entries have no versioned denominator yet                                           |
 | Readiness evidence          | Live-probed per request; not frozen into this source ledger                            |
-| Live verification           | S1 exact-SHA deploy, authorized cloud turn, tenant audit, and wide visual proof passed |
+| Live verification           | S1 exact-SHA releases retain cloud-egress and receipt-correlated outcome proof         |
 
 `not-audited` is an honest state, not 0% capability. A service moves to `current` only after its
 pinned upstream denominator and all four gates have evidence. A mutable tag must remain explicit.
@@ -79,25 +79,26 @@ receipt and no CRM mutation. `enterprise-source-crm/write-sync-webhooks` is ther
 the stale mutable source identity keeps Available at `no`, while the broad pagination/sync/webhook
 denominator remains only partially integrated, exposed, and used.
 
-### Outcome Observation Plane code-wired delta
+### Outcome Observation Plane live-verified delta — `f5338085e2ae86e0018a645187cbe02791aeab26`
 
-The frozen `ActionReceipt` now has one Console-owned post-action evidence path in source commits
-`5f488c3a..e2884441`. The server resolves the canonical receipt from the active tenant's App run;
-browser input cannot supply or replace receipt identity. It appends accepted, rejected, converted,
-cured, or settled facts, derives retry idempotency from tenant + receipt + source event, and retains
-corrections and withdrawals instead of rewriting history.
+S1 served the exact Console SHA through the Console-only release scope with one listener and HTTP 200
+on `/signin`. Backup `/Users/admin/offgrid/backups/20260723-000547/console.sql.gz` (6,273,842 bytes,
+gzip-valid) was verified before migration
+`0012` (`43694143dadeabcf036391ff9ea0ccce02e5bffa59f4a4e82543904cd969ecd9`); the deployed database
+reported the 22-column observation table, 10 validated constraints, and six indexes. The server
+resolves the canonical receipt from the active tenant's App run, so browser input cannot supply or
+replace receipt identity.
 
-| Evidence slice                        | Source state | Retained source proof                                                            | Still required before live verification                                                                 |
-| ------------------------------------- | ------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Contract and evidence lifecycle       | code-wired   | Outcome-focused suite 32/32; real PostgreSQL constraints, store, and routes pass | Back up the live database, apply `drizzle/0012_action_outcome_observations.sql`, and verify invariants.  |
-| Nontechnical run-to-result journey    | code-wired   | URL-driven create/detail/correct pages and rendered role/error states pass       | Deploy the exact Console SHA; visually verify wide/narrow; retain one real bank receipt → result path. |
-| Audit retention and replay guarantees | code-wired   | Duplicate-safe source replay; App deletion returns an explicit evidence conflict | Retain deployed observation, correction, withdrawal, audit actor, and unchanged conflicting replay.     |
+| Evidence slice                        | State         | Retained proof | Remaining breadth |
+| ------------------------------------- | ------------- | -------------- | ----------------- |
+| Contract and evidence lifecycle       | live-verified | `org_bharat/app_d07ab6a9/apprun_5e715894/create-follow-up`, canonical receipt `action:40ebe5a69ca94a8e461e0a129314e8fbe2c2ce57a1f55957012a5561c66de279`; all four snapshots matched byte-for-byte and App/run foreign keys remained `RESTRICT` | Automate governed system/import capture. |
+| Nontechnical run-to-result journey    | live-verified | Accepted HTTP 201 `aout_f0092c463fcb4a289afd`; converted HTTP 201 `aout_b87f8c14147a4f3399f6` with INR 10,000 baseline and INR 25,000 result. Exact candidate passed create → detail → Back at 1600×1000, 768×1024, and 390×844 without horizontal overflow. | Add portfolio baseline-versus-result reporting. |
+| Audit retention and replay guarantees | live-verified | Replay returned HTTP 200, `replayed:true`, and the same accepted id; correction `aout_a0311b31bdf14dc79eaa` changed accepted → rejected, while withdrawal `aout_c65fa282e33045be948b` terminated the converted fact. Four rows remain, with no duplicate source keys. Cross-tenant detail returned 404 and App deletion with evidence returned 409. | Extend the lifecycle to additional enterprise action families. |
 
-No four-gate state is promoted by this source checkpoint. The canonical
-`enterprise-source-crm/write-sync-webhooks` item stays `N/P/P/P`: its live proof still ends at the
-governed CRM action receipt. A deployed business-result record, automatic CRM/system ingestion,
-portfolio baseline-versus-result reporting, and the broader pagination/sync/webhook denominator are
-not yet retained.
+This live Outcome slice does not inflate the broader capability denominator. The canonical
+`enterprise-source-crm/write-sync-webhooks` item stays `N/P/P/P`: the source identity is still
+mutable, while automatic CRM/system ingestion, portfolio reporting, pagination, incremental sync,
+rate-limit handling, webhooks, and broader CRM CRUD remain partial or absent.
 
 ### LLM Guard 0.3.16 audit delta
 

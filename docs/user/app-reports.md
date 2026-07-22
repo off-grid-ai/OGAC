@@ -26,7 +26,9 @@ artifact of a specific run (a reimbursement decision, a triage outcome).
 These rollups describe **system run outcomes**. They do not yet aggregate the post-action business
 results recorded on an Action step (customer accepted/converted, account cured, claim settled). Open
 the individual App run's **Action and result** section to inspect those receipt-correlated facts. A
-portfolio baseline-versus-result view is still a tracked capability gap.
+live bank reference run now demonstrates an INR 10,000 baseline and INR 25,000 result on its
+converted record, but Reports does not yet roll that evidence up across a portfolio. That aggregate
+baseline-versus-result view remains a tracked capability gap.
 
 ## The signed per-run PDF
 

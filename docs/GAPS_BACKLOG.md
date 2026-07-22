@@ -1147,17 +1147,18 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   CRM mutations; pagination, incremental sync, webhooks, generic CRM CRUD, and other enterprise action
   families remain future audited slices.
 
-- **[G-OUTCOME-LIVE] CODE + WIRED; LIVE EVIDENCE PENDING — system completion is now distinct from
-  business success.** Commits `5f488c3a..e2884441` freeze one `ActionReceipt`-consuming contract and
-  implement tenant-scoped append-only PostgreSQL evidence, source-event idempotency, accepted /
-  rejected / converted / cured / settled results, retained correction/withdrawal history, thin
-  authenticated routes, and URL-driven nontechnical create/detail/correct journeys. The 32-test
-  focused suite proves the real migration, route → store → PostgreSQL path, replay conflicts,
-  tenancy, audit retention, role states, and rendered user copy. This is not live proof. Release
-  acceptance is: backup; apply `drizzle/0012_action_outcome_observations.sql`; deploy one exact
-  Console SHA; retain a real bank `ActionReceipt` → accepted → converted journey; prove exact
-  replay adds no row; correct and withdraw retained facts; confirm App deletion returns a deliberate
-  evidence-retention conflict; and visually inspect wide and narrow states.
+- **[G-OUTCOME-LIVE] RESOLVED + LIVE — system completion is distinct from business success.** Exact
+  Console `f5338085e2ae86e0018a645187cbe02791aeab26` was deployed through the Console-only scope after
+  verified gzip backup `/Users/admin/offgrid/backups/20260723-000547/console.sql.gz` and migration
+  `0012`. Bank run
+  `apprun_5e715894`, step `create-follow-up`, retained accepted result `aout_f0092c463fcb4a289afd`,
+  converted result `aout_b87f8c14147a4f3399f6` with INR 10,000 → INR 25,000 measurement, correction
+  `aout_a0311b31bdf14dc79eaa`, and withdrawal `aout_c65fa282e33045be948b`. Exact replay returned the
+  accepted id with `replayed:true` and left the final append-only history at four rows with no
+  duplicate source keys. Its effective truth is rejected plus a terminally withdrawn conversion;
+  cross-tenant detail failed closed with 404 and App deletion returned the deliberate retained-evidence 409.
+  The exact candidate's create/detail/Back journey passed 1600×1000, 768×1024, and 390×844 visual
+  checks without horizontal overflow.
 
 - **[G-OUTCOME-AUTOMATION] OPEN — observation capture and portfolio learning remain manual.** The
   first slice accepts human, system, and import source identities but exposes only the authenticated

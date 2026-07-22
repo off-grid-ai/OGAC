@@ -31,12 +31,13 @@ does not reconcile contract rows. `--apply` requires the exact deployed Console 
 only the three contract-owned Apps/pipelines, missing required domain declarations, and catalog
 seed rows; it preserves unrelated rows and refuses operator-owned naming/binding collisions.
 
-The Outcome Observation Plane is now code-wired against the frozen governed `ActionReceipt` without
-creating another service family or capability denominator. It gives the three journeys one
-tenant-scoped, append-only result lifecycle and plain-language run UI. It is not live evidence until
-the checked-in migration and exact Console SHA are deployed and a real flagship receipt is correlated
-to a retained result. The existing `enterprise-source-crm/write-sync-webhooks` row therefore remains
-`N/P/P/P`.
+The Outcome Observation Plane is live against the frozen governed `ActionReceipt` without creating
+another service family or capability denominator. Exact Console
+`f5338085e2ae86e0018a645187cbe02791aeab26` retained a tenant-scoped accepted → converted → corrected /
+withdrawn bank-result history against run `apprun_5e715894`, including an INR 10,000 baseline and INR
+25,000 result. This closes the shared manual receipt-to-result lifecycle, not the broader CRM source
+denominator. `enterprise-source-crm/write-sync-webhooks` remains `N/P/P/P` until its mutable source,
+automatic sync/webhooks, pagination, rate-limit handling, and broader CRUD gaps are closed.
 
 ## Minimum closure set
 
@@ -71,7 +72,7 @@ governed step execution, human pause/resume, failure recovery, and output persis
 | Indemnity/FNOL             | `enterprise-source-minio/object-read-write` | Y/N/P/N  | The pinned service provides S3 APIs; only source ontology is visible.                        | Implement governed bucket/key-scoped claim-document read/write with limits, provenance, and workflow proof.            |
 | Delinquency and cross-sell | `enterprise-source-corebank/sql-read`       | N/Y/Y/Y  | Bounded PostgreSQL reads, Data Sources UI, and retained lender/claims lookup evidence exist. | Pin the mutable source and repeat schema/count/read evidence.                                                          |
 | Delinquency and cross-sell | `enterprise-source-crm/rest-read`           | N/Y/Y/Y  | Bounded CRM reads, UI journeys, and retained customer/cross-sell lookup evidence exist.      | Pin the mutable source and repeat discovery/read evidence.                                                             |
-| Delinquency and cross-sell | `enterprise-source-crm/write-sync-webhooks` | N/P/P/P  | Console `16fa96443c79` proves a governed bank task write, approval evidence, signed receipt, duplicate-safe replay, and zero-mutation shadow run. Receipt-correlated business results are code-wired and test-proven, not deployed. | Deploy migration + Console, retain one real receipt → result → correction/withdrawal journey, then add typed pagination, incremental state, rate-limit handling, webhooks, and broader audited CRM CRUD. |
+| Delinquency and cross-sell | `enterprise-source-crm/write-sync-webhooks` | N/P/P/P  | Console `16fa96443c79` proves the governed write; Console `f5338085e2ae86e0018a645187cbe02791aeab26` retains accepted, converted, corrected, withdrawn, replay, tenant-denial, and evidence-retention proof against the same receipt. | Add typed pagination, incremental state, rate-limit handling, governed webhook/import capture, and broader audited CRM CRUD. |
 
 ## Insurance indemnity / FNOL
 

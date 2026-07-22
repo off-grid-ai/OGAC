@@ -94,6 +94,11 @@ Only admins can record, correct, or withdraw business results. Other roles see a
 state. Deleting an App with retained result evidence is intentionally blocked so audit history cannot
 be erased accidentally.
 
+This journey is live on the bank reference run: the same signed action receipt retained customer
+acceptance, later conversion with an INR 10,000 baseline and INR 25,000 result, and the complete
+correction/withdrawal history. Retrying the accepted source event returned the original record rather
+than creating a duplicate.
+
 Current boundary: results are recorded from the run journey. Automatic CRM webhook/import capture
 and portfolio baseline-versus-result reporting are not yet available, so one recorded result must not
 be treated as automated learning or ROI proof.
