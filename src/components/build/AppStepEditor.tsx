@@ -4,6 +4,7 @@ import {
   AppWindow,
   CaretDown,
   CaretUp,
+  CheckSquareOffset,
   Database,
   FileText,
   Globe,
@@ -15,22 +16,45 @@ import {
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useState } from 'react';
+import { ActionStepConfiguration } from '@/components/actions/ActionStepConfiguration';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { describeStepBinding, type BindingNames } from '@/lib/app-builder';
+import { describeStepBinding, type ActionStepPatch, type BindingNames } from '@/lib/app-builder';
 import type { AppStep, AppStepKind, OutputStep } from '@/lib/app-model';
 
 // ─── Tool catalog shape (mirrors GET /api/v1/admin/tool-catalog) ──────────────────────────────────
-interface AppToolEntry { id: string; ref: string; name: string; description: string; cyclic: boolean }
-interface PrimitiveEntry {
-  id: string; ref: string; name: string; description: string; enabled: boolean;
-  reachesInternet: boolean; airgapNote: string;
+interface AppToolEntry {
+  id: string;
+  ref: string;
+  name: string;
+  description: string;
+  cyclic: boolean;
 }
-interface RegisteredEntry { id: string; ref: string; name: string; description: string; type: string; policy: string }
-interface ToolCatalog { apps: AppToolEntry[]; primitives: PrimitiveEntry[]; registered: RegisteredEntry[] }
+interface PrimitiveEntry {
+  id: string;
+  ref: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  reachesInternet: boolean;
+  airgapNote: string;
+}
+interface RegisteredEntry {
+  id: string;
+  ref: string;
+  name: string;
+  description: string;
+  type: string;
+  policy: string;
+}
+interface ToolCatalog {
+  apps: AppToolEntry[];
+  primitives: PrimitiveEntry[];
+  registered: RegisteredEntry[];
+}
 
 // ─── AppStepEditor (Builder Epic Phase 3A) ────────────────────────────────────────────────────────
 // One card in the ordered step skeleton. Renders the step's kind icon + label + a per-kind binding
@@ -57,6 +81,8 @@ export interface StepEditorHandlers {
   /** Set the tool refs an inline agent step may call (#117 composable tools). Optional: when absent
    *  the tool picker is hidden (a host that hasn't wired tool-setting yet). */
   onSetTools?: (toolRefs: string[]) => void;
+  /** Configure a governed enterprise action through the pure AppSpec reducer. */
+  onConfigureAction?: (patch: ActionStepPatch) => void;
 }
 
 const KIND_META: Record<AppStepKind, { icon: React.ReactNode; noun: string }> = {
@@ -65,6 +91,7 @@ const KIND_META: Record<AppStepKind, { icon: React.ReactNode; noun: string }> = 
   guardrail: { icon: <ShieldCheck className="size-4" />, noun: 'Guardrail check' },
   human: { icon: <FileText className="size-4" />, noun: 'Human review / approve' },
   output: { icon: <FileText className="size-4" />, noun: 'Output result' },
+  action: { icon: <CheckSquareOffset className="size-4" />, noun: 'Complete an action' },
 };
 
 // Delivery sinks the operator can pick. ALL of these DELIVER for real (each honest-degrades to "not
@@ -90,6 +117,8 @@ export function AppStepEditor({
   names,
   handlers,
   appId,
+  connectors = [],
+  approvalSteps = [],
 }: Readonly<{
   step: AppStep;
   index: number;
@@ -98,12 +127,15 @@ export function AppStepEditor({
   handlers: StepEditorHandlers;
   /** The id of the app being edited — so the tool picker can flag apps-as-tools that would cycle. */
   appId?: string;
+  connectors?: { id: string; name: string; type: string; endpoint?: string }[];
+  approvalSteps?: { id: string; label: string }[];
 }>) {
   const meta = KIND_META[step.kind];
   const binding = describeStepBinding(step, names);
   const unbound =
     (step.kind === 'connector-query' && !step.domain?.trim()) ||
-    (step.kind === 'agent' && !step.agentId && !step.inlineAgent?.systemPrompt?.trim());
+    (step.kind === 'agent' && !step.agentId && !step.inlineAgent?.systemPrompt?.trim()) ||
+    (step.kind === 'action' && (!step.connectorId.trim() || !step.approvalStepId));
 
   return (
     <div className="rounded-md border border-border bg-background">
@@ -123,7 +155,13 @@ export function AppStepEditor({
             placeholder={meta.noun}
             className="h-8 text-sm"
           />
-          <p className={unbound ? 'mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-500' : 'mt-1 text-[11px] text-muted-foreground'}>
+          <p
+            className={
+              unbound
+                ? 'mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-500'
+                : 'mt-1 text-[11px] text-muted-foreground'
+            }
+          >
             {unbound ? <Warning className="size-3" /> : null}
             {binding}
           </p>
@@ -173,8 +211,14 @@ export function AppStepEditor({
         {step.kind === 'connector-query' ? (
           <ConnectorBinding step={step} names={names} handlers={handlers} />
         ) : null}
-        {step.kind === 'output' ? (
-          <OutputBinding step={step} handlers={handlers} />
+        {step.kind === 'output' ? <OutputBinding step={step} handlers={handlers} /> : null}
+        {step.kind === 'action' ? (
+          <ActionStepConfiguration
+            step={step}
+            configure={handlers.onConfigureAction}
+            connectors={connectors}
+            approvalSteps={approvalSteps}
+          />
         ) : null}
         {step.kind === 'guardrail' ? (
           <p className="text-[11px] text-muted-foreground">
@@ -230,8 +274,8 @@ function OutputBinding({
         <p className="self-end pb-1 text-[11px] text-muted-foreground">
           Every channel delivers for real and reports &ldquo;not configured&rdquo; honestly if its
           credentials aren&apos;t set up — it never fakes a send. Cloud channels (email via Resend,
-          webhook, Slack) only leave the box when your pipeline&apos;s egress policy allows it, and PII
-          is masked before it crosses the wire. The outcome is always recorded to the console.
+          webhook, Slack) only leave the box when your pipeline&apos;s egress policy allows it, and
+          PII is masked before it crosses the wire. The outcome is always recorded to the console.
         </p>
       </div>
 
@@ -356,7 +400,9 @@ function AgentBinding({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Use an existing agent, or write instructions</Label>
+        <Label className="text-xs text-muted-foreground">
+          Use an existing agent, or write instructions
+        </Label>
         <select
           value={step.agentId ?? ''}
           onChange={(e) => handlers.onRebindAgent(e.target.value)}
@@ -417,7 +463,9 @@ function ConnectorBinding({
   const domains = names.domains ?? [];
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">Which data source does this step read?</Label>
+      <Label className="text-xs text-muted-foreground">
+        Which data source does this step read?
+      </Label>
       {domains.length === 0 ? (
         <p className="text-[11px] text-amber-600 dark:text-amber-500">
           No data domains declared for your org yet — add a data-domain mapping (Data → Domains) so
@@ -468,11 +516,20 @@ function ToolPicker({
     fetch(`/api/v1/admin/tool-catalog${qs}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('load'))))
       .then((data: ToolCatalog) => {
-        if (live) { setCatalog(data); setError(false); }
+        if (live) {
+          setCatalog(data);
+          setError(false);
+        }
       })
-      .catch(() => { if (live) setError(true); })
-      .finally(() => { if (live) setLoading(false); });
-    return () => { live = false; };
+      .catch(() => {
+        if (live) setError(true);
+      })
+      .finally(() => {
+        if (live) setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
   }, [appId]);
 
   const toggle = (ref: string) => {
@@ -503,7 +560,11 @@ function ToolPicker({
       ) : catalog ? (
         <div className="space-y-3 pt-1">
           {/* 1. Your apps */}
-          <ToolGroup icon={<AppWindow className="size-3.5" />} title="Your apps" hint="Published apps, used as building blocks.">
+          <ToolGroup
+            icon={<AppWindow className="size-3.5" />}
+            title="Your apps"
+            hint="Published apps, used as building blocks."
+          >
             {catalog.apps.length === 0 ? (
               <EmptyRow text="No published apps yet — publish one to reuse it here." />
             ) : (
@@ -511,7 +572,9 @@ function ToolPicker({
                 <ToolRow
                   key={a.ref}
                   name={a.name}
-                  description={a.cyclic ? 'Would create a loop with this app — not allowed.' : a.description}
+                  description={
+                    a.cyclic ? 'Would create a loop with this app — not allowed.' : a.description
+                  }
                   checked={selected.includes(a.ref)}
                   disabled={a.cyclic}
                   onToggle={() => toggle(a.ref)}
@@ -521,7 +584,11 @@ function ToolPicker({
           </ToolGroup>
 
           {/* 2. Primitives */}
-          <ToolGroup icon={<PuzzlePiece className="size-3.5" />} title="Primitives" hint="Small built-in tools.">
+          <ToolGroup
+            icon={<PuzzlePiece className="size-3.5" />}
+            title="Primitives"
+            hint="Small built-in tools."
+          >
             {catalog.primitives.map((p) => (
               <ToolRow
                 key={p.ref}
@@ -550,7 +617,11 @@ function ToolPicker({
           </ToolGroup>
 
           {/* 3. Registered tools */}
-          <ToolGroup icon={<Plugs className="size-3.5" />} title="Registered tools" hint="HTTP / MCP tools your org set up.">
+          <ToolGroup
+            icon={<Plugs className="size-3.5" />}
+            title="Registered tools"
+            hint="HTTP / MCP tools your org set up."
+          >
             {catalog.registered.length === 0 ? (
               <EmptyRow text="No registered tools — add one under Tools." />
             ) : (

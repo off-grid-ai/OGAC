@@ -4,7 +4,11 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ActionImpactSummary } from '@/components/actions/ActionImpactSummary';
 import { ActionExecutionReceipt } from '@/components/actions/ActionExecutionReceipt';
-import { planActionImpact, type ActionReceipt } from '@/lib/action-contract';
+import {
+  confirmOnPremActionImpact,
+  planActionImpact,
+  type ActionReceipt,
+} from '@/lib/action-contract';
 
 test('action impact explains the external change, data boundary, approval and retained proof', () => {
   const impact = planActionImpact({
@@ -28,24 +32,27 @@ test('action impact explains the external change, data boundary, approval and re
   assert.match(html, /Create CRM follow-up task for opp-priya/);
   assert.match(html, /CRM/);
   assert.match(html, /Data leaving your organization/);
-  assert.match(html, /No data leaves your organization/);
+  assert.match(html, /Select an approved internal connection to verify the boundary/);
   assert.match(html, /Approval required before execution/);
   assert.match(html, /Branch manager or campaign owner/);
   assert.match(html, /CRM record identifier/);
   assert.match(html, /md:grid-cols-2/);
   assert.doesNotMatch(html, /Kestra|Temporal|sink payload|plugin/i);
+  assert.doesNotMatch(html, /maker-checker|shadow-/i);
 });
 
 test('action impact states when no data leaves and no approval is needed', () => {
   const impact = {
-    ...planActionImpact({
-      id: 'action-1',
-      kind: 'action' as const,
-      actionId: 'crm.update-task' as const,
-      connectorId: 'crm-main',
-      command: { taskId: 'task-1' },
-      approvalStepId: 'approve-1',
-    }),
+    ...confirmOnPremActionImpact(
+      planActionImpact({
+        id: 'action-1',
+        kind: 'action' as const,
+        actionId: 'crm.update-task' as const,
+        connectorId: 'crm-main',
+        command: { taskId: 'task-1' },
+        approvalStepId: 'approve-1',
+      }),
+    ),
     sideEffects: [],
     approval: { required: false, status: 'not-required' as const },
   };
@@ -88,6 +95,7 @@ test('completed action receipt keeps the execution proof visible', () => {
   assert.match(html, /Approved by the branch manager/);
   assert.match(html, /Signed provider receipt/);
   assert.match(html, /Retained evidence/);
+  assert.doesNotMatch(html, /shadow-/);
 });
 
 test('replayed receipt states that the retained result prevented a duplicate change', () => {

@@ -30,6 +30,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   addStep,
+  configureActionStep,
   moveStep,
   rebindAgent,
   rebindDomain,
@@ -100,6 +101,7 @@ const STEP_KINDS: { kind: AppStepKind; label: string }[] = [
   { kind: 'agent', label: 'Agent step' },
   { kind: 'guardrail', label: 'Guardrail' },
   { kind: 'human', label: 'Human review' },
+  { kind: 'action', label: 'Complete an action' },
   { kind: 'output', label: 'Output' },
 ];
 
@@ -295,6 +297,7 @@ export function AppBuilder({
       onSetSinkConfig: (key, value) =>
         setSpec((s) => (s ? setOutputConfigField(s, stepId, key, value) : s)),
       onSetTools: (refs) => setSpec((s) => (s ? setStepTools(s, stepId, refs) : s)),
+      onConfigureAction: (patch) => setSpec((s) => (s ? configureActionStep(s, stepId, patch) : s)),
     };
   }
 
@@ -347,6 +350,7 @@ export function AppBuilder({
               pipelines={pipelines}
               highlightStep={highlightStep}
               handlersFor={handlersFor}
+              connectors={connectors}
               onSpec={setSpec}
             />
           ) : (
@@ -466,6 +470,7 @@ function GuidedRefine({
   pipelines,
   highlightStep,
   handlersFor,
+  connectors,
   onSpec,
 }: Readonly<{
   spec: AppSpec;
@@ -473,6 +478,7 @@ function GuidedRefine({
   pipelines: { id: string; name: string }[];
   highlightStep: string | null;
   handlersFor: (id: string) => StepEditorHandlers;
+  connectors: ConnectorOption[];
   onSpec: (fn: (s: AppSpec | null) => AppSpec | null) => void;
 }>) {
   return (
@@ -507,6 +513,11 @@ function GuidedRefine({
                     names={names}
                     handlers={handlersFor(step.id)}
                     appId={spec.id}
+                    connectors={connectors}
+                    approvalSteps={spec.steps
+                      .slice(0, i)
+                      .filter((candidate) => candidate.kind === 'human')
+                      .map((candidate) => ({ id: candidate.id, label: candidate.label }))}
                   />
                 </div>
               </div>

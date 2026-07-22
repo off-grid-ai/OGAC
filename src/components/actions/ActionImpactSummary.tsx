@@ -48,8 +48,12 @@ export function ActionImpactSummary({
           icon={<ArrowSquareOut className="size-4" />}
           label="Data leaving your organization"
         >
-          {!impact.egress.dataLeavesOrganisation ? (
+          {impact.egress.dataLeavesOrganisation === false ? (
             <p className="text-xs text-foreground">No data leaves your organization.</p>
+          ) : impact.egress.dataLeavesOrganisation === null ? (
+            <p className="text-xs text-foreground">
+              Select an approved internal connection to verify the boundary.
+            </p>
           ) : (
             <p className="text-xs text-foreground">
               Action data crosses the organization boundary.
