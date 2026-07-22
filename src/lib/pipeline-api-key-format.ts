@@ -154,6 +154,17 @@ export function pipelineTag(pipelineId: string): string {
   return `pipeline:${pipelineId}`;
 }
 
+// The per-entity Langfuse trace match for a pipeline — the ONE place the pipeline observability
+// surfaces (fetch route + OBSERVE tab) derive their `EntityMatch`, so tag/id attribution can't drift
+// between them (DRY). Matches traces naming the canonical `pipeline:<id>` tag OR the bare id (the
+// latter preserves the pre-existing best-effort match). Pure — returns a plain descriptor, no I/O.
+export function pipelineTraceMatch(pipelineId: string): {
+  id: string;
+  tags: string[];
+} {
+  return { id: pipelineId, tags: [pipelineTag(pipelineId), pipelineId] };
+}
+
 // PA-12 — the ONE canonical tag-derivation used at every telemetry SOURCE (traces, eval_runs, cost,
 // audit) so per-pipeline lenses filter EXACTLY on one form. Given a run's bound pipeline id (or
 // null/empty when no pipeline governs the run), returns the canonical `pipeline:<id>` tag or null.

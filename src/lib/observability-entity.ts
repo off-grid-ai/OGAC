@@ -16,8 +16,8 @@
 //
 // Everything below is pure + deterministic and covered by test/observability-entity.test.ts.
 
-import type { LangfuseScore, LangfuseTrace } from './langfuse';
-import { type ScoreTrendSeries, shapeScoreTrends } from './langfuse';
+import type { LangfuseObservation, LangfuseScore, LangfuseTrace } from './langfuse';
+import { buildWaterfall, type ScoreTrendSeries, shapeScoreTrends, type WaterfallSpan } from './langfuse';
 
 // ─── entity match descriptor ──────────────────────────────────────────────────────────────────────
 // How to recognise THIS entity's traces. An entity supplies tag substrings, an explicit trace-id set,
@@ -221,4 +221,84 @@ export function scoresForTrace(scores: LangfuseScore[], traceId: string): TraceS
       if ((a.timestamp ?? '') > (b.timestamp ?? '')) return -1;
       return a.name.localeCompare(b.name);
     });
+}
+
+// ─── time-window narrowing ────────────────────────────────────────────────────────────────────────
+// Langfuse's traces list endpoint has no reliable per-entity server-side filter, so the adapter pulls
+// a recent page and we narrow client-side by BOTH the entity match AND the selected time window.
+// Pure: keep traces whose timestamp falls in [fromIso, toIso]. A trace with no parseable timestamp is
+// kept (honest — we don't silently drop a real trace just because its ts is missing/odd). Bounds are
+// inclusive; an undefined bound means "unbounded on that side". Input order preserved (newest-first).
+export function filterTracesByWindow(
+  traces: LangfuseTrace[],
+  fromIso?: string,
+  toIso?: string,
+): LangfuseTrace[] {
+  const from = fromIso ? Date.parse(fromIso) : Number.NEGATIVE_INFINITY;
+  const to = toIso ? Date.parse(toIso) : Number.POSITIVE_INFINITY;
+  return traces.filter((t) => {
+    const ts = t.timestamp ? Date.parse(t.timestamp) : Number.NaN;
+    if (Number.isNaN(ts)) return true;
+    return ts >= from && ts <= to;
+  });
+}
+
+// ─── trace detail (span waterfall + generation summary) ─────────────────────────────────────────────
+// One trace's drill-down: the header metadata (from its list row), the span/generation waterfall, the
+// distinct models it touched, and its attached judge/eval scores. Reuses the pure `buildWaterfall`
+// (langfuse.ts) and `scoresForTrace` above — no duplicated logic (DRY).
+export interface TraceDetail {
+  id: string;
+  name: string;
+  userId: string | null;
+  timestamp: string | null;
+  latency: number | null;
+  cost: number | null;
+  /** total span count on the trace */
+  spanCount: number;
+  /** how many of those spans are LLM generations */
+  generationCount: number;
+  /** distinct model ids seen across the spans, sorted */
+  models: string[];
+  spans: WaterfallSpan[];
+  scores: TraceScoreRow[];
+}
+
+// Pure: is a span an LLM generation? Langfuse types generations as 'GENERATION' (case-insensitive).
+function isGeneration(type: string | null | undefined): boolean {
+  return (type ?? '').toUpperCase() === 'GENERATION';
+}
+
+// Pure: the distinct, sorted model ids referenced by a trace's observations (blank/null dropped).
+export function modelsForObservations(obs: LangfuseObservation[]): string[] {
+  const set = new Set<string>();
+  for (const o of obs) {
+    const m = (o.model ?? '').trim();
+    if (m) set.add(m);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+// Pure: assemble a trace's full detail from its list row, its observations, and the entity's scores.
+// `row` may be null when the trace metadata wasn't in the recent list page — the detail still renders
+// from the observations + scores (honest partial, never fabricated).
+export function shapeTraceDetail(
+  traceId: string,
+  row: TraceRow | null,
+  observations: LangfuseObservation[],
+  scores: LangfuseScore[],
+): TraceDetail {
+  return {
+    id: traceId,
+    name: row?.name ?? traceId,
+    userId: row?.userId ?? null,
+    timestamp: row?.timestamp ?? null,
+    latency: row?.latency ?? null,
+    cost: row?.cost ?? null,
+    spanCount: observations.length,
+    generationCount: observations.filter((o) => isGeneration(o.type)).length,
+    models: modelsForObservations(observations),
+    spans: buildWaterfall(observations),
+    scores: scoresForTrace(scores, traceId),
+  };
 }
