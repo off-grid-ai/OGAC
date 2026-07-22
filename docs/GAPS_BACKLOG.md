@@ -1144,3 +1144,23 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
 
 ## Pre-existing per-file coverage debt (logged 2026-07-21)
 - c8 `--per-file` fails on files NOT in recent diffs: `lib/reports/model.ts` (62.5% br), `lib/reports/validate.ts` (61.9% br), `lib/retrieval/types.ts` (0% — type-only file, c8 quirk; should be excluded), `lib/qa/status.ts` (0%), `lib/exporters/openlineage.ts` (76%) + `store.ts` (68.5% br), `lib/service-capabilities/data-quality-observability.ts` (71.4% br, data file). Global aggregate is 95.71%/88.37% (passes). Fix: add tests or add type-only/excluded files to `.c8rc` exclusions. Pre-existing — not introduced by the parallel-3 merge.
+
+## Capability-map honesty drift (pre-existing, found 2026-07-22)
+
+Snapshot tests in `test/service-capabilities-*.test.ts` fail against the current map. NOT caused by
+observability #20 work — present before commit 9569383a. Two classes, both need a deliberate
+gate-status vs gap-text reconciliation (do NOT rubber-stamp gates to green the tests):
+
+1. **all-`yes`-but-non-empty-`gap`** (violates the honesty invariant `gap⇔incomplete`). The gap text
+   describes residual/scale work, so the honest fix is per-capability: either downgrade the real gate
+   to `partial` (if the residual is a genuine gap) or move the note to evidence + clear the gap (if
+   it's an aspirational enhancement, capability genuinely complete). Records:
+   `ragas/faithfulness`, `ragas/answer-relevancy`, `llm-guard/prompt-sanitization`,
+   `opa/policy-decisions`, `opa/policy-lifecycle`, `openbao/dynamic-credentials`,
+   `litellm/budgets-rate-limits` (⚠ dollar-budgets are $0 no-ops on free models — workflow gate is
+   likely `partial`, not `yes`), `litellm/virtual-keys`, `litellm/spend-analytics`.
+   (`evidently/dataset-drift` in this class was fixed — its gap referenced other line-items, not itself.)
+2. **stale snapshot arrays**: `runtime-governance-operations.test.ts` locks exact gate arrays for
+   `llm-guard` (output-safety-quality, prompt-sanitization) and the common execution-spine record that
+   no longer match the map. Reconcile the test to the *verified* map, or the map to reality — after
+   confirming each gate live, not from the snapshot.
