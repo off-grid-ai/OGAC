@@ -16,6 +16,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ActionReviewEvidence } from '@/components/actions/ActionReviewEvidence';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -26,7 +27,13 @@ type ReviewOutcome = 'approve' | 'reject';
 
 // Pick one of three values by the run's decided outcome — approved / rejected / undecided.
 // A tiny pure selector so the outcome→tone/label mappings read as flat lookups, not nested ternaries.
-function byOutcome<T>(approved: boolean, rejected: boolean, whenApproved: T, whenRejected: T, otherwise: T): T {
+function byOutcome<T>(
+  approved: boolean,
+  rejected: boolean,
+  whenApproved: T,
+  whenRejected: T,
+  otherwise: T,
+): T {
   if (approved) return whenApproved;
   if (rejected) return whenRejected;
   return otherwise;
@@ -159,7 +166,9 @@ export function ReviewDecision({
       <div className="space-y-5">
         {/* The decision being asked — or, once decided, its recorded outcome (state-aware header). */}
         <div className={`rounded-lg border p-5 ${headerTone}`}>
-          <div className={`flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide ${eyebrowTone}`}>
+          <div
+            className={`flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide ${eyebrowTone}`}
+          >
             {outcome ? (
               decidedApproved ? (
                 <CheckCircle className="size-4" weight="fill" />
@@ -217,15 +226,13 @@ export function ReviewDecision({
                 <Quotes className="size-4 text-primary" /> Where this came from
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                The sources the app used to write this. A supported source directly backs the answer.
+                The sources the app used to write this. A supported source directly backs the
+                answer.
               </p>
             </CardHeader>
             <CardContent className="space-y-2">
               {detail.citations.map((c, i) => (
-                <div
-                  key={i}
-                  className="rounded-md border border-border/60 p-3"
-                >
+                <div key={i} className="rounded-md border border-border/60 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-xs font-medium text-foreground">{c.title}</span>
                     <span
@@ -248,7 +255,9 @@ export function ReviewDecision({
                     </span>
                   </div>
                   {c.snippet ? (
-                    <p className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">{c.snippet}</p>
+                    <p className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">
+                      {c.snippet}
+                    </p>
                   ) : null}
                 </div>
               ))}
@@ -286,7 +295,10 @@ export function ReviewDecision({
             {detail.guardrailNotes.length > 0 ? (
               <ul className="space-y-1.5">
                 {detail.guardrailNotes.map((n, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                  <li
+                    key={i}
+                    className="flex items-start gap-1.5 text-[11px] text-muted-foreground"
+                  >
                     <CheckCircle className="mt-0.5 size-3 shrink-0 text-primary" weight="fill" />
                     {n}
                   </li>
@@ -331,8 +343,15 @@ export function ReviewDecision({
           </CardContent>
         </Card>
 
+        <ActionReviewEvidence
+          impact={detail.actionImpact}
+          receipt={detail.actionReceipt}
+          canApprove={detail.canApprove}
+          boundaryReady={detail.actionBoundaryReady}
+        />
+
         {/* The actions. */}
-        <Card className="border-amber-500/40 shadow-sm">
+        <Card className="border-amber-500/40">
           <CardContent className="space-y-3 pt-5">
             {resolved ? (
               <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3 text-sm">
@@ -358,7 +377,11 @@ export function ReviewDecision({
                   <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/[0.06] p-3 text-xs">
                     <Lock className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-500" />
                     <div>
-                      <p className="font-medium text-foreground">Above your approval authority</p>
+                      <p className="font-medium text-foreground">
+                        {detail.actionBoundaryReady === false
+                          ? 'Connection needs attention'
+                          : 'Above your approval authority'}
+                      </p>
                       <p className="mt-0.5 text-muted-foreground">
                         {detail.approveBlockedReason ??
                           'You can reject or escalate this, but not approve it.'}
