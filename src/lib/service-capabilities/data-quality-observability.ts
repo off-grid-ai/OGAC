@@ -104,11 +104,11 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
         'partial', 'Index detail shows metadata without payload-index controls.',
         'yes', 'Verified live on the fleet 2026-07-21: a governed Qdrant retrieval applied filters=tenant:org_id/match + acl:document_acl/grants, attributed to provider=qdrant — org and ACL payload filtering executed on the selected Qdrant backend.',
       ]),
-      capability('snapshots-cluster', 'Snapshots, aliases, and cluster operations', 'Back up collections, move shards, manage aliases, and inspect consensus state.', '/operations/services/qdrant', 'Inspect Qdrant', 'No snapshot, alias, shard, or consensus adapter is exposed. Add guarded backup/restore and cluster evidence before treating Qdrant as console-managed.', [
+      capability('snapshots-cluster', 'Snapshots, aliases, and cluster operations', 'Back up collections, move shards, manage aliases, and inspect consensus state.', '/data/knowledge/indexes/collections', 'Manage collections', 'Snapshot backup/restore is live and fleet-proven; aliases, shard moves, and consensus inspection remain unexposed — add those adapters to fully console-manage the cluster.', [
         'yes', 'Qdrant 1.12.5 includes snapshot, alias, shard, and distributed-cluster APIs.',
-        'no', 'The current adapter covers knowledge operations, not cluster administration.',
-        'no', 'No Qdrant snapshot, alias, or shard UI exists.',
-        'no', 'No production workflow manages these operations through the console.',
+        'partial', 'A guarded snapshots adapter (list/create/delete/recover/download + live collection health) is wired via qdrant-http/qdrant-snapshots; aliases, shard moves, and consensus are not.',
+        'partial', 'Each collection has a backup/DR detail page (create/download/delete-with-confirm/restore) at /data/knowledge/indexes/collections; no alias or shard UI yet.',
+        'yes', 'Fleet-proven live: a real 494KB snapshot of the offgrid-brain collection was created, listed, and deleted through the console admin routes (create→list→delete→empty) against the live Qdrant on-prem.',
       ]),
     ],
   },
