@@ -4,6 +4,12 @@ import {
   KNOWN_REQUIRED_ACTIONS,
   REALM_MANAGEMENT_CLIENT,
   buildOidcIdpRep,
+  buildSamlIdpRep,
+  isIdpSecretConfigKey,
+  mergeIdpUpdate,
+  normalizeIdpDetail,
+  validateIdpAlias,
+  type KcRawIdp,
   deriveMfaStatus,
   extractLifetimes,
   federationGrantCommand,
@@ -216,6 +222,142 @@ test('buildOidcIdpRep: rejects missing/invalid fields', () => {
     buildOidcIdpRep({ alias: 'ok', authorizationUrl: '', tokenUrl: 't', clientId: 'c', clientSecret: 's' }),
     { error: 'authorizationUrl is required' },
   );
+  // Remaining required-field guards.
+  assert.deepEqual(
+    buildOidcIdpRep({ alias: 'ok', authorizationUrl: 'a', tokenUrl: '', clientId: 'c', clientSecret: 's' }),
+    { error: 'tokenUrl is required' },
+  );
+  assert.deepEqual(
+    buildOidcIdpRep({ alias: 'ok', authorizationUrl: 'a', tokenUrl: 't', clientId: '', clientSecret: 's' }),
+    { error: 'clientId is required' },
+  );
+  assert.deepEqual(
+    buildOidcIdpRep({ alias: 'ok', authorizationUrl: 'a', tokenUrl: 't', clientId: 'c', clientSecret: '' }),
+    { error: 'clientSecret is required' },
+  );
+});
+
+test('validateIdpAlias: enforces presence + charset', () => {
+  assert.equal(validateIdpAlias('suraksha-life'), null);
+  assert.equal(validateIdpAlias(undefined), 'alias is required');
+  assert.equal(validateIdpAlias('   '), 'alias is required');
+  assert.equal(
+    validateIdpAlias('has space'),
+    'alias may only contain letters, numbers, hyphen and underscore',
+  );
+});
+
+test('isIdpSecretConfigKey: only clientSecret is treated as secret', () => {
+  assert.equal(isIdpSecretConfigKey('clientSecret'), true);
+  assert.equal(isIdpSecretConfigKey('clientId'), false);
+  assert.equal(isIdpSecretConfigKey('authorizationUrl'), false);
+});
+
+test('normalizeIdpDetail: surfaces full config but redacts secrets and flags configured ones', () => {
+  const detail = normalizeIdpDetail({
+    alias: 'suraksha-sso',
+    displayName: 'Suraksha Life SSO',
+    providerId: 'oidc',
+    enabled: true,
+    config: {
+      authorizationUrl: 'https://sso.suraksha.example/auth',
+      tokenUrl: 'https://sso.suraksha.example/token',
+      clientId: 'console',
+      clientSecret: 's3cr3t',
+    },
+  });
+  assert.equal(detail.alias, 'suraksha-sso');
+  assert.equal(detail.config.authorizationUrl, 'https://sso.suraksha.example/auth');
+  assert.equal(detail.config.clientId, 'console');
+  // Secret value never crosses the wire.
+  assert.equal(detail.config.clientSecret, '');
+  assert.deepEqual(detail.secretKeysConfigured, ['clientSecret']);
+});
+
+test('normalizeIdpDetail: an unset secret is not reported as configured', () => {
+  const detail = normalizeIdpDetail({
+    alias: 'saml-only',
+    providerId: 'saml',
+    config: { singleSignOnServiceUrl: 'https://idp/sso', clientSecret: '' },
+  });
+  assert.equal(detail.config.clientSecret, '');
+  assert.deepEqual(detail.secretKeysConfigured, []);
+});
+
+test('buildSamlIdpRep: valid input produces a SAML rep with POST-binding defaults', () => {
+  const res = buildSamlIdpRep({
+    alias: 'suraksha-saml',
+    displayName: 'Suraksha Life (SAML)',
+    singleSignOnServiceUrl: 'https://idp.suraksha.example/saml/sso',
+    entityId: 'https://console.suraksha.example',
+    singleLogoutServiceUrl: 'https://idp.suraksha.example/saml/slo',
+  });
+  assert.ok('rep' in res);
+  if ('rep' in res) {
+    assert.equal(res.rep.providerId, 'saml');
+    assert.equal(res.rep.enabled, true);
+    assert.equal(res.rep.config?.singleSignOnServiceUrl, 'https://idp.suraksha.example/saml/sso');
+    assert.equal(res.rep.config?.entityId, 'https://console.suraksha.example');
+    assert.equal(res.rep.config?.singleLogoutServiceUrl, 'https://idp.suraksha.example/saml/slo');
+    assert.equal(res.rep.config?.postBindingResponse, 'true');
+  }
+});
+
+test('buildSamlIdpRep: optional keys omitted when blank; required SSO url enforced', () => {
+  const minimal = buildSamlIdpRep({ alias: 'm', singleSignOnServiceUrl: 'https://idp/sso' });
+  assert.ok('rep' in minimal);
+  if ('rep' in minimal) {
+    assert.equal(minimal.rep.displayName, 'm'); // defaults to alias
+    assert.equal('entityId' in (minimal.rep.config ?? {}), false);
+    assert.equal('singleLogoutServiceUrl' in (minimal.rep.config ?? {}), false);
+  }
+  assert.deepEqual(buildSamlIdpRep({ alias: 'bad alias', singleSignOnServiceUrl: 'x' }), {
+    error: 'alias may only contain letters, numbers, hyphen and underscore',
+  });
+  assert.deepEqual(buildSamlIdpRep({ alias: 'ok', singleSignOnServiceUrl: '' }), {
+    error: 'singleSignOnServiceUrl is required',
+  });
+});
+
+test('mergeIdpUpdate: toggles enabled + renames without clobbering other fields', () => {
+  const current: KcRawIdp = {
+    alias: 'okta',
+    displayName: 'Okta',
+    providerId: 'oidc',
+    enabled: true,
+    config: { clientId: 'cid', clientSecret: 'kept', authorizationUrl: 'https://a' },
+  };
+  const merged = mergeIdpUpdate(current, { enabled: false, displayName: 'Okta (prod)' });
+  assert.equal(merged.enabled, false);
+  assert.equal(merged.displayName, 'Okta (prod)');
+  assert.equal(merged.providerId, 'oidc'); // untouched
+  assert.equal(merged.config?.clientSecret, 'kept'); // untouched
+});
+
+test('mergeIdpUpdate: blank secret preserves stored value; a real new secret overwrites', () => {
+  const current: KcRawIdp = {
+    alias: 'okta',
+    providerId: 'oidc',
+    enabled: true,
+    config: { clientId: 'cid', clientSecret: 'old' },
+  };
+  // Editing clientId with a redacted (blank) secret must keep the old secret.
+  const kept = mergeIdpUpdate(current, { config: { clientId: 'newcid', clientSecret: '' } });
+  assert.equal(kept.config?.clientId, 'newcid');
+  assert.equal(kept.config?.clientSecret, 'old');
+  // A genuinely new secret overwrites.
+  const rotated = mergeIdpUpdate(current, { config: { clientSecret: 'brand-new' } });
+  assert.equal(rotated.config?.clientSecret, 'brand-new');
+});
+
+test('mergeIdpUpdate: empty patch and blank displayName are no-ops', () => {
+  const current: KcRawIdp = { alias: 'x', providerId: 'saml', enabled: true, config: { a: '1' } };
+  assert.deepEqual(mergeIdpUpdate(current, {}), current);
+  // Blank/whitespace displayName is ignored (not written as empty).
+  assert.equal(mergeIdpUpdate(current, { displayName: '   ' }).displayName, undefined);
+  // Config merge onto a rep with no prior config still works.
+  const noCfg: KcRawIdp = { alias: 'y', providerId: 'saml', enabled: true };
+  assert.deepEqual(mergeIdpUpdate(noCfg, { config: { k: 'v' } }).config, { k: 'v' });
 });
 
 // ── Token / session lifetimes ────────────────────────────────────────────────
