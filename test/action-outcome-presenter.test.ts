@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { ActionReceipt } from '../src/lib/action-contract.ts';
-import { actionOutcomeCopy, presentActionOutcomes } from '../src/lib/action-outcome-presenter.ts';
+import {
+  actionOutcomeCopy,
+  presentActionOutcomes,
+  presentOutcomeMeasurement,
+} from '../src/lib/action-outcome-presenter.ts';
 import type { ActionOutcomeRecord } from '../src/lib/action-outcome-contract.ts';
 
 const receipt: ActionReceipt = {
@@ -127,5 +131,52 @@ test('a withdrawal labels the original fact withdrawn rather than corrected', ()
       ['converted', 'Withdrawn'],
       ['withdrawal', 'Withdrawn'],
     ],
+  );
+});
+
+test('measurement presentation derives before, after and change without inventing a percentage', () => {
+  assert.deepEqual(
+    presentOutcomeMeasurement({
+      metricName: 'Incremental revenue',
+      metricUnit: 'INR',
+      baselineValue: 10_000,
+      resultValue: 25_000,
+    }),
+    {
+      metricName: 'Incremental revenue',
+      baselineValue: '10,000 INR',
+      resultValue: '25,000 INR',
+      changeValue: '+15,000 INR',
+      changeDetail: '+150% from baseline',
+    },
+  );
+  assert.deepEqual(
+    presentOutcomeMeasurement({
+      metricName: 'Incremental revenue',
+      metricUnit: 'INR',
+      baselineValue: 0,
+      resultValue: 500,
+    }),
+    {
+      metricName: 'Incremental revenue',
+      baselineValue: '0 INR',
+      resultValue: '500 INR',
+      changeValue: '+500 INR',
+      changeDetail: 'Percentage change is not available from a zero baseline.',
+    },
+  );
+  assert.deepEqual(
+    presentOutcomeMeasurement({
+      metricName: 'Incremental revenue',
+      metricUnit: 'INR',
+      resultValue: 500,
+    }),
+    {
+      metricName: 'Incremental revenue',
+      baselineValue: 'Not recorded',
+      resultValue: '500 INR',
+      changeValue: 'Not available',
+      changeDetail: 'Add a baseline to calculate the change.',
+    },
   );
 });

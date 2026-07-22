@@ -5,7 +5,10 @@ import { OutcomeWithdrawButton } from '@/components/outcomes/OutcomeWithdrawButt
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ActionOutcomeRecord } from '@/lib/action-outcome-contract';
-import { presentActionOutcomes } from '@/lib/action-outcome-presenter';
+import {
+  presentActionOutcomes,
+  presentOutcomeMeasurement,
+} from '@/lib/action-outcome-presenter';
 import { appRunHref, correctActionOutcomeHref } from '@/lib/action-outcome-routes';
 
 interface OutcomeDetailProps {
@@ -28,6 +31,9 @@ export function OutcomeDetail({
   const view = presentActionOutcomes(records);
   const item = view.history.find((candidate) => candidate.record.id === observation.id);
   const runHref = appRunHref(appId, observation.runId);
+  const measurement = observation.measurement
+    ? presentOutcomeMeasurement(observation.measurement)
+    : null;
 
   return (
     <div className="w-full space-y-5">
@@ -98,18 +104,21 @@ export function OutcomeDetail({
               </h2>
               <p className="mt-1 whitespace-pre-wrap text-foreground">{observation.note}</p>
             </div>
-            {observation.measurement ? (
+            {measurement ? (
               <div className="border-t border-border pt-3">
                 <h2 className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Measured value
+                  Measured result
                 </h2>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                  {observation.measurement.resultValue.toLocaleString()}{' '}
-                  {observation.measurement.metricUnit}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {observation.measurement.metricName}
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{measurement.metricName}</p>
+                <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <MeasurementFact label="Before action" value={measurement.baselineValue} />
+                  <MeasurementFact label="After action" value={measurement.resultValue} />
+                  <MeasurementFact
+                    label="Change"
+                    value={measurement.changeValue}
+                    detail={measurement.changeDetail}
+                  />
+                </dl>
               </div>
             ) : null}
             <div className="border-t border-border pt-3">
@@ -135,6 +144,20 @@ export function OutcomeDetail({
           Your role can view business results but cannot record or correct them.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+function MeasurementFact({
+  label,
+  value,
+  detail,
+}: Readonly<{ label: string; value: string; detail?: string | null }>) {
+  return (
+    <div className="min-w-0 border-t border-border pt-2">
+      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 break-words font-semibold tabular-nums text-foreground">{value}</dd>
+      {detail ? <dd className="mt-1 text-xs text-muted-foreground">{detail}</dd> : null}
     </div>
   );
 }

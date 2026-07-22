@@ -85,11 +85,82 @@ test('entry form uses plain language, all frozen outcomes, and no browser-suppli
     'Claim settled',
     'The result is linked to the exact system change',
     'same result is not added twice',
+    'Revenue before this action',
+    'Revenue after this action',
   ]) {
     assert.match(html, new RegExp(copy));
   }
   assert.doesNotMatch(html, /event_hidden/);
   assert.doesNotMatch(html, /name="(?:orgId|runId|stepId|actionReceipt|eventId)"/);
+});
+
+test('detail presents the baseline, result and derived change in plain language', () => {
+  const measured: ActionOutcomeRecord = {
+    ...accepted,
+    measurement: {
+      metricName: 'Incremental revenue',
+      metricUnit: 'INR',
+      baselineValue: 10_000,
+      resultValue: 25_000,
+    },
+  };
+  const html = renderToStaticMarkup(
+    createElement(OutcomeDetail, {
+      appId: 'app_1',
+      records: [measured],
+      observation: measured,
+      canManage: true,
+      withdrawalEventId: 'withdraw_hidden',
+      withdrawalObservedAt: '2026-07-22T11:00:00.000Z',
+    }),
+  );
+  for (const copy of [
+    'Measured result',
+    'Before action',
+    '10,000 INR',
+    'After action',
+    '25,000 INR',
+    'Change',
+    '+15,000 INR',
+    '+150% from baseline',
+  ]) {
+    assert.match(html, new RegExp(copy.replace('+', '\\+')));
+  }
+});
+
+test('detail explains zero and missing baselines without fabricating a percentage', () => {
+  function detailFor(measurement: NonNullable<ActionOutcomeRecord['measurement']>) {
+    const observation: ActionOutcomeRecord = { ...accepted, measurement };
+    return renderToStaticMarkup(
+      createElement(OutcomeDetail, {
+        appId: 'app_1',
+        records: [observation],
+        observation,
+        canManage: true,
+        withdrawalEventId: 'withdraw_hidden',
+        withdrawalObservedAt: '2026-07-22T11:00:00.000Z',
+      }),
+    );
+  }
+
+  const zeroBaseline = detailFor({
+    metricName: 'Incremental revenue',
+    metricUnit: 'INR',
+    baselineValue: 0,
+    resultValue: 500,
+  });
+  assert.match(zeroBaseline, /0 INR/);
+  assert.match(zeroBaseline, /\+500 INR/);
+  assert.match(zeroBaseline, /Percentage change is not available from a zero baseline/);
+
+  const missingBaseline = detailFor({
+    metricName: 'Incremental revenue',
+    metricUnit: 'INR',
+    resultValue: 500,
+  });
+  assert.match(missingBaseline, /Not recorded/);
+  assert.match(missingBaseline, /Not available/);
+  assert.match(missingBaseline, /Add a baseline to calculate the change/);
 });
 
 test('detail renders signed system proof beside, not as, the observed business result', () => {

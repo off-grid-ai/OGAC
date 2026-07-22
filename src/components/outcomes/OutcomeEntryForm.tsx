@@ -56,7 +56,13 @@ export function OutcomeEntryForm({
     setSaving(true);
     setError('');
     const form = new FormData(event.currentTarget);
+    const baseline = String(form.get('baseline') ?? '').trim();
     const revenue = String(form.get('revenue') ?? '').trim();
+    if (baseline && !revenue) {
+      setError('Enter the result before adding a baseline.');
+      setSaving(false);
+      return;
+    }
     const observedAt = isoObservedAtFromForm(form.get('observedAt'));
     if (!observedAt.ok) {
       setError(observedAt.error);
@@ -75,6 +81,7 @@ export function OutcomeEntryForm({
               metricName: 'Incremental revenue',
               metricUnit: String(form.get('currency') ?? 'INR'),
               resultValue: revenue,
+              ...(baseline ? { baselineValue: baseline } : {}),
             },
           }
         : {}),
@@ -200,9 +207,20 @@ export function OutcomeEntryForm({
             />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_10rem]">
             <Field>
-              <Label htmlFor="revenue">Revenue recorded (optional)</Label>
+              <Label htmlFor="baseline">Revenue before this action (optional)</Label>
+              <Input
+                id="baseline"
+                name="baseline"
+                type="number"
+                step="any"
+                min="0"
+                defaultValue={initial?.measurement?.baselineValue}
+              />
+            </Field>
+            <Field>
+              <Label htmlFor="revenue">Revenue after this action (optional)</Label>
               <Input
                 id="revenue"
                 name="revenue"
@@ -247,7 +265,7 @@ export function OutcomeEntryForm({
           <h2 className="mt-3 text-sm font-medium text-foreground">What this creates</h2>
           <ul className="mt-3 space-y-3 text-xs leading-relaxed text-muted-foreground">
             <li>The result is linked to the exact system change shown on this run.</li>
-            <li>The time, person, evidence and optional measured value are kept with it.</li>
+            <li>The time, person, evidence and optional before-and-after values are kept with it.</li>
             <li>If saving is retried, the same result is not added twice.</li>
             <li>A correction or withdrawal keeps the original record for review.</li>
           </ul>
