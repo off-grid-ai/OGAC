@@ -99,12 +99,14 @@ test(
     });
 
     const { createKafkaSource } = await import('@/lib/adapters/kafka-source-onboarding');
-    const { createConnector, deleteConnector, listConnectors, updateConnector } =
+    const { createConnector, deleteConnector, listConnectors, listIngestJobs, updateConnector } =
       await import('@/lib/store');
     const { createDomain, deleteDomain, getDomain, listDomains, updateDomain } =
       await import('@/lib/data-domains-store');
     const collectionRoute = await import('@/app/api/v1/admin/data-domains/route');
     const detailRoute = await import('@/app/api/v1/admin/data-domains/[id]/route');
+    const syncRoute = await import('@/app/api/v1/admin/connectors/[id]/sync/route');
+    const { getConnector } = await import('@/lib/connector-detail');
 
     async function clean(orgId: string) {
       for (const domain of await listDomains(orgId)) await deleteDomain(domain.id, orgId);
@@ -259,6 +261,46 @@ test(
       { params: Promise.resolve({ id: normalDomain.id }) },
     );
     assert.equal(normalDelete.status, 200);
+
+    const governedBeforeSync = await getConnector(governed.connectorId, ORG);
+    const governedSync = await syncRoute.POST(
+      request(`/api/v1/admin/connectors/${governed.connectorId}/sync`, { method: 'POST' }),
+      { params: Promise.resolve({ id: governed.connectorId }) },
+    );
+    assert.equal(governedSync.status, 409);
+    assert.equal((await governedSync.json()).manageAt, '/api/v1/admin/kafka-sources');
+    assert.deepEqual(await getConnector(governed.connectorId, ORG), governedBeforeSync);
+    assert.ok(
+      !(await listIngestJobs(ORG)).some((job) => job.connectorId === governed.connectorId),
+      'generic sync did not create history for the governed Kafka source',
+    );
+
+    const foreignBeforeSync = await getConnector(foreign.connectorId, FOREIGN_ORG);
+    const foreignSync = await syncRoute.POST(
+      request(`/api/v1/admin/connectors/${foreign.connectorId}/sync`, { method: 'POST' }),
+      { params: Promise.resolve({ id: foreign.connectorId }) },
+    );
+    assert.equal(foreignSync.status, 404);
+    assert.deepEqual(await getConnector(foreign.connectorId, FOREIGN_ORG), foreignBeforeSync);
+    assert.ok(
+      !(await listIngestJobs(FOREIGN_ORG)).some((job) => job.connectorId === foreign.connectorId),
+      "generic sync did not create another tenant's history",
+    );
+
+    const restBeforeSync = await getConnector(rest.id, ORG);
+    const restSync = await syncRoute.POST(
+      request(`/api/v1/admin/connectors/${rest.id}/sync`, { method: 'POST' }),
+      { params: Promise.resolve({ id: rest.id }) },
+    );
+    assert.equal(restSync.status, 202);
+    assert.equal((await restSync.json()).connectorId, rest.id);
+    const restAfterSync = await getConnector(rest.id, ORG);
+    assert.equal(restBeforeSync?.lastSync, null);
+    assert.ok(restAfterSync?.lastSync, 'normal REST sync stamps its connector');
+    assert.ok(
+      (await listIngestJobs(ORG)).some((job) => job.connectorId === rest.id),
+      'normal REST sync records its ingest history',
+    );
 
     const metadataKafka = await createConnector({
       name: 'Kafka metadata fixture',

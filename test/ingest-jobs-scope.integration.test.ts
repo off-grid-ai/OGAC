@@ -25,8 +25,8 @@ test('listIngestJobs is scoped to the org — no cross-tenant leak', { skip: dbU
     await db.execute(sql`DELETE FROM connectors WHERE org_id IN (${ORG_A}, ${ORG_B})`);
   });
 
-  const jobA = await syncConnector(conA.id);
-  const jobB = await syncConnector(conB.id);
+  const jobA = await syncConnector(conA.id, ORG_A);
+  const jobB = await syncConnector(conB.id, ORG_B);
   assert.ok(jobA, 'sync A produced a job');
   assert.ok(jobB, 'sync B produced a job');
 

@@ -67,14 +67,14 @@ test('connector CRUD against a real Postgres', { skip: dbUp ? false : SKIP_MESSA
   assert.equal(await updateConnector('con_nope99', { name: 'x' }, ORG), null, 'unknown id → null');
 
   // ── SYNC (records an ingest job; endpoint is unreachable → status error, records 0) ────────────
-  const job = await syncConnector(created.id);
+  const job = await syncConnector(created.id, ORG);
   assert.ok(job, 'sync returns a job for a known connector');
   assert.equal(job!.connectorId, created.id);
   const afterSync = (await listConnectors(ORG)).find((c) => c.id === created.id);
   assert.ok(afterSync!.lastSync, 'lastSync is stamped after a sync');
 
   // Syncing an unknown connector is a clean null.
-  assert.equal(await syncConnector('con_nope99'), null, 'sync unknown → null');
+  assert.equal(await syncConnector('con_nope99', ORG), null, 'sync unknown → null');
 
   // ── DELETE (also removes ingest history) ───────────────────────────────────────────────────────
   await deleteConnector(created.id, ORG);

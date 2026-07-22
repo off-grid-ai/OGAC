@@ -925,9 +925,10 @@ export async function deleteConnector(id: string, orgId: string = DEFAULT_ORG): 
   await db.delete(connectors).where(and(eq(connectors.id, id), eq(connectors.orgId, orgId)));
 }
 
-export async function syncConnector(id: string): Promise<IngestJob | null> {
+export async function syncConnector(id: string, orgId: string): Promise<IngestJob | null> {
   await ensureOrgSchema();
-  const [con] = await db.select().from(connectors).where(eq(connectors.id, id)).limit(1);
+  const scope = and(eq(connectors.id, id), eq(connectors.orgId, orgId));
+  const [con] = await db.select().from(connectors).where(scope).limit(1);
   if (!con) return null;
   // Real count from the source; null (unreachable/non-DB) records 0 and marks the connector
   // in error rather than fabricating a number.
@@ -936,13 +937,12 @@ export async function syncConnector(id: string): Promise<IngestJob | null> {
   await db
     .update(connectors)
     .set({ lastSync: new Date(), status: real === null ? 'error' : 'connected' })
-    .where(eq(connectors.id, id));
+    .where(scope);
   const [job] = await db
     .insert(ingestJobs)
     .values({
       id: `job_${randomUUID().slice(0, 6)}`,
-      // Inherit the connector's org so listIngestJobs(orgId) can scope by tenant (P1 fix).
-      orgId: con.orgId ?? DEFAULT_ORG,
+      orgId,
       connectorId: id,
       connectorName: con.name,
       status: 'completed',

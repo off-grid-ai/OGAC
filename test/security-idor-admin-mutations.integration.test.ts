@@ -69,7 +69,7 @@ test("connectors: cross-org delete does NOT purge B's ingest history (cascade is
   const { eq } = await import('drizzle-orm');
 
   const cB = await store.createConnector({ name: 'B-conn-sync', type: 'http', orgId: B });
-  await store.syncConnector(cB.id); // records an ingest job under org B
+  await store.syncConnector(cB.id, B); // records an ingest job under org B
 
   t.after(async () => {
     await db.delete(ingestJobs).where(eq(ingestJobs.connectorId, cB.id)).catch(() => {});
