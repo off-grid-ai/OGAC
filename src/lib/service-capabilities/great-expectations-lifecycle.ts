@@ -43,6 +43,10 @@ export interface GxSuiteUpdate {
   expectations?: GxExpectationSpec[];
 }
 
+export interface GxSuiteDelete {
+  expectedVersion?: number;
+}
+
 export interface GxDataSourceRef {
   dataSourceId: string;
   assetName: string;
@@ -215,6 +219,12 @@ export function parseSuiteDraft(input: unknown): ParseResult<GxSuiteDraft> {
     : { ok: true, errors: [], value: { name, description, expectations } };
 }
 
+export function parseSuiteName(input: unknown): ParseResult<string> {
+  const errors: string[] = [];
+  const name = identifier(input, 'suite name', errors);
+  return errors.length ? { ok: false, errors, value: null } : { ok: true, errors: [], value: name };
+}
+
 export function parseSuiteUpdate(input: unknown): ParseResult<GxSuiteUpdate> {
   const raw = object(input) ?? {};
   const errors: string[] = [];
@@ -226,6 +236,18 @@ export function parseSuiteUpdate(input: unknown): ParseResult<GxSuiteUpdate> {
   return errors.length
     ? { ok: false, errors, value: null }
     : { ok: true, errors: [], value: { expectedVersion, description, expectations } };
+}
+
+export function parseSuiteDelete(input: unknown): ParseResult<GxSuiteDelete> {
+  const raw = object(input) ?? {};
+  if (raw.expectedVersion === undefined || raw.expectedVersion === null || raw.expectedVersion === '') {
+    return { ok: true, errors: [], value: {} };
+  }
+  const errors: string[] = [];
+  const expectedVersion = positiveInteger(raw.expectedVersion, 0, Number.MAX_SAFE_INTEGER, 'expectedVersion', errors);
+  return errors.length
+    ? { ok: false, errors, value: null }
+    : { ok: true, errors: [], value: { expectedVersion } };
 }
 
 export function parseProfileRequest(input: unknown): ParseResult<GxProfileRequest> {

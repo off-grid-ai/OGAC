@@ -6,7 +6,9 @@ import {
   parseCapabilityManifest,
   parseHistoryQuery,
   parseProfileRequest,
+  parseSuiteDelete,
   parseSuiteDraft,
+  parseSuiteName,
   parseSuiteUpdate,
   parseTenantContext,
   parseValidationRequest,
@@ -32,6 +34,9 @@ test('suite create and update normalize valid lifecycle input', () => {
 
   const update = parseSuiteUpdate({ expectedVersion: 2, description: ' tightened ', expectations: [expectation] });
   assert.deepEqual(update.value, { expectedVersion: 2, description: 'tightened', expectations: [expectation] });
+  assert.equal(parseSuiteName('kyc.v1').value, 'kyc.v1');
+  assert.deepEqual(parseSuiteDelete({ expectedVersion: 2 }).value, { expectedVersion: 2 });
+  assert.deepEqual(parseSuiteDelete({}).value, {});
 });
 
 test('suite validation rejects traversal, fake expectation types, empty updates, and unbounded suites', () => {
@@ -43,6 +48,8 @@ test('suite validation rejects traversal, fake expectation types, empty updates,
   assert.equal(parseSuiteUpdate({ expectedVersion: 1 }).ok, false);
   assert.equal(parseSuiteUpdate({ expectedVersion: 0, description: 'x' }).ok, false);
   assert.equal(parseSuiteUpdate({ expectedVersion: 1, description: 'x'.repeat(1001) }).ok, false);
+  assert.equal(parseSuiteName('../kyc').ok, false);
+  assert.equal(parseSuiteDelete({ expectedVersion: '2' }).ok, false);
 });
 
 test('profile parsing requires a governed source/asset and applies a bounded default sample', () => {
