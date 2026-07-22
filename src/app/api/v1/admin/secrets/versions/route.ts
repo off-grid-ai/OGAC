@@ -8,11 +8,22 @@ import {
   openBaoConfigured,
 } from '@/lib/adapters/secrets';
 import { requireAdmin } from '@/lib/authz';
+import { isConnectorCredentialPath } from '@/lib/connector-secret-policy';
 import { validateKeyPath } from '@/lib/secret-keys';
 import { scopeSecretKey } from '@/lib/secret-scope';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
+
+function connectorCredentialConflict(): NextResponse {
+  return NextResponse.json(
+    {
+      error: 'Connector credentials are managed from their data source.',
+      manageAt: '/data/sources',
+    },
+    { status: 409 },
+  );
+}
 
 // KV v2 versioning + rotation for a single key. Returns VERSION METADATA only (version numbers,
 // timestamps, deleted/destroyed state) — never a secret value. Rotation POSTs a new value (which
@@ -43,6 +54,7 @@ export async function GET(req: Request) {
   if (gate instanceof NextResponse) return gate;
   const v = validateKeyPath(new URL(req.url).searchParams.get('key'));
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+  if (isConnectorCredentialPath(v.key)) return connectorCredentialConflict();
   const blocked = guard();
   if (blocked) return blocked;
   try {
@@ -72,6 +84,7 @@ export async function POST(req: Request) {
   } | null;
   const v = validateKeyPath(b?.key);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+  if (isConnectorCredentialPath(v.key)) return connectorCredentialConflict();
   const blocked = guard();
   if (blocked) return blocked;
 

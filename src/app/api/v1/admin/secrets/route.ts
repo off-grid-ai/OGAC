@@ -2,10 +2,21 @@ import { NextResponse } from 'next/server';
 import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
+import { isConnectorCredentialPath } from '@/lib/connector-secret-policy';
 import { normalizeKeyList, validateKeyPath } from '@/lib/secret-keys';
 import { orgSecretPrefix, scopeSecretKey, scopeSecretKeyList } from '@/lib/secret-scope';
 import { readSecretsView } from '@/lib/secrets-view';
 import { currentOrgId } from '@/lib/tenancy';
+
+function connectorCredentialConflict(): NextResponse {
+  return NextResponse.json(
+    {
+      error: 'Connector credentials are managed from their data source.',
+      manageAt: '/data/sources',
+    },
+    { status: 409 },
+  );
+}
 
 // OpenBao secrets management. Stores connector/tool credentials and virtual-key secrets in
 // OpenBao KV v2 via the openBaoSecrets adapter. Secret VALUES are never returned by GET — only
@@ -48,6 +59,7 @@ export async function POST(req: Request) {
   }
   const v = validateKeyPath(b.key);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+  if (isConnectorCredentialPath(v.key)) return connectorCredentialConflict();
   if (!openBaoConfigured() || !openBaoSecrets.set) {
     return NextResponse.json({ error: 'OpenBao not configured' }, { status: 503 });
   }
@@ -74,6 +86,7 @@ export async function DELETE(req: Request) {
   if (gate instanceof NextResponse) return gate;
   const v = validateKeyPath(new URL(req.url).searchParams.get('key'));
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+  if (isConnectorCredentialPath(v.key)) return connectorCredentialConflict();
   if (!openBaoConfigured() || !openBaoSecrets.remove) {
     return NextResponse.json({ error: 'OpenBao not configured' }, { status: 503 });
   }
