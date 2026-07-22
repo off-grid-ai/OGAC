@@ -37,7 +37,7 @@ class LifecycleError(Exception):
         self.status = status
 
 
-def _identifier(value: Any, label: str) -> str:
+def validated_identifier(value: Any, label: str) -> str:
     candidate = value.strip() if isinstance(value, str) else ""
     if not IDENTIFIER.fullmatch(candidate):
         raise LifecycleError(
@@ -114,7 +114,7 @@ class GxLifecycle:
             return self._locks.setdefault(org_id, threading.RLock())
 
     def _tenant_root(self, org_id: str) -> Path:
-        safe_org = _identifier(org_id, "org id")
+        safe_org = validated_identifier(org_id, "org id")
         root = (self.state_root / "tenants" / safe_org).resolve()
         root.relative_to(self.state_root)
         root.mkdir(parents=True, exist_ok=True)
@@ -125,8 +125,8 @@ class GxLifecycle:
         return gx.get_context(mode="file", project_root_dir=str(self._tenant_root(org_id)))
 
     def _asset_path(self, org_id: str, data_source_id: str, asset_name: str) -> Path:
-        safe_source = _identifier(data_source_id, "data source id")
-        safe_asset = _identifier(asset_name, "asset name")
+        safe_source = validated_identifier(data_source_id, "data source id")
+        safe_asset = validated_identifier(asset_name, "asset name")
         asset_root = (self._tenant_root(org_id) / "assets").resolve()
         candidates = [
             asset_root / safe_source / f"{safe_asset}.jsonl",
@@ -191,8 +191,8 @@ class GxLifecycle:
                 }
             )
         return {
-            "dataSourceId": _identifier(data_source_id, "data source id"),
-            "assetName": _identifier(asset_name, "asset name"),
+            "dataSourceId": validated_identifier(data_source_id, "data source id"),
+            "assetName": validated_identifier(asset_name, "asset name"),
             "profiledAt": _now(),
             "sampledRows": len(rows),
             "columns": columns,
@@ -217,14 +217,14 @@ class GxLifecycle:
         return scalar(minimum), scalar(maximum)
 
     def _suite(self, context: Any, name: str) -> Any:
-        safe_name = _identifier(name, "suite name")
+        safe_name = validated_identifier(name, "suite name")
         try:
             return context.suites.get(safe_name)
         except Exception as error:
             raise LifecycleError("expectation suite not found.", 404) from error
 
     def _receipt_path(self, org_id: str, idempotency_key: str) -> Path:
-        safe_key = _identifier(idempotency_key, "idempotency key")
+        safe_key = validated_identifier(idempotency_key, "idempotency key")
         receipts = self._tenant_root(org_id) / "offgrid" / "idempotency"
         receipts.mkdir(parents=True, exist_ok=True)
         return receipts / f"{hashlib.sha256(safe_key.encode()).hexdigest()}.json"
@@ -253,8 +253,8 @@ class GxLifecycle:
                 raise LifecycleError(f"inline rows must contain at most {MAX_INLINE_ROWS} objects.")
             return rows, None, None
         if kind == "asset":
-            data_source_id = _identifier(batch.get("dataSourceId"), "data source id")
-            asset_name = _identifier(batch.get("assetName"), "asset name")
+            data_source_id = validated_identifier(batch.get("dataSourceId"), "data source id")
+            asset_name = validated_identifier(batch.get("assetName"), "asset name")
             limit = batch.get("limit", 1_000)
             return (
                 self.load_asset_rows(org_id, data_source_id, asset_name, limit),
@@ -377,7 +377,7 @@ class GxLifecycle:
         batch: Dict[str, Any],
         idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        safe_suite_name = _identifier(suite_name, "suite name")
+        safe_suite_name = validated_identifier(suite_name, "suite name")
         if not isinstance(batch, dict):
             raise LifecycleError("batch is required.")
         request_hash = self._request_hash(safe_suite_name, batch)
@@ -442,8 +442,10 @@ class GxLifecycle:
     ) -> Dict[str, Any]:
         if not isinstance(limit, int) or not 1 <= limit <= 200:
             raise LifecycleError("history limit must be between 1 and 200.")
-        safe_suite = _identifier(suite_name, "suite name") if suite_name else None
-        safe_source = _identifier(data_source_id, "data source id") if data_source_id else None
+        safe_suite = validated_identifier(suite_name, "suite name") if suite_name else None
+        safe_source = (
+            validated_identifier(data_source_id, "data source id") if data_source_id else None
+        )
         with self._lock(org_id):
             context = self.context(org_id)
             store = context.stores["validation_results_store"]
@@ -517,7 +519,7 @@ class GxLifecycle:
         description: str,
         expectations: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
-        safe_name = _identifier(name, "suite name")
+        safe_name = validated_identifier(name, "suite name")
         if not 1 <= len(expectations) <= MAX_EXPECTATIONS:
             raise LifecycleError(f"expectations must contain 1-{MAX_EXPECTATIONS} entries.")
         with self._lock(org_id):
