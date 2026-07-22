@@ -1322,3 +1322,18 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   deletion disappear from results, and all three consumers retain exact citations and audit. The
   corpus must cover shared artifacts, chats/meetings, live enterprise sources, warehouse assets,
   and governed App-generated outputs; existing collections become curated views over those sources.
+
+## AI Quality Assurance as an independent platform capability (2026-07-23)
+
+- **[G-AI-QA-PLATFORM] OPEN (future prioritization; does not change the active capability wave) —
+  AI QA must work for externally built AI applications as well as Off Grid-built Apps and agents.**
+  Treat this as its own service category and product surface, not an eval tab coupled to the builder.
+  Define provider-neutral ingestion contracts for traces, prompts, model/tool calls, datasets,
+  feedback, outcomes, and release candidates; support API/SDK/OpenTelemetry integration for external
+  applications. The complete capability should cover offline and online evaluation, golden and
+  adversarial suites, regression and drift detection, safety/guardrail tests, human review and
+  adjudication, trace/replay, experiment and model/prompt comparison, quality gates, incident
+  evidence, audit/provenance, RBAC/tenant isolation, and regulatory reporting. Reuse existing
+  Langfuse, Ragas, promptfoo, Evidently, and gateway evidence through Off Grid-owned ports so any
+  underlying QA service can be replaced later. Re-rank this entry against the service-capability map
+  at the next backlog-prioritization checkpoint; do not interrupt Kafka, Onyx, or GX delivery now.
