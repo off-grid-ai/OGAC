@@ -1,9 +1,24 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
+import {
+  isGovernedKafkaConnector,
+  isGovernedKafkaDomain,
+} from '@/lib/adapters/kafka-source-onboarding';
 import { requireAdmin } from '@/lib/authz';
+import { getConnector } from '@/lib/connector-detail';
 import { deleteDomain, getDomain, updateDomain } from '@/lib/data-domains-store';
 import { parseAliases } from '@/lib/data-domains-ui';
 import { currentOrgId } from '@/lib/tenancy';
+
+function governedKafkaConflict(): NextResponse {
+  return NextResponse.json(
+    {
+      error: 'Manage this governed event source from its source page.',
+      manageAt: '/api/v1/admin/kafka-sources',
+    },
+    { status: 409 },
+  );
+}
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireAdmin(req);
@@ -73,6 +88,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const patch = built.patch;
 
   const orgId = await currentOrgId();
+  if (!(await getDomain(id, orgId))) {
+    return NextResponse.json({ error: 'unknown data domain' }, { status: 404 });
+  }
+  if (await isGovernedKafkaDomain(id, orgId)) {
+    return governedKafkaConflict();
+  }
+  if (patch.connectorId) {
+    if (!(await getConnector(patch.connectorId, orgId))) {
+      return NextResponse.json(
+        { error: 'The selected data source was not found.' },
+        { status: 404 },
+      );
+    }
+    if (await isGovernedKafkaConnector(patch.connectorId, orgId)) {
+      return governedKafkaConflict();
+    }
+  }
   const updated = await updateDomain(id, patch, orgId);
   if (!updated) return NextResponse.json({ error: 'unknown data domain' }, { status: 404 });
   auditFromSession(gate, orgId, {
@@ -88,6 +120,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const orgId = await currentOrgId();
+  if (!(await getDomain(id, orgId))) {
+    return NextResponse.json({ error: 'unknown data domain' }, { status: 404 });
+  }
+  if (await isGovernedKafkaDomain(id, orgId)) {
+    return governedKafkaConflict();
+  }
   const removed = await deleteDomain(id, orgId);
   if (!removed) return NextResponse.json({ error: 'unknown data domain' }, { status: 404 });
   auditFromSession(gate, orgId, {

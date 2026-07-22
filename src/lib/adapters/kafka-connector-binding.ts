@@ -1,5 +1,9 @@
 import { getConnector } from '@/lib/connector-detail';
-import { resolveConnectorSecret } from '@/lib/connector-secrets';
+import {
+  connectorSecretKey,
+  getConnectorSecretRef,
+  resolveConnectorSecret,
+} from '@/lib/connector-secrets';
 import { getDomain } from '@/lib/data-domains-store';
 import {
   KafkaSourceContractError,
@@ -188,6 +192,25 @@ function parseBootstrapBroker(endpoint: string): { broker: string; tls: boolean 
     );
   }
   return { broker: `${url.hostname}:${url.port}`, tls: url.protocol === 'kafkas:' };
+}
+
+/**
+ * Identify lifecycle-owned Kafka bindings without reading credential values or contacting OpenBao.
+ * Ownership is the stable structure written by the governed lifecycle, not current runtime
+ * validity: malformed endpoints/schema hints must remain owned so generic routes cannot become a
+ * repair bypass. Generic Kafka metadata fixtures remain outside this owner because they lack the
+ * exact canonical connector secret reference.
+ */
+export async function isGovernedKafkaBinding(input: {
+  orgId: string;
+  connectorId: string;
+  domainId: string;
+}): Promise<boolean> {
+  const connector = await getConnector(input.connectorId, input.orgId);
+  if (!connector || connector.type.toLowerCase() !== 'kafka') return false;
+  const domain = await getDomain(input.domainId, input.orgId);
+  if (!domain || domain.connectorId !== connector.id) return false;
+  return (await getConnectorSecretRef(connector.id)) === connectorSecretKey(connector.id);
 }
 
 /**

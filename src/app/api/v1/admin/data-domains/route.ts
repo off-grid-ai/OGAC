@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
+import { isGovernedKafkaConnector } from '@/lib/adapters/kafka-source-onboarding';
 import { requireAdmin } from '@/lib/authz';
+import { getConnector } from '@/lib/connector-detail';
 import { createDomain, listDomains } from '@/lib/data-domains-store';
 import { validateDomainForm } from '@/lib/data-domains-ui';
 import { currentOrgId } from '@/lib/tenancy';
@@ -35,6 +37,18 @@ export async function POST(req: Request) {
   }
 
   const orgId = await currentOrgId();
+  if (!(await getConnector(result.value.connectorId, orgId))) {
+    return NextResponse.json({ error: 'The selected data source was not found.' }, { status: 404 });
+  }
+  if (await isGovernedKafkaConnector(result.value.connectorId, orgId)) {
+    return NextResponse.json(
+      {
+        error: 'Manage this governed event source from its source page.',
+        manageAt: '/api/v1/admin/kafka-sources',
+      },
+      { status: 409 },
+    );
+  }
   const opHints =
     body?.opHints && typeof body.opHints === 'object'
       ? (body.opHints as Record<string, unknown>)

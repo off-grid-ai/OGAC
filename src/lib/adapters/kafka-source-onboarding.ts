@@ -1,14 +1,23 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { connectors, dataDomains, ingestJobs } from '@/db/schema';
-import { resolveKafkaConnectorBinding } from '@/lib/adapters/kafka-connector-binding';
+import {
+  isGovernedKafkaBinding,
+  resolveKafkaConnectorBinding,
+} from '@/lib/adapters/kafka-connector-binding';
 import {
   getConnectorSecretRef,
   persistConnectorSecret,
   resolveConnectorSecret,
 } from '@/lib/connector-secrets';
 import { getConnector } from '@/lib/connector-detail';
-import { createDomain, deleteDomain, listDomains, updateDomain } from '@/lib/data-domains-store';
+import {
+  createDomain,
+  deleteDomain,
+  getDomain,
+  listDomains,
+  updateDomain,
+} from '@/lib/data-domains-store';
 import {
   redactedKafkaSecurity,
   validateKafkaSource,
@@ -125,6 +134,27 @@ async function assembleView(connectorId: string, orgId: string): Promise<KafkaSo
 
 export async function getKafkaSource(connectorId: string, orgId: string): Promise<KafkaSourceView> {
   return assembleView(connectorId, orgId);
+}
+
+export async function isGovernedKafkaDomain(domainId: string, orgId: string): Promise<boolean> {
+  const domain = await getDomain(domainId, orgId);
+  if (!domain) return false;
+  return isGovernedKafkaBinding({
+    orgId,
+    connectorId: domain.connectorId,
+    domainId: domain.id,
+  });
+}
+
+export async function isGovernedKafkaConnector(
+  connectorId: string,
+  orgId: string,
+): Promise<boolean> {
+  const domains = (await listDomains(orgId)).filter((domain) => domain.connectorId === connectorId);
+  for (const domain of domains) {
+    if (await isGovernedKafkaBinding({ orgId, connectorId, domainId: domain.id })) return true;
+  }
+  return false;
 }
 
 /**
