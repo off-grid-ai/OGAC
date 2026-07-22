@@ -29,8 +29,9 @@ import {
   type SchemaModelDetail,
 } from '@/lib/schema-model-store';
 
-// A discriminated result the routes translate to HTTP: validation failure (422), not-found (404),
-// warehouse-exec failure (502), or success with the fresh model detail.
+// A discriminated result the routes translate to HTTP via schema-model's pure serviceErrorStatus /
+// serviceErrorMessage: validation failure (422), not-found (404), warehouse-exec failure (502), or
+// success with the fresh model detail.
 export type ServiceResult<T> =
   | { ok: true; value: T }
   | { ok: false; kind: 'invalid'; errors: string[] }

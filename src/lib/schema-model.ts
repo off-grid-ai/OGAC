@@ -230,6 +230,25 @@ export function planRollback(
   return { ok: true, statements: found.applyDdl };
 }
 
+// ─── service-failure → HTTP surface (pure, so every route maps it identically) ─
+export type ServiceErrorKind = 'invalid' | 'not_found' | 'warehouse';
+
+// invalid → 422 (validation), not_found → 404, warehouse → 502 (upstream ClickHouse failed).
+export function serviceErrorStatus(kind: ServiceErrorKind): number {
+  if (kind === 'not_found') return 404;
+  if (kind === 'warehouse') return 502;
+  return 422;
+}
+
+// Flatten a service failure to one human message for the route body / audit trace.
+export function serviceErrorMessage(
+  result:
+    | { kind: 'invalid'; errors: string[] }
+    | { kind: 'not_found' | 'warehouse'; message: string },
+): string {
+  return result.kind === 'invalid' ? result.errors.join('; ') : result.message;
+}
+
 // ─── small pure helpers ───────────────────────────────────────────────────────
 function balancedParens(s: string): boolean {
   let depth = 0;

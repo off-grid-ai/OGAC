@@ -15,6 +15,8 @@ import {
   planModelApply,
   planModelDrop,
   planRollback,
+  serviceErrorStatus,
+  serviceErrorMessage,
   MODEL_KINDS,
   ALLOWED_ENGINES,
   type ModelInput,
@@ -248,4 +250,13 @@ test('planRollback: rejects bad target, unknown version, and empty DDL', () => {
   const empty = planRollback(versions, 3);
   assert.equal(empty.ok, false);
   assert.match(!empty.ok ? empty.reason : '', /no recorded DDL/);
+});
+
+test('serviceErrorStatus / serviceErrorMessage', () => {
+  assert.equal(serviceErrorStatus('invalid'), 422);
+  assert.equal(serviceErrorStatus('not_found'), 404);
+  assert.equal(serviceErrorStatus('warehouse'), 502);
+  assert.equal(serviceErrorMessage({ kind: 'invalid', errors: ['a', 'b'] }), 'a; b');
+  assert.equal(serviceErrorMessage({ kind: 'not_found', message: 'gone' }), 'gone');
+  assert.equal(serviceErrorMessage({ kind: 'warehouse', message: 'ch 500' }), 'ch 500');
 });
