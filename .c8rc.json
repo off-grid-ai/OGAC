@@ -194,7 +194,10 @@
     "src/lib/pipelines.ts",
     "src/lib/app-schedules.ts",
     "src/lib/observability-settings.ts",
-    "src/lib/pipeline-release.ts"
+    "src/lib/pipeline-release.ts",
+
+    "// warehouse-model orchestration glue: sequences the pure plan (schema-model.ts) + the ClickHouse adapter (adapters/warehouse.ts) + the store (schema-model-store.ts); every decision (plan/validate/status) is pure & tested in schema-model.test.ts, verified live by warehouse-model-service.integration.test.ts.",
+    "src/lib/warehouse-model-service.ts"
   ],
   "excludeNodeModules": true,
   "skip-full": false,

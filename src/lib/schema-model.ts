@@ -177,6 +177,78 @@ export function nextVersion(current: number | null | undefined): number {
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) + 1 : 1;
 }
 
+// ─── apply / rollback / drop PLANS (the single decision seam the routes call) ──
+// A "plan" is validate-then-build in one place: the route never validates and builds separately
+// (that would let the two drift). The I/O service (warehouse-model-service.ts) takes a plan's
+// statements and hands them to the warehouse adapter's execDdl — it never decides WHAT DDL runs.
+export type ApplyPlan =
+  | { ok: true; statements: string[] }
+  | { ok: false; errors: string[] };
+
+// Plan the DDL that makes the warehouse object match a submitted definition (create OR edit — the
+// statements are identical; whether it's v1 or vN is the store's concern). Validates first; an
+// invalid input yields the collected errors and NO statements (fail-closed — nothing reaches CH).
+export function planModelApply(input: ModelInput): ApplyPlan {
+  const v = validateModelInput(input);
+  if (!v.ok) return { ok: false, errors: v.errors };
+  return { ok: true, statements: buildApplyDdl(input) };
+}
+
+// Plan the DROP for a delete. Wrapped in an array so it feeds execDdl uniformly. Assumes the
+// name/database were validated at create time (they're stored, not re-submitted).
+export function planModelDrop(kind: ModelKind, name: string, database?: string | null): string[] {
+  return [buildDropDdl(kind, name, database ?? undefined)];
+}
+
+// A minimal shape of a stored version row — just enough for the pure rollback decision, so this
+// stays zero-IO (the real row is SchemaModelVersion in the store).
+export interface VersionLike {
+  version: number;
+  applyDdl: string[];
+}
+
+export type RollbackPlan =
+  | { ok: true; statements: string[] }
+  | { ok: false; reason: string };
+
+// Plan a rollback to a prior version: re-apply that version's FROZEN DDL exactly as it was applied
+// (a view's CREATE OR REPLACE / a table's DROP+CREATE are both idempotent, so re-running is safe).
+// Pointing at the current version is allowed (a no-op re-apply / repair). Rejects an unknown
+// version or one whose frozen DDL is empty (nothing safe to re-run).
+export function planRollback(
+  versions: readonly VersionLike[],
+  targetVersion: number,
+): RollbackPlan {
+  if (!Number.isInteger(targetVersion) || targetVersion < 1) {
+    return { ok: false, reason: 'target version must be a positive integer' };
+  }
+  const found = versions.find((v) => v.version === targetVersion);
+  if (!found) return { ok: false, reason: `version ${targetVersion} not found` };
+  if (!Array.isArray(found.applyDdl) || found.applyDdl.length === 0) {
+    return { ok: false, reason: `version ${targetVersion} has no recorded DDL to re-apply` };
+  }
+  return { ok: true, statements: found.applyDdl };
+}
+
+// ─── service-failure → HTTP surface (pure, so every route maps it identically) ─
+export type ServiceErrorKind = 'invalid' | 'not_found' | 'warehouse';
+
+// invalid → 422 (validation), not_found → 404, warehouse → 502 (upstream ClickHouse failed).
+export function serviceErrorStatus(kind: ServiceErrorKind): number {
+  if (kind === 'not_found') return 404;
+  if (kind === 'warehouse') return 502;
+  return 422;
+}
+
+// Flatten a service failure to one human message for the route body / audit trace.
+export function serviceErrorMessage(
+  result:
+    | { kind: 'invalid'; errors: string[] }
+    | { kind: 'not_found' | 'warehouse'; message: string },
+): string {
+  return result.kind === 'invalid' ? result.errors.join('; ') : result.message;
+}
+
 // ─── small pure helpers ───────────────────────────────────────────────────────
 function balancedParens(s: string): boolean {
   let depth = 0;
