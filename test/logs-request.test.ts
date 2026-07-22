@@ -22,7 +22,8 @@ test('parseLogsRequest: field filters compose with free text, filters first', ()
   const r = parseLogsRequest(
     new URLSearchParams({ q: 'panic', service: 'gateway', level: 'error', range: '24h' }),
   );
-  assert.equal(r.query, 'service:"gateway" level:"error" panic');
+  // query composes with PHYSICAL field names (service→service.name, level→severity)...
+  assert.equal(r.query, 'service.name:"gateway" severity:"error" panic');
   assert.equal(r.range.key, '24h');
   assert.deepEqual(r.filters, [
     { field: 'service', value: 'gateway' },
@@ -32,7 +33,7 @@ test('parseLogsRequest: field filters compose with free text, filters first', ()
 
 test('parseLogsRequest: blank filter values are dropped', () => {
   const r = parseLogsRequest(new URLSearchParams({ service: '  ', level: 'warn' }));
-  assert.equal(r.query, 'level:"warn"');
+  assert.equal(r.query, 'severity:"warn"');
   assert.deepEqual(r.filters, [{ field: 'level', value: 'warn' }]);
 });
 

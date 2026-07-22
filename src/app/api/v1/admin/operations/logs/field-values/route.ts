@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { victoriaLogs } from '@/lib/adapters/victorialogs';
-import { FILTER_FIELDS, type FilterField } from '@/lib/logs-request';
+import { FILTER_FIELDS, PHYSICAL_FIELD, type FilterField } from '@/lib/logs-request';
 import { parseRange } from '@/lib/victorialogs-query';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +23,8 @@ export async function GET(req: Request) {
   const range = parseRange(params.get('range'));
   // Field values across everything in the window (`*`), not the current filter, so a dropdown always
   // offers the full option set.
-  const result = await victoriaLogs.fieldValues(field, '*', { start: range.start, end: 'now' });
+  // Resolve the logical UI field to its physical VictoriaLogs field (service→service.name, etc.)
+  // so the dropdown actually populates from the real log schema.
+  const result = await victoriaLogs.fieldValues(PHYSICAL_FIELD[field], '*', { start: range.start, end: 'now' });
   return NextResponse.json(result);
 }
