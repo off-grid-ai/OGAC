@@ -81,6 +81,19 @@ test('a mixed-prefix listing fails whole before any out-of-scope key can be sele
     1,
   );
   assert.equal(hiddenAfterLimit.ok, false);
+
+  const wrongRequestedFolder = selectListedObjectKeys(
+    scope,
+    {
+      prefix: 'approved/cases/',
+      folders: [],
+      nextToken: null,
+      objects: [{ key: 'approved/notes/one.txt', size: 1, lastModified: '', etag: 'one' }],
+    },
+    20,
+    'approved/cases/',
+  );
+  assert.equal(wrongRequestedFolder.ok, false);
 });
 
 test('materialization retains full provenance and rejects metadata drift or unsafe content', () => {
@@ -101,6 +114,15 @@ test('materialization retains full provenance and rejects metadata drift or unsa
     materializeObjectSourceRow({
       scope,
       detail: detail({ size: 12 }),
+      bytes,
+      getContentType: 'application/json',
+    }).ok,
+    false,
+  );
+  assert.equal(
+    materializeObjectSourceRow({
+      scope,
+      detail: detail({ etag: '' }),
       bytes,
       getContentType: 'application/json',
     }).ok,

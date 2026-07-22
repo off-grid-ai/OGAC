@@ -133,11 +133,15 @@ export function selectListedObjectKeys(
   scope: ObjectAccessScope,
   listing: ObjectListing,
   limit: number,
+  expectedPrefix = scope.prefix,
 ): ObjectSourceValidation<string[]> {
   const keys: string[] = [];
   for (const object of listing.objects) {
     if (scope.prefix && !object.key.startsWith(scope.prefix)) {
       return failure('scope-denied', 'Object listing escaped the approved prefix.');
+    }
+    if (!object.key.startsWith(expectedPrefix)) {
+      return failure('scope-denied', 'Object listing escaped the requested prefix.');
     }
     const relative = scope.prefix ? object.key.slice(scope.prefix.length) : object.key;
     const scoped = fullObjectSourceKey(scope, relative);
@@ -161,6 +165,9 @@ export function validateObjectSourceDetail(
       'object-too-large',
       `Object retrieval is limited to ${MAX_OBJECT_SOURCE_BYTES} bytes per object.`,
     );
+  }
+  if (!detail.etag.trim()) {
+    return failure('source-changed', 'Object metadata is missing an immutable ETag.');
   }
   return { ok: true, value: { contentType, size: detail.size } };
 }
