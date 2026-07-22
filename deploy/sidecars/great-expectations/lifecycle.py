@@ -432,6 +432,48 @@ class GxLifecycle:
                 temporary.replace(receipt)
             return response
 
+    def validate_legacy_checkpoint(
+        self,
+        suite_label: str,
+        rows: List[Dict[str, Any]],
+        expectations: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Run the old inline checkpoint contract through the same real GX 1.19 execution seam.
+
+        Legacy callers do not send tenant context, so the deployment boundary confines this route
+        to the private data-plane listener and its evidence is isolated under one compatibility
+        tenant. The hashed suite name prevents collisions with governed tenant suites.
+        """
+        if (
+            not isinstance(rows, list)
+            or len(rows) > MAX_INLINE_ROWS
+            or any(not isinstance(row, dict) for row in rows)
+        ):
+            raise LifecycleError(f"rows must contain at most {MAX_INLINE_ROWS} objects.")
+        if not 1 <= len(expectations) <= MAX_EXPECTATIONS:
+            raise LifecycleError(f"expectations must contain 1-{MAX_EXPECTATIONS} entries.")
+        identity = json.dumps(
+            {"suite": suite_label, "expectations": expectations},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        suite_name = f"legacy_{hashlib.sha256(identity.encode()).hexdigest()[:24]}"
+        compatibility_org = "legacy_internal"
+        with self._lock(compatibility_org):
+            context = self.context(compatibility_org)
+            if not any(suite.name == suite_name for suite in context.suites.all()):
+                self.create_suite(
+                    compatibility_org,
+                    suite_name,
+                    f"Compatibility checkpoint: {suite_label[:200]}",
+                    expectations,
+                )
+            return self.validate(
+                compatibility_org,
+                suite_name,
+                {"kind": "inline", "rows": rows},
+            )
+
     def history(
         self,
         org_id: str,

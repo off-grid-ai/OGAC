@@ -796,7 +796,10 @@ services:
   great-expectations:
     build: ./sidecars/great-expectations
     profiles: [dataquality, all]
-    ports: ['8003:8003']
+    # Safe generic default: loopback-only. The private fleet runbook may set
+    # OFFGRID_DATA_PLANE_BIND to the node's private LAN address so the Console edge proxy can reach
+    # it; never bind this unauthenticated legacy compatibility route to 0.0.0.0/public interfaces.
+    ports: ['${OFFGRID_DATA_PLANE_BIND:-127.0.0.1}:8003:8003']
     environment:
       GX_STATE_ROOT: /var/lib/offgrid-gx
       OFFGRID_GX_SERVICE_TOKEN: ${OFFGRID_GX_SERVICE_TOKEN:-}

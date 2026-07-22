@@ -21,16 +21,9 @@ failed.
 The legacy ``/checkpoint`` endpoint remains for existing flow gates. The governed lifecycle lives
 under authenticated ``/v1`` routes and uses GX Core 1.19 File Data Context stores per tenant.
 
-LEGACY ENGINE SELECTION — real evaluation either way:
-  - If the `great_expectations` library is importable, `_ge_validate` builds a real GE
-    PandasDataset, runs each expectation through GE's own validators, and maps the results.
-    Reported engine: "great-expectations".
-  - Otherwise the sidecar runs its OWN faithful, correct evaluator (`_native_validate`) that
-    computes REAL per-expectation unexpected counts over the posted rows — matching GE's
-    semantics for the console's vocabulary. Reported engine: "native".
-
-There is NO stub / no fake "reachable but 0 evaluated" path: every posted expectation is really
-evaluated over the real rows. Ports: 8003.
+The legacy route executes through the same pinned GX Core 1.19 ValidationDefinition path as the
+governed lifecycle. There is no native fallback: a GX execution failure returns a bounded upstream
+error so callers fail closed. Ports: 8003.
 """
 
 from __future__ import annotations
@@ -60,16 +53,6 @@ def gx_lifecycle() -> GxLifecycle:
     if lifecycle is None:
         lifecycle = GxLifecycle(Path(os.environ.get("GX_STATE_ROOT", "/var/lib/offgrid-gx")))
     return lifecycle
-
-# The vocabulary the console's data-quality-model.ts emits.
-SUPPORTED = {
-    "expect_column_values_to_not_be_null",
-    "expect_column_values_to_be_between",
-    "expect_column_values_to_be_in_set",
-    "expect_column_values_to_be_unique",
-    "expect_column_to_exist",
-}
-
 
 class Expectation(BaseModel):
     type: str
@@ -149,162 +132,50 @@ async def lifecycle_error(_request: Request, error: LifecycleError) -> JSONRespo
     return JSONResponse(status_code=error.status, content={"error": str(error)})
 
 
-def _is_missing(v: Any) -> bool:
-    """GE treats null/NaN as missing. We also treat the empty string as missing, matching the
-    console's fallback semantics (a blank PAN/IFSC cell is not a real value)."""
-    if v is None or v == "":
-        return True
-    # NaN is the only value not equal to itself.
-    return isinstance(v, float) and v != v
-
-
-def _column_exists(rows: List[Dict[str, Any]], col: Optional[str]) -> bool:
-    """A column exists if ANY row carries the key (robust to ragged rows), matching GE which
-    validates against the frame's columns."""
-    return bool(rows) and any(col in r for r in rows)
-
-
-def _native_validate(rows: List[Dict[str, Any]], expectations: List[Expectation]) -> dict:
-    """Faithful, dependency-free evaluator. Computes REAL unexpected counts per expectation over
-    the real rows — a correct implementation of GE's semantics for the console's vocabulary, NOT
-    a stub. Zero-IO, unit-testable.
-
-    GE convention: `_to_not_be_null` counts nulls as unexpected; the value-family expectations
-    (`_between`, `_in_set`, `_unique`) IGNORE missing values (null handling is a separate
-    expectation) and count only present-but-violating values. `_column_to_exist` is a
-    frame-level check (unexpected_count 1 if the column is absent, else 0)."""
-    failed: List[dict] = []
-    for exp in expectations:
-        col = exp.column
-        unexpected = 0
-
-        if exp.type == "expect_column_values_to_not_be_null":
-            unexpected = sum(1 for r in rows if _is_missing(r.get(col)))
-
-        elif exp.type == "expect_column_values_to_be_between":
-            for r in rows:
-                v = r.get(col)
-                if _is_missing(v):
-                    continue  # null handled by a separate not-null expectation
-                if isinstance(v, bool) or not isinstance(v, (int, float)):
-                    unexpected += 1
-                    continue
-                if exp.min is not None and v < exp.min:
-                    unexpected += 1
-                elif exp.max is not None and v > exp.max:
-                    unexpected += 1
-
-        elif exp.type == "expect_column_values_to_be_in_set":
-            # An empty/absent value_set means nothing is allowed → every present value is unexpected.
-            allowed = list(exp.value_set) if exp.value_set is not None else []
-            for r in rows:
-                v = r.get(col)
-                if _is_missing(v):
-                    continue
-                if v not in allowed:
-                    unexpected += 1
-
-        elif exp.type == "expect_column_values_to_be_unique":
-            # Every value in a duplicate group is unexpected (GE semantics).
-            counts: Dict[Any, int] = {}
-            present: List[Any] = []
-            for r in rows:
-                v = r.get(col)
-                if _is_missing(v):
-                    continue
-                present.append(v)
-                counts[v] = counts.get(v, 0) + 1
-            unexpected = sum(1 for v in present if counts[v] > 1)
-
-        elif exp.type == "expect_column_to_exist":
-            unexpected = 0 if _column_exists(rows, col) else 1
-
-        else:
-            failed.append({
-                "type": exp.type, "column": col, "unexpected_count": -1,
-                "note": f"unsupported expectation type: {exp.type}",
-            })
+def _ge_validate(rows: List[Dict[str, Any]], expectations: List[Expectation]) -> dict:
+    """Run the legacy wire contract through GX Core 1.19's public ValidationDefinition API."""
+    specs = [
+        {
+            "type": expectation.type,
+            "kwargs": {
+                "column": expectation.column,
+                **({"min_value": expectation.min} if expectation.min is not None else {}),
+                **({"max_value": expectation.max} if expectation.max is not None else {}),
+                **(
+                    {"value_set": expectation.value_set}
+                    if expectation.value_set is not None
+                    else {}
+                ),
+            },
+        }
+        for expectation in expectations
+    ]
+    try:
+        result = gx_lifecycle().validate_legacy_checkpoint("inline", rows, specs)
+    except LifecycleError:
+        raise
+    except Exception as error:
+        raise LifecycleError("GX checkpoint execution failed.", 502) from error
+    failed = []
+    for index, outcome in enumerate(result["outcomes"]):
+        if outcome["success"]:
             continue
-
-        if unexpected > 0:
-            failed.append({"type": exp.type, "column": col, "unexpected_count": unexpected})
-
+        failed.append(
+            {
+                "type": outcome["type"],
+                "column": expectations[index].column if index < len(expectations) else None,
+                "unexpected_count": outcome["unexpectedCount"],
+                "note": outcome["detail"],
+            }
+        )
     return {
-        "success": len(failed) == 0,
-        "evaluated": len(expectations),
-        "engine": "native",
-        "failed": failed,
-    }
-
-
-def _ge_validate(rows: List[Dict[str, Any]], expectations: List[Expectation]) -> Optional[dict]:
-    """Run the REAL Great Expectations engine if the library is importable. Returns None if GE
-    isn't available so the caller falls back to the native evaluator (equally real).
-
-    Builds a GE PandasDataset from the posted rows and calls GE's own expectation validators;
-    maps each result into the response shape. Both engines produce the same contract."""
-    try:
-        import pandas as pd
-        import great_expectations as ge  # noqa: F401
-        from great_expectations.dataset import PandasDataset
-    except Exception:
-        return None
-
-    df = pd.DataFrame(rows if rows else [])
-    dataset = PandasDataset(df)
-    failed: List[dict] = []
-
-    for exp in expectations:
-        col = exp.column
-        try:
-            if exp.type == "expect_column_to_exist":
-                res = dataset.expect_column_to_exist(col)
-                if not bool(res.success):
-                    failed.append({"type": exp.type, "column": col, "unexpected_count": 1})
-                continue
-
-            if col is not None and col not in df.columns:
-                # A value-level expectation on a missing column can't be evaluated the way the
-                # console means it; surface it honestly rather than crashing.
-                failed.append({"type": exp.type, "column": col, "unexpected_count": -1,
-                               "note": f"column '{col}' not present"})
-                continue
-
-            if exp.type == "expect_column_values_to_not_be_null":
-                res = dataset.expect_column_values_to_not_be_null(col)
-            elif exp.type == "expect_column_values_to_be_between":
-                res = dataset.expect_column_values_to_be_between(col, min_value=exp.min, max_value=exp.max)
-            elif exp.type == "expect_column_values_to_be_in_set":
-                res = dataset.expect_column_values_to_be_in_set(col, list(exp.value_set or []))
-            elif exp.type == "expect_column_values_to_be_unique":
-                res = dataset.expect_column_values_to_be_unique(col)
-            else:
-                failed.append({"type": exp.type, "column": col, "unexpected_count": -1,
-                               "note": f"unsupported expectation type: {exp.type}"})
-                continue
-
-            if not res.success:
-                unexpected = int((res.result or {}).get("unexpected_count", 0) or 0)
-                failed.append({"type": exp.type, "column": col,
-                               "unexpected_count": unexpected if unexpected > 0 else 1})
-        except Exception as e:  # never let one bad expectation take down the checkpoint
-            failed.append({"type": exp.type, "column": col, "unexpected_count": -1,
-                           "note": f"evaluation error: {e}"})
-
-    return {
-        "success": len(failed) == 0,
-        "evaluated": len(expectations),
+        "success": result["success"],
+        "evaluated": result["evaluated"],
         "engine": "great-expectations",
+        "engineVersion": GX_CORE_VERSION,
         "failed": failed,
+        "validationId": result["id"],
     }
-
-
-def _engine_available() -> str:
-    try:
-        import great_expectations  # noqa: F401
-        return "great-expectations"
-    except Exception:
-        return "native"
 
 
 @app.get("/")
@@ -320,10 +191,9 @@ def health() -> dict:
 
 @app.post("/checkpoint/{suite}")
 def checkpoint(suite: str, cp: Checkpoint) -> dict:
-    result = _ge_validate(cp.rows, cp.expectations)
-    if result is not None:
-        return result
-    return _native_validate(cp.rows, cp.expectations)
+    # No silent native fallback: GX is pinned in the image, and execution failure is a bounded 502
+    # so the Console's existing adapter produces a fail-closed verdict.
+    return _ge_validate(cp.rows, cp.expectations)
 
 
 @app.get("/v1/capabilities")

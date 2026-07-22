@@ -123,6 +123,56 @@ class LifecycleApiTest(unittest.TestCase):
         self.assertEqual(missing.status_code, 404)
         self.assertEqual(missing.json(), {"error": "governed data asset not found."})
 
+    def test_legacy_checkpoint_executes_and_retains_real_gx_119_results(self) -> None:
+        passing = self.client.post(
+            "/checkpoint/existing-flow",
+            json={
+                "rows": [{"pan": "ABCDE1234F"}],
+                "expectations": [
+                    {"type": "expect_column_values_to_not_be_null", "column": "pan"}
+                ],
+            },
+        )
+        self.assertEqual(passing.status_code, 200, passing.text)
+        self.assertTrue(passing.json()["success"])
+        self.assertEqual(passing.json()["engine"], "great-expectations")
+        self.assertEqual(passing.json()["engineVersion"], "1.19.0")
+
+        failing = self.client.post(
+            "/checkpoint/existing-flow",
+            json={
+                "rows": [{"pan": None}],
+                "expectations": [
+                    {"type": "expect_column_values_to_not_be_null", "column": "pan"}
+                ],
+            },
+        )
+        self.assertEqual(failing.status_code, 200, failing.text)
+        self.assertFalse(failing.json()["success"])
+        self.assertEqual(failing.json()["failed"][0]["unexpected_count"], 1)
+        retained = app_module.gx_lifecycle().context("legacy_internal").stores[
+            "validation_results_store"
+        ]
+        self.assertEqual(len(retained.list_keys()), 2)
+
+    def test_legacy_checkpoint_fails_closed_when_gx_cannot_persist(self) -> None:
+        blocked_state_root = self.root / "blocked"
+        app_module.lifecycle = GxLifecycle(blocked_state_root)
+        (blocked_state_root / "tenants").write_text("not a directory")
+
+        response = self.client.post(
+            "/checkpoint/existing-flow",
+            json={
+                "rows": [{"pan": "ABCDE1234F"}],
+                "expectations": [
+                    {"type": "expect_column_values_to_not_be_null", "column": "pan"}
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 502, response.text)
+        self.assertEqual(response.json(), {"error": "GX checkpoint execution failed."})
+
 
 if __name__ == "__main__":
     unittest.main()
