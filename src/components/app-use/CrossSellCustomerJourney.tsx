@@ -3,6 +3,7 @@ import { ActionExecutionReceipt } from '@/components/actions/ActionExecutionRece
 import { CrossSellDecisionPanel } from '@/components/app-use/CrossSellDecisionPanel';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ErrorState } from '@/components/ui/states';
 import type {
   CrossSellEvidenceState,
   CrossSellOpportunityView,
@@ -17,6 +18,19 @@ const PHASE_COPY: Record<CrossSellEvidenceState['phase'], string> = {
   'needs-outcome': 'Waiting for the customer result',
   measured: 'Business result recorded',
 };
+
+export function CrossSellSourceUnavailable() {
+  return (
+    <Card>
+      <CardContent className="py-6">
+        <ErrorState
+          title="Live opportunity data is unavailable"
+          description="No recommendations were generated. Ask an administrator to check this App’s customer and eligibility source bindings, then refresh the page."
+        />
+      </CardContent>
+    </Card>
+  );
+}
 
 export function CrossSellCustomerJourney({
   slug,

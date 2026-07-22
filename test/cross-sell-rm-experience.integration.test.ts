@@ -6,7 +6,10 @@ import {
   CrossSellOpportunityQueue,
   type CrossSellQueueRow,
 } from '@/components/app-use/CrossSellOpportunityQueue';
-import { CrossSellCustomerJourney } from '@/components/app-use/CrossSellCustomerJourney';
+import {
+  CrossSellCustomerJourney,
+  CrossSellSourceUnavailable,
+} from '@/components/app-use/CrossSellCustomerJourney';
 
 function row(): CrossSellQueueRow {
   return {
@@ -94,4 +97,11 @@ test('customer journey explains recommendation, citations, governance and the hu
   assert.match(html, /Approve and create CRM task/);
   assert.match(html, /Governed journey/);
   assert.doesNotMatch(html, /sample|synthetic|fallback/i);
+});
+
+test('source outage is explicit and never replaced by demo recommendations', () => {
+  const html = renderToStaticMarkup(createElement(CrossSellSourceUnavailable));
+  assert.match(html, /Live opportunity data is unavailable/);
+  assert.match(html, /customer and eligibility source bindings/);
+  assert.doesNotMatch(html, /Alpha Industries|Group Term Life|sample|synthetic|fallback/i);
 });

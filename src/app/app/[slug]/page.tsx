@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AppUseShell } from '@/components/app-use/AppUseShell';
+import { CrossSellSourceUnavailable } from '@/components/app-use/CrossSellCustomerJourney';
 import { CrossSellOpportunityQueue } from '@/components/app-use/CrossSellOpportunityQueue';
 import type { RunField } from '@/components/app-use/RunPanel';
 import { readBankCrossSellOpportunityBook } from '@/lib/adapters/bank-cross-sell-execution';
@@ -26,11 +27,12 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
   const isCockpit = /cross[-\s]?sell/i.test(resolved.slug) || /cross[-\s]?sell/i.test(resolved.title);
   if (isCockpit) {
     const orgId = await currentOrgId();
-    const book = await readBankCrossSellOpportunityBook(resolved.slug, orgId);
-    const rows = book.opportunities.map((opportunity, index) => ({
-      opportunity,
-      evidence: book.evidence[index],
-    }));
+    const book = await readBankCrossSellOpportunityBook(resolved.slug, orgId).catch(() => null);
+    const rows =
+      book?.opportunities.map((opportunity, index) => ({
+        opportunity,
+        evidence: book.evidence[index],
+      })) ?? [];
     return (
       <main className="min-h-screen w-full bg-background px-4 py-6 md:px-8">
         <div className="w-full max-w-[110rem] space-y-5">
@@ -44,10 +46,14 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
               Governed context → RM decision → CRM receipt → customer result
             </p>
           </header>
-          <CrossSellOpportunityQueue
-            rows={rows}
-            customerHrefBase={`/app/${encodeURIComponent(resolved.slug)}/customers/`}
-          />
+          {book ? (
+            <CrossSellOpportunityQueue
+              rows={rows}
+              customerHrefBase={`/app/${encodeURIComponent(resolved.slug)}/customers/`}
+            />
+          ) : (
+            <CrossSellSourceUnavailable />
+          )}
         </div>
       </main>
     );
