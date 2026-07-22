@@ -17,6 +17,13 @@ Cross-session design decisions and fleet realities live in the orchestrator's au
 - **Coverage bar is ≥85% on branches/statements/lines/functions/conditions**, enforced by the pre-push hook (`npm run coverage:check`). Measured on the unit-testable logic layer (`src/lib` pure logic + adapters' pure paths); pure-I/O glue and `.tsx` are excluded and verified by integration + build + vision instead. A file that's hard to cover usually needs a cleaner pure/I/O seam.
 - **No mocks of our own code.** Mock only at the true device/IO boundary (outbound HTTP/socket, DB client). Assert the terminal artifact, not an intermediate call. If you're mocking a lot, the code needs a cleaner seam.
 
+## Verification protocol — the loop every landed feature closes
+
+Founder standing instruction (2026-07-22): "keep ensuring deep verification with screenshots; update the operations/services-capability-map URL properly." A feature is not done at green tests + build. Close this loop for EVERY landed capability:
+1. **Screenshot-verify live** — run the authed UI harness (`next dev` + programmatic `/api/auth/callback/dev` login + Playwright), exercise the REAL path (not a probe), capture the terminal artifact. Save shots to `console/docs/screenshots/capabilities/`.
+2. **Update the capability map at its canonical URL** — the map lives at `/operations/services/capability-map`, composed in `src/lib/service-capability-map.ts` from family modules `src/lib/service-capabilities/*.ts`. Add/update the capability's entry there with HONEST gate statuses (code / wired / verified — c8-style yes/partial/no) and an `evidence` string citing the exact run/ids + screenshot. NEVER flip a gate to verified without live evidence. If a landed capability has no home family module, add it to the right one (or a new family) — don't leave the map lying by omission.
+3. **Confirm the URL renders** the new/updated entry (screenshot the map page too).
+
 ## Verification honesty (recurring defect)
 
 - **A probe/badge/row-existing ≠ enforced.** Exercise the REAL path and read the terminal artifact before flipping any capability gate. Restart the agent-worker too after env changes (not just the console). Dollar-budgets are $0 no-ops on free models.
