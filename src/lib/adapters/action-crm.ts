@@ -7,6 +7,7 @@
 import {
   approvalEvidenceMatches,
   actionTarget,
+  confirmOnPremActionImpact,
   getActionDescriptor,
   planActionImpact,
   validateActionEnvelope,
@@ -19,6 +20,7 @@ import {
   deriveActionIdempotencyKey,
 } from '@/lib/action-idempotency';
 import type { ConnectorTarget } from '@/lib/connector-exec';
+import { isInternalEnterpriseEndpoint } from '@/lib/connector-endpoint';
 import { writeCrmTask } from '@/lib/adapters/crm-task-writeback';
 import {
   writeCrmOpportunityFollowUp,
@@ -99,6 +101,15 @@ export async function executeCrmAction(
       impact,
     };
   }
+  if (!isInternalEnterpriseEndpoint(connector.endpoint)) {
+    return {
+      ok: false,
+      code: 'unsupported-connector',
+      message: 'This action requires an on-prem CRM connection; no data was sent.',
+      impact,
+    };
+  }
+  const confirmedImpact = confirmOnPremActionImpact(impact);
 
   const clock = context.now ?? (() => new Date());
   // Non-technical builders never own replay semantics. Override any supplied key at the final
@@ -108,7 +119,7 @@ export async function executeCrmAction(
     step.actionId === 'crm.create-task' || step.actionId === 'crm.update-task'
       ? await writeCrmTask(connector, command, context.orgId, clock)
       : await writeCrmOpportunityFollowUp(connector, command, context.orgId, clock);
-  if (!result.ok) return { ...result, impact };
+  if (!result.ok) return { ...result, impact: confirmedImpact };
 
   const descriptor = getActionDescriptor(step.actionId);
   const providerReceipt = result.receipt as unknown as Record<string, unknown>;
@@ -128,5 +139,5 @@ export async function executeCrmAction(
     providerReceipt,
   };
   const resource = 'task' in result ? result.task : result.record;
-  return { ok: true, impact, receipt, resource };
+  return { ok: true, impact: confirmedImpact, receipt, resource };
 }

@@ -27,7 +27,7 @@ import type {
   TriggerKind,
   TriggerSpec,
 } from '@/lib/app-model';
-import type { ActionId } from '@/lib/action-contract';
+import { defaultActionCommand, type ActionId } from '@/lib/action-contract';
 
 // ─── rechainEdges — rebuild a linear edge chain from the current step order ──────────────────────
 // The single source of truth for edges in text-edit mode: given the ordered steps, wire s0→s1→…→sn.
@@ -161,7 +161,7 @@ export function blankStep(kind: AppStepKind, id: string): AppStep {
         kind: 'action',
         actionId: 'crm.create-task',
         connectorId: '',
-        command: { operation: 'create-task' },
+        command: defaultActionCommand('crm.create-task'),
       };
     default:
       // exhaustive; TS guards this, but keep a safe fallback.
@@ -323,11 +323,16 @@ export function configureActionStep(
 ): AppSpec {
   return mapStep(spec, stepId, (step) => {
     if (step.kind !== 'action') return step;
+    const changedAction = patch.actionId !== undefined && patch.actionId !== step.actionId;
     const next: ActionStep = {
       ...step,
       ...(patch.actionId ? { actionId: patch.actionId } : {}),
       ...(patch.connectorId !== undefined ? { connectorId: patch.connectorId.trim() } : {}),
-      ...(patch.command !== undefined ? { command: withoutUserIdempotency(patch.command) } : {}),
+      ...(changedAction
+        ? { command: defaultActionCommand(patch.actionId!) }
+        : patch.command !== undefined
+          ? { command: withoutUserIdempotency(patch.command) }
+          : {}),
     };
     if (patch.approvalStepId === null) delete next.approvalStepId;
     else if (patch.approvalStepId !== undefined) {

@@ -35,7 +35,12 @@ test('adding an action selects the nearest preceding human checker', () => {
   if (action?.kind !== 'action') return;
   assert.equal(action.approvalStepId, 'rm-review');
   assert.equal(action.actionId, 'crm.create-task');
-  assert.deepEqual(action.command, { operation: 'create-task' });
+  assert.deepEqual(action.command, {
+    subject: '',
+    useCase: '',
+    kind: '',
+    opportunityId: '',
+  });
   assert.equal(describeStepBinding(action), 'needs a CRM connection');
 
   const noRechain = addStepNoRechain(spec(), 'action');
@@ -57,8 +62,18 @@ test('inserting an action never selects a later human step', () => {
 test('configureActionStep remains typed, plain-language and strips user replay keys', () => {
   const added = addStep(spec(), 'action');
   const action = added.steps.at(-1)!;
-  const configured = configureActionStep(added, action.id, {
+  const changedAction = configureActionStep(added, action.id, {
     actionId: 'crm.update-opportunity',
+  });
+  const reset = changedAction.steps.at(-1);
+  assert.equal(reset?.kind, 'action');
+  if (reset?.kind !== 'action') return;
+  assert.deepEqual(reset.command, {
+    opportunityId: '',
+    useCase: '',
+    followUp: { kind: '', summary: '' },
+  });
+  const configured = configureActionStep(changedAction, action.id, {
     connectorId: '  crm_bharat  ',
     approvalStepId: 'rm-review',
     command: {
@@ -73,6 +88,21 @@ test('configureActionStep remains typed, plain-language and strips user replay k
   assert.equal(changed.connectorId, 'crm_bharat');
   assert.equal('idempotencyKey' in changed.command, false);
   assert.equal(describeStepBinding(changed), 'updates CRM · approval required');
+
+  const task = configureActionStep(configured, changed.id, { actionId: 'crm.update-task' });
+  const taskAction = task.steps.at(-1);
+  assert.deepEqual(taskAction?.kind === 'action' && taskAction.command, {
+    taskId: '',
+    patch: {},
+  });
+  const create = configureActionStep(task, changed.id, { actionId: 'crm.create-task' });
+  const createAction = create.steps.at(-1);
+  assert.deepEqual(createAction?.kind === 'action' && createAction.command, {
+    subject: '',
+    useCase: '',
+    kind: '',
+    opportunityId: '',
+  });
 
   const cleared = configureActionStep(configured, changed.id, { approvalStepId: null });
   const clearedAction = cleared.steps.at(-1);
@@ -91,6 +121,6 @@ test('blank action has a safe incomplete shape and a nontechnical label', () => 
     kind: 'action',
     actionId: 'crm.create-task',
     connectorId: '',
-    command: { operation: 'create-task' },
+    command: { subject: '', useCase: '', kind: '', opportunityId: '' },
   });
 });

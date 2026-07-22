@@ -5,6 +5,9 @@
 // Future Kestra/catalog actions extend this catalogue and adapter dispatch instead of creating a
 // parallel registry or exposing arbitrary URLs, methods, and payloads to an App.
 
+import { validateCrmTaskCommand } from '@/lib/crm-task-writeback';
+import { validateCrmOpportunityWriteback } from '@/lib/crm-writeback';
+
 export const ACTION_DESCRIPTORS = {
   'crm.create-task': {
     id: 'crm.create-task',
@@ -35,6 +38,14 @@ export const ACTION_DESCRIPTORS = {
 export type ActionId = keyof typeof ACTION_DESCRIPTORS;
 export type ActionDescriptor = (typeof ACTION_DESCRIPTORS)[ActionId];
 
+export function defaultActionCommand(actionId: ActionId): Record<string, unknown> {
+  if (actionId === 'crm.create-task') {
+    return { subject: '', useCase: '', kind: '', opportunityId: '' };
+  }
+  if (actionId === 'crm.update-task') return { taskId: '', patch: {} };
+  return { opportunityId: '', useCase: '', followUp: { kind: '', summary: '' } };
+}
+
 export interface ActionStepShape {
   id: string;
   kind: 'action';
@@ -58,9 +69,9 @@ export interface ActionImpact {
     status: 'required' | 'approved' | 'not-required';
   };
   egress: {
-    classification: 'on-prem-enterprise';
-    dataLeavesOrganisation: false;
-    dlp: 'not-applicable-on-prem';
+    classification: 'internal-connection-required' | 'on-prem-enterprise';
+    dataLeavesOrganisation: false | null;
+    dlp: 'boundary-verification-required' | 'not-applicable-on-prem';
   };
   sideEffects: string[];
 }
@@ -128,12 +139,43 @@ export function validateActionEnvelope(step: ActionStepShape): ActionValidationR
   return { ok: errors.length === 0, errors };
 }
 
+const READINESS_KEY = 'action:0000000000000000000000000000000000000000000000000000000000000000';
+
+/**
+ * The canonical save/readiness validator. It reuses the existing bounded CRM validators after
+ * injecting runtime-owned operation/idempotency fields, so UI and AppSpec validation report the
+ * same target/title/type/purpose gaps without duplicating domain rules.
+ */
+export function validateActionCommandReadiness(step: ActionStepShape): ActionValidationResult {
+  if (!isActionId(step.actionId)) return { ok: false, errors: [] };
+  const command = { ...step.command, idempotencyKey: READINESS_KEY };
+  const result =
+    step.actionId === 'crm.create-task'
+      ? validateCrmTaskCommand({ ...command, operation: 'create-task' })
+      : step.actionId === 'crm.update-task'
+        ? validateCrmTaskCommand({ ...command, operation: 'update-task' })
+        : validateCrmOpportunityWriteback(command);
+  const errors = result.ok ? [] : result.errors.map((error) => `action step ${step.id}: ${error}`);
+  return { ok: errors.length === 0, errors };
+}
+
 export function actionTarget(actionId: ActionId, command: Record<string, unknown>): string {
   if (actionId === 'crm.create-task') {
-    return String(command.opportunityId ?? command.accountId ?? 'selected CRM record');
+    return cleanActionTarget([command.opportunityId, command.accountId], 'selected CRM record');
   }
-  if (actionId === 'crm.update-task') return String(command.taskId ?? 'selected CRM task');
-  return String(command.opportunityId ?? 'selected CRM opportunity');
+  if (actionId === 'crm.update-task') {
+    return cleanActionTarget([command.taskId], 'selected CRM task');
+  }
+  return cleanActionTarget([command.opportunityId], 'selected CRM opportunity');
+}
+
+function cleanActionTarget(values: unknown[], fallback: string): string {
+  for (const value of values) {
+    if (typeof value !== 'string' && typeof value !== 'number') continue;
+    const clean = String(value).trim();
+    if (clean) return clean;
+  }
+  return fallback;
 }
 
 /** Plain-language, bounded, PII-minimising preview. Free-text command fields are never echoed. */
@@ -147,22 +189,34 @@ export function planActionImpact(step: ActionStepShape, approved = false): Actio
     system: descriptor.system,
     effect: descriptor.effect,
     target,
-    summary: `${descriptor.label} for ${target}. ${approved ? 'Approval recorded.' : 'Nothing has been changed.'}`,
+    summary: `${descriptor.label} for ${target}. Nothing has been changed.`,
     approval: {
       required,
       ...(step.approvalStepId ? { stepId: step.approvalStepId } : {}),
       status: required ? (approved ? 'approved' : 'required') : 'not-required',
     },
     egress: {
-      classification: descriptor.egress,
-      dataLeavesOrganisation: false,
-      dlp: 'not-applicable-on-prem',
+      classification: 'internal-connection-required',
+      dataLeavesOrganisation: null,
+      dlp: 'boundary-verification-required',
     },
     sideEffects: [
       descriptor.effect === 'create'
         ? `Creates one record in ${descriptor.system}`
         : `Updates one allowlisted record in ${descriptor.system}`,
     ],
+  };
+}
+
+/** Apply only after the resolved connector passed the internal-enterprise endpoint rule. */
+export function confirmOnPremActionImpact(impact: ActionImpact): ActionImpact {
+  return {
+    ...impact,
+    egress: {
+      classification: 'on-prem-enterprise',
+      dataLeavesOrganisation: false,
+      dlp: 'not-applicable-on-prem',
+    },
   };
 }
 

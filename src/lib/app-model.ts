@@ -5,7 +5,12 @@
 // old templates keep working. No imports, no I/O — the storage layer (apps-store.ts) adapts this to
 // the `apps` table. Keeping the rules here pure makes them unit-testable in isolation.
 
-import { isApprovalAncestor, validateActionEnvelope, type ActionId } from '@/lib/action-contract';
+import {
+  isApprovalAncestor,
+  validateActionCommandReadiness,
+  validateActionEnvelope,
+  type ActionId,
+} from '@/lib/action-contract';
 
 // ─── FormField — one field of an input form (collected before a run) ──────────
 export interface FormField {
@@ -252,6 +257,7 @@ function validateStepShape(step: AppStep, errors: string[]): void {
       break;
     case 'action':
       errors.push(...validateActionEnvelope(step).errors);
+      errors.push(...validateActionCommandReadiness(step).errors);
       break;
     // guardrail + human have no required fields beyond id/label/kind.
     default:

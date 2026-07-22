@@ -97,8 +97,8 @@ test('shadow action returns a bounded impact preview and makes zero CRM requests
   );
   assert.equal(result.status, 'done');
   assert.equal(result.actionReceipt, undefined);
-  assert.equal(result.actionImpact?.summary.includes('Nothing has been changed.'), false);
-  assert.equal(result.actionImpact?.egress.dataLeavesOrganisation, false);
+  assert.equal(result.actionImpact?.summary.includes('Nothing has been changed.'), true);
+  assert.equal(result.actionImpact?.egress.dataLeavesOrganisation, null);
   assert.match(result.detail ?? '', /^SHADOW:/);
   assert.equal(requests, 0);
 });

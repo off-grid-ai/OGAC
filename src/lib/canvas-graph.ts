@@ -17,6 +17,7 @@
 // or rule logic lives in the component.
 
 import type { AppSpec, AppStep, AppStepKind } from '@/lib/app-model';
+import { validateActionCommandReadiness, validateActionEnvelope } from '@/lib/action-contract';
 
 // ─── The React-Flow-shaped output (structural, framework-agnostic) ───────────────────────────────
 // We intentionally do NOT import React-Flow types here (this module must stay pure + testable under
@@ -59,19 +60,21 @@ export interface CanvasGraph {
 
 // ─── Per-kind accent color (brutalist/terminal palette; emerald = agent, the primary path) ───────
 export const KIND_COLOR: Record<AppStepKind, string> = {
-  'agent': '#059669', // emerald — the governed decision (the primary path)
+  agent: '#059669', // emerald — the governed decision (the primary path)
   'connector-query': '#7c3aed', // violet — reads a bound data domain
-  'guardrail': '#dc2626', // red — a governance check
-  'human': '#ca8a04', // amber — a person pauses the run (HITL)
-  'output': '#db2777', // pink — emits to a sink
+  guardrail: '#dc2626', // red — a governance check
+  human: '#ca8a04', // amber — a person pauses the run (HITL)
+  output: '#db2777', // pink — emits to a sink
+  action: '#2563eb', // blue — a governed external mutation
 };
 
 export const KIND_LABEL: Record<AppStepKind, string> = {
-  'agent': 'Agent',
+  agent: 'Agent',
   'connector-query': 'Read data',
-  'guardrail': 'Guardrail',
-  'human': 'Human review',
-  'output': 'Output',
+  guardrail: 'Guardrail',
+  human: 'Human review',
+  output: 'Output',
+  action: 'Action',
 };
 
 // Layout geometry — a single vertical column (the flow is a linear chain in the 3B/3A model). Kept as
@@ -112,6 +115,10 @@ export function describeBinding(step: AppStep, look: BindingLookups = {}): strin
       return step.formSchema?.length ? `${step.formSchema.length}-field form` : 'approve / reject';
     case 'output':
       return `→ ${step.sink}`;
+    case 'action':
+      return step.connectorId
+        ? `${step.actionId === 'crm.create-task' ? 'create follow-up' : 'update CRM'} · approval`
+        : 'pick a CRM connection';
     default:
       return '';
   }
@@ -130,6 +137,8 @@ export function isStepIncomplete(step: AppStep): boolean {
       return !step.domain?.trim();
     case 'output':
       return !step.sink;
+    case 'action':
+      return !validateActionEnvelope(step).ok || !validateActionCommandReadiness(step).ok;
     default:
       return false;
   }
@@ -181,10 +190,14 @@ export interface GraphSummary {
 }
 
 export function graphSummary(spec: AppSpec): GraphSummary {
-  const kinds = { 'agent': 0, 'connector-query': 0, 'guardrail': 0, 'human': 0, 'output': 0 } as Record<
-    AppStepKind,
-    number
-  >;
+  const kinds = {
+    agent: 0,
+    'connector-query': 0,
+    guardrail: 0,
+    human: 0,
+    output: 0,
+    action: 0,
+  } as Record<AppStepKind, number>;
   let incompleteCount = 0;
   for (const s of spec.steps) {
     kinds[s.kind] += 1;

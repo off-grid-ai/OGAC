@@ -239,6 +239,23 @@ test('action errors remain bounded and unsupported catalogue entries do not fabr
   }
 });
 
+test('public or ambiguous CRM endpoints are blocked before any action I/O', async () => {
+  const result = await executeCrmAction(
+    { id: 'crm_cloud', type: 'rest', endpoint: 'https://api.example.com' },
+    CREATE,
+    CONTEXT,
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.code, 'unsupported-connector');
+    assert.equal(
+      result.message,
+      'This action requires an on-prem CRM connection; no data was sent.',
+    );
+    assert.equal(result.impact?.egress.dataLeavesOrganisation, null);
+  }
+});
+
 test('the real HTTP action boundary times out with a bounded useful failure', async (t) => {
   const server = createServer(() => {
     // Deliberately never respond: execRestConnectorRequest owns the five-second abort boundary.

@@ -69,7 +69,12 @@ export function splitEndpointSecret(endpoint: string): SplitEndpoint {
 // fetching. Kept here (zero-import) so it rides into the client Add-connector form.
 
 // Hostnames that always resolve to the local machine.
-const LOOPBACK_HOSTNAMES = new Set(['localhost', 'localhost.localdomain', 'ip6-localhost', 'ip6-loopback']);
+const LOOPBACK_HOSTNAMES = new Set([
+  'localhost',
+  'localhost.localdomain',
+  'ip6-localhost',
+  'ip6-loopback',
+]);
 
 // Strip an IPv6 zone id and surrounding brackets so `[fe80::1%eth0]` compares as `fe80::1`.
 function normalizeHost(rawHost: string): string {
@@ -113,7 +118,12 @@ function isPrivateIpv4([a, b]: [number, number, number, number]): boolean {
 // (fe80::/10), unique-local (fc00::/7), and IPv4-mapped (::ffff:a.b.c.d) that maps to a private v4.
 function isPrivateIpv6(host: string): boolean {
   if (host === '::1' || host === '::') return true;
-  if (host.startsWith('fe8') || host.startsWith('fe9') || host.startsWith('fea') || host.startsWith('feb')) {
+  if (
+    host.startsWith('fe8') ||
+    host.startsWith('fe9') ||
+    host.startsWith('fea') ||
+    host.startsWith('feb')
+  ) {
     return true; // fe80::/10 link-local
   }
   if (host.startsWith('fc') || host.startsWith('fd')) return true; // fc00::/7 unique-local
@@ -154,4 +164,32 @@ export function isPublicEndpointHost(endpoint: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Is this endpoint explicitly an on-prem enterprise target? This is intentionally narrower than
+ * `!isPublicEndpointHost`: cloud metadata/link-local/CGNAT are non-public but are NOT enterprise
+ * services. Governed internal actions accept only loopback, RFC-1918, ULA, `.local`, or a single-
+ * label service hostname. Invalid URLs and non-HTTP protocols fail closed.
+ */
+export function isInternalEnterpriseEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+  const host = normalizeHost(url.hostname);
+  if (!host) return false;
+  if (LOOPBACK_HOSTNAMES.has(host) || host.endsWith('.local')) return true;
+  const v4 = ipv4Octets(host);
+  if (v4) {
+    const [a, b] = v4;
+    return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  }
+  if (host.includes(':')) {
+    return host === '::1' || host.startsWith('fc') || host.startsWith('fd');
+  }
+  return !host.includes('.');
 }

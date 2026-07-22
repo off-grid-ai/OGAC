@@ -4,10 +4,13 @@ import { test } from 'node:test';
 import {
   ACTION_DESCRIPTORS,
   actionTarget,
+  confirmOnPremActionImpact,
+  defaultActionCommand,
   hasApprovedMakerChecker,
   isActionId,
   isApprovalAncestor,
   planActionImpact,
+  validateActionCommandReadiness,
   validateActionEnvelope,
   type ActionStepShape,
 } from '@/lib/action-contract';
@@ -16,6 +19,7 @@ import {
   deriveActionIdempotencyKey,
 } from '@/lib/action-idempotency';
 import { validateAppSpec, type AppSpec } from '@/lib/app-model';
+import { isInternalEnterpriseEndpoint } from '@/lib/connector-endpoint';
 
 const ACTION: ActionStepShape = {
   id: 'act',
@@ -24,9 +28,10 @@ const ACTION: ActionStepShape = {
   connectorId: 'crm_bharat',
   approvalStepId: 'review',
   command: {
-    operation: 'create-task',
     opportunityId: 'opp_101',
     subject: 'Contains customer details that the preview must not echo',
+    useCase: 'bank-cross-sell',
+    kind: 'call',
   },
 };
 
@@ -69,19 +74,76 @@ test('shadow impact is bounded, plain-language and classifies on-prem egress hon
     status: 'required',
   });
   assert.deepEqual(impact.egress, {
-    classification: 'on-prem-enterprise',
-    dataLeavesOrganisation: false,
-    dlp: 'not-applicable-on-prem',
+    classification: 'internal-connection-required',
+    dataLeavesOrganisation: null,
+    dlp: 'boundary-verification-required',
   });
   assert.deepEqual(impact.sideEffects, ['Creates one record in CRM']);
   assert.equal(planActionImpact(ACTION, true).approval.status, 'approved');
-  assert.equal(planActionImpact(ACTION, true).summary.endsWith('Approval recorded.'), true);
+  assert.equal(planActionImpact(ACTION, true).summary.endsWith('Nothing has been changed.'), true);
+  assert.equal(confirmOnPremActionImpact(impact).egress.dataLeavesOrganisation, false);
 
   assert.equal(actionTarget('crm.update-task', { taskId: 'task_1' }), 'task_1');
   assert.equal(actionTarget('crm.update-opportunity', { opportunityId: 'opp_2' }), 'opp_2');
   assert.equal(actionTarget('crm.create-task', {}), 'selected CRM record');
   assert.equal(actionTarget('crm.update-task', {}), 'selected CRM task');
   assert.equal(actionTarget('crm.update-opportunity', {}), 'selected CRM opportunity');
+  assert.equal(
+    actionTarget('crm.create-task', defaultActionCommand('crm.create-task')),
+    'selected CRM record',
+  );
+  assert.equal(
+    actionTarget('crm.update-task', defaultActionCommand('crm.update-task')),
+    'selected CRM task',
+  );
+});
+
+test('action defaults and readiness reuse the bounded CRM command validators', () => {
+  assert.deepEqual(defaultActionCommand('crm.create-task'), {
+    subject: '',
+    useCase: '',
+    kind: '',
+    opportunityId: '',
+  });
+  assert.deepEqual(defaultActionCommand('crm.update-task'), { taskId: '', patch: {} });
+  assert.deepEqual(defaultActionCommand('crm.update-opportunity'), {
+    opportunityId: '',
+    useCase: '',
+    followUp: { kind: '', summary: '' },
+  });
+  assert.equal(validateActionCommandReadiness(ACTION).ok, true);
+  const unreadied = validateActionCommandReadiness({
+    ...ACTION,
+    command: defaultActionCommand('crm.create-task'),
+  });
+  assert.equal(unreadied.ok, false);
+  assert.match(unreadied.errors.join(' '), /subject must be 1-200 characters/);
+  assert.match(unreadied.errors.join(' '), /useCase must be one of/);
+  assert.match(unreadied.errors.join(' '), /opportunityId or accountId is required/);
+});
+
+test('internal action boundary allows enterprise targets but rejects metadata and public hosts', () => {
+  for (const endpoint of [
+    'http://127.0.0.1:8946',
+    'http://10.1.2.3',
+    'http://172.16.2.3',
+    'http://192.168.1.8',
+    'http://crm.local',
+    'http://crm:8080',
+    'http://[::1]:8080',
+    'http://[fd00::1]:8080',
+  ]) {
+    assert.equal(isInternalEnterpriseEndpoint(endpoint), true, endpoint);
+  }
+  for (const endpoint of [
+    'http://169.254.169.254/latest/meta-data',
+    'http://100.64.0.1',
+    'https://api.example.com',
+    'ftp://crm.local/file',
+    'not-a-url',
+  ]) {
+    assert.equal(isInternalEnterpriseEndpoint(endpoint), false, endpoint);
+  }
 });
 
 test('runtime derives replay identity without exposing a builder field', () => {
@@ -93,6 +155,7 @@ test('runtime derives replay identity without exposing a builder field', () => {
   assert.deepEqual(commandWithRuntimeIdempotency(ACTION, context), {
     ...ACTION.command,
     idempotencyKey: key,
+    operation: 'create-task',
   });
   assert.equal(ACTION.command.idempotencyKey, undefined);
 });

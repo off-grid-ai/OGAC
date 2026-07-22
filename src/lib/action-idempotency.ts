@@ -24,5 +24,9 @@ export function commandWithRuntimeIdempotency(
   step: ActionStepShape,
   context: { orgId: string; runId: string; stepId: string },
 ): Record<string, unknown> {
-  return { ...step.command, idempotencyKey: deriveActionIdempotencyKey(step, context) };
+  const command = { ...step.command, idempotencyKey: deriveActionIdempotencyKey(step, context) };
+  if (step.actionId === 'crm.create-task') return { ...command, operation: 'create-task' };
+  if (step.actionId === 'crm.update-task') return { ...command, operation: 'update-task' };
+  const { operation: _operation, ...opportunity } = command;
+  return opportunity;
 }
