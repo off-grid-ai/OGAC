@@ -15,6 +15,7 @@ import { PLATFORM_CHARTS, safePlatformMetrics } from '@/lib/victoria-metrics';
 
 const SOURCE_LABEL: Record<HealthDestinationId, string> = {
   metrics: 'metrics',
+  alerts: 'alerts',
   logs: 'logs',
   traces: 'traces',
 };
