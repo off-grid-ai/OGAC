@@ -553,7 +553,7 @@ export async function POST(req: Request) {
     const egressModel = `${plan.selection.provider.id}:${plan.selection.model}`;
     const dlpCtx = {
       actor: egressCtx.actor,
-      org: DEFAULT_ORG,
+      org: orgId,
       project: egressCtx.project,
       runId: chatRunId,
       model: egressModel,
