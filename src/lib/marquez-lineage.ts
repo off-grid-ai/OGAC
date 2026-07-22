@@ -132,6 +132,28 @@ function str(v: unknown): string | null {
   return typeof v === 'string' && v.trim().length > 0 ? v.trim() : null;
 }
 
+// Coerce anything into a plain object so downstream field reads need no per-field guard.
+function asObj(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+}
+
+// First value that coerces to a non-empty string, else null. Replaces long `str(a) ?? str(b) ?? …`
+// chains with one call (keeps callers under the complexity bar and DRY).
+function firstStr(...vals: unknown[]): string | null {
+  for (const v of vals) {
+    const s = str(v);
+    if (s) return s;
+  }
+  return null;
+}
+
+// The later of two ISO instants (either may be null).
+function maxInstant(a: string | null, b: string | null): string | null {
+  if (!b) return a;
+  if (!a) return b;
+  return b > a ? b : a;
+}
+
 function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
@@ -197,37 +219,44 @@ export function formatDuration(ms: number | null | undefined): string {
  * when Marquez didn't precompute it, and lifts the NominalTimeRunFacet (from either the top-level
  * fields or the run.facets.nominalTime facet). Never throws. Pure, zero-IO.
  */
+// Lift the run's nominal (business) time window from either the top-level fields or the
+// NominalTimeRunFacet under run.facets.
+function nominalWindow(
+  r: RawMarquezRun,
+  facets: Record<string, unknown>,
+): { start: string | null; end: string | null } {
+  const f = asObj(facets.nominalTime);
+  return {
+    start: firstStr(r.nominalStartTime, f.nominalStartTime),
+    end: firstStr(r.nominalEndTime, f.nominalEndTime),
+  };
+}
+
 export function normalizeRun(raw: RawMarquezRun | null | undefined): RunHistoryRow {
-  const r = raw && typeof raw === 'object' ? raw : {};
+  const r = asObj(raw) as RawMarquezRun;
   const startedAt = str(r.startedAt);
   const endedAt = str(r.endedAt);
-  const createdAt = str(r.createdAt);
-
   const provided = num(r.durationMs);
+  // Derive only when Marquez left it null; derived !== null therefore implies it was derived.
   const derived = provided === null ? diffMs(startedAt, endedAt) : null;
-  const durationMs = provided ?? derived;
-
-  const facets = r.facets && typeof r.facets === 'object' ? r.facets : {};
-  const facetNames = Object.keys(facets);
-  const nominalFacet = facets.nominalTime ?? null;
-  const nominalStartTime = str(r.nominalStartTime) ?? str(nominalFacet?.nominalStartTime);
-  const nominalEndTime = str(r.nominalEndTime) ?? str(nominalFacet?.nominalEndTime);
+  const facets = asObj(r.facets);
+  const nominal = nominalWindow(r, facets);
 
   return {
     id: str(r.id) ?? '(unknown)',
     state: normalizeState(r.state),
     startedAt,
     endedAt,
-    createdAt,
-    durationMs,
-    durationDerived: provided === null && derived !== null,
-    nominalStartTime,
-    nominalEndTime,
-    nominalDurationMs: diffMs(nominalStartTime, nominalEndTime),
-    hasNominalTime: nominalStartTime !== null,
+    createdAt: str(r.createdAt),
+    durationMs: provided ?? derived,
+    durationDerived: derived !== null,
+    nominalStartTime: nominal.start,
+    nominalEndTime: nominal.end,
+    nominalDurationMs: diffMs(nominal.start, nominal.end),
+    hasNominalTime: nominal.start !== null,
     inputs: versionRefNames(r.inputDatasetVersions),
     outputs: versionRefNames(r.outputDatasetVersions),
-    facetNames,
+    facetNames: Object.keys(facets),
   };
 }
 
@@ -259,8 +288,7 @@ export function summarizeRuns(rows: RunHistoryRow[]): RunHistorySummary {
       totalDurationMs += row.durationMs;
       durationCount += 1;
     }
-    const ts = rowInstant(row);
-    if (ts && (lastRunAt === null || ts > lastRunAt)) lastRunAt = ts;
+    lastRunAt = maxInstant(lastRunAt, rowInstant(row));
   }
 
   const decided = completed + failed;
@@ -305,15 +333,15 @@ export function normalizeRunHistory(input: {
 
 // ── Job list normalization ─────────────────────────────────────────────────────────────────────
 export function normalizeJobRef(raw: RawJobRef | null | undefined): JobRefView {
-  const j = raw && typeof raw === 'object' ? raw : {};
+  const j = asObj(raw) as RawJobRef;
+  const lr = asObj(j.latestRun);
   const name = str(j.name) ?? '(unnamed)';
-  const lr = j.latestRun ?? null;
   return {
     name,
     label: lineageNodeLabel(name),
     type: str(j.type),
-    lastRunState: normalizeState(lr?.state),
-    lastRunAt: str(lr?.endedAt) ?? str(lr?.startedAt) ?? str(lr?.createdAt) ?? str(j.updatedAt),
+    lastRunState: normalizeState(str(lr.state)),
+    lastRunAt: firstStr(lr.endedAt, lr.startedAt, lr.createdAt, j.updatedAt),
   };
 }
 
@@ -325,16 +353,16 @@ export function normalizeJobList(raws: RawJobRef[] | null | undefined): JobRefVi
 export function normalizeNamespaceOwnership(
   raw: RawNamespaceOwnership | null | undefined,
 ): NamespaceOwnershipView | null {
-  const n = raw && typeof raw === 'object' ? raw : null;
-  const name = str(n?.name);
+  const n = asObj(raw);
+  const name = str(n.name);
   if (!name) return null;
   return {
     name,
-    ownerName: str(n?.ownerName),
-    description: str(n?.description),
-    createdAt: str(n?.createdAt),
-    updatedAt: str(n?.updatedAt),
-    isHidden: n?.isHidden === true,
+    ownerName: str(n.ownerName),
+    description: str(n.description),
+    createdAt: str(n.createdAt),
+    updatedAt: str(n.updatedAt),
+    isHidden: n.isHidden === true,
   };
 }
 

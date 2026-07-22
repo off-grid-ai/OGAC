@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import { marquezLineageReader } from '@/lib/adapters/marquez-lineage';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { marquezLineageReader } from '@/lib/adapters/marquez-lineage';
 import { validateTagDecl } from '@/lib/marquez-lineage';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -24,46 +24,38 @@ interface TagBody {
   tag?: string;
 }
 
-// Dispatch one governance action to the reader; returns the audit `resource` label on success.
-async function dispatch(
-  b: TagBody,
-): Promise<{ ok: boolean; status?: number; error?: string; resource?: string }> {
-  switch (b.action) {
-    case 'declare': {
-      const v = validateTagDecl(b);
-      if (!v.ok || !v.value) return { ok: false, status: 400, error: v.error };
-      return { ...(await marquezLineageReader.declareTag(v.value)), resource: `tag:${v.value.name}` };
-    }
-    case 'tag-dataset':
-      return {
-        ...(await marquezLineageReader.tagDataset({
-          namespace: b.namespace ?? '',
-          dataset: b.dataset ?? '',
-          tag: b.tag ?? '',
-        })),
-        resource: `dataset:${b.namespace}/${b.dataset}`,
-      };
-    case 'untag-dataset':
-      return {
-        ...(await marquezLineageReader.untagDataset({
-          namespace: b.namespace ?? '',
-          dataset: b.dataset ?? '',
-          tag: b.tag ?? '',
-        })),
-        resource: `dataset:${b.namespace}/${b.dataset}`,
-      };
-    case 'tag-job':
-      return {
-        ...(await marquezLineageReader.tagJob({
-          namespace: b.namespace ?? '',
-          job: b.job ?? '',
-          tag: b.tag ?? '',
-        })),
-        resource: `job:${b.namespace}/${b.job}`,
-      };
-    default:
-      return { ok: false, status: 400, error: 'unknown action' };
-  }
+type Dispatch = { ok: boolean; status?: number; error?: string; resource?: string };
+
+async function declareAction(b: TagBody): Promise<Dispatch> {
+  const v = validateTagDecl(b);
+  if (!v.ok || !v.value) return { ok: false, status: 400, error: v.error };
+  return { ...(await marquezLineageReader.declareTag(v.value)), resource: `tag:${v.value.name}` };
+}
+
+async function datasetTagAction(b: TagBody, remove: boolean): Promise<Dispatch> {
+  const input = { namespace: b.namespace ?? '', dataset: b.dataset ?? '', tag: b.tag ?? '' };
+  const r = remove
+    ? await marquezLineageReader.untagDataset(input)
+    : await marquezLineageReader.tagDataset(input);
+  return { ...r, resource: `dataset:${b.namespace}/${b.dataset}` };
+}
+
+async function jobTagAction(b: TagBody): Promise<Dispatch> {
+  const r = await marquezLineageReader.tagJob({
+    namespace: b.namespace ?? '',
+    job: b.job ?? '',
+    tag: b.tag ?? '',
+  });
+  return { ...r, resource: `job:${b.namespace}/${b.job}` };
+}
+
+// Route one governance action to its handler; returns the audit `resource` label on success.
+function dispatch(b: TagBody): Promise<Dispatch> {
+  if (b.action === 'declare') return declareAction(b);
+  if (b.action === 'tag-dataset') return datasetTagAction(b, false);
+  if (b.action === 'untag-dataset') return datasetTagAction(b, true);
+  if (b.action === 'tag-job') return jobTagAction(b);
+  return Promise.resolve({ ok: false, status: 400, error: 'unknown action' });
 }
 
 // POST — declare a tag, or apply/remove a tag on a dataset or job. Governed, audited writes.

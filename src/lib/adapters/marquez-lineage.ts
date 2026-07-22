@@ -10,6 +10,14 @@
 // Dependency-injected `fetcher` + `baseUrl` make every path unit-testable with a fake network
 // boundary (no live Marquez, no mocks of our own code). The default singleton reads the env.
 import {
+  type MarquezRequest,
+  buildDatasetTagRequest,
+  buildDatasetUntagRequest,
+  buildJobTagRequest,
+  buildNamespaceRequest,
+  buildTagRequest,
+} from '@/lib/lineage-writer';
+import {
   type JobRefView,
   type NamespaceOwnershipView,
   type RawJobRef,
@@ -23,14 +31,6 @@ import {
   normalizeRunHistory,
   normalizeTagList,
 } from '@/lib/marquez-lineage';
-import {
-  type MarquezRequest,
-  buildDatasetTagRequest,
-  buildDatasetUntagRequest,
-  buildJobTagRequest,
-  buildNamespaceRequest,
-  buildTagRequest,
-} from '@/lib/lineage-writer';
 
 export interface ReadEnvelope<T> {
   configured: boolean;

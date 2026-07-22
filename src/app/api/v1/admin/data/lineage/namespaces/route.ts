@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import { marquezLineageReader } from '@/lib/adapters/marquez-lineage';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { marquezLineageReader } from '@/lib/adapters/marquez-lineage';
 import { validateOwnerInput } from '@/lib/marquez-lineage';
 import { currentOrgId } from '@/lib/tenancy';
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/authz';
 import { marquezLineageReader } from '@/lib/adapters/marquez-lineage';
+import { requireAdmin } from '@/lib/authz';
 
 export const dynamic = 'force-dynamic';
 
