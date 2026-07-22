@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Database } from '@phosphor-icons/react/dist/ssr';
+import { ArrowLeft, ArrowRight, Database, FolderOpen } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
@@ -92,7 +92,17 @@ export default async function ConnectorDetailPage({
               </div>
             </div>
             <div className="shrink-0">
-              <ConnectorActions id={c.id} name={c.name} />
+              <div className="flex items-center gap-2">
+                {c.type === 's3' ? (
+                  <Link
+                    href={`/data/sources/${encodeURIComponent(c.id)}/objects`}
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-foreground hover:bg-muted/50"
+                  >
+                    <FolderOpen className="size-4" /> Browse objects
+                  </Link>
+                ) : null}
+                <ConnectorActions id={c.id} name={c.name} />
+              </div>
             </div>
           </div>
 
