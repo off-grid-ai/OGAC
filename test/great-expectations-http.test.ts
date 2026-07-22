@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { gxParseFailure, gxResultPayload } from '../src/lib/service-capabilities/great-expectations-http.ts';
+import {
+  gxParseFailure,
+  gxResultPayload,
+} from '../src/lib/service-capabilities/great-expectations-http.ts';
 import { unavailableManifest } from '../src/lib/service-capabilities/great-expectations-lifecycle.ts';
 
 test('GX HTTP mapping preserves success values and explicit lifecycle availability', () => {
@@ -15,8 +18,17 @@ test('GX HTTP mapping preserves success values and explicit lifecycle availabili
 test('GX HTTP mapping preserves typed failures and parse errors', () => {
   const manifest = unavailableManifest('not installed');
   assert.deepEqual(
-    gxResultPayload({ ok: false, kind: 'unavailable', message: 'suite CRUD unavailable', status: 501, manifest }),
-    { status: 501, body: { error: 'suite CRUD unavailable', kind: 'unavailable', capabilities: manifest } },
+    gxResultPayload({
+      ok: false,
+      kind: 'unavailable',
+      message: 'suite CRUD unavailable',
+      status: 501,
+      manifest,
+    }),
+    {
+      status: 501,
+      body: { error: 'suite CRUD unavailable', kind: 'unavailable', capabilities: manifest },
+    },
   );
   assert.deepEqual(gxParseFailure({ ok: false, errors: ['suite is invalid'], value: null }), {
     status: 400,

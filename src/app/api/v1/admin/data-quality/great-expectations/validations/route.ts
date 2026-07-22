@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { greatExpectationsLifecycle } from '@/lib/adapters/great-expectations-lifecycle';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { gxParseFailure, gxResultPayload } from '@/lib/service-capabilities/great-expectations-http';
+import {
+  gxParseFailure,
+  gxResultPayload,
+} from '@/lib/service-capabilities/great-expectations-http';
 import {
   parseHistoryQuery,
   parseValidationRequest,
@@ -50,7 +53,13 @@ export async function POST(req: Request) {
   auditFromSession(gate, orgId, {
     action: 'data-quality.gx.validation.run',
     resource: `suite:${parsed.value.suiteName}`,
-    outcome: result.ok ? (result.value.success ? 'ok' : 'fail') : result.kind === 'unavailable' ? 'blocked' : 'error',
+    outcome: result.ok
+      ? result.value.success
+        ? 'ok'
+        : 'fail'
+      : result.kind === 'unavailable'
+        ? 'blocked'
+        : 'error',
   });
   const response = gxResultPayload(result, 201);
   return NextResponse.json(response.body, { status: response.status });

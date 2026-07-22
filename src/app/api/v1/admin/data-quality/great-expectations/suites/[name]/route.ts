@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { greatExpectationsLifecycle } from '@/lib/adapters/great-expectations-lifecycle';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { gxParseFailure, gxResultPayload } from '@/lib/service-capabilities/great-expectations-http';
+import {
+  gxParseFailure,
+  gxResultPayload,
+} from '@/lib/service-capabilities/great-expectations-http';
 import {
   parseSuiteDelete,
   parseSuiteName,
@@ -68,7 +71,9 @@ export async function DELETE(req: Request, context: Context) {
   if (gate instanceof NextResponse) return gate;
   const name = await checkedName(context);
   const versionParam = new URL(req.url).searchParams.get('expectedVersion');
-  const parsed = parseSuiteDelete({ expectedVersion: versionParam === null ? undefined : Number(versionParam) });
+  const parsed = parseSuiteDelete({
+    expectedVersion: versionParam === null ? undefined : Number(versionParam),
+  });
   if (!name.ok || !name.value) {
     const response = gxParseFailure(name);
     return NextResponse.json(response.body, { status: response.status });

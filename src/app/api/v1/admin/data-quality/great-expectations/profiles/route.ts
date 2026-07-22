@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { greatExpectationsLifecycle } from '@/lib/adapters/great-expectations-lifecycle';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { gxParseFailure, gxResultPayload } from '@/lib/service-capabilities/great-expectations-http';
+import {
+  gxParseFailure,
+  gxResultPayload,
+} from '@/lib/service-capabilities/great-expectations-http';
 import { parseProfileRequest } from '@/lib/service-capabilities/great-expectations-lifecycle';
 import { currentOrgId } from '@/lib/tenancy';
 
