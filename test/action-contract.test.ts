@@ -3,7 +3,6 @@ import { test } from 'node:test';
 
 import {
   ACTION_DESCRIPTORS,
-  actionIdempotencyKey,
   actionTarget,
   hasApprovedMakerChecker,
   isActionId,
@@ -12,6 +11,10 @@ import {
   validateActionEnvelope,
   type ActionStepShape,
 } from '@/lib/action-contract';
+import {
+  commandWithRuntimeIdempotency,
+  deriveActionIdempotencyKey,
+} from '@/lib/action-idempotency';
 import { validateAppSpec, type AppSpec } from '@/lib/app-model';
 
 const ACTION: ActionStepShape = {
@@ -22,7 +25,6 @@ const ACTION: ActionStepShape = {
   approvalStepId: 'review',
   command: {
     operation: 'create-task',
-    idempotencyKey: 'cross-sell:opp-101:v1',
     opportunityId: 'opp_101',
     subject: 'Contains customer details that the preview must not echo',
   },
@@ -80,8 +82,19 @@ test('shadow impact is bounded, plain-language and classifies on-prem egress hon
   assert.equal(actionTarget('crm.create-task', {}), 'selected CRM record');
   assert.equal(actionTarget('crm.update-task', {}), 'selected CRM task');
   assert.equal(actionTarget('crm.update-opportunity', {}), 'selected CRM opportunity');
-  assert.equal(actionIdempotencyKey(ACTION.command), 'cross-sell:opp-101:v1');
-  assert.equal(actionIdempotencyKey({}), '');
+});
+
+test('runtime derives replay identity without exposing a builder field', () => {
+  const context = { orgId: 'org_bharat', runId: 'run_1', stepId: 'act' };
+  const key = deriveActionIdempotencyKey(ACTION, context);
+  assert.match(key, /^action:[a-f0-9]{64}$/);
+  assert.equal(deriveActionIdempotencyKey(ACTION, context), key);
+  assert.notEqual(deriveActionIdempotencyKey(ACTION, { ...context, runId: 'run_2' }), key);
+  assert.deepEqual(commandWithRuntimeIdempotency(ACTION, context), {
+    ...ACTION.command,
+    idempotencyKey: key,
+  });
+  assert.equal(ACTION.command.idempotencyKey, undefined);
 });
 
 test('maker-checker evidence must be the exact approved human step', () => {

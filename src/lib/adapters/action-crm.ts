@@ -5,7 +5,7 @@
 // methods or patches. The generic receipt wraps (and retains) the domain adapter's signed receipt.
 
 import {
-  actionIdempotencyKey,
+  approvalEvidenceMatches,
   actionTarget,
   getActionDescriptor,
   planActionImpact,
@@ -14,6 +14,10 @@ import {
   type ActionReceipt,
   type ActionStepShape,
 } from '@/lib/action-contract';
+import {
+  commandWithRuntimeIdempotency,
+  deriveActionIdempotencyKey,
+} from '@/lib/action-idempotency';
 import type { ConnectorTarget } from '@/lib/connector-exec';
 import { writeCrmTask } from '@/lib/adapters/crm-task-writeback';
 import {
@@ -67,10 +71,16 @@ export async function executeCrmAction(
     };
   }
 
-  const approvalVerified = Boolean(
-    context.approval &&
-    context.approval.stepId === step.approvalStepId &&
-    /\bapproved\b/i.test(context.approval.evidence),
+  const approvalVerified = approvalEvidenceMatches(
+    step,
+    context.approval
+      ? {
+          stepId: context.approval.stepId,
+          kind: 'human',
+          status: 'done',
+          detail: context.approval.evidence,
+        }
+      : undefined,
   );
   const impact = planActionImpact(step, approvalVerified);
   if (!envelope.ok) {
@@ -91,10 +101,13 @@ export async function executeCrmAction(
   }
 
   const clock = context.now ?? (() => new Date());
+  // Non-technical builders never own replay semantics. Override any supplied key at the final
+  // boundary so a malicious/stale AppSpec cannot replay another run's action.
+  const command = commandWithRuntimeIdempotency(step, context);
   const result =
     step.actionId === 'crm.create-task' || step.actionId === 'crm.update-task'
-      ? await writeCrmTask(connector, step.command, context.orgId, clock)
-      : await writeCrmOpportunityFollowUp(connector, step.command, context.orgId, clock);
+      ? await writeCrmTask(connector, command, context.orgId, clock)
+      : await writeCrmOpportunityFollowUp(connector, command, context.orgId, clock);
   if (!result.ok) return { ...result, impact };
 
   const descriptor = getActionDescriptor(step.actionId);
@@ -108,7 +121,7 @@ export async function executeCrmAction(
     stepId: context.stepId,
     connectorId: connector.id ?? step.connectorId,
     target: actionTarget(step.actionId, step.command),
-    idempotencyKey: actionIdempotencyKey(step.command),
+    idempotencyKey: deriveActionIdempotencyKey(step, context),
     status: result.receipt.replayed ? 'replayed' : 'executed',
     executedAt: result.receipt.signedAt,
     approval: context.approval,

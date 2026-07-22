@@ -136,10 +136,6 @@ export function actionTarget(actionId: ActionId, command: Record<string, unknown
   return String(command.opportunityId ?? 'selected CRM opportunity');
 }
 
-export function actionIdempotencyKey(command: Record<string, unknown>): string {
-  return typeof command.idempotencyKey === 'string' ? command.idempotencyKey : '';
-}
-
 /** Plain-language, bounded, PII-minimising preview. Free-text command fields are never echoed. */
 export function planActionImpact(step: ActionStepShape, approved = false): ActionImpact {
   const descriptor = getActionDescriptor(step.actionId);
@@ -178,8 +174,18 @@ export function hasApprovedMakerChecker(
   if (descriptor.approval !== 'maker-checker') return true;
   if (!step.approvalStepId) return false;
   const approval = priorResults.find((result) => result.stepId === step.approvalStepId);
+  return approvalEvidenceMatches(step, approval);
+}
+
+/** The one exact-step + approved-evidence rule used by runtime and every concrete adapter. */
+export function approvalEvidenceMatches(
+  step: ActionStepShape,
+  approval: ActionApprovalEvidence | undefined,
+): boolean {
   return Boolean(
+    step.approvalStepId &&
     approval &&
+    approval.stepId === step.approvalStepId &&
     approval.kind === 'human' &&
     approval.status === 'done' &&
     /\bapproved\b/i.test(approval.detail ?? ''),

@@ -27,7 +27,6 @@ const CREATE: ActionStepShape = {
   approvalStepId: 'rm-review',
   command: {
     operation: 'create-task',
-    idempotencyKey: 'cross-sell:opp-101:v1',
     subject: 'Discuss the approved next-best offer',
     useCase: 'bank-cross-sell',
     kind: 'call',
@@ -154,6 +153,17 @@ test('generic action creates and replays a tenant-scoped CRM task through real H
   assert.equal(writes, 1);
   assert.deepEqual(seenOrgs, ['org_bharat', 'org_bharat']);
 
+  const independent = await executeCrmAction(connector, CREATE, {
+    ...CONTEXT,
+    runId: 'apprun_cross_sell_102',
+  });
+  assert.equal(independent.ok, true);
+  if (independent.ok) {
+    assert.equal(independent.receipt.status, 'executed');
+    assert.notEqual(independent.receipt.idempotencyKey, created.receipt.idempotencyKey);
+  }
+  assert.equal(writes, 2, 'a different run owns an independent action');
+
   const conflict = await executeCrmAction(
     connector,
     { ...CREATE, command: { ...CREATE.command, subject: 'Different command' } },
@@ -161,7 +171,7 @@ test('generic action creates and replays a tenant-scoped CRM task through real H
   );
   assert.equal(conflict.ok, false);
   if (!conflict.ok) assert.equal(conflict.code, 'idempotency-conflict');
-  assert.equal(writes, 1);
+  assert.equal(writes, 2);
 });
 
 test('generic action updates a CRM opportunity through its existing signed adapter', async (t) => {
@@ -186,7 +196,6 @@ test('generic action updates a CRM opportunity through its existing signed adapt
     approvalStepId: 'rm-review',
     command: {
       opportunityId: 'opp_202',
-      idempotencyKey: 'cross-sell:opp-202:v1',
       useCase: 'bank-cross-sell',
       followUp: { kind: 'meeting', summary: 'Present approved offer' },
       stage: 'proposal',

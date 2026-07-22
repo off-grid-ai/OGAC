@@ -16,6 +16,7 @@
 // SOLID: pure logic, unit-tested in test/app-builder.test.ts. The component is a thin caller.
 
 import type {
+  ActionStep,
   AgentStep,
   AppEdge,
   AppSpec,
@@ -26,6 +27,7 @@ import type {
   TriggerKind,
   TriggerSpec,
 } from '@/lib/app-model';
+import type { ActionId } from '@/lib/action-contract';
 
 // ─── rechainEdges — rebuild a linear edge chain from the current step order ──────────────────────
 // The single source of truth for edges in text-edit mode: given the ordered steps, wire s0→s1→…→sn.
@@ -105,7 +107,7 @@ export function removeEdge(spec: AppSpec, from: string, to: string): AppSpec {
 // the new node. PURE (mirrors addStep's mint+blank, minus rechain).
 export function addStepNoRechain(spec: AppSpec, kind: AppStepKind): { spec: AppSpec; id: string } {
   const id = mintStepId(spec.steps);
-  const step = blankStep(kind, id);
+  const step = withNearestApproval(blankStep(kind, id), spec.steps);
   return { spec: { ...spec, steps: [...spec.steps, step] }, id };
 }
 
@@ -152,6 +154,15 @@ export function blankStep(kind: AppStepKind, id: string): AppStep {
       return { id, label, kind: 'human' };
     case 'output':
       return { id, label, kind: 'output', sink: 'console' };
+    case 'action':
+      return {
+        id,
+        label,
+        kind: 'action',
+        actionId: 'crm.create-task',
+        connectorId: '',
+        command: { operation: 'create-task' },
+      };
     default:
       // exhaustive; TS guards this, but keep a safe fallback.
       return { id, label: 'Step', kind: 'output', sink: 'console' } as AppStep;
@@ -170,6 +181,8 @@ function defaultLabel(kind: AppStepKind): string {
       return 'Review / approve';
     case 'output':
       return 'Output';
+    case 'action':
+      return 'Complete the next action';
     default:
       return 'Step';
   }
@@ -180,9 +193,9 @@ function defaultLabel(kind: AppStepKind): string {
 // rechains the edges so the new step joins the linear flow.
 export function addStep(spec: AppSpec, kind: AppStepKind, index?: number): AppSpec {
   const id = mintStepId(spec.steps);
-  const step = blankStep(kind, id);
   const steps = [...spec.steps];
   const at = index === undefined ? steps.length : clamp(index, 0, steps.length);
+  const step = withNearestApproval(blankStep(kind, id), steps.slice(0, at));
   steps.splice(at, 0, step);
   return { ...spec, steps, edges: rechainEdges(steps) };
 }
@@ -252,7 +265,11 @@ export function setAgentPrompt(spec: AppSpec, stepId: string, prompt: string): A
   return mapStep(spec, stepId, (s) => {
     if (s.kind !== 'agent') return s;
     const inline = s.inlineAgent ?? { systemPrompt: '', grounded: true };
-    const next: AgentStep = { ...s, agentId: undefined, inlineAgent: { ...inline, systemPrompt: prompt } };
+    const next: AgentStep = {
+      ...s,
+      agentId: undefined,
+      inlineAgent: { ...inline, systemPrompt: prompt },
+    };
     return next;
   });
 }
@@ -291,8 +308,41 @@ export function setOutputConfigField(
   });
 }
 
+export interface ActionStepPatch {
+  actionId?: ActionId;
+  connectorId?: string;
+  command?: Record<string, unknown>;
+  approvalStepId?: string | null;
+}
+
+/** Configure the selected governed action without exposing replay keys or arbitrary HTTP fields. */
+export function configureActionStep(
+  spec: AppSpec,
+  stepId: string,
+  patch: ActionStepPatch,
+): AppSpec {
+  return mapStep(spec, stepId, (step) => {
+    if (step.kind !== 'action') return step;
+    const next: ActionStep = {
+      ...step,
+      ...(patch.actionId ? { actionId: patch.actionId } : {}),
+      ...(patch.connectorId !== undefined ? { connectorId: patch.connectorId.trim() } : {}),
+      ...(patch.command !== undefined ? { command: withoutUserIdempotency(patch.command) } : {}),
+    };
+    if (patch.approvalStepId === null) delete next.approvalStepId;
+    else if (patch.approvalStepId !== undefined) {
+      next.approvalStepId = patch.approvalStepId.trim() || undefined;
+    }
+    return next;
+  });
+}
+
 // ─── setTrigger — pick how the app is invoked ─────────────────────────────────────────────────────
-export function setTrigger(spec: AppSpec, kind: TriggerKind, config?: Record<string, unknown>): AppSpec {
+export function setTrigger(
+  spec: AppSpec,
+  kind: TriggerKind,
+  config?: Record<string, unknown>,
+): AppSpec {
   const trigger: TriggerSpec = { kind, ...(config ? { config } : {}) };
   return { ...spec, trigger };
 }
@@ -346,6 +396,9 @@ export function describeStepBinding(step: AppStep, names: BindingNames = {}): st
         : 'human review / approve';
     case 'output':
       return `output · ${step.sink}`;
+    case 'action':
+      if (!step.connectorId) return 'needs a CRM connection';
+      return `${step.actionId === 'crm.create-task' ? 'creates a CRM follow-up' : 'updates CRM'} · approval required`;
     default:
       return '';
   }
@@ -364,4 +417,15 @@ function mapStep(spec: AppSpec, stepId: string, fn: (s: AppStep) => AppStep): Ap
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
+}
+
+function withNearestApproval(step: AppStep, preceding: AppStep[]): AppStep {
+  if (step.kind !== 'action') return step;
+  const review = [...preceding].reverse().find((candidate) => candidate.kind === 'human');
+  return review ? { ...step, approvalStepId: review.id } : step;
+}
+
+function withoutUserIdempotency(command: Record<string, unknown>): Record<string, unknown> {
+  const { idempotencyKey: _idempotencyKey, ...safe } = command;
+  return safe;
 }
