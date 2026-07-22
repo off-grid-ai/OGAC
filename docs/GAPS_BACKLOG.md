@@ -1184,3 +1184,9 @@ scrape targets / remote-write producers are configured. The console metric explo
 + alerts view are live-verified and correct, but no real metric VALUE can be read until VM ingests.
 Fix is a fleet/deploy concern (configure VM scraping or point producers at it) — OUTSIDE the console;
 NOT fixable by a Next.js change. metrics-query workflow gate held at `partial`, alerts at `no`.
+
+### LiteLLM response caching disabled on deploy (2026-07-22)
+The deployed LiteLLM proxy has no cache initialized (/cache/ping → 503 "litellm.cache is None").
+The console cache surface (status/flush/hit-rate) is live-verified and degrades honestly, but no cache
+hit/flush workflow can be proven until caching is enabled in the proxy config + reloaded — a deploy/
+service concern, NOT a Next.js change. response-cache workflow gate held at `no`.
