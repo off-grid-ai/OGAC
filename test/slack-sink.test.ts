@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildSlackPayload, postSlack } from '@/lib/adapters/sinks/slack';
+import {
+  buildSlackPayload,
+  isSlackSinkConfigured,
+  persistSlackWebhookUrl,
+  postSlack,
+  removeSlackWebhookUrl,
+  resolveSlackWebhookUrl,
+} from '@/lib/adapters/sinks/slack';
 
 // ─── payload shaping (PURE) ──────────────────────────────────────────────────────────────────────
 
@@ -17,6 +24,31 @@ test('buildSlackPayload passes a valid #channel / @user override, drops anything
   assert.equal(buildSlackPayload({ text: 't', channel: 'ops-alerts' }).channel, undefined);
   assert.equal(buildSlackPayload({ text: 't', channel: '#a b' }).channel, undefined);
   assert.equal(buildSlackPayload({ text: 't', channel: '   ' }).channel, undefined);
+});
+
+// ─── vaulted webhook URL (real OpenBao adapter — no live vault in test → env fallback path) ───────
+
+test('resolveSlackWebhookUrl falls back to SLACK_WEBHOOK_URL env when the vault has nothing', async () => {
+  const url = 'https://hooks.slack.com/services/T/B/x';
+  assert.equal(await resolveSlackWebhookUrl({ SLACK_WEBHOOK_URL: url }), url);
+  assert.equal(await resolveSlackWebhookUrl({}), null);
+  assert.equal(await resolveSlackWebhookUrl({ SLACK_WEBHOOK_URL: '  ' }), null);
+});
+
+test('persistSlackWebhookUrl throws honestly when the vault backend is not reachable/writable', async () => {
+  await assert.rejects(() => persistSlackWebhookUrl('https://hooks.slack.com/x'), /OpenBao|writable/);
+});
+
+test('removeSlackWebhookUrl is best-effort — never throws even when the vault is unreachable', async () => {
+  await removeSlackWebhookUrl();
+});
+
+test('isSlackSinkConfigured follows the resolvable webhook URL', async () => {
+  assert.equal(await isSlackSinkConfigured({}), false);
+  assert.equal(
+    await isSlackSinkConfigured({ SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/T/B/x' }),
+    true,
+  );
 });
 
 // ─── send (I/O — fetch + env are the ONLY mocked boundary) ────────────────────────────────────────
@@ -76,6 +108,21 @@ test('postSlack treats a 200 with a non-"ok" body as a failure', async () => {
   );
   assert.equal(r.ok, false);
   assert.match(r.reason, /channel_not_found/);
+});
+
+test('postSlack tolerates a response whose body cannot be read (treats as non-ok failure)', async () => {
+  const r = await postSlack(
+    { text: 'x' },
+    { SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/T/B/x' },
+    async () =>
+      // A Response whose .text() rejects — the sink's .catch(()=>'') keeps it from throwing.
+      ({
+        ok: true,
+        status: 200,
+        text: () => Promise.reject(new Error('stream error')),
+      }) as unknown as Response,
+  );
+  assert.equal(r.ok, false); // empty body !== "ok" → honest failure, never a fake success
 });
 
 test('postSlack reports a transport error (never throws)', async () => {

@@ -15,6 +15,13 @@ test('buildWhatsAppSend normalizes the recipient (strips spaces/dashes, keeps +)
   assert.deepEqual(buildWhatsAppSend('  918888  ', 'x'), { to: '918888', text: 'x' });
 });
 
+test('buildWhatsAppSend tolerates null/undefined args (defaults to empty strings)', () => {
+  assert.deepEqual(
+    buildWhatsAppSend(undefined as unknown as string, undefined as unknown as string),
+    { to: '', text: '' },
+  );
+});
+
 // ─── config gate (reuses the trigger's pure authority) ───────────────────────────────────────────
 
 test('isWhatsAppSinkConfigured follows OFFGRID_WHATSAPP_URL', () => {
@@ -68,6 +75,13 @@ test('sendWhatsApp reports a non-2xx gateway response as a failure with the stat
   assert.equal(r.status, 422);
   assert.match(r.reason, /422/);
   assert.match(r.reason, /bad number/);
+});
+
+test('sendWhatsApp reports a non-2xx with an empty body (status only, no detail suffix)', async () => {
+  const r = await sendWhatsApp('+9199', 'x', GW, async () => new Response('', { status: 500 }));
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 500);
+  assert.match(r.reason, /500/);
 });
 
 test('sendWhatsApp reports a transport error (never throws)', async () => {

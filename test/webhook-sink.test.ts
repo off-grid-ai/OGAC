@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildWebhookPayload,
+  isWebhookSinkConfigured,
+  persistWebhookSecret,
   postWebhook,
+  removeWebhookSecret,
+  resolveWebhookSecret,
   serializeWebhookBody,
   signWebhookBody,
   signatureHeaderValue,
@@ -57,6 +61,33 @@ test('signWebhookBody matches an independent HMAC-SHA256 over the exact body byt
   const expected = createHmac('sha256', 'topsecret').update(body).digest('hex');
   assert.equal(sig, expected);
   assert.equal(signatureHeaderValue(sig), `sha256=${expected}`);
+});
+
+// ─── vaulted signing secret (real OpenBao adapter — no live vault in test → env fallback path) ────
+
+test('resolveWebhookSecret falls back to OFFGRID_WEBHOOK_SECRET env when the vault has nothing', async () => {
+  // No OFFGRID_OPENBAO_URL in test → the vault get returns undefined → env fallback is used.
+  assert.equal(await resolveWebhookSecret({ OFFGRID_WEBHOOK_SECRET: 'env-key' }), 'env-key');
+  assert.equal(await resolveWebhookSecret({}), null);
+  assert.equal(await resolveWebhookSecret({ OFFGRID_WEBHOOK_SECRET: '   ' }), null);
+});
+
+test('persistWebhookSecret throws honestly when the vault backend is not reachable/writable', async () => {
+  // With no OpenBao configured the KV write throws — surfaced, never a silent fake success.
+  await assert.rejects(() => persistWebhookSecret('s'), /OpenBao|writable/);
+});
+
+test('removeWebhookSecret is best-effort — never throws even when the vault is unreachable', async () => {
+  await removeWebhookSecret(); // must resolve without throwing
+});
+
+test('isWebhookSinkConfigured requires BOTH a valid url AND a resolvable secret', async () => {
+  assert.equal(await isWebhookSinkConfigured({}, {}), false); // no url
+  assert.equal(await isWebhookSinkConfigured({ url: 'https://hooks.corp/in' }, {}), false); // no secret
+  assert.equal(
+    await isWebhookSinkConfigured({ url: 'https://hooks.corp/in' }, { OFFGRID_WEBHOOK_SECRET: 's' }),
+    true,
+  );
 });
 
 // ─── send (I/O — fetch + env are the ONLY mocked boundary) ────────────────────────────────────────
