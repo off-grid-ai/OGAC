@@ -115,7 +115,10 @@ export default async function QualityDriftPage() {
             <CardTitle className="text-sm">Retained drift runs</CardTitle>
             <CardDescription className="text-xs">
               Each run is persisted with its engine attribution, so a genuine Evidently execution is
-              distinguishable from the PSI fallback after the fact.
+              distinguishable from the PSI fallback after the fact.{' '}
+              <a href="/solutions/quality/drift-monitoring" className="text-primary hover:underline">
+                Track drift over time in monitoring projects →
+              </a>
             </CardDescription>
           </CardHeader>
           <CardContent>
