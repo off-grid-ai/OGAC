@@ -862,6 +862,28 @@ export async function getTemplate(id: string, orgId: string): Promise<TemplateVi
   return visible ? toTemplateView(row) : null;
 }
 
+// ─── getTemplateSourceSpec — the source AppSpec of a template, for adoption ─────
+// Reads the template's own definition (from ITS org) so a cross-org adopter can clone it, gated by
+// the SAME org/public visibility rule as getTemplate: only a public template — or the caller's own
+// org template — is adoptable. Returns null when the viewer may not adopt it. This is the only place
+// a read crosses org scope, and it is deliberately narrow: template + published + visible.
+export async function getTemplateSourceSpec(
+  id: string,
+  viewerOrgId: string,
+): Promise<AppSpec | null> {
+  await ensureAppsSchema();
+  const scopedOrgId = viewerOrgId || DEFAULT_ORG;
+  const [row] = await db
+    .select()
+    .from(apps)
+    .where(and(eq(apps.id, id), eq(apps.isTemplate, true)))
+    .limit(1);
+  if (!row) return null;
+  const visible =
+    row.visibility === 'public' || (row.orgId === scopedOrgId && row.visibility === 'org');
+  return visible ? toAppSpec(row) : null;
+}
+
 function toTemplateView(row: App): TemplateView {
   return {
     id: row.id,
