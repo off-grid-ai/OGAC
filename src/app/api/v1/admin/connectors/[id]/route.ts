@@ -24,6 +24,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const orgId = await currentOrgId();
   const existing = await getConnector(id, orgId);
   if (!existing) return NextResponse.json({ error: 'unknown connector' }, { status: 404 });
+  if (existing.type.toLowerCase() === 'kafka') {
+    return NextResponse.json(
+      { error: 'Manage Kafka sources through the governed source endpoint.' },
+      { status: 409 },
+    );
+  }
   if (body.type !== undefined && body.type !== existing.type) {
     return NextResponse.json(
       { error: 'Connector type cannot be changed after creation.' },
@@ -104,6 +110,13 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   // Scope the delete (row + ingest-job cascade) to the caller's org — org A cannot delete org B's
   // connector via a guessed id (P1 IDOR fix).
   const orgId = await currentOrgId();
+  const existing = await getConnector(id, orgId);
+  if (existing?.type.toLowerCase() === 'kafka') {
+    return NextResponse.json(
+      { error: 'Manage Kafka sources through the governed source endpoint.' },
+      { status: 409 },
+    );
+  }
   await deleteConnector(id, orgId);
   auditFromSession(gate, orgId, {
     action: 'connector.delete',

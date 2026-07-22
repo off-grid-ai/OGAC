@@ -149,6 +149,16 @@ test('fails closed on endpoint, schema, tenant, and credential drift', () => {
   ]);
 });
 
+test('rejects caller-defined runtime policy instead of ignoring it', () => {
+  const result = validateKafkaSource({
+    ...validInput(),
+    consumerGroup: 'caller-selected-group',
+    maxRecords: 50_000,
+  } as KafkaSourceInput);
+  assert.equal(result.ok, false);
+  assert.equal(result.errors.request, 'Remove fields that are not part of governed source onboarding.');
+});
+
 test('redacted security reports presence and modes without returning secrets', () => {
   const redacted = redactedKafkaSecurity({
     tls: true,

@@ -81,6 +81,26 @@ const TOPIC_RE = /^[A-Za-z0-9._-]{1,249}$/;
 const SCHEMA_SUBJECT_RE = /^[A-Za-z0-9._-]{1,249}$/;
 const TENANT_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/i;
+const INPUT_KEYS = new Set<keyof KafkaSourceInput>([
+  'name',
+  'description',
+  'bootstrapEndpoint',
+  'schemaRegistryEndpoint',
+  'topic',
+  'schemaSubject',
+  'schemaVersion',
+  'schemaId',
+  'schemaSha256',
+  'tenantField',
+  'tls',
+  'sasl',
+  'username',
+  'password',
+  'registryAuth',
+  'registryToken',
+  'registryUsername',
+  'registryPassword',
+]);
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -168,6 +188,9 @@ export function validateKafkaSource(
   current?: KafkaSourceCurrentSecurity,
 ): KafkaSourceValidation {
   const errors: Record<string, string> = {};
+  if (Object.keys(input).some((key) => !INPUT_KEYS.has(key as keyof KafkaSourceInput))) {
+    errors.request = 'Remove fields that are not part of governed source onboarding.';
+  }
   const name = text(input.name);
   const description = text(input.description);
   const bootstrapRaw = text(input.bootstrapEndpoint);

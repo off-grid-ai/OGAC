@@ -7,6 +7,7 @@ import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
 const ORG = 'test-kafka-source-onboarding';
 const FOREIGN_ORG = 'test-kafka-source-onboarding-foreign';
 const SHA = 'b'.repeat(64);
+const TOKEN = 'kafka-source-onboarding-admin';
 const dbUp = await dbReachable();
 
 function sourceInput(overrides: Record<string, unknown> = {}) {
@@ -82,13 +83,25 @@ test(
     const { port } = server.address() as AddressInfo;
     const previousUrl = process.env.OFFGRID_OPENBAO_URL;
     const previousToken = process.env.OFFGRID_OPENBAO_TOKEN;
+    const previousAdminToken = process.env.OFFGRID_ADMIN_TOKEN;
+    const previousOrg = process.env.OFFGRID_ORG;
+    const previousAuthSecret = process.env.AUTH_SECRET;
     process.env.OFFGRID_OPENBAO_URL = `http://127.0.0.1:${port}`;
     process.env.OFFGRID_OPENBAO_TOKEN = 'test-token';
+    process.env.OFFGRID_ADMIN_TOKEN = TOKEN;
+    process.env.OFFGRID_ORG = ORG;
+    process.env.AUTH_SECRET = 'test-kafka-source-onboarding-auth-secret';
     t.after(() => {
       if (previousUrl === undefined) delete process.env.OFFGRID_OPENBAO_URL;
       else process.env.OFFGRID_OPENBAO_URL = previousUrl;
       if (previousToken === undefined) delete process.env.OFFGRID_OPENBAO_TOKEN;
       else process.env.OFFGRID_OPENBAO_TOKEN = previousToken;
+      if (previousAdminToken === undefined) delete process.env.OFFGRID_ADMIN_TOKEN;
+      else process.env.OFFGRID_ADMIN_TOKEN = previousAdminToken;
+      if (previousOrg === undefined) delete process.env.OFFGRID_ORG;
+      else process.env.OFFGRID_ORG = previousOrg;
+      if (previousAuthSecret === undefined) delete process.env.AUTH_SECRET;
+      else process.env.AUTH_SECRET = previousAuthSecret;
     });
 
     const { listConnectors, deleteConnector } = await import('@/lib/store');
@@ -96,11 +109,24 @@ test(
     const { connectorSecretKey } = await import('@/lib/connector-secrets');
     const {
       createKafkaSource,
-      deleteKafkaSource,
       getKafkaSource,
       updateKafkaSource,
       KafkaSourceOnboardingError,
     } = await import('@/lib/adapters/kafka-source-onboarding');
+    const collectionRoute = await import('@/app/api/v1/admin/kafka-sources/route');
+    const sourceRoute = await import('@/app/api/v1/admin/kafka-sources/[id]/route');
+    const genericConnectorRoute = await import('@/app/api/v1/admin/connectors/[id]/route');
+
+    function request(path: string, init?: RequestInit) {
+      return new Request(`http://console.local${path}`, {
+        ...init,
+        headers: {
+          authorization: `Bearer ${TOKEN}`,
+          'content-type': 'application/json',
+          ...(init?.headers ?? {}),
+        },
+      });
+    }
 
     async function clean(orgId: string) {
       for (const domain of await listDomains(orgId)) await deleteDomain(domain.id, orgId);
@@ -115,7 +141,14 @@ test(
       await clean(FOREIGN_ORG);
     });
 
-    const created = await createKafkaSource(sourceInput(), ORG);
+    const createResponse = await collectionRoute.POST(
+      request('/api/v1/admin/kafka-sources', {
+        method: 'POST',
+        body: JSON.stringify(sourceInput()),
+      }),
+    );
+    assert.equal(createResponse.status, 201);
+    const created = (await createResponse.json()) as Awaited<ReturnType<typeof createKafkaSource>>;
     assert.equal(created.name, 'Enterprise risk signals');
     assert.equal(created.bootstrapEndpoint, 'kafka://127.0.0.1:19092');
     assert.equal(created.topic, 'enterprise.risk-signals');
@@ -128,6 +161,15 @@ test(
     });
     assert.equal(JSON.stringify(created).includes('vault-only-password'), false);
     assert.equal(JSON.stringify(created).includes('registry-only-token'), false);
+
+    const getResponse = await sourceRoute.GET(
+      request(`/api/v1/admin/kafka-sources/${created.connectorId}`),
+      { params: Promise.resolve({ id: created.connectorId }) },
+    );
+    assert.equal(getResponse.status, 200);
+    const responseText = await getResponse.text();
+    assert.equal(responseText.includes('vault-only-password'), false);
+    assert.equal(responseText.includes('registry-only-token'), false);
 
     const connectors = await listConnectors(ORG);
     const domains = await listDomains(ORG);
@@ -166,6 +208,29 @@ test(
     assert.equal(preserved.topic, 'enterprise.operating-signals');
     assert.match(vault.get(key)!, /vault-only-password/);
 
+    for (const handler of [genericConnectorRoute.PATCH, genericConnectorRoute.DELETE]) {
+      const response = await handler(
+        request(`/api/v1/admin/connectors/${created.connectorId}`, {
+          method: handler === genericConnectorRoute.PATCH ? 'PATCH' : 'DELETE',
+          ...(handler === genericConnectorRoute.PATCH
+            ? { body: JSON.stringify({ name: 'Bypass' }) }
+            : {}),
+        }),
+        { params: Promise.resolve({ id: created.connectorId }) },
+      );
+      assert.equal(response.status, 409, 'generic Kafka mutation is refused');
+    }
+
+    const beforeUnsupported = (await listConnectors(ORG)).length;
+    const unsupported = await collectionRoute.POST(
+      request('/api/v1/admin/kafka-sources', {
+        method: 'POST',
+        body: JSON.stringify({ ...sourceInput(), consumerGroup: 'caller-owned' }),
+      }),
+    );
+    assert.equal(unsupported.status, 400);
+    assert.equal((await listConnectors(ORG)).length, beforeUnsupported);
+
     const beforeFailedUpdate = await getKafkaSource(created.connectorId, ORG);
     const beforeFailedSecret = vault.get(key);
     failNextWrite = true;
@@ -192,7 +257,11 @@ test(
     assert.equal((await listConnectors(ORG)).length, 1);
     assert.equal((await listDomains(ORG)).length, 1);
 
-    await deleteKafkaSource(created.connectorId, ORG);
+    const deleteResponse = await sourceRoute.DELETE(
+      request(`/api/v1/admin/kafka-sources/${created.connectorId}`, { method: 'DELETE' }),
+      { params: Promise.resolve({ id: created.connectorId }) },
+    );
+    assert.equal(deleteResponse.status, 200);
     assert.equal((await listConnectors(ORG)).length, 0);
     assert.equal((await listDomains(ORG)).length, 0);
     assert.equal(vault.has(key), false);
