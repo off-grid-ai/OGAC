@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { StatBand } from '@/components/insights/StatBand';
 import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect';
 import { AlertingManager } from '@/components/siem/AlertingManager';
+import { IndexAdminManager } from '@/components/siem/IndexAdminManager';
 import { SiemEventsTable } from '@/components/siem/SiemEventsTable';
 import { SuppressionManager } from '@/components/siem/SuppressionManager';
 import { buildSiemStats } from '@/lib/insights-stats';
@@ -155,6 +156,11 @@ export async function SiemSurface({
           {/* Management: OpenSearch alerting monitors (threshold triggers over the audit/gateway
           indices) + the ISM retention/rollover policy. URL-driven (?panel=alerting, ?atab=). */}
           <AlertingManager />
+
+          {/* Read-only context around the writable ISM policy: the index templates + write-aliases
+          that back the audit/gateway indices, plus native security-analytics detectors + firing
+          state. URL-driven (?ipanel=index-admin, ?itab=, ?isel=). */}
+          <IndexAdminManager />
         </div>
       }
     </PageFrame>
