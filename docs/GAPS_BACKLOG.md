@@ -1177,3 +1177,10 @@ All map-honesty test failures reconciled to VERIFIED-LIVE truth (not rubber-stam
 - **llm-guard** re-verified live: `/analyze/prompt` redacts PAN→[REDACTED] + email (is_valid:false, Anonymize/Regex fired); `/analyze/output` trips Toxicity:1 → is_valid:false. Confirms prompt-sanitization [y,y,y,y] + output-safety-quality [y,y,partial,partial] (workflow partial: no retained BLOCKED-output run). Test snapshot updated to match.
 - **OPA** re-verified live: `OFFGRID_ADAPTER_POLICY=opa`, a live decision attributed `engine:opa`. policy-decisions + policy-lifecycle are CLOSED (gates yes, stale item gaps cleared). auditState stays `stale` — only the immutable image digest is unpinned (that residual lives in auditStateEvidence, a provenance axis, not a capability gap). Spine test updated: OPA capability gates are `yes` while it remains identity-stale.
 - Cleared vestigial completion-statement gaps on all-yes+verified records: openbao/dynamic-credentials, litellm/virtual-keys, ragas/faithfulness, ragas/answer-relevancy. Full map suite (43 tests) green.
+
+### VictoriaMetrics has zero series (deploy gap, 2026-07-22)
+The deployed VictoriaMetrics (:8428) holds NO time series — not even its own self-metrics — i.e. no
+scrape targets / remote-write producers are configured. The console metric explorer + saved-query CRUD
++ alerts view are live-verified and correct, but no real metric VALUE can be read until VM ingests.
+Fix is a fleet/deploy concern (configure VM scraping or point producers at it) — OUTSIDE the console;
+NOT fixable by a Next.js change. metrics-query workflow gate held at `partial`, alerts at `no`.
