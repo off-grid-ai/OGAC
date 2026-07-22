@@ -1115,7 +1115,7 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
 
 ## CRM governed write-back slice (2026-07-20)
 
-- **[G-CRM-TASKS] RESOLVED IN CODE / DEPLOYMENT PENDING — typed opportunity follow-up and standalone
+- **[G-CRM-TASKS] RESOLVED LIVE — typed opportunity follow-up and standalone
   task writes share one governed CRM action seam.** The Console now has one tenant-scoped,
   allowlisted and idempotent action seam for bank cross-sell and lender delinquency:
   `POST /api/v1/admin/connectors/:id/actions/crm-writeback`. It reads the existing opportunity,
@@ -1127,11 +1127,11 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   and a persisted idempotency ledger. Console task requests require that exact API version, pass the
   session-derived org boundary in `x-offgrid-org-id`, emit attributed audit events, and return signed
   receipts. Real HTTP tests prove create, update, replay, conflict, tenant propagation and fail-closed
-  version handling. Live closure remains pending the documented CRM container recreation followed by
-  Console deployment and integration verification. Generic webhook ingestion and broad CRM CRUD are
-  explicitly outside this action seam rather than being falsely claimed as implemented.
+  version handling. Console `16fa96443c79` and bank run `apprun_5e715894` prove the live Console seam:
+  CRM count `0→1`, signed receipt retained, duplicate approval rejected, and provider replay without
+  a second task. Generic webhook ingestion and broad CRM CRUD are explicitly outside this action seam.
 
-- **[G-ACTION-PLANE] CODE-WIRED / LIVE DEPLOYMENT PENDING — the App runtime now composes the bounded
+- **[G-ACTION-PLANE] RESOLVED LIVE FOR THE BOUNDED CRM SLICE — the App runtime composes the bounded
   CRM seam behind human approval.** A catalogued Action step exposes create-task, update-task, and
   update-opportunity choices in plain language; accepts only approved internal CRM connections;
   requires a preceding Human review step; previews the record and effect without echoing free text;
@@ -1140,11 +1140,12 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   the tenant-scoped CRM adapters, and persists approval evidence plus the signed provider receipt.
   Source and integration evidence at `dac5034d`, `9ef9b99e`, `5061e43b`, and `a1f29e87` covers invalid
   graphs, missing/incorrect approval, shadow interception, execute/replay, persistence, worker resume,
-  and nontechnical builder/review rendering. Closure still requires one exact-SHA deployment and a
-  retained bank journey proving pending review → authorized approval → one live CRM mutation → replay
-  without duplication, plus wide/narrow visual evidence. The action catalogue currently contains
-  only the three CRM mutations; pagination, incremental sync, webhooks, generic CRM CRUD, and other
-  enterprise action families remain future audited slices.
+  and nontechnical builder/review rendering. Live Console `16fa96443c79` retained bank run
+  `apprun_5e715894` (pending review → approval → exactly one task → duplicate-safe replay) and shadow
+  run `apprun_71da60a4` (zero mutation). Wide visual QA proved the full-width builder with no overflow;
+  the established sub-768px handoff remained intact. The catalogue currently contains only the three
+  CRM mutations; pagination, incremental sync, webhooks, generic CRM CRUD, and other enterprise action
+  families remain future audited slices.
 
 ## Insurance claim disposition source ownership (2026-07-20)
 

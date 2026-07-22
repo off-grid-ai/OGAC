@@ -56,9 +56,9 @@ canonical agent-run id. Marquez distinguishes `accepted`, `rejected`, `unreachab
 No Qdrant or Marquez A/I/UI/W gate changes at this checkpoint: focused tests and typecheck prove
 the code contract, not the selected live deployment or a completed BFSI workflow.
 
-### Governed Action Plane code-wired delta
+### Governed Action Plane live-verified delta
 
-The first bounded Action Plane slice is wired in source without promoting live proof. App authors can
+The first bounded Action Plane slice is live on Console `16fa96443c79`. App authors can
 select one of three catalogued CRM mutations, bind an approved internal CRM connection and a prior
 Human review step, complete purpose-specific fields, and see a plain-language impact preview. The
 runtime requires the exact approved human ancestor, derives the replay key from the run and step,
@@ -66,15 +66,18 @@ intercepts all mutations in shadow mode, delegates live execution to the existin
 task/opportunity adapters, and retains the reviewer decision, impact, changed resource, and signed
 provider receipt on the run.
 
-| Evidence slice                    | Source state | Retained source proof                    | Still required before live verification                                                                                   |
-| --------------------------------- | ------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Action catalogue and builder      | code-wired   | `dac5034d`, `86fa9c38`, `40258303`       | Render and inspect the exact deployed builder at wide and narrow viewports with a real tenant connector.                  |
-| Approval, shadow, and CRM runtime | code-wired   | `9ef9b99e`, `5061e43b`, `a1f29e87`       | Deploy one immutable SHA; prove pending review → approval → one CRM mutation → replay without duplication, plus shadow.   |
+| Evidence slice                    | State         | Retained proof                                                                 | Remaining breadth                                                                                       |
+| --------------------------------- | ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Action catalogue and builder      | live-verified | Wide 1600px visual QA, zero horizontal overflow, explicit narrow-screen handoff | Retain the same usability bar as new action families are added.                                         |
+| Approval, shadow, and CRM runtime | live-verified | `apprun_5e715894`, `apprun_71da60a4`, Console `16fa96443c79`                    | Add typed pagination, incremental sync, rate-limit handling, webhooks, and broader audited CRM CRUD.    |
 
-`enterprise-source-crm/write-sync-webhooks` remains `N/P/P/N`: the stale source identity still
-normalizes Available to `no`, writes are only one narrow part of the audited denominator, and no
-live Console workflow proof exists yet. Pagination, incremental sync, rate-limit handling, webhook
-ingestion, and broad CRM CRUD remain explicitly outside this slice.
+The live bank journey paused at `rm-review`, retained `service@offgrid.local` as the authenticated
+reviewer, changed CRM task count exactly `0→1`, and persisted an on-prem impact plus signed provider
+receipt. Repeating approval returned `409`; replaying the same provider command returned `200` with
+`x-idempotent-replay: true`, leaving the count at `1`. Shadow run `apprun_71da60a4` completed with no
+receipt and no CRM mutation. `enterprise-source-crm/write-sync-webhooks` is therefore `N/P/P/P`:
+the stale mutable source identity keeps Available at `no`, while the broad pagination/sync/webhook
+denominator remains only partially integrated, exposed, and used.
 
 ### LLM Guard 0.3.16 audit delta
 

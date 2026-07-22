@@ -64,7 +64,7 @@ governed step execution, human pause/resume, failure recovery, and output persis
 | Indemnity/FNOL             | `enterprise-source-minio/object-read-write` | Y/N/P/N  | The pinned service provides S3 APIs; only source ontology is visible.                        | Implement governed bucket/key-scoped claim-document read/write with limits, provenance, and workflow proof.            |
 | Delinquency and cross-sell | `enterprise-source-corebank/sql-read`       | N/Y/Y/Y  | Bounded PostgreSQL reads, Data Sources UI, and retained lender/claims lookup evidence exist. | Pin the mutable source and repeat schema/count/read evidence.                                                          |
 | Delinquency and cross-sell | `enterprise-source-crm/rest-read`           | N/Y/Y/Y  | Bounded CRM reads, UI journeys, and retained customer/cross-sell lookup evidence exist.      | Pin the mutable source and repeat discovery/read evidence.                                                             |
-| Delinquency and cross-sell | `enterprise-source-crm/write-sync-webhooks` | N/P/P/N  | Governed task/opportunity writes and nontechnical human-approval UI are code-wired; no live Console workflow proof exists. | Deploy and prove one exact bank action/replay; retain typed pagination, incremental state, rate-limit, and webhook gaps. |
+| Delinquency and cross-sell | `enterprise-source-crm/write-sync-webhooks` | N/P/P/P  | Console `16fa96443c79` proves a governed bank task write, approval evidence, signed receipt, duplicate-safe replay, and zero-mutation shadow run. | Add typed pagination, incremental state, rate-limit handling, webhooks, and broader audited CRM CRUD. |
 
 ## Insurance indemnity / FNOL
 
