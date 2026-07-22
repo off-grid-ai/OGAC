@@ -704,6 +704,35 @@ export async function getLineage(id: string, orgId: string): Promise<AppLineage 
   return (row?.lineage as AppLineage | null) ?? null;
 }
 
+// ─── getAppReuseMeta — the reuse state of an app in one read (for the app shell) ─
+// The AppSpec model deliberately omits template/lineage fields; this returns them together so the
+// per-app lifecycle shell can render the reuse toolbar (template badge + var schema + lineage chip)
+// without three round-trips. Null when the app isn't in the org.
+export interface AppReuseMeta {
+  isTemplate: boolean;
+  templateVars: TemplateVarSchema;
+  lineage: AppLineage | null;
+}
+
+export async function getAppReuseMeta(id: string, orgId: string): Promise<AppReuseMeta | null> {
+  await ensureAppsSchema();
+  const [row] = await db
+    .select({
+      isTemplate: apps.isTemplate,
+      templateVars: apps.templateVars,
+      lineage: apps.lineage,
+    })
+    .from(apps)
+    .where(and(eq(apps.id, id), eq(apps.orgId, orgId || DEFAULT_ORG)))
+    .limit(1);
+  if (!row) return null;
+  return {
+    isTemplate: row.isTemplate === true,
+    templateVars: toTemplateVars(row.templateVars),
+    lineage: (row.lineage as AppLineage | null) ?? null,
+  };
+}
+
 // ─── cloneApp — persist a deep clone of an app into a (possibly different) org ──
 // The pure cloneAppSpec decides WHAT carries over / resets + records lineage; this fn does the I/O:
 // mint the id, insert the row with its lineage + (optional) inherited template var schema. When
