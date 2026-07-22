@@ -215,55 +215,65 @@ export function createNativeKafkaEnterpriseSourcePort(
       try {
         await consumer.connect();
         await consumer.subscribe({ topic, fromBeginning: true });
-        run = consumer.run({
-          autoCommit: false,
-          eachBatchAutoResolve: false,
-          eachBatch: async ({ batch }) => {
-            if (!positioned || completed.has(batch.partition)) return;
-            const target = targets.get(batch.partition);
-            if (!target) {
-              consumer.pause([{ topic, partitions: [batch.partition] }]);
-              return;
-            }
-            const from = BigInt(target.fromOffset);
-            const to = BigInt(target.toOffset);
-            for (const message of batch.messages) {
-              const current = BigInt(message.offset);
-              if (current < from) continue;
-              if (current > to) {
-                fail?.(
-                  new KafkaEnterpriseSourceBoundaryError(
-                    'incomplete-window',
-                    `Kafka partition ${batch.partition} skipped required offset ${target.toOffset}`,
-                  ),
-                );
-                return;
-              }
-              if (!message.value) {
-                fail?.(
-                  new KafkaEnterpriseSourceBoundaryError(
-                    'incomplete-window',
-                    `Kafka partition ${batch.partition} offset ${message.offset} has no value`,
-                  ),
-                );
-                return;
-              }
-              records.push({
-                partition: batch.partition,
-                offset: message.offset,
-                key: message.key ? Buffer.from(message.key) : null,
-                timestamp: message.timestamp ?? null,
-                value: Buffer.from(message.value),
-              });
-              if (current === to) {
-                completed.add(batch.partition);
+        run = consumer
+          .run({
+            autoCommit: false,
+            eachBatchAutoResolve: false,
+            eachBatch: async ({ batch }) => {
+              if (!positioned || completed.has(batch.partition)) return;
+              const target = targets.get(batch.partition);
+              if (!target) {
                 consumer.pause([{ topic, partitions: [batch.partition] }]);
-                if (completed.size === targets.size) settle?.();
                 return;
               }
-            }
-          },
-        });
+              const from = BigInt(target.fromOffset);
+              const to = BigInt(target.toOffset);
+              for (const message of batch.messages) {
+                const current = BigInt(message.offset);
+                if (current < from) continue;
+                if (current > to) {
+                  fail?.(
+                    new KafkaEnterpriseSourceBoundaryError(
+                      'incomplete-window',
+                      `Kafka partition ${batch.partition} skipped required offset ${target.toOffset}`,
+                    ),
+                  );
+                  return;
+                }
+                if (!message.value) {
+                  fail?.(
+                    new KafkaEnterpriseSourceBoundaryError(
+                      'incomplete-window',
+                      `Kafka partition ${batch.partition} offset ${message.offset} has no value`,
+                    ),
+                  );
+                  return;
+                }
+                records.push({
+                  partition: batch.partition,
+                  offset: message.offset,
+                  key: message.key ? Buffer.from(message.key) : null,
+                  timestamp: message.timestamp ?? null,
+                  value: Buffer.from(message.value),
+                });
+                if (current === to) {
+                  completed.add(batch.partition);
+                  consumer.pause([{ topic, partitions: [batch.partition] }]);
+                  if (completed.size === targets.size) settle?.();
+                  return;
+                }
+              }
+            },
+          })
+          .catch((error) => {
+            fail?.(
+              new KafkaEnterpriseSourceBoundaryError(
+                'source-unavailable',
+                'Kafka consumer stopped before the governed window completed',
+                { cause: error },
+              ),
+            );
+          });
         await Promise.race([joined, completion]);
         throwIfAborted(signal);
         for (const window of windows) {
