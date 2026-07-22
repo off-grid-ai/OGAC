@@ -4,7 +4,6 @@
 
 CREATE TABLE IF NOT EXISTS "action_outcome_observations" (
   "id" text PRIMARY KEY NOT NULL,
-  "observation_key" text NOT NULL,
   "org_id" text NOT NULL,
   "app_id" text NOT NULL,
   "run_id" text NOT NULL,
@@ -45,12 +44,8 @@ CREATE TABLE IF NOT EXISTS "action_outcome_observations" (
     CHECK ("observed_at" >= "action_executed_at")
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "action_outcome_observations_key_idx"
-  ON "action_outcome_observations" ("observation_key");
---> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "action_outcome_observations_source_event_idx"
-  ON "action_outcome_observations"
-  ("org_id", "receipt_idempotency_key", "source_kind", "source_event_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "action_outcome_observations_source_idempotency_idx"
+  ON "action_outcome_observations" ("source_idempotency_key");
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "action_outcome_observations_supersedes_idx"
   ON "action_outcome_observations" ("supersedes_id");

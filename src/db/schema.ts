@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, doublePrecision, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, check, doublePrecision, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core';
 
 // ─── Fleet / control-plane tables ────────────────────────────────────────────
 export const devices = pgTable('devices', {
@@ -1128,7 +1128,6 @@ export const actionOutcomeObservations = pgTable(
   'action_outcome_observations',
   {
     id: text('id').primaryKey(),
-    observationKey: text('observation_key').notNull(),
     orgId: text('org_id').notNull(),
     appId: text('app_id').notNull(),
     runId: text('run_id').notNull(),
@@ -1159,17 +1158,16 @@ export const actionOutcomeObservations = pgTable(
     measurement: jsonb('measurement').$type<
       import('@/lib/action-outcome-contract').ActionOutcomeMeasurement | null
     >(),
-    supersedesId: text('supersedes_id'),
+    supersedesId: text('supersedes_id').references(
+      (): AnyPgColumn => actionOutcomeObservations.id,
+      { onDelete: 'restrict' },
+    ),
     recordedBy: text('recorded_by').notNull(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex('action_outcome_observations_key_idx').on(t.observationKey),
-    uniqueIndex('action_outcome_observations_source_event_idx').on(
-      t.orgId,
-      t.receiptIdempotencyKey,
-      t.sourceKind,
-      t.sourceEventId,
+    uniqueIndex('action_outcome_observations_source_idempotency_idx').on(
+      t.sourceIdempotencyKey,
     ),
     uniqueIndex('action_outcome_observations_supersedes_idx').on(t.supersedesId),
     index('action_outcome_observations_run_step_idx').on(t.orgId, t.runId, t.stepId),
@@ -1181,6 +1179,26 @@ export const actionOutcomeObservations = pgTable(
     ),
     foreignKey({ columns: [t.runId], foreignColumns: [appRuns.id] }).onDelete('restrict'),
     foreignKey({ columns: [t.appId], foreignColumns: [apps.id] }).onDelete('restrict'),
+    check(
+      'action_outcome_observations_kind_check',
+      sql`${t.kind} IN ('observed', 'corrected', 'withdrawn')`,
+    ),
+    check(
+      'action_outcome_observations_outcome_check',
+      sql`(${t.kind} = 'withdrawn' AND ${t.outcomeCode} IS NULL) OR (${t.kind} <> 'withdrawn' AND ${t.outcomeCode} IN ('accepted', 'rejected', 'converted', 'cured', 'settled'))`,
+    ),
+    check(
+      'action_outcome_observations_source_check',
+      sql`${t.sourceKind} IN ('human', 'system', 'import')`,
+    ),
+    check(
+      'action_outcome_observations_evidence_check',
+      sql`jsonb_typeof(${t.evidenceLinks}) = 'array' AND jsonb_array_length(${t.evidenceLinks}) > 0`,
+    ),
+    check(
+      'action_outcome_observations_time_check',
+      sql`${t.observedAt} >= ${t.actionExecutedAt}`,
+    ),
   ],
 );
 
