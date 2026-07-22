@@ -176,6 +176,7 @@
     "src/lib/adapters/airbyte.ts",
     "src/lib/adapters/kestra.ts",
     "src/lib/adapters/web-search.ts",
+    "src/lib/adapters/victorialogs.ts",
 
     "// db-io-libs: DB/network read libs whose pure decision/shape half is a tested sibling.",
     "src/lib/evals.ts",
