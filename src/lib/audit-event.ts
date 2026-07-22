@@ -55,6 +55,9 @@ export type AuditAction =
   | 'team.delete'
   | 'team.member.add'
   | 'team.member.remove'
+  // team governs an app/agent (app tier of team RBAC): bind / unbind
+  | 'team.app.bind'
+  | 'team.app.unbind'
   // app-run HITL review (feedback → golden capture)
   | 'app.run.review'
   // budget enforcement — a call denied for exceeding a spend limit (hard stop, outcome=blocked)
