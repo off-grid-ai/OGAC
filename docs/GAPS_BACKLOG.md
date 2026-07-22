@@ -1205,6 +1205,19 @@ sink-config UI + a real governed send via the local UI harness → docs/screensh
 (2) add an honest capability-map entry at /operations/services/capability-map (gates: code=yes,
 wired=yes, verified=partial until the live shot). Do NOT flip verified→yes without the screenshot.
 
+### Cloud-egress DLP boundary breadth (2026-07-22)
+
+- **[G-EGRESS-DLP-TENANCY] ✅ RESOLVED LIVE — DLP decisions retain the request tenant.** Console
+  `c5e8e01e1852da63a7094ca99745fb0830af7710` replaced `DEFAULT_ORG` with the resolved `orgId` at the
+  final chat cloud boundary. Two authorized `org_bharat` temporary turns reached
+  `compat:openai/gpt-4o-mini`; the provider answer contained only PAN/email placeholders and the
+  Bharat Union ledger retained two `gateway.egress.dlp` masked/redacted rows. Screenshots live under
+  `docs/screenshots/capabilities/`.
+- **[G-EGRESS-DLP-BREADTH] OPEN — the final DLP boundary is chat-only.** Agent and app model calls,
+  cloud tools, and outbound sinks do not yet enter the same tenant-scoped, fail-closed sanitizer
+  immediately before external send. Keep the capability's Integrated gate `partial` until each
+  external path reuses one shared release seam and has retained masked + fail-closed live evidence.
+
 ### SOP / cross-team workflow-template reuse — DELIVERED + VERIFIED LIVE (2026-07-22, feat/sop-template-reuse)
 App cloning + parameterized template variables + org SOP/template library. Code / wired / verified:
 - **PURE engines (unit-tested, ≥85% all metrics):** `src/lib/app-clone.ts` (deep-clone AppSpec →

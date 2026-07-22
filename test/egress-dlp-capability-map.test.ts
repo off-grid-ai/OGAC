@@ -27,7 +27,7 @@ test('cloud egress DLP belongs to the gateway and reports its bounded, honest re
       capability.gates.ui.status,
       capability.gates.workflow.status,
     ],
-    ['yes', 'partial', 'yes', 'partial'],
+    ['yes', 'partial', 'yes', 'yes'],
   );
 
   assert.match(capability.gates.upstream.evidence, /default-on/i);
@@ -35,7 +35,10 @@ test('cloud egress DLP belongs to the gateway and reports its bounded, honest re
   assert.match(capability.gates.upstream.evidence, /admin opt-out/i);
   assert.match(capability.gates.adapter.evidence, /before forwardToCloud/);
   assert.match(capability.gap, /only the chat\/stream cloud-model path/);
-  assert.match(capability.gap, /DEFAULT_ORG/);
-  assert.match(capability.gap, /current orgId/);
-  assert.match(capability.gap, /PAN\/email/);
+  assert.doesNotMatch(capability.gap, /DEFAULT_ORG/);
+  assert.match(capability.gates.adapter.evidence, /current orgId/);
+  assert.match(capability.gates.workflow.evidence, /org_bharat/);
+  assert.match(capability.gates.workflow.evidence, /compat:openai\/gpt-4o-mini/);
+  assert.match(capability.gates.workflow.evidence, /\[REDACTED_EMAIL_ADDRESS_3\]/);
+  assert.match(capability.gates.workflow.evidence, /c5e8e01e1852da63a7094ca99745fb0830af7710/);
 });

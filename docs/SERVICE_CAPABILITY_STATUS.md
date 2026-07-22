@@ -8,46 +8,37 @@ live deployment.
 
 ## Current checkpoint
 
-| Field                        | State                                                                         |
-| ---------------------------- | ----------------------------------------------------------------------------- |
-| Updated                      | 2026-07-20                                                                    |
-| Release branch               | `codex/modernize-console-sidebar`                                             |
-| Registry checkpoint          | Source snapshot through `5fdf5670`; this is not a deployed-SHA assertion      |
-| Logical inventory            | 48 entries: 42 platform services + 6 enterprise sources                       |
-| Versioned capability audits  | 38 records: 21 current, 17 stale                                              |
-| Audited denominator          | 164 capability items / 656 four-gate assessments                              |
-| Audit backlog                | 10 entries have no versioned denominator yet                                  |
-| Readiness evidence           | 47 `unverified`, 1 `partial`; no entry is release-verified by this checkpoint |
-| Enterprise-source projection | Repaired in `7f4f8d61`; live UI confirmation remains outstanding              |
-| Live verification            | Deployed `09b508bf`; mechanical UI gate passes, narrow Quality Runs visual gate fails |
+| Field                       | State                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| Updated                     | 2026-07-22                                                                            |
+| Release branch              | `main`                                                                                |
+| Registry checkpoint         | Cloud-egress DLP live proof captured from deployed `c5e8e01e1852da63a7094ca99745fb0830af7710` |
+| Logical inventory           | 48 entries: 42 platform services + 6 enterprise sources                               |
+| Versioned capability audits | 39 records: 24 current, 15 stale                                                      |
+| Audited denominator         | 171 capability items / 684 four-gate assessments                                      |
+| Audit backlog               | 9 entries have no versioned denominator yet                                           |
+| Readiness evidence          | Live-probed per request; not frozen into this source ledger                            |
+| Live verification           | S1 exact-SHA deploy, authorized cloud turn, tenant audit, and wide visual proof passed |
 
 `not-audited` is an honest state, not 0% capability. A service moves to `current` only after its
 pinned upstream denominator and all four gates have evidence. A mutable tag must remain explicit.
 
-### Live deployed UI verification — `09b508bf996565eba0cce1cd3454a8b50eb50f19`
+### Live cloud-egress DLP verification — `c5e8e01e1852da63a7094ca99745fb0830af7710`
 
-The live release stamp on `offgrid-s1.local` is
-`09b508bf996565eba0cce1cd3454a8b50eb50f19` with Next `BUILD_ID=offgrid-onprem`. This is older than
-the source checkpoint above: the LLM Guard denominator added by `5fdf5670` is not in the deployed
-artifact. The live capability map therefore correctly renders the deployed release as **48 entries,
-20 current audits, 17 stale audits, and 11 pending audits**; it must not be reported as the source
-checkpoint's 21/17/10 split until that later source is deployed.
+S1 served the exact stamped Console SHA with `BUILD_ID=offgrid-onprem`, one `admin`-owned listener on
+`:3000`, and HTTP 200 on `/signin`. An authorized, temporary Bharat Union chat submitted synthetic PAN
+`ABCDE1234F` and a synthetic email on the default `public` data class. Routing selected the configured
+cloud provider model `compat:openai/gpt-4o-mini`. The provider-produced answer contained only
+`PAN: [REDACTED]` and `Email: [REDACTED_EMAIL_ADDRESS_3]`; the raw values remained confined to the
+local user bubble. The tenant-scoped `/governance/egress` ledger retained two
+`gateway.egress.dlp` decisions for `org_bharat`, both `masked` / `redacted`, with the same cloud model.
 
-Authenticated Playwright verification covered Bharat Union and Suraksha at 1600x1000 and 820x1000.
-The canonical capability-map route, a selected last-inventory CRM route, the exact Quality Runs
-collection, and a seeded execution detail all returned 200 without an error boundary, console/page
-error, or horizontal page overflow. Each tenant exposed all 48 service rows; the bounded inventory
-list scrolled to the final `enterprise-source-crm` row, the family rail used local `overflow-x:auto`,
-and the selected CRM evidence remained visible. Both tenants exposed 24 seeded Quality executions;
-the 820px table used a local horizontal scroller rather than overflowing the page.
-
-The visual gate is still **failed**. At 820px, both tenants render the Quality Runs “Execution
-filters” title and its explanatory paragraph at the same vertical origin (`top=434px`), causing
-visible text overlap. Wide rendering is clean. Until that narrow composition is fixed, rebuilt,
-deployed, and re-captured, this release is mechanically reachable but not visually verified.
-Evidence is retained locally under `.shots/release-verification-20260720/` (manifests, layout reports,
-and inspected PNGs); the directory is intentionally ignored because the demo banner includes login
-credentials.
+The live capability map reported the canonical **48 entries, 24 current audits, 15 stale audits, and
+9 pending audits**. Cloud-egress DLP is now workflow-verified for the chat cloud-model seam. Its
+integration gate remains `partial` because agent/app model calls, cloud tools, and outbound sinks do
+not yet share this final DLP boundary. Evidence is retained in
+`docs/screenshots/capabilities/egress-dlp-cloud-response-c5e8e01e.png` and
+`docs/screenshots/capabilities/egress-dlp-ledger-c5e8e01e-wide.png`.
 
 ### Retrieval and lineage evidence-spine delta
 
@@ -90,7 +81,7 @@ cutover. Until that evidence exists, the Console must not claim current upstream
 
 ## Evidence roll-up
 
-These totals are calculated from the 164 versioned capability records currently owned by the two
+These totals are calculated from the 171 versioned capability records currently owned by the two
 canonical family registries. `yes`, `partial`, and `no` describe retained audit evidence—not fleet
 health. Stale audits are deliberately normalized so their Available gate cannot be treated as
 current. A `no` therefore means "not currently evidenced against the pinned denominator", not
@@ -98,16 +89,16 @@ necessarily "the upstream product can never do this".
 
 | Gate                          |     Yes | Partial |      No |   Total |
 | ----------------------------- | ------: | ------: | ------: | ------: |
-| Available                     |     107 |       0 |      57 |     164 |
-| Integrated                    |      67 |      68 |      29 |     164 |
-| UI exposed                    |      83 |      50 |      31 |     164 |
-| Used in a production workflow |      40 |      47 |      77 |     164 |
-| **All four gates**            | **297** | **165** | **194** | **656** |
+| Available                     |     120 |       0 |      51 |     171 |
+| Integrated                    |      93 |      58 |      20 |     171 |
+| UI exposed                    |      98 |      50 |      23 |     171 |
+| Used in a production workflow |      72 |      47 |      52 |     171 |
+| **All four gates**            | **383** | **155** | **146** | **684** |
 
-Readiness is a separate projection. At this checkpoint, 47 inventory entries have no sufficient
-runtime topology evidence and one has only partial evidence. This is an evidence-state result, not a
-claim that 47 processes are down or that one process is healthy. Optional-service fallbacks, indirect
-forwarders, seeds, images, or a successful ping do not upgrade readiness.
+Readiness is a separate live projection derived from service probes and retained workflow evidence.
+It is intentionally recomputed by the capability-map request rather than copied into this ledger.
+Optional-service fallbacks, indirect forwarders, seeds, images, or a successful ping do not upgrade
+readiness on their own.
 
 ## Active lanes
 
