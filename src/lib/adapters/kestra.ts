@@ -137,6 +137,9 @@ export interface OrchestrationPort {
   listFlows(): Promise<OrchFlow[]>;
   getFlow(namespace: string, id: string): Promise<OrchFlow | null>;
   upsertFlow(yaml: string, namespace: string, id: string): Promise<OrchResult<OrchFlow>>;
+  // Delete a deployed flow (idempotent — a 404 counts as success). Prevents orphaned flows when the
+  // console entity that owns the flow is deleted.
+  deleteFlow(namespace: string, id: string): Promise<OrchResult<{ id: string }>>;
   execute(namespace: string, id: string, inputs?: Record<string, string>): Promise<OrchResult<OrchExecution>>;
   executionStatus(executionId: string): Promise<OrchExecution | null>;
   executionLogs(executionId: string): Promise<OrchLogLine[]>;
@@ -265,6 +268,26 @@ export const kestraOrchestration: OrchestrationPort = {
           revision: typeof b.revision === 'number' ? b.revision : undefined,
         },
       };
+    } catch (err) {
+      return { ok: false as const, configured: false, error: describeError(err) };
+    }
+  },
+
+  async deleteFlow(namespace, id) {
+    try {
+      const r = await req(
+        'DELETE',
+        `/api/v1/${tenant()}/flows/${encodeURIComponent(namespace)}/${encodeURIComponent(id)}`,
+      );
+      // 404 = the flow is already gone; an idempotent delete treats that as success.
+      if (!r.ok && r.status !== 404) {
+        return {
+          ok: false as const,
+          configured: true,
+          error: `engine ${r.status}${r.text ? `: ${r.text.slice(0, 200)}` : ''}`,
+        };
+      }
+      return { ok: true as const, value: { id } };
     } catch (err) {
       return { ok: false as const, configured: false, error: describeError(err) };
     }

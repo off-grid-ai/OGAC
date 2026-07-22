@@ -36,7 +36,7 @@ import {
   type EtlJobSpec,
   type EtlRunView,
 } from '@/lib/etl-job';
-import { compileToKestraFlow } from '@/lib/etl-kestra-compile';
+import { compileToKestraFlow, kestraFlowId, KESTRA_NAMESPACE } from '@/lib/etl-kestra-compile';
 import type { EtlJobStatus } from '@/lib/etl-model';
 import { listConnectors } from '@/lib/store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -179,6 +179,18 @@ function prepareDraft(
   return { ok: true, draft };
 }
 
+// Deploy (upsert) the compiled Kestra flow for a DAG job WITHOUT running it. Called on save for a
+// SCHEDULED job so its cron Schedule trigger is live in the engine immediately (a manual run isn't
+// needed to activate the schedule). Best-effort: an unreachable engine doesn't block the save — the
+// next run (runJobViaKestra) redeploys and reports honestly. The compile RULE stays in one place.
+async function deployJobFlow(job: EtlJobSpec): Promise<void> {
+  if (!job.dag) return;
+  const compiled = compileToKestraFlow(job.dag, job.id, job.name);
+  await kestraOrchestration
+    .upsertFlow(compiled.yaml, compiled.namespace, compiled.flowId)
+    .catch(() => {});
+}
+
 export async function createEtlJob(
   raw: EtlJobDraft,
   orgId: string = DEFAULT_ORG,
@@ -201,7 +213,10 @@ export async function createEtlJob(
        ${draft.destDatabase}, ${draft.destTable}, ${mappingsJson}::jsonb, ${draft.trigger},
        ${draft.cron ?? null}, ${rowLimit}, ${dagJson}::jsonb)
     RETURNING *`);
-  return { ok: true, job: rowToSpec((res.rows as Record<string, unknown>[])[0]) };
+  const job = rowToSpec((res.rows as Record<string, unknown>[])[0]);
+  // A scheduled job's flow (with its cron trigger) must be live in the engine at save time.
+  if (job.trigger === 'schedule') await deployJobFlow(job);
+  return { ok: true, job };
 }
 
 export async function updateEtlJob(
@@ -234,12 +249,19 @@ export async function updateEtlJob(
     WHERE id = ${id} AND org_id = ${orgId}
     RETURNING *`);
   const row = (res.rows as Record<string, unknown>[])[0];
-  return row ? { ok: true, job: rowToSpec(row) } : null;
+  if (!row) return null;
+  const job = rowToSpec(row);
+  // Keep the deployed flow in sync when a scheduled job is edited (cron/DAG changes go live now).
+  if (job.trigger === 'schedule') await deployJobFlow(job);
+  return { ok: true, job };
 }
 
 export async function deleteEtlJob(id: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
   await ensureEtlJobsSchema();
   const { sql } = await import('drizzle-orm');
+  // Remove the deployed Kestra flow too (idempotent, best-effort) so deleting the console job never
+  // orphans its flow in the engine.
+  await kestraOrchestration.deleteFlow(KESTRA_NAMESPACE, kestraFlowId(id)).catch(() => {});
   await db.execute(sql`DELETE FROM etl_runs WHERE job_id = ${id} AND org_id = ${orgId}`);
   const res = await db.execute(
     sql`DELETE FROM etl_jobs WHERE id = ${id} AND org_id = ${orgId} RETURNING id`,
