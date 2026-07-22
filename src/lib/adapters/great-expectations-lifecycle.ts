@@ -260,6 +260,14 @@ export function createGreatExpectationsLifecycleAdapter(
       );
     }
     const manifest = await capabilities(parsedContext.value);
+    if (!manifest.serviceReachable) {
+      return failure(
+        manifest,
+        'upstream',
+        manifest.reason ?? 'Great Expectations lifecycle service is unavailable.',
+        502,
+      );
+    }
     if (!manifest.operations[spec.operation]) return operationUnavailable(manifest, spec.operation);
     const headers = authHeaders(parsedContext.value);
     if (!headers)

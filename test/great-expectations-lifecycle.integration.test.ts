@@ -262,3 +262,20 @@ test('adapter rejects malformed success payloads instead of trusting upstream', 
     await remote.close();
   }
 });
+
+test('adapter reports a provider outage as an upstream 502, not an unsupported capability', async () => {
+  const remote = await startServer();
+  const adapter = createGreatExpectationsLifecycleAdapter({
+    baseUrl: remote.url,
+    token: 'service-secret',
+  });
+  await remote.close();
+
+  const result = await adapter.listSuites(context);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.kind, 'upstream');
+    assert.equal(result.status, 502);
+    assert.match(result.message, /unreachable/);
+  }
+});
