@@ -10,6 +10,7 @@ import {
   HardDrives,
   CheckCircle,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -195,6 +196,11 @@ export function RetrievalManager({
               {view.reachable ? 'reachable' : 'unreachable'}
             </Badge>
           )}
+          <Link href={`${basePath}/collections`}>
+            <Button size="sm" variant="outline">
+              <HardDrives className="size-4" /> Snapshots &amp; backup
+            </Button>
+          </Link>
           {manageable && (
             <Button size="sm" onClick={() => setParam('new', '1')} disabled={!view.reachable}>
               <Plus className="size-4" /> New collection
