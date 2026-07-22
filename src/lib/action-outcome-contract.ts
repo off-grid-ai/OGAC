@@ -5,7 +5,7 @@
 // store must resolve the canonical receipt under the active org and copy its immutable correlation
 // fields. It must never trust receipt metadata supplied by a client.
 
-import type { ActionId } from '@/lib/action-contract';
+import type { ActionId, ActionReceipt } from '@/lib/action-contract';
 
 export const ACTION_OUTCOME_CODES = [
   'accepted',
@@ -49,6 +49,7 @@ export interface ActionOutcomeMutationInput {
 }
 
 export interface ActionOutcomeReceiptRef {
+  appId: string;
   runId: string;
   stepId: string;
   receiptIdempotencyKey: string;
@@ -69,6 +70,8 @@ export interface ActionOutcomeRecord extends ActionOutcomeReceiptRef {
     /** sha256(orgId | receiptIdempotencyKey | source kind | source event id). */
     idempotencyKey: string;
   };
+  /** Canonical signed receipt copied by the store; never accepted from browser input. */
+  actionReceipt: ActionReceipt;
   note: string;
   evidenceLinks: string[];
   measurement: ActionOutcomeMeasurement | null;
@@ -115,6 +118,7 @@ export function validateActionOutcomeMutation(input: ActionOutcomeMutationInput)
   if (input.note.trim().length === 0) errors.push('a plain-language note is required');
   if (input.note.length > 2_000) errors.push('note must be 2000 characters or fewer');
   if (!Array.isArray(input.evidenceLinks)) errors.push('evidence links must be a list');
+  else if (input.evidenceLinks.length === 0) errors.push('supporting evidence is required');
   else if (input.evidenceLinks.some((link) => !validEvidenceLink(link))) {
     errors.push('evidence links must be relative or HTTP URLs');
   }
@@ -186,11 +190,18 @@ export function summarizeOutcomeWindow(
       )
       .map((record) => record.receiptIdempotencyKey),
   );
-  const counts = Object.fromEntries(ACTION_OUTCOME_CODES.map((code) => [code, 0])) as Record<
+  const receiptsByCode = Object.fromEntries(
+    ACTION_OUTCOME_CODES.map((code) => [code, new Set<string>()]),
+  ) as Record<ActionOutcomeCode, Set<string>>;
+  for (const record of effective) {
+    if (record.outcomeCode) receiptsByCode[record.outcomeCode].add(record.receiptIdempotencyKey);
+  }
+  const counts = Object.fromEntries(
+    ACTION_OUTCOME_CODES.map((code) => [code, receiptsByCode[code].size]),
+  ) as Record<
     ActionOutcomeCode,
     number
   >;
-  for (const record of effective) if (record.outcomeCode) counts[record.outcomeCode] += 1;
   const actionsExecuted = receipts.size;
   return {
     actionsExecuted,

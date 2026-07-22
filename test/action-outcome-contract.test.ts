@@ -28,6 +28,7 @@ function record(
   return {
     id,
     orgId: 'org_bank',
+    appId: 'app_cross_sell',
     runId: 'apprun_123',
     stepId: 'write_crm',
     receiptIdempotencyKey: 'action:receipt-1',
@@ -41,6 +42,21 @@ function record(
       kind: 'human',
       eventId: `event_${id}`,
       idempotencyKey: `source_${id}`,
+    },
+    actionReceipt: {
+      actionId: 'crm.create-task',
+      label: 'Create CRM follow-up task',
+      system: 'CRM',
+      orgId: 'org_bank',
+      runId: 'apprun_123',
+      stepId: 'write_crm',
+      connectorId: 'crm',
+      target: 'opp_101',
+      idempotencyKey: 'action:receipt-1',
+      status: 'executed',
+      executedAt: '2026-07-22T09:00:00.000Z',
+      approval: { stepId: 'review', evidence: 'approved' },
+      providerReceipt: { signature: 'signed' },
     },
     note: 'Observed result',
     evidenceLinks: [],
@@ -101,6 +117,12 @@ test('refuses malformed identity, source, evidence, dates and measurements', () 
   ]);
 });
 
+test('requires supporting evidence for an observed result', () => {
+  assert.deepEqual(validateActionOutcomeMutation({ ...baseInput, evidenceLinks: [] }), [
+    'supporting evidence is required',
+  ]);
+});
+
 test('accepted then converted are independent effective facts', () => {
   const accepted = record('out_accepted', 'accepted');
   const converted = record('out_converted', 'converted');
@@ -135,6 +157,7 @@ test('summarizes baseline versus result over canonical action receipt denominato
     [
       record('out_c1', 'accepted', { receiptIdempotencyKey: 'receipt_c' }),
       record('out_c2', 'converted', { receiptIdempotencyKey: 'receipt_c' }),
+      record('out_c3', 'converted', { receiptIdempotencyKey: 'receipt_c' }),
       record('out_d', 'rejected', { receiptIdempotencyKey: 'receipt_d' }),
     ],
     new Set(['converted']),
