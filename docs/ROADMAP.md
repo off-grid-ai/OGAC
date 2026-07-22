@@ -911,32 +911,74 @@ The host reads the config, mounts everything automatically. Add/remove a module 
 
 ---
 
-## Phase 8 — The Soul (intelligence layer)
+## Phase 8 — Governed Organizational Brain
 
-**Goal:** the platform works on your behalf. Context flows in from all sources, synthesis flows out, nodes get smarter over time.
-**Timeline:** after Phase 6. **Explicitly after desktop/mobile capture is built.**
-**Depends on:** `@offgrid/memory` (which depends on desktop/mobile capture — not built yet), Qdrant as default (Phase 4), org-scoped embeddings (Phase 3).
+**Goal:** every authorized person, App, and agent can retrieve the enterprise intelligence relevant
+to its role and context, with source permissions, provenance, lineage, sensitivity, and retention
+preserved end to end.
 
-### Why this comes last
+**Sequencing correction:** the brain product is **not blocked on desktop/mobile capture**. Build it
+from the enterprise sources that exist now. Device and edge contribution is explicitly outside this
+phase; it may join later without changing the brain product or its authorization boundary.
 
-The Soul's value comes from feeding it rich event data from all surfaces: desktop captures, mobile sessions, agent runs, Provit test results. Without desktop/mobile capture (`@offgrid/capture`, `@offgrid/memory`), the Soul has partial signal. Build it when the full signal is available.
+### Selected OSS product: OpenBeam
 
-### The pipeline (when ready)
+Adopt a reviewed, immutable OpenBeam release as the organizational-brain engine. It supplies the
+self-hosted connector framework, incremental synchronization, hybrid retrieval, media/document
+search, permission-indexed content, citations, RAG, agents, and MCP surface. Integrate it as a
+composable service behind an Off Grid adapter rather than rebuilding those capabilities in Console.
+
+OpenBeam is AGPL-3.0 and currently early-stage. Pin the exact source/image digest, retain the
+corresponding source offer, generate an SBOM, run the connector and authorization corpus, and keep
+the adapter swappable. Its team/source permission index is a retrieval enforcement mechanism;
+Keycloak and OPA remain the authoritative identity and policy systems. Never trust a browser-supplied
+team, principal, group, or ACL filter.
+
+### Canonical contribution contract
+
+Every source emits a versioned `KnowledgeEnvelope` containing:
+
+- tenant, source, external object/version, content type, checksum, event time, and observed time;
+- subject/resource identity plus user/group/role ACL principals that the caller cannot weaken;
+- sensitivity, residency, retention, and deletion/tombstone semantics;
+- provenance and lineage references to the retained source artifact or derived signal; and
+- either approved inline derived content or a governed S3 object reference.
+
+Live signals travel through the governed Kafka source. Retained documents, images, recordings, and
+datasets travel through the governed S3 source. Structured data passes the Great Expectations
+quality lifecycle. Images and documents pass Presidio visual/text redaction before their approved
+derived content enters retrieval. Raw edge material may remain on-device; the envelope can contain
+only the derived SOP, nudge, risk signal, opportunity, or lesson.
+
+### Shared retrieval and action spine
 
 ```
-Event sources (all surfaces)     Enrichment          Store           Retrieval
-────────────────────────────     ──────────────      ──────          ──────────
-agentRuns (Postgres)        ──►  LLM summary         Qdrant          RRF router
-audit log                   ──►  /v1/chat        ──► event_intel ──► + new source
-Langfuse traces             ──►  + embed             per org     ──► context_hints
-Marquez lineage             ──►  /v1/embeddings                      in policy-pull
-Provit run results          ──►
-Desktop captures (mobile)   ──►  ← blocked on @offgrid/memory
+Enterprise sources + governed node signals
+  -> quality / redaction / classification
+  -> S3 artifact + Kafka event envelope
+  -> Qdrant semantic index + keyword index
+  -> mandatory tenant + source-ACL policy filter
+  -> cited context for people, Apps, and agents
+  -> governed action -> receipt -> observed outcome -> reusable evidence
 ```
 
-No new containers needed. The pipeline is a scheduled job (Temporal, already wired by Phase 4) reading across all sources per org, summarising, embedding, upserting to Qdrant.
+OpenBeam owns the organizational search/index/sync product. Keycloak/OPA, OpenBao, Kafka, S3,
+Marquez, Presidio, and Great Expectations remain the governed Off Grid boundary around identity,
+policy, secrets, enterprise-source transport, lineage, privacy, and quality. Existing Qdrant
+retrieval remains available to current Off Grid knowledge paths during migration; do not dual-write
+indefinitely or create two authoritative organizational brains.
 
-**Definition of done:** events embedded on a schedule, retrieved at query time, `context_hints` in node policy-pull responses. Observability module has a Soul activity view.
+**Implementation pair:** (1) pinned OpenBeam service + Off Grid identity/tenant/permission adapter;
+(2) nontechnical organizational-search experience + the same governed retrieval contract for Apps
+and agents. Freeze the service, identity, citation, and authorization contract before parallel work.
+
+**Definition of done:** a nontechnical operator connects and maintains text, documents, structured
+data, shared artifacts, chats, meeting transcripts, images, warehouse assets, and governed App
+outputs; permission changes and deletions propagate; unauthorized chunks are excluded before
+retrieval; every answer cites exact source versions and lineage; and the same governed retrieval API
+is proven through one person, one App, and one agent. Collections become curated permissioned views
+over this continuously synchronized corpus, not isolated upload buckets. Edge sync is not a
+completion gate for this phase.
 
 ---
 

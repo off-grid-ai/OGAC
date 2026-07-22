@@ -56,6 +56,20 @@ canonical agent-run id. Marquez distinguishes `accepted`, `rejected`, `unreachab
 No Qdrant or Marquez A/I/UI/W gate changes at this checkpoint: focused tests and typecheck prove
 the code contract, not the selected live deployment or a completed BFSI workflow.
 
+### Governed Organizational Brain planned plane
+
+OpenBeam is the selected OSS organizational-brain engine for connector synchronization, hybrid
+enterprise search, media/document retrieval, permission-indexed content, citations, RAG, agents,
+and MCP. It will run as a pinned composable service behind one Off Grid adapter. Keycloak/OPA remain
+authoritative for identity and policy, and callers cannot supply or weaken tenant, group, principal,
+or ACL filters. OpenBao, Kafka/S3, Marquez, Presidio, and Great Expectations remain the governed
+secret, enterprise-source, lineage, privacy, and quality boundaries around the OSS engine.
+
+The current product scope is enterprise knowledge for people, Apps, and agents. Device/edge sync is
+not an implementation or verification gate. This records a selected upstream and delivery contract
+only: it does not alter any upstream capability denominator or claim code, wiring, UI, deployment,
+or live proof.
+
 ### Governed Action Plane live-verified delta
 
 The first bounded Action Plane slice is live on Console `16fa96443c79`. App authors can

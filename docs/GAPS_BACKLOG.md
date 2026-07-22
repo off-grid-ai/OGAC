@@ -1306,3 +1306,19 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   With zero or multiple eligible pipelines, Forge now reports “no pipeline yet” rather than
   inventing an org default, but an operator must use Guided mode to make the binding choice. Add the
   shared catalogue-driven pipeline picker to Forge; do not create a second selection model.
+
+## Governed Organizational Brain product (2026-07-23)
+
+- **[G-ORG-BRAIN-ENGINE] OPEN (P0) — OpenBeam is selected but not yet pinned, integrated, or
+  deployed.** Pin a reviewed AGPL-3.0 SHA/image, retain its source offer and SBOM, add it as a
+  composable service, and implement one Off Grid adapter for source lifecycle, sync status, hybrid
+  search/RAG, citations, deletions, and permission changes. Keycloak/OPA must derive tenant and ACL
+  identity server-side; a caller-supplied team or ACL is never authoritative. Edge sync is outside
+  this slice.
+- **[G-ORG-BRAIN-CONSUMERS] OPEN (P0) — the OSS brain is not yet a shared product capability for
+  people, Apps, and agents.** Add a nontechnical connect/sync/search/cited-answer journey and reuse
+  the exact same governed retrieval contract from App and agent runtimes. Prove an allowed user can
+  retrieve a private source, a disallowed user cannot retrieve or infer it, a permission removal and
+  deletion disappear from results, and all three consumers retain exact citations and audit. The
+  corpus must cover shared artifacts, chats/meetings, live enterprise sources, warehouse assets,
+  and governed App-generated outputs; existing collections become curated views over those sources.
