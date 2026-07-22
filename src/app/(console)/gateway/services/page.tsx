@@ -2,7 +2,7 @@ import { ServicesDirectory } from '@/components/services/ServicesDirectory';
 import { requireModuleForUser } from '@/lib/module-access';
 import { PageFrame } from '@/components/PageFrame';
 import { toServiceTopologyDirectoryEntries } from '@/lib/service-directory-view';
-import { getRuntimeServiceTopologyRegistry } from '@/lib/runtime-service-topology';
+import { listLiveServiceTopologies } from '@/lib/live-service-readiness';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // we run and reach any of it, all behind the one console login.
 export default async function ServicesPage() {
   await requireModuleForUser('services');
-  const topologies = getRuntimeServiceTopologyRegistry().list();
+  const topologies = await listLiveServiceTopologies();
   return (
     <PageFrame>
       <ServicesDirectory services={toServiceTopologyDirectoryEntries(topologies)} />

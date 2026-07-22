@@ -1,16 +1,23 @@
 {
-  "reporter": ["text-summary", "text", "json-summary", "lcov"],
+  "reporter": [
+    "text-summary",
+    "text",
+    "json-summary",
+    "lcov"
+  ],
   "all": true,
-  "src": ["src/lib"],
-  "include": ["src/lib/**/*.ts"],
+  "src": [
+    "src/lib"
+  ],
+  "include": [
+    "src/lib/**/*.ts"
+  ],
   "exclude": [
     "**/*.test.ts",
     "**/*.d.ts",
     "test/**",
     "src/**/*.tsx",
-
     "//─── GENUINE I/O GLUE — needs live Postgres/network/FS/crypto services; no branching logic to unit-test. NOT excluded to game coverage; each is a thin adapter whose PURE decision half lives in a separate, tested module. ───",
-
     "src/lib/store.ts",
     "src/lib/keycloak-admin.ts",
     "src/lib/keycloak-realm.ts",
@@ -23,7 +30,6 @@
     "src/lib/adapters/qdrant.ts",
     "src/lib/adapters/redis.ts",
     "src/lib/adapters/worker-readiness.ts",
-
     "// db-stores: Drizzle/pg CRUD stores — raw DB reads/writes, no decision logic (exercised by the *.integration.test.ts suites against a real DB).",
     "src/lib/agent-runs-store.ts",
     "src/lib/agentrun.ts",
@@ -56,7 +62,6 @@
     "src/lib/edge-log.ts",
     "src/lib/edge-intent.ts",
     "src/lib/ingest.ts",
-
     "// network-fetchers: Fetch/HTTP clients to external services (gateway, OpenSearch, Marquez, Langfuse, Unleash, Keycloak, Superset, OPA, Kestra, Airbyte, IMAP/SMTP) — no branch logic beyond ok/!ok fallbacks the read-back tests cover; pure shaping lives in *-shape / *-aggs / *-policy siblings.",
     "src/lib/marquez.ts",
     "src/lib/langfuse.ts",
@@ -85,7 +90,6 @@
     "src/lib/copilot-gateway.ts",
     "src/lib/copilot-gather.ts",
     "src/lib/chat-audio-server.ts",
-
     "// worker-orchestration-glue: Multi-step I/O orchestrators — walk a graph and call real subsystems; scheduling/reducer/durability decisions are pure in *-plan / *-durable / *-policy siblings that ARE tested.",
     "src/lib/app-run.ts",
     "src/lib/chat.ts",
@@ -101,7 +105,6 @@
     "src/lib/brain.ts",
     "src/lib/files.ts",
     "src/lib/trigger-dispatch.ts",
-
     "// thin-io-adapters-over-pure-siblings: Each is a documented thin I/O adapter whose decision half is a separate PURE, tested module (named in the file header).",
     "src/lib/cloud-route-plan.ts",
     "src/lib/cloud-client.ts",
@@ -121,7 +124,6 @@
     "src/lib/embeds.ts",
     "src/lib/handbook.ts",
     "src/lib/prompt-intel.ts",
-
     "// provenance-signing-crypto: server-only signing/verify + provit broker — network + crypto + external Provit API; no unit-testable branches.",
     "src/lib/sigstore.ts",
     "src/lib/c2pa.ts",
@@ -132,7 +134,6 @@
     "src/lib/provit-access.ts",
     "src/lib/provit-token.ts",
     "src/lib/provit-upload.ts",
-
     "// next-request-surface: Server-only guards that touch next/navigation, next/server or @/auth (notFound()/NextResponse/session) — no pure branch logic; the permission RULES they call live in role-permissions.ts / tenancy-policy.ts (tested).",
     "src/lib/authz.ts",
     "src/lib/tenancy.ts",
@@ -141,16 +142,13 @@
     "src/lib/auth/identity.ts",
     "src/lib/auth/token-verifier.ts",
     "src/lib/use-pagination.ts",
-
     "// static-content-data: Hand-authored static content/spec data (arrays of strings) — no branching logic; testing them only re-asserts literals.",
     "src/lib/openapi.ts",
     "src/lib/architecture.ts",
     "src/lib/docs/**",
-
     "// qa-adapters: QA sweep/scoring — I/O adapters over the drift/eval registries; the pure scoring rules are covered where they compute.",
     "src/lib/qa/sweep.ts",
     "src/lib/qa/scoring.ts",
-
     "// exporter-runner-io: Exporter runner + wire-emitters that open sockets/HTTP; the payload SHAPING (openlineage/prometheus/splunk) is unit-tested in exporters-payloads.test.ts.",
     "src/lib/exporters/run.ts",
     "src/lib/adapters/sinks/report.ts",
@@ -161,7 +159,6 @@
     "src/lib/adapters/connector-query.ts",
     "src/lib/adapters/triggers/email-imap.ts",
     "src/lib/adapters/triggers/whatsapp-onprem.ts",
-
     "// adapter-ports-io: The remaining src/lib/adapters/* port implementations — each is the I/O half of a ports-and-adapters seam (execFile/fetch/DB/socket); the PURE gating + shaping lives in the sibling *-regex / *-catalog / *-shape / lib/* module (all tested). registry.ts is pure wiring of those ports (no logic).",
     "src/lib/adapters/tool-primitives.ts",
     "src/lib/adapters/warehouse.ts",
@@ -180,7 +177,7 @@
     "src/lib/adapters/kestra.ts",
     "src/lib/adapters/web-search.ts",
     "src/lib/adapters/victorialogs.ts",
-
+    "src/lib/live-service-readiness.ts",
     "// db-io-libs: DB/network read libs whose pure decision/shape half is a tested sibling.",
     "src/lib/evals.ts",
     "src/lib/agents.ts",
@@ -199,7 +196,6 @@
     "src/lib/app-schedules.ts",
     "src/lib/observability-settings.ts",
     "src/lib/pipeline-release.ts",
-
     "// warehouse-model orchestration glue: sequences the pure plan (schema-model.ts) + the ClickHouse adapter (adapters/warehouse.ts) + the store (schema-model-store.ts); every decision (plan/validate/status) is pure & tested in schema-model.test.ts, verified live by warehouse-model-service.integration.test.ts.",
     "src/lib/warehouse-model-service.ts"
   ],

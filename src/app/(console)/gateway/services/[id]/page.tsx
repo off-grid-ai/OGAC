@@ -3,7 +3,7 @@ import { ServiceDetail } from '@/components/services/ServiceDetail';
 import { requireModuleForUser } from '@/lib/module-access';
 import { PageFrame } from '@/components/PageFrame';
 import { toServiceTopologyDetailEntry } from '@/lib/service-directory-view';
-import { getRuntimeServiceTopologyRegistry } from '@/lib/runtime-service-topology';
+import { listLiveServiceTopologies } from '@/lib/live-service-readiness';
 import { serviceControl } from '@/lib/services-directory';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,7 @@ export default async function ServiceDetailPage({
 }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('services');
   const { id } = await params;
-  const topology = getRuntimeServiceTopologyRegistry().find(id);
+  const topology = (await listLiveServiceTopologies()).find((entry) => entry.service.id === id);
   if (!topology) notFound();
 
   const control = serviceControl(topology.service);

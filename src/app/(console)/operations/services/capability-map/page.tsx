@@ -9,7 +9,7 @@ import {
   isServiceInventoryReadinessState,
   reconcileServiceInventory,
 } from '@/lib/service-inventory';
-import { getRuntimeServiceTopologyRegistry } from '@/lib/runtime-service-topology';
+import { listLiveServiceTopologies } from '@/lib/live-service-readiness';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +28,7 @@ export default async function ServiceCapabilityMapPage({
   const rawOwner = typeof params.owner === 'string' ? params.owner : '';
   const rawAudit = typeof params.audit === 'string' ? params.audit : '';
   const rawReadiness = typeof params.readiness === 'string' ? params.readiness : '';
-  const topology = getRuntimeServiceTopologyRegistry().list();
+  const topology = await listLiveServiceTopologies();
   const inventory = reconcileServiceInventory({
     platformServices: topology.map((entry) => entry.service),
     topologies: topology,
