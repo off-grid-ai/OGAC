@@ -4,6 +4,9 @@ import type { CrossSellOpportunityView } from '@/lib/bank-cross-sell-contract';
 import type { AppSpec } from '@/lib/app-model';
 import {
   buildBankCrossSellRuntimeSpec,
+  buildBankCrossSellRuntimeSpecFromSnapshot,
+  freezeBankCrossSellRunSnapshot,
+  parseBankCrossSellRunSnapshot,
   projectBankCrossSellEvidence,
 } from '@/lib/bank-cross-sell-execution';
 
@@ -116,6 +119,42 @@ test('runtime insertion preserves unrelated actions and graph edges', () => {
   assert.ok(runtime.steps.some((step) => step.id === 'existing-action'));
   assert.ok(runtime.edges.some((edge) => edge.from === 'read' && edge.to === 'existing-action'));
   assert.ok(runtime.edges.some((edge) => edge.from === 'existing-action' && edge.to === 'review'));
+});
+
+test('approval rebuild uses the frozen product when live source recommendations drift', () => {
+  const frozen = freezeBankCrossSellRunSnapshot(OPPORTUNITY, 'crm');
+  const changedLiveView = {
+    ...OPPORTUNITY,
+    recommendation: { ...OPPORTUNITY.recommendation!, product: 'Different future product' },
+  };
+  assert.notEqual(changedLiveView.recommendation.product, frozen.recommendation.product);
+  const runtime = buildBankCrossSellRuntimeSpecFromSnapshot(APP, frozen);
+  const action = runtime.steps.find((step) => step.kind === 'action');
+  assert.ok(action && action.kind === 'action');
+  assert.equal(action.command.subject, 'Discuss the approved Group Term');
+  assert.equal(action.command.accountId, '7');
+  assert.deepEqual(parseBankCrossSellRunSnapshot(frozen), frozen);
+  assert.equal(
+    parseBankCrossSellRunSnapshot({
+      ...frozen,
+      action: { ...frozen.action, accountId: 'another-customer' },
+    }),
+    null,
+  );
+  for (const malformed of [
+    {},
+    { ...frozen, recommendation: null },
+    { ...frozen, recommendation: { ...frozen.recommendation, citations: [null] } },
+    { ...frozen, source: { kind: 'live' } },
+    Object.defineProperty({}, 'version', {
+      get: () => {
+        throw new Error('hostile getter');
+      },
+    }),
+  ]) {
+    assert.doesNotThrow(() => parseBankCrossSellRunSnapshot(malformed));
+    assert.equal(parseBankCrossSellRunSnapshot(malformed), null);
+  }
 });
 
 test('canonical run evidence advances through approval and action receipt', () => {

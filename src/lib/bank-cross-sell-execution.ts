@@ -13,6 +13,153 @@ export interface BankCrossSellOpportunityEvidence {
   evidence: CrossSellEvidenceState;
 }
 
+export interface BankCrossSellRunSnapshot {
+  version: 1;
+  customerId: string;
+  opportunityId: string;
+  relationshipManager: string;
+  recommendation: NonNullable<CrossSellOpportunityView['recommendation']>;
+  source: CrossSellOpportunityView['source'];
+  action: {
+    actionId: 'crm.create-task';
+    connectorId: string;
+    accountId: string;
+  };
+}
+
+export function freezeBankCrossSellRunSnapshot(
+  opportunity: CrossSellOpportunityView,
+  connectorId: string,
+): BankCrossSellRunSnapshot {
+  const recommendation = opportunity.recommendation;
+  if (
+    !recommendation?.eligible ||
+    recommendation.constraints.length > 0 ||
+    recommendation.citations.length === 0 ||
+    !connectorId.trim()
+  ) {
+    throw new Error('Cross-sell recommendation is not eligible for governed action');
+  }
+  return {
+    version: 1,
+    customerId: opportunity.customerId,
+    opportunityId: opportunity.opportunityId,
+    relationshipManager: opportunity.relationshipManager,
+    recommendation: {
+      ...recommendation,
+      constraints: [...recommendation.constraints],
+      citations: recommendation.citations.map((citation) => ({ ...citation })),
+    },
+    source: { ...opportunity.source },
+    action: { actionId: 'crm.create-task', connectorId, accountId: opportunity.customerId },
+  };
+}
+
+export function parseBankCrossSellRunSnapshot(value: unknown): BankCrossSellRunSnapshot | null {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const snapshot = value as Partial<BankCrossSellRunSnapshot>;
+    const recommendation = snapshot.recommendation;
+    const action = snapshot.action;
+    const source = snapshot.source;
+    const citations = recommendation?.citations;
+    if (
+      snapshot.version !== 1 ||
+      typeof snapshot.customerId !== 'string' ||
+      !snapshot.customerId.trim() ||
+      typeof snapshot.opportunityId !== 'string' ||
+      !snapshot.opportunityId.trim() ||
+      typeof snapshot.relationshipManager !== 'string' ||
+      !recommendation ||
+      typeof recommendation.product !== 'string' ||
+      !recommendation.product.trim() ||
+      typeof recommendation.rationale !== 'string' ||
+      !recommendation.rationale.trim() ||
+      !Number.isFinite(recommendation.confidence) ||
+      recommendation.confidence < 0 ||
+      recommendation.confidence > 1 ||
+      recommendation.eligible !== true ||
+      !Array.isArray(recommendation.constraints) ||
+      recommendation.constraints.length !== 0 ||
+      !Array.isArray(citations) ||
+      citations.length === 0 ||
+      citations.some(
+        (citation) =>
+          !citation ||
+          typeof citation.source !== 'string' ||
+          !citation.source.trim() ||
+          typeof citation.record !== 'string' ||
+          !citation.record.trim() ||
+          typeof citation.label !== 'string' ||
+          !citation.label.trim(),
+      ) ||
+      !source ||
+      source.kind !== 'live' ||
+      typeof source.customerDomain !== 'string' ||
+      !source.customerDomain.trim() ||
+      typeof source.eligibilityDomain !== 'string' ||
+      !source.eligibilityDomain.trim() ||
+      !Number.isFinite(Date.parse(source.readAt)) ||
+      !action ||
+      action.actionId !== 'crm.create-task' ||
+      typeof action.connectorId !== 'string' ||
+      !action.connectorId.trim() ||
+      action.accountId !== snapshot.customerId
+    ) {
+      return null;
+    }
+    return freezeBankCrossSellRunSnapshot(
+      {
+        opportunityId: snapshot.opportunityId,
+        customerId: snapshot.customerId,
+        customerName: 'Frozen governed customer',
+        relationshipManager: snapshot.relationshipManager,
+        segment: '',
+        region: '',
+        currentProducts: [],
+        opportunityValueInr: 0,
+        source,
+        recommendation,
+        runId: null,
+        rmDecision: { status: 'pending', reason: null, reviewer: null, decidedAt: null },
+        actionReceipt: null,
+        outcomes: [],
+      },
+      action.connectorId,
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** Rebuild the exact start-time action for canonical inline review; never re-read recommendation data. */
+export function buildBankCrossSellRuntimeSpecFromSnapshot(
+  app: AppSpec,
+  snapshot: BankCrossSellRunSnapshot,
+): AppSpec {
+  const opportunity: CrossSellOpportunityView = {
+    opportunityId: snapshot.opportunityId,
+    customerId: snapshot.customerId,
+    customerName: 'Frozen governed customer',
+    relationshipManager: snapshot.relationshipManager,
+    segment: 'Frozen at recommendation time',
+    region: 'Frozen at recommendation time',
+    currentProducts: [],
+    opportunityValueInr: 0,
+    source: { ...snapshot.source },
+    recommendation: {
+      ...snapshot.recommendation,
+      constraints: [...snapshot.recommendation.constraints],
+      citations: snapshot.recommendation.citations.map((citation) => ({ ...citation })),
+    },
+    runId: null,
+    rmDecision: { status: 'pending', reason: null, reviewer: null, decidedAt: null },
+    actionReceipt: null,
+    outcomes: [],
+  };
+  return buildBankCrossSellRuntimeSpec(app, opportunity, snapshot.action.connectorId);
+}
+
 function actionStepFor(
   opportunity: CrossSellOpportunityView,
   connectorId: string,
