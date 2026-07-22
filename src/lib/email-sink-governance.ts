@@ -17,9 +17,13 @@
 // (the egress leash) + applyPiiEscalation (the mask) + effectivePiiMasking (the mask-required
 // authority); it owns no I/O.
 
+import {
+  cloudEgressVerdict,
+  maskTextForSend,
+  sinkMaskingRequired,
+} from '@/lib/adapters/sinks/sink-governance';
 import type { PiiScanLike } from '@/lib/guardrail-rules-runtime';
-import { applyPiiEscalation, effectivePiiMasking } from '@/lib/pii-escalation';
-import { enforceModelCall, type PipelineContract } from '@/lib/pipeline-enforcement';
+import type { PipelineContract } from '@/lib/pipeline-enforcement';
 
 export type EmailProvider = 'resend' | 'smtp';
 
@@ -44,48 +48,23 @@ export interface EmailEgressVerdict {
 }
 
 /**
- * Decide whether an email delivery may leave the box. PURE.
- *
- * - SMTP (air-gapped) → ALWAYS allowed: it only ever reaches the operator's own on-prem host, so the
- *   cloud egress leash does not apply (there is no external egress to leash).
- * - RESEND (cloud) → the pipeline egress leash for the 'general' data-class (the run's outcome carries
- *   whatever the pipeline touched). A 'block' OR 'local' effective egress DENIES the send: a pipeline
- *   leashed to on-prem-only must not fan its result out through a third-party mailer. 'cloud'/'allow'
- *   permits it. With NO pipeline bound the leash is permissive (legacy) → allowed.
+ * Decide whether an email delivery may leave the box. PURE. DELEGATES to the shared sink-governance
+ * authority so email + every other outbound sink share ONE egress decision (no drift). SMTP is an
+ * air-gapped transport (always allowed); Resend is a cloud transport (gated by the pipeline egress
+ * leash for the 'general' data-class).
  */
-function emailEgressReason(
-  allow: boolean,
-  verdict: { egress: string; forceLocal: boolean; reason: string },
-): string {
-  if (allow) return `egress "${verdict.egress}" permits cloud email delivery`;
-  if (verdict.forceLocal) {
-    return 'pipeline egress leashed to LOCAL — a cloud mailer (Resend) is not permitted; use the on-prem SMTP sink';
-  }
-  return `pipeline egress leash blocked cloud email delivery (${verdict.reason})`;
-}
-
 export function emailEgressVerdict(
   contract: PipelineContract | null,
   provider: EmailProvider,
 ): EmailEgressVerdict {
-  if (provider === 'smtp') {
-    return { allow: true, egress: 'local', reason: 'SMTP sink is air-gapped (on-prem host only) — no cloud egress' };
-  }
-  const verdict = enforceModelCall(contract, 'general');
-  // A cloud mailer requires a non-local egress. block → denied; local → denied (stay on-prem); else allow.
-  const allow = verdict.allow && !verdict.forceLocal;
-  return {
-    allow,
-    egress: verdict.egress,
-    reason: emailEgressReason(allow, verdict),
-  };
+  const transport = provider === 'smtp' ? 'air-gapped' : 'cloud';
+  return cloudEgressVerdict(contract, transport, provider === 'smtp' ? 'SMTP email' : 'email');
 }
 
 /** Whether PII masking is required for this email delivery (org floor OR pipeline overlay). PURE. */
 export function emailMaskingRequired(contract: PipelineContract | null): boolean {
-  // Reuse the ONE authority: the model-call verdict already merges org floor + pipeline overlay.
-  const verdict = contract ? enforceModelCall(contract, 'general') : null;
-  return effectivePiiMasking(false, verdict);
+  // DELEGATE to the ONE authority (org floor + pipeline overlay) shared by every outbound sink.
+  return sinkMaskingRequired(contract);
 }
 
 /** The masked outbound subject + body + whether anything was redacted. PURE. */
@@ -107,7 +86,9 @@ export function maskEmailForSend(
   scanSubject: PiiScanLike,
   scanText: PiiScanLike,
 ): MaskedEmail {
-  const s = applyPiiEscalation(subject, required, scanSubject);
-  const t = applyPiiEscalation(text, required, scanText);
+  // DELEGATE the raw→redacted substitution to the shared authority (same applyPiiEscalation as the
+  // model path + every outbound sink). Two fields → two masks; `masked` is true if either changed.
+  const s = maskTextForSend(subject, required, scanSubject);
+  const t = maskTextForSend(text, required, scanText);
   return { subject: s.text, text: t.text, masked: s.masked || t.masked };
 }
