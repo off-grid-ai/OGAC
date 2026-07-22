@@ -15,6 +15,7 @@ import {
   TreeStructure,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -61,6 +62,7 @@ import {
   mergeFixIts,
   type FixIt,
 } from '@/lib/builder-gaps';
+import { buildBuilderCatalogueOptions } from '@/lib/builder-catalogue-options';
 import { resolveBuilderSurfaceAccess } from '@/lib/builder-surface-access';
 import type { OrgContextSummary } from '@/lib/org-context';
 
@@ -575,7 +577,6 @@ function GuidedRefine({
                     total={spec.steps.length}
                     names={names}
                     handlers={handlersFor(step.id)}
-                    appId={spec.id}
                     connectors={connectors}
                     approvalSteps={spec.steps
                       .slice(0, i)
@@ -665,44 +666,102 @@ function GuidedRefine({
             ))}
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <FlowArrow className="size-4 text-primary" />
-              Runs on
-            </CardTitle>
-            <CardDescription className="text-[11px]">
-              The governed pipeline this app runs on — its model gateway, data ceiling, policy and
-              guardrails. Every run is tagged to it. Leave on the org default unless you need a
-              specific one.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            <SelectRow
-              active={!spec.pipelineId}
-              label="Org default (governed)"
-              hint="Resolve to your org's default pipeline at run time"
-              onClick={() => onSpec((s) => (s ? setPipeline(s, null) : s))}
-            />
-            {pipelines.map((pl) => (
-              <SelectRow
-                key={pl.id}
-                active={spec.pipelineId === pl.id}
-                label={pl.name}
-                hint={`Runs on ${pl.name}`}
-                onClick={() => onSpec((s) => (s ? setPipeline(s, pl.id) : s))}
-              />
-            ))}
-            {pipelines.length === 0 ? (
-              <p className="px-1 pt-1 text-[11px] text-muted-foreground">
-                No pipelines defined yet — the org default applies. Create pipelines under
-                Governance to offer specific ones here.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <BuilderPipelinePicker
+          capabilityContext={capabilityContext}
+          selectedPipelineId={spec.pipelineId ?? null}
+          savedPipelines={pipelines}
+          onSelect={(pipelineId) =>
+            onSpec((current) => (current ? setPipeline(current, pipelineId) : current))
+          }
+        />
       </div>
     </div>
+  );
+}
+
+export function BuilderPipelinePicker({
+  capabilityContext,
+  selectedPipelineId,
+  savedPipelines,
+  onSelect,
+}: Readonly<{
+  capabilityContext: BuilderCapabilityContextState;
+  selectedPipelineId: string | null;
+  savedPipelines: { id: string; name: string }[];
+  onSelect: (pipelineId: string | null) => void;
+}>) {
+  const choices = buildBuilderCatalogueOptions(capabilityContext, {
+    sliceId: 'pipelines',
+    refPrefixes: ['pipeline:'],
+    selected: selectedPipelineId
+      ? [
+          {
+            ref: `pipeline:${selectedPipelineId}`,
+            label: savedPipelines.find((pipeline) => pipeline.id === selectedPipelineId)?.name,
+          },
+        ]
+      : [],
+  });
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <FlowArrow className="size-4 text-primary" />
+          Runs on
+        </CardTitle>
+        <CardDescription className="text-[11px]">
+          The governed pipeline this app runs on — its model gateway, data ceiling, policy and
+          guardrails. Every run is tagged to it. Leave on the org default unless you need a specific
+          one.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-1.5">
+        <SelectRow
+          active={!selectedPipelineId}
+          label="Org default (governed)"
+          hint="Resolve to your org's default pipeline at run time"
+          disabled={capabilityContext.status !== 'ready' || choices.selectionDisabled}
+          onClick={() => onSelect(null)}
+        />
+        {choices.options.map((option) => {
+          const pipelineId = option.ref.slice('pipeline:'.length);
+          return (
+            <div key={option.ref}>
+              <SelectRow
+                active={selectedPipelineId === pipelineId}
+                label={option.label}
+                hint={
+                  option.selectable
+                    ? (option.description ?? option.scopeSummary ?? `Runs on ${option.label}`)
+                    : option.explanation
+                }
+                disabled={!option.selectable}
+                onClick={() => onSelect(pipelineId)}
+              />
+              {option.remedyHref && !option.selectable ? (
+                <Link
+                  href={option.remedyHref}
+                  className="ml-3 inline-flex min-h-11 items-center text-[11px] text-primary underline-offset-4 hover:underline"
+                >
+                  Fix setup
+                </Link>
+              ) : null}
+            </div>
+          );
+        })}
+        {choices.guidance ? (
+          <p className="px-1 pt-1 text-[11px] text-muted-foreground" role="status">
+            {choices.guidance}
+          </p>
+        ) : null}
+        {capabilityContext.status === 'ready' && choices.options.length === 0 ? (
+          <p className="px-1 pt-1 text-[11px] text-muted-foreground">
+            No governed pipelines are available yet. Create and publish one under Governance, then
+            return here.
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -963,21 +1022,26 @@ function SelectRow({
   active,
   label,
   hint,
+  disabled = false,
   onClick,
 }: Readonly<{
   active: boolean;
   label: string;
   hint: string;
+  disabled?: boolean;
   onClick: () => void;
 }>) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
       className={
-        active
-          ? 'flex w-full items-center justify-between rounded-md border border-primary bg-primary/5 px-3 py-2 text-left'
-          : 'flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left hover:border-primary/40'
+        disabled
+          ? 'flex w-full cursor-not-allowed items-center justify-between rounded-md border border-border px-3 py-2 text-left opacity-55'
+          : active
+            ? 'flex w-full items-center justify-between rounded-md border border-primary bg-primary/5 px-3 py-2 text-left'
+            : 'flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left hover:border-primary/40'
       }
     >
       <div>

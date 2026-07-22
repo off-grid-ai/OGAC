@@ -7,7 +7,6 @@ import {
   CheckSquareOffset,
   Database,
   FileText,
-  Globe,
   Plugs,
   PuzzlePiece,
   Robot,
@@ -15,47 +14,21 @@ import {
   Trash,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ActionStepConfiguration } from '@/components/actions/ActionStepConfiguration';
 import { Button } from '@/components/ui/button';
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { describeStepBinding, type ActionStepPatch, type BindingNames } from '@/lib/app-builder';
 import type { AppStep, AppStepKind, OutputStep } from '@/lib/app-model';
+import {
+  buildBuilderCatalogueOptions,
+  type BuilderCatalogueOption,
+} from '@/lib/builder-catalogue-options';
 import type { BuilderSurfaceContextState } from '@/lib/builder-surface-access';
-
-// ─── Tool catalog shape (mirrors GET /api/v1/admin/tool-catalog) ──────────────────────────────────
-interface AppToolEntry {
-  id: string;
-  ref: string;
-  name: string;
-  description: string;
-  cyclic: boolean;
-}
-interface PrimitiveEntry {
-  id: string;
-  ref: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  reachesInternet: boolean;
-  airgapNote: string;
-}
-interface RegisteredEntry {
-  id: string;
-  ref: string;
-  name: string;
-  description: string;
-  type: string;
-  policy: string;
-}
-interface ToolCatalog {
-  apps: AppToolEntry[];
-  primitives: PrimitiveEntry[];
-  registered: RegisteredEntry[];
-}
 
 // ─── AppStepEditor (Builder Epic Phase 3A) ────────────────────────────────────────────────────────
 // One card in the ordered step skeleton. Renders the step's kind icon + label + a per-kind binding
@@ -117,7 +90,6 @@ export function AppStepEditor({
   total,
   names,
   handlers,
-  appId,
   connectors = [],
   approvalSteps = [],
   capabilityContext,
@@ -127,8 +99,6 @@ export function AppStepEditor({
   total: number;
   names: BindingNames;
   handlers: StepEditorHandlers;
-  /** The id of the app being edited — so the tool picker can flag apps-as-tools that would cycle. */
-  appId?: string;
   connectors?: { id: string; name: string; type: string; endpoint?: string }[];
   approvalSteps?: { id: string; label: string }[];
   capabilityContext: BuilderSurfaceContextState;
@@ -209,10 +179,20 @@ export function AppStepEditor({
       {/* Per-kind binding editor */}
       <div className="space-y-3 px-3 py-3">
         {step.kind === 'agent' ? (
-          <AgentBinding step={step} names={names} handlers={handlers} appId={appId} />
+          <AgentBinding
+            step={step}
+            names={names}
+            handlers={handlers}
+            capabilityContext={capabilityContext}
+          />
         ) : null}
         {step.kind === 'connector-query' ? (
-          <ConnectorBinding step={step} names={names} handlers={handlers} />
+          <ConnectorBinding
+            step={step}
+            names={names}
+            handlers={handlers}
+            capabilityContext={capabilityContext}
+          />
         ) : null}
         {step.kind === 'output' ? <OutputBinding step={step} handlers={handlers} /> : null}
         {step.kind === 'action' ? (
@@ -393,12 +373,12 @@ function AgentBinding({
   step,
   names,
   handlers,
-  appId,
+  capabilityContext,
 }: Readonly<{
   step: Extract<AppStep, { kind: 'agent' }>;
   names: BindingNames;
   handlers: StepEditorHandlers;
-  appId?: string;
+  capabilityContext: BuilderSurfaceContextState;
 }>) {
   const agents = names.agents ?? [];
   return (
@@ -446,7 +426,7 @@ function AgentBinding({
             <ToolPicker
               selected={step.inlineAgent?.tools ?? []}
               onChange={handlers.onSetTools}
-              appId={appId}
+              capabilityContext={capabilityContext}
             />
           ) : null}
         </div>
@@ -459,36 +439,56 @@ function ConnectorBinding({
   step,
   names,
   handlers,
+  capabilityContext,
 }: Readonly<{
   step: Extract<AppStep, { kind: 'connector-query' }>;
   names: BindingNames;
   handlers: StepEditorHandlers;
+  capabilityContext: BuilderSurfaceContextState;
 }>) {
   const domains = names.domains ?? [];
+  const choices = buildBuilderCatalogueOptions(capabilityContext, {
+    sliceId: 'data',
+    refPrefixes: ['data:'],
+    selected: step.domain
+      ? [
+          {
+            ref: `data:${step.domain}`,
+            label: domains.find((domain) => domain.id === step.domain)?.label,
+          },
+        ]
+      : [],
+  });
   return (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">
         Which data source does this step read?
       </Label>
-      {domains.length === 0 ? (
-        <p className="text-[11px] text-amber-600 dark:text-amber-500">
-          No data domains declared for your org yet — add a data-domain mapping (Data → Domains) so
-          this step can bind to a real connector. Until then this step is unbound.
+      <select
+        value={step.domain}
+        disabled={choices.selectionDisabled}
+        onChange={(event) => handlers.onRebindDomain(event.target.value)}
+        className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+      >
+        <option value="">— pick a data source —</option>
+        {choices.options.map((option) => (
+          <option
+            key={option.ref}
+            value={option.ref.slice('data:'.length)}
+            disabled={!option.selectable}
+          >
+            {option.label}
+            {option.requiresApproval ? ' (approval required)' : ''}
+            {!option.selectable ? ` (${option.statusLabel})` : ''}
+          </option>
+        ))}
+      </select>
+      {choices.guidance ? (
+        <p className="text-[11px] text-muted-foreground" role="status">
+          {choices.guidance}
         </p>
-      ) : (
-        <select
-          value={step.domain}
-          onChange={(e) => handlers.onRebindDomain(e.target.value)}
-          className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
-        >
-          <option value="">— pick a data domain —</option>
-          {domains.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.label}
-            </option>
-          ))}
-        </select>
-      )}
+      ) : null}
+      <UnavailableCatalogueOptions options={choices.options} />
     </div>
   );
 }
@@ -503,38 +503,21 @@ function ConnectorBinding({
 function ToolPicker({
   selected,
   onChange,
-  appId,
+  capabilityContext,
 }: Readonly<{
   selected: string[];
   onChange: (refs: string[]) => void;
-  appId?: string;
+  capabilityContext: BuilderSurfaceContextState;
 }>) {
-  const [catalog, setCatalog] = useState<ToolCatalog | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let live = true;
-    setLoading(true);
-    const qs = appId ? `?appId=${encodeURIComponent(appId)}` : '';
-    fetch(`/api/v1/admin/tool-catalog${qs}`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('load'))))
-      .then((data: ToolCatalog) => {
-        if (live) {
-          setCatalog(data);
-          setError(false);
-        }
-      })
-      .catch(() => {
-        if (live) setError(true);
-      })
-      .finally(() => {
-        if (live) setLoading(false);
-      });
-    return () => {
-      live = false;
-    };
-  }, [appId]);
+  const choices = buildBuilderCatalogueOptions(capabilityContext, {
+    sliceId: 'capabilities',
+    controlId: 'select',
+    refPrefixes: ['app:', 'prim:', 'tool:'],
+    selected: selected.map((ref) => ({ ref })),
+  });
+  const apps = choices.options.filter((option) => option.ref.startsWith('app:'));
+  const primitives = choices.options.filter((option) => option.ref.startsWith('prim:'));
+  const registered = choices.options.filter((option) => option.ref.startsWith('tool:'));
 
   const toggle = (ref: string) => {
     onChange(selected.includes(ref) ? selected.filter((r) => r !== ref) : [...selected, ref]);
@@ -555,94 +538,57 @@ function ToolPicker({
         registered service. Every call stays governed by your org&apos;s policy.
       </p>
 
-      {loading ? (
-        <p className="text-[11px] text-muted-foreground">Loading tools…</p>
-      ) : error ? (
-        <p className="text-[11px] text-amber-600 dark:text-amber-500">
-          Couldn&apos;t load the tool catalog — try again.
+      {choices.guidance ? (
+        <p className="text-[11px] text-muted-foreground" role="status">
+          {choices.guidance}
         </p>
-      ) : catalog ? (
-        <div className="space-y-3 pt-1">
-          {/* 1. Your apps */}
-          <ToolGroup
-            icon={<AppWindow className="size-3.5" />}
-            title="Your apps"
-            hint="Published apps, used as building blocks."
-          >
-            {catalog.apps.length === 0 ? (
-              <EmptyRow text="No published apps yet — publish one to reuse it here." />
-            ) : (
-              catalog.apps.map((a) => (
-                <ToolRow
-                  key={a.ref}
-                  name={a.name}
-                  description={
-                    a.cyclic ? 'Would create a loop with this app — not allowed.' : a.description
-                  }
-                  checked={selected.includes(a.ref)}
-                  disabled={a.cyclic}
-                  onToggle={() => toggle(a.ref)}
-                />
-              ))
-            )}
-          </ToolGroup>
-
-          {/* 2. Primitives */}
-          <ToolGroup
-            icon={<PuzzlePiece className="size-3.5" />}
-            title="Primitives"
-            hint="Small built-in tools."
-          >
-            {catalog.primitives.map((p) => (
-              <ToolRow
-                key={p.ref}
-                name={p.name}
-                description={p.enabled ? p.description : `${p.airgapNote}`}
-                checked={selected.includes(p.ref)}
-                disabled={!p.enabled}
-                badge={
-                  p.reachesInternet ? (
-                    <span
-                      className={
-                        p.enabled
-                          ? 'inline-flex items-center gap-0.5 text-[9px] text-emerald-600 dark:text-emerald-500'
-                          : 'inline-flex items-center gap-0.5 text-[9px] text-muted-foreground'
-                      }
-                      title={p.airgapNote}
-                    >
-                      <Globe className="size-2.5" />
-                      {p.enabled ? 'online' : 'off (air-gapped)'}
-                    </span>
-                  ) : null
-                }
-                onToggle={() => toggle(p.ref)}
-              />
-            ))}
-          </ToolGroup>
-
-          {/* 3. Registered tools */}
-          <ToolGroup
-            icon={<Plugs className="size-3.5" />}
-            title="Registered tools"
-            hint="HTTP / MCP tools your org set up."
-          >
-            {catalog.registered.length === 0 ? (
-              <EmptyRow text="No registered tools — add one under Tools." />
-            ) : (
-              catalog.registered.map((t) => (
-                <ToolRow
-                  key={t.ref}
-                  name={t.name}
-                  description={`${t.description} · ${t.type} · policy: ${t.policy}`}
-                  checked={selected.includes(t.ref)}
-                  disabled={t.policy === 'blocked'}
-                  onToggle={() => toggle(t.ref)}
-                />
-              ))
-            )}
-          </ToolGroup>
-        </div>
       ) : null}
+      <div className="space-y-3 pt-1">
+        {/* 1. Your apps */}
+        <ToolGroup
+          icon={<AppWindow className="size-3.5" />}
+          title="Your apps"
+          hint="Published apps, used as building blocks."
+        >
+          {apps.length === 0 ? (
+            <EmptyRow text="No published apps yet — publish one to reuse it here." />
+          ) : (
+            apps.map((option) => (
+              <ToolRow key={option.ref} option={option} onToggle={() => toggle(option.ref)} />
+            ))
+          )}
+        </ToolGroup>
+
+        {/* 2. Primitives */}
+        <ToolGroup
+          icon={<PuzzlePiece className="size-3.5" />}
+          title="Primitives"
+          hint="Small built-in tools."
+        >
+          {primitives.length === 0 ? (
+            <EmptyRow text="No built-in tools are available yet." />
+          ) : (
+            primitives.map((option) => (
+              <ToolRow key={option.ref} option={option} onToggle={() => toggle(option.ref)} />
+            ))
+          )}
+        </ToolGroup>
+
+        {/* 3. Registered tools */}
+        <ToolGroup
+          icon={<Plugs className="size-3.5" />}
+          title="Registered tools"
+          hint="HTTP / MCP tools your org set up."
+        >
+          {registered.length === 0 ? (
+            <EmptyRow text="No registered tools — add one under Tools." />
+          ) : (
+            registered.map((option) => (
+              <ToolRow key={option.ref} option={option} onToggle={() => toggle(option.ref)} />
+            ))
+          )}
+        </ToolGroup>
+      </div>
     </div>
   );
 }
@@ -671,44 +617,100 @@ function ToolGroup({
 }
 
 function ToolRow({
-  name,
-  description,
-  checked,
-  disabled,
-  badge,
+  option,
   onToggle,
 }: Readonly<{
-  name: string;
-  description: string;
-  checked: boolean;
-  disabled?: boolean;
-  badge?: React.ReactNode;
+  option: BuilderCatalogueOption;
   onToggle: () => void;
 }>) {
   return (
-    <label
-      className={
-        disabled
-          ? 'flex cursor-not-allowed items-start gap-2 rounded px-1.5 py-1 opacity-55'
-          : 'flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 hover:bg-muted/50'
-      }
-    >
-      <input
-        type="checkbox"
-        aria-label={name}
-        className="mt-0.5 size-3.5 shrink-0 accent-primary"
-        checked={checked}
-        disabled={disabled}
-        onChange={onToggle}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-foreground">{name}</span>
-          {badge}
+    <div className={!option.selectable ? 'opacity-55' : ''}>
+      <label
+        className={
+          !option.selectable && !option.removable
+            ? 'flex cursor-not-allowed items-start gap-2 rounded px-1.5 py-1'
+            : 'flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 hover:bg-muted/50'
+        }
+      >
+        <input
+          type="checkbox"
+          aria-label={option.label}
+          className="mt-0.5 size-3.5 shrink-0 accent-primary"
+          checked={option.selected}
+          disabled={!option.selectable && !option.removable}
+          onChange={onToggle}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-foreground">{option.label}</span>
+            {option.requiresApproval || !option.selectable ? (
+              <span className="text-[9px] text-muted-foreground">{option.statusLabel}</span>
+            ) : null}
+          </span>
+          {option.description ? (
+            <span className="block text-[11px] text-muted-foreground">{option.description}</span>
+          ) : null}
+          {option.requiresApproval || !option.selectable ? (
+            <span className="block text-[11px] leading-relaxed text-muted-foreground">
+              {option.explanation}
+            </span>
+          ) : null}
         </span>
-        <span className="block truncate text-[11px] text-muted-foreground">{description}</span>
-      </span>
-    </label>
+      </label>
+      {option.remedyHref ? (
+        <Link
+          href={option.remedyHref}
+          className="ml-7 inline-flex min-h-11 items-center text-[11px] text-primary underline-offset-4 hover:underline"
+        >
+          Fix setup
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function UnavailableCatalogueOptions({ options }: Readonly<{ options: BuilderCatalogueOption[] }>) {
+  const unavailable = options.filter((option) => !option.selectable);
+  if (unavailable.length === 0) return null;
+  const selected = unavailable.filter((option) => option.selected);
+  const unselected = unavailable.filter((option) => !option.selected);
+  const visible = [...selected, ...unselected.slice(0, Math.max(0, 3 - selected.length))];
+  const visibleRefs = new Set(visible.map((option) => option.ref));
+  const remaining = unavailable.filter((option) => !visibleRefs.has(option.ref));
+  return (
+    <div aria-label="Unavailable choices">
+      <CatalogueOptionExplanations options={visible} />
+      {remaining.length > 0 ? (
+        <Disclosure className="mt-1">
+          <DisclosureTrigger className="min-h-11 text-[11px] text-muted-foreground hover:text-foreground">
+            Show {remaining.length} more
+          </DisclosureTrigger>
+          <DisclosureContent>
+            <CatalogueOptionExplanations options={remaining} />
+          </DisclosureContent>
+        </Disclosure>
+      ) : null}
+    </div>
+  );
+}
+
+function CatalogueOptionExplanations({ options }: Readonly<{ options: BuilderCatalogueOption[] }>) {
+  return (
+    <ul className="space-y-1 text-[11px] text-muted-foreground">
+      {options.map((option) => (
+        <li key={option.ref}>
+          <span className="font-medium text-foreground">{option.label}:</span> {option.explanation}
+          {option.remedyHref ? (
+            <Link
+              href={option.remedyHref}
+              className="ml-1 inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline"
+            >
+              Fix setup
+            </Link>
+          ) : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 
