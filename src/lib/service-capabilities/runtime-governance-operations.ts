@@ -236,7 +236,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     versionSource:
       'Historical Console release 61b86a720f725bbd6fdd40d0368e499e22c1bc2e; scripts/gateway-aggregator.mjs source owner 55064461a42a76a332392e19ea724a06732203b1; onprem fleet SERVER_STATE.md at bc74d828e02db7566b32191650cb58360f9178ae',
     denominatorSource:
-      'packages/gateway/src/index.ts; packages/gateway/src/cluster/types.ts; packages/gateway/src/queue/types.ts',
+      'packages/gateway/src/index.ts; packages/gateway/src/cluster/types.ts; packages/gateway/src/queue/types.ts; Console cloud-egress contract at c0d3e793: src/lib/egress-dlp.ts, src/lib/egress-dlp-run.ts, src/lib/egress-policy-store.ts, and src/app/api/v1/chat/stream/route.ts',
     auditStateEvidence:
       'Historical auth and routing proof exists, but deploy/push.sh explicitly does not restart the aggregator and the live process has no repo-owned launch artifact or deployed-source stamp. Record the running script checksum, launch manifest revision, PID start time, and expected Console SHA in recover.sh before treating its identity as current.',
     summary:
@@ -294,6 +294,24 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'Governance and runtime surfaces expose effective controls and evidence.',
           'partial',
           'Governed denial and merged guard scans passed separately, but the retained evidence does not correlate both with the same gateway request and traffic record.',
+        ],
+      ],
+      [
+        'cloud-egress-dlp',
+        'Cloud egress DLP',
+        'Mask or block sensitive text at the final governed boundary before a chat request is sent to a cloud model.',
+        '/governance/egress',
+        'Manage cloud egress protection',
+        'The final enforcement hook currently covers only the chat/stream cloud-model path immediately before forwardToCloud; agent and app model calls, cloud tools, and outbound sinks do not enter it. Policy lookup and scanning use the current orgId, but gateway.egress.dlp audit events are written under DEFAULT_ORG, so a non-default tenant can lose its decision evidence from the tenant-scoped panel. Thread orgId into that audit context, extend the same boundary to every cloud-egress path, and retain one cloud-routed PAN/email request whose provider payload is masked before promoting integration or workflow to yes.',
+        [
+          'yes',
+          'First-party Console commit c0d3e793 provides a default-on mask policy, strict block mode, fail-closed guardrail handling, and an explicit admin opt-out for cloud-bound text.',
+          'partial',
+          'The chat stream loads the tenant policy, scans every outbound text unit through the selected PII adapter, replaces payload.messages before forwardToCloud, and refuses the call when screening fails. Coverage is limited to this chat cloud-model seam, and its audit context incorrectly uses DEFAULT_ORG instead of the current orgId.',
+          'yes',
+          'The URL-driven /governance/egress surface and admin GET/PATCH route expose per-org ON/OFF, mask-versus-block policy, detector readiness, and recent decisions; disabling protection is an explicit audited admin action.',
+          'partial',
+          'The deployed surface reports the secure default ON and a reachable detector, and the real adapter contract proves masked and fail-closed payload handling. No retained live cloud-routed PAN/email request yet proves the sanitized payload reached the provider, and non-default-tenant audit attribution is incorrect.',
         ],
       ],
     ],
