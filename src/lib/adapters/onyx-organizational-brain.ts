@@ -5,6 +5,7 @@ import {
   resolveBrainSourceBinding,
   selectAuthorizedBrainDocumentSet,
   validateBrainDocument,
+  validateBrainDocumentId,
   type BrainAuthorizationContext,
   type BrainCitation,
   type BrainDocument,
@@ -140,6 +141,9 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
     this.config = config;
     this.fetchImpl = config.fetchImpl ?? fetch;
     this.timeoutMs = config.timeoutMs ?? 10_000;
+    if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 1 || this.timeoutMs > 60_000) {
+      throw new OnyxOrganizationalBrainError('Onyx timeout must be an integer between 1 and 60000 milliseconds');
+    }
   }
 
   private async request(path: string, init: RequestInit = {}): Promise<unknown> {
@@ -271,7 +275,7 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
 
   async deleteDocument(context: BrainAuthorizationContext, documentId: string): Promise<void> {
     requireBrainIngestionConnection(context);
-    if (!documentId.trim()) throw new OnyxOrganizationalBrainError('document id is required');
+    validateBrainDocumentId(documentId);
     await this.request(`/onyx-api/ingestion/${encodeURIComponent(`ogac:${context.tenantId}:${documentId}`)}`, {
       method: 'DELETE',
     });

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   assertBrainAuthorization,
   BrainAuthorizationError,
+  BrainDocumentValidationError,
   BrainPolicyError,
   brainDocumentSetName,
   requireBrainCapability,
@@ -210,12 +211,15 @@ test('document ingestion validation bounds identifiers, content, metadata, time,
     { ...valid, semanticIdentifier: 'bad\u0000name' },
     { ...valid, sourceUri: '/relative' },
     { ...valid, sections: [] },
+    { ...valid, sections: [{ text: 'unsafe\u0000text' }] },
     { ...valid, sections: [{ text: 'x'.repeat(256 * 1024 + 1) }] },
     { ...valid, sections: Array.from({ length: 65 }, () => ({ text: 'x' })) },
     { ...valid, metadata: Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`key${index}`, 'x'])) },
     { ...valid, metadata: { key: 'x'.repeat(4097) } },
+    { ...valid, metadata: { key: '   ' } },
     { ...valid, version: 'x'.repeat(129) },
     { ...valid, updatedAt: 'not-a-date' },
   ];
-  for (const document of invalid) assert.throws(() => validateBrainDocument(document), BrainPolicyError);
+  for (const document of invalid) assert.throws(() => validateBrainDocument(document), BrainDocumentValidationError);
+  assert.doesNotThrow(() => validateBrainDocument({ ...valid, sections: [{ text: 'line one\nline two\tvalue' }] }));
 });

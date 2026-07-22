@@ -493,3 +493,22 @@ test('foreign source mutation returns not found after a scoped read and performs
   );
   assert.deepEqual(fake.calls.map((call) => call.method), ['GET']);
 });
+
+test('constructor and delete boundary reject unsafe timeout and document ids before network', async () => {
+  const fake = boundary(() => json({ detail: 'must not be reached' }, 500));
+  for (const timeoutMs of [0, -1, 60_001, Number.POSITIVE_INFINITY, 1.5]) {
+    assert.throws(
+      () =>
+        new OnyxOrganizationalBrain({
+          apiBaseUrl: 'http://onyx.internal/api',
+          apiToken: 'private-onyx-pat',
+          fetchImpl: fake.fetch,
+          timeoutMs,
+        }),
+      /timeout/,
+    );
+  }
+  await assert.rejects(() => adapter(fake.fetch).deleteDocument(manager, 'unsafe\u0000id'), /document id/);
+  await assert.rejects(() => adapter(fake.fetch).deleteDocument(manager, 'x'.repeat(513)), /document id/);
+  assert.equal(fake.calls.length, 0);
+});
