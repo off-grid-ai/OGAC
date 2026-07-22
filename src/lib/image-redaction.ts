@@ -175,6 +175,16 @@ function validateSignature(bytes: Uint8Array, type: ImageRedactionMediaType): vo
   }
 }
 
+/** Decode bounded base64 image bytes and verify the declared raster signature. */
+export function decodeImageRedactionBytes(
+  value: unknown,
+  type: ImageRedactionMediaType,
+): Uint8Array {
+  const bytes = decodeImage(value);
+  validateSignature(bytes, type);
+  return bytes;
+}
+
 function imagePolicy(entityTypes: unknown, scoreThreshold: unknown): ImageRedactionPolicy {
   const supplied = entityTypes === undefined ? [...DEFAULT_IMAGE_REDACTION_ENTITIES] : entityTypes;
   if (
@@ -220,8 +230,7 @@ export function parseImageRedactionCommand(
   }
   const body = value as ImageRedactionBody;
   const resolvedMediaType = mediaType(body.mediaType);
-  const bytes = decodeImage(body.imageBase64);
-  validateSignature(bytes, resolvedMediaType);
+  const bytes = decodeImageRedactionBytes(body.imageBase64, resolvedMediaType);
   return {
     bytes,
     mediaType: resolvedMediaType,
@@ -255,7 +264,7 @@ export function summarizeImageRedactionEntities(
       !allowed.has(entityType) ||
       typeof score !== 'number' ||
       !Number.isFinite(score) ||
-      score < 0 ||
+      score < policy.scoreThreshold ||
       score > 1
     ) {
       throw new ImageRedactionError(
