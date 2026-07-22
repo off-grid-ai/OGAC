@@ -1,6 +1,7 @@
 import { CheckCircle, Database, ShieldCheck, Warning } from '@phosphor-icons/react/dist/ssr';
 import { ActionExecutionReceipt } from '@/components/actions/ActionExecutionReceipt';
 import { CrossSellDecisionPanel } from '@/components/app-use/CrossSellDecisionPanel';
+import { CrossSellOutcomeEntry } from '@/components/app-use/CrossSellOutcomeEntry';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/states';
@@ -42,6 +43,17 @@ export function CrossSellCustomerJourney({
   evidence: CrossSellEvidenceState;
 }>) {
   const recommendation = opportunity.recommendation;
+  const currentOutcomes = opportunity.outcomes.filter((outcome) => outcome.status !== 'withdrawn');
+  const outcomeEntryMode =
+    currentOutcomes.length === 0
+      ? 'initial'
+      : currentOutcomes.some(
+            (outcome) => outcome.status === 'converted' || outcome.status === 'rejected',
+          )
+        ? null
+        : currentOutcomes.some((outcome) => outcome.status === 'accepted')
+          ? 'conversion'
+          : null;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -155,12 +167,29 @@ export function CrossSellCustomerJourney({
             <ActionExecutionReceipt receipt={opportunity.actionReceipt} />
           ) : null}
 
+          {opportunity.actionReceipt && outcomeEntryMode ? (
+            <CrossSellOutcomeEntry
+              slug={slug}
+              customerId={opportunity.customerId}
+              receipt={opportunity.actionReceipt}
+              mode={outcomeEntryMode}
+            />
+          ) : null}
+
           {opportunity.actionReceipt ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Customer results</CardTitle>
+            <Card aria-label="Customer result history">
+              <CardHeader className="space-y-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Result history
+                </p>
+                <CardTitle className="text-sm font-medium">
+                  {opportunity.outcomes.length === 0
+                    ? 'Business result not known'
+                    : 'Observed customer results'}
+                </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Business success is recorded separately from successful CRM execution.
+                  CRM completion confirms the system change. Only these observations describe what
+                  happened afterward.
                 </p>
               </CardHeader>
               <CardContent>

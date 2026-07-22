@@ -10,6 +10,28 @@ import {
   CrossSellCustomerJourney,
   CrossSellSourceUnavailable,
 } from '@/components/app-use/CrossSellCustomerJourney';
+import { CrossSellOutcomeEntry } from '@/components/app-use/CrossSellOutcomeEntry';
+import type { ActionReceipt } from '@/lib/action-contract';
+
+const receipt: ActionReceipt = {
+  actionId: 'crm.create-task',
+  label: 'Create CRM follow-up task',
+  system: 'CRM',
+  orgId: 'org_bank',
+  runId: 'run_7',
+  stepId: 'cross-sell-writeback',
+  connectorId: 'crm',
+  target: '7',
+  idempotencyKey: 'action:receipt-7',
+  status: 'executed',
+  executedAt: '2026-07-23T00:15:00.000Z',
+  approval: {
+    stepId: 'rm-review',
+    evidence: 'Approved by the relationship manager',
+    reviewer: 'rm@example.test',
+  },
+  providerReceipt: { signature: 'signed' },
+};
 
 function row(): CrossSellQueueRow {
   return {
@@ -104,4 +126,127 @@ test('source outage is explicit and never replaced by demo recommendations', () 
   assert.match(html, /Live opportunity data is unavailable/);
   assert.match(html, /customer and eligibility source bindings/);
   assert.doesNotMatch(html, /Alpha Industries|Group Term Life|sample|synthetic|fallback/i);
+});
+
+test('completed CRM execution opens the receipt-correlated customer result journey', () => {
+  const data = row();
+  data.opportunity.rmDecision = {
+    status: 'accepted',
+    reason: 'The recommendation matches the customer need.',
+    reviewer: 'rm@example.test',
+    decidedAt: '2026-07-23T00:10:00.000Z',
+  };
+  data.opportunity.actionReceipt = receipt;
+  data.evidence = {
+    phase: 'needs-outcome',
+    complete: false,
+    missing: ['receipt-correlated customer outcome'],
+  };
+
+  const html = renderToStaticMarkup(
+    createElement(CrossSellCustomerJourney, {
+      slug: 'cross-sell',
+      opportunity: data.opportunity,
+      evidence: data.evidence,
+    }),
+  );
+  assert.match(html, /Execution receipt/);
+  assert.match(html, /Record what happened/);
+  assert.match(html, /The CRM task is complete/);
+  assert.match(html, /Business result not known/);
+  assert.match(html, /No customer result has been observed yet/);
+  assert.match(html, /Waiting for the customer result/);
+  assert.doesNotMatch(html, /Business result recorded/);
+});
+
+test('customer result form uses the canonical receipt locator without browser-supplied identity', () => {
+  const html = renderToStaticMarkup(
+    createElement(CrossSellOutcomeEntry, {
+      slug: 'bank cross-sell',
+      customerId: 'customer/7',
+      receipt,
+      mode: 'initial',
+    }),
+  );
+  for (const copy of [
+    'Customer accepted',
+    'Customer declined',
+    'Customer converted',
+    'This is the customer result, not the relationship manager decision',
+    'What confirms this result?',
+    'Revenue before (optional)',
+    'Revenue after (optional)',
+  ]) {
+    assert.match(html, new RegExp(copy.replace(/[?()]/g, '\\$&')));
+  }
+  assert.match(html, /\/app\/bank%20cross-sell\/customers\/customer%2F7/);
+  assert.doesNotMatch(html, /Account cured|Claim settled/);
+  assert.doesNotMatch(html, /name="(?:orgId|runId|stepId|receipt|eventId)"/);
+});
+
+test('an observed response stays separate from CRM completion and suggests conversion next', () => {
+  const data = row();
+  data.opportunity.rmDecision = {
+    status: 'accepted',
+    reason: 'The recommendation matches the customer need.',
+    reviewer: 'rm@example.test',
+    decidedAt: '2026-07-23T00:10:00.000Z',
+  };
+  data.opportunity.actionReceipt = receipt;
+  data.opportunity.outcomes = [
+    {
+      status: 'accepted',
+      observedAt: '2026-07-23T00:30:00.000Z',
+      value: 125_000,
+      currency: 'INR',
+      evidenceHref: '/app/cross-sell/customers/7',
+    },
+  ];
+  data.evidence = { phase: 'measured', complete: true, missing: [] };
+
+  const html = renderToStaticMarkup(
+    createElement(CrossSellCustomerJourney, {
+      slug: 'cross-sell',
+      opportunity: data.opportunity,
+      evidence: data.evidence,
+    }),
+  );
+  assert.match(html, /Record the confirmed conversion/);
+  assert.match(html, /value="converted" selected=""/);
+  assert.match(html, /Observed customer results/);
+  assert.match(html, /accepted/);
+  assert.match(html, /INR 125,000/);
+  assert.match(html, /CRM completion confirms the system change/);
+});
+
+test('a terminal customer result remains visible without offering a duplicate observation', () => {
+  const data = row();
+  data.opportunity.rmDecision = {
+    status: 'accepted',
+    reason: 'The recommendation matches the customer need.',
+    reviewer: 'rm@example.test',
+    decidedAt: '2026-07-23T00:10:00.000Z',
+  };
+  data.opportunity.actionReceipt = receipt;
+  data.opportunity.outcomes = [
+    {
+      status: 'converted',
+      observedAt: '2026-07-23T00:30:00.000Z',
+      value: 125_000,
+      currency: 'INR',
+      evidenceHref: '/app/cross-sell/customers/7',
+    },
+  ];
+  data.evidence = { phase: 'measured', complete: true, missing: [] };
+
+  const html = renderToStaticMarkup(
+    createElement(CrossSellCustomerJourney, {
+      slug: 'cross-sell',
+      opportunity: data.opportunity,
+      evidence: data.evidence,
+    }),
+  );
+  assert.match(html, /Observed customer results/);
+  assert.match(html, /converted/);
+  assert.doesNotMatch(html, /Record what happened|Record the confirmed conversion/);
 });
