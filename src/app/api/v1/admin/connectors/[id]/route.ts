@@ -43,7 +43,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // endpoints split to secret=null and are stored verbatim.
   const rawEndpoint = body.endpoint as string | undefined;
   const { endpoint: cleanEndpoint, secret: peeledSecret } =
-    rawEndpoint !== undefined ? splitEndpointSecret(rawEndpoint) : { endpoint: undefined, secret: null };
+    rawEndpoint !== undefined
+      ? splitEndpointSecret(rawEndpoint)
+      : { endpoint: undefined, secret: null };
 
   // Run the SAME create-grade validation on the edit (DRY): a coming-soon/garbage type and a
   // non-http / private / metadata endpoint are refused here just as on create — the PATCH path used
@@ -82,8 +84,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Vault the peeled credential (if any) AFTER the row update succeeds, so a rotated password from an
   // edited endpoint lands in OpenBao and the DB stays clean. A vault failure is surfaced (502) — the
   // endpoint is already sanitized, so we never silently keep a plaintext secret around.
-  const replacementSecret =
-    existing.type === 's3' ? credentialResult.secret : peeledSecret;
+  const replacementSecret = existing.type === 's3' ? credentialResult.secret : peeledSecret;
   if (replacementSecret) {
     try {
       await persistConnectorSecret(id, replacementSecret);

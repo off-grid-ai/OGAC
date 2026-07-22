@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
-import { createKafkaSource, KafkaSourceOnboardingError } from '@/lib/adapters/kafka-source-onboarding';
+import {
+  createKafkaSource,
+  KafkaSourceOnboardingError,
+} from '@/lib/adapters/kafka-source-onboarding';
 import { requireAdmin } from '@/lib/authz';
 import type { KafkaSourceInput } from '@/lib/kafka-source-onboarding';
 import { currentOrgId } from '@/lib/tenancy';
@@ -9,7 +12,8 @@ function failure(error: unknown): NextResponse {
   if (!(error instanceof KafkaSourceOnboardingError)) {
     return NextResponse.json({ error: 'The Kafka source could not be saved.' }, { status: 500 });
   }
-  const status = error.code === 'invalid-input' ? 400 : error.code === 'ambiguous-binding' ? 409 : 502;
+  const status =
+    error.code === 'invalid-input' ? 400 : error.code === 'ambiguous-binding' ? 409 : 502;
   return NextResponse.json(
     { error: error.message, ...(Object.keys(error.fields).length ? { fields: error.fields } : {}) },
     { status },

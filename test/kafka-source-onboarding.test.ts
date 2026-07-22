@@ -169,7 +169,10 @@ test('rejects caller-defined runtime policy instead of ignoring it', () => {
     maxRecords: 50_000,
   } as KafkaSourceInput);
   assert.equal(result.ok, false);
-  assert.equal(result.errors.request, 'Remove fields that are not part of governed source onboarding.');
+  assert.equal(
+    result.errors.request,
+    'Remove fields that are not part of governed source onboarding.',
+  );
 });
 
 test('redacted security reports presence and modes without returning secrets', () => {

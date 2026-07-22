@@ -70,12 +70,7 @@ export interface KafkaSourceCurrentSecurity extends KafkaSourceSecrets {
   tls: boolean;
 }
 
-const SASL_MODES: readonly KafkaSaslMode[] = [
-  'none',
-  'plain',
-  'scram-sha-256',
-  'scram-sha-512',
-];
+const SASL_MODES: readonly KafkaSaslMode[] = ['none', 'plain', 'scram-sha-256', 'scram-sha-512'];
 const REGISTRY_AUTH_MODES: readonly KafkaRegistryAuthMode[] = ['none', 'bearer', 'basic'];
 const TOPIC_RE = /^[A-Za-z0-9._-]{1,249}$/;
 const SCHEMA_SUBJECT_RE = /^[A-Za-z0-9._-]{1,249}$/;
@@ -172,9 +167,7 @@ function encodeBasic(username: string, password: string): string {
   return btoa(unescape(encodeURIComponent(`${username}:${password}`)));
 }
 
-function registryModeFromCurrent(
-  authorization: string | undefined,
-): KafkaRegistryAuthMode {
+function registryModeFromCurrent(authorization: string | undefined): KafkaRegistryAuthMode {
   if (authorization?.startsWith('Bearer ')) return 'bearer';
   if (authorization?.startsWith('Basic ')) return 'basic';
   return 'none';
