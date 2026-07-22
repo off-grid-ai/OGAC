@@ -45,6 +45,15 @@ export interface EtlPort {
   getConnectionRaw(connectionId: string): Promise<Record<string, unknown> | null>;
   // Post a ConnectionUpdate (built by the pure model) to /connections/update. Returns true on 2xx.
   updateConnection(update: Record<string, unknown>): Promise<boolean>;
+  // Submit an update then CONFIRM it landed by re-reading the connection — Airbyte's /connections/
+  // update HTTP can block far longer than our timeout while applying the change server-side, so the
+  // slow write's return is not trustworthy; the terminal state is. Returns true once `confirm(raw)`
+  // holds on a read-back, false if it never does.
+  updateConnectionConfirmed(
+    update: Record<string, unknown>,
+    connectionId: string,
+    confirm: (raw: Record<string, unknown>) => boolean,
+  ): Promise<boolean>;
   // Reset (clear) a connection's replication state so the next sync re-reads from scratch. Returns
   // the reset job, or null on failure.
   resetConnection(connectionId: string): Promise<EtlJob | null>;
@@ -182,6 +191,21 @@ export const airbyteEtl: EtlPort = {
     // carries no read-only field). A 2xx means the change landed.
     const data = await post<unknown>('connections/update', update);
     return data !== null;
+  },
+
+  async updateConnectionConfirmed(update, connectionId, confirm) {
+    // Fire the update (bounded timeout; may return null when Airbyte's slow /connections/update HTTP
+    // outlasts it) then CONFIRM by polling the connection — the change applies server-side within a
+    // few seconds even when the write call never returns, so we trust the read-back, not the write.
+    const direct = await this.updateConnection(update);
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const raw = await this.getConnectionRaw(connectionId);
+      if (raw && confirm(raw)) return true;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    // Last-chance read after the final wait, so a change that lands right at the deadline still counts.
+    const raw = await this.getConnectionRaw(connectionId);
+    return (raw != null && confirm(raw)) || direct;
   },
 
   async resetConnection(connectionId: string) {

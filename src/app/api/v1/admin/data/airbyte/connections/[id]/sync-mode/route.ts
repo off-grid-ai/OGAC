@@ -3,7 +3,11 @@ import { airbyteEtl } from '@/lib/adapters/airbyte';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireWriter } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
-import { buildSyncModeUpdate, type SyncModeChoice } from '@/lib/airbyte-schedule-model';
+import {
+  buildSyncModeUpdate,
+  normalizeConnectionDetail,
+  type SyncModeChoice,
+} from '@/lib/airbyte-schedule-model';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +48,11 @@ export async function PATCH(
     return NextResponse.json({ error: built.error }, { status: 400 });
   }
 
-  const ok = await airbyteEtl.updateConnection(built.update);
+  const ok = await airbyteEtl.updateConnectionConfirmed(built.update, id, (raw) =>
+    normalizeConnectionDetail(raw).streams.some(
+      (s) => s.name === (body.stream ?? '') && s.syncMode === (body.mode as SyncModeChoice),
+    ),
+  );
   auditFromSession(gate, org, {
     action: 'data.airbyte.sync-mode',
     resource: `connection:${id} stream:${body.stream} mode=${body.mode}`,
