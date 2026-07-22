@@ -89,7 +89,7 @@ export const SEEDED_SOLUTION_BLUEPRINTS: readonly SeededSolutionBlueprint[] = [
       industry: 'Banking',
       process: 'Relationship management · cross-sell',
       businessOwner: 'Head of Relationship Banking',
-      requiredDataDomains: ['customer data'],
+      requiredDataDomains: ['customer data', 'pricing rate card'],
       requiredCapabilities: ['grounded-inference', 'human-approval', 'report-output'],
       requiredPipelineName: 'RM cross-sell',
       sourceTemplateKey: 'cross-sell',
