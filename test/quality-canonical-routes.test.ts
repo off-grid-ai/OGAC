@@ -23,7 +23,10 @@ test('canonical Quality routes expose executions, drift, performance, and releas
   const performance = source('src/app/(console)/solutions/quality/performance/page.tsx');
   const gates = source('src/app/(console)/solutions/quality/release-gates/page.tsx');
   assert.match(run, /getEvalRun\(id, await currentOrgId\(\)\)/);
-  assert.match(drift, /readDriftView\(\{ orgId: await currentOrgId\(\) \}\)/);
+  assert.equal(drift.match(/await currentOrgId\(\)/g)?.length, 1);
+  assert.match(drift, /const orgId = await currentOrgId\(\);/);
+  assert.match(drift, /readDriftView\(\{ orgId \}\)/);
+  assert.match(drift, /listDriftRuns\(10, orgId\)/);
   assert.match(drift, /<DriftCatalog/);
   assert.match(performance, /readQaStatus\(orgId\)/);
   assert.match(performance, /<RunSweepButton/);
@@ -43,10 +46,7 @@ test('Quality root reveals current posture before configuration CRUD', () => {
 
 test('Quality executions resolves its canonical runs segment instead of treating it as a menu id', () => {
   const module = contextualModule('solutions-quality');
-  assert.equal(
-    contextualDestinationForPath(module, '/solutions/quality/runs')?.id,
-    'executions',
-  );
+  assert.equal(contextualDestinationForPath(module, '/solutions/quality/runs')?.id, 'executions');
 
   const destinationPage = source('src/app/(console)/solutions/quality/[destination]/page.tsx');
   assert.match(destinationPage, /contextualDestinationForPath/);
@@ -55,14 +55,8 @@ test('Quality executions resolves its canonical runs segment instead of treating
 
 test('Quality card guidance uses the shared description row without header overlap', () => {
   const cards = [
-    [
-      'src/app/(console)/solutions/quality/[destination]/page.tsx',
-      'Used by pipelines',
-    ],
-    [
-      'src/app/(console)/solutions/quality/[destination]/page.tsx',
-      'Execution filters',
-    ],
+    ['src/app/(console)/solutions/quality/[destination]/page.tsx', 'Used by pipelines'],
+    ['src/app/(console)/solutions/quality/[destination]/page.tsx', 'Execution filters'],
     ['src/app/(console)/solutions/quality/performance/page.tsx', 'Score history'],
     ['src/app/(console)/solutions/quality/drift/page.tsx', 'Current drift evidence'],
     ['src/app/(console)/solutions/quality/drift/page.tsx', 'Run a drift check'],

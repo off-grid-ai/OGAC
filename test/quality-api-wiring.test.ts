@@ -24,10 +24,18 @@ test('interactive drift reads and runs are tenant-scoped', () => {
   const route = source('src/app/api/v1/admin/drift/route.ts');
   const legacyRoute = source('src/app/api/v1/admin/qa/drift/route.ts');
   const page = source('src/app/(console)/solutions/quality/drift/page.tsx');
+  // GET resolves once inline; POST resolves once into orgId and reuses it for its read + retained run.
+  assert.equal(route.match(/await currentOrgId\(\)/g)?.length, 2);
   assert.match(route, /readDriftView\(\{ orgId: await currentOrgId\(\) \}\)/);
-  assert.match(route, /orgId: await currentOrgId\(\),\s+preset:/);
+  assert.match(route, /const orgId = await currentOrgId\(\);/);
+  assert.match(route, /readDriftView\(\{\s+orgId,\s+preset:/);
+  assert.match(route, /recordDriftRun\([\s\S]*?,\s+orgId,\s+\);/);
   assert.match(legacyRoute, /analyze\(\{ orgId: await currentOrgId\(\) \}\)/);
-  assert.match(page, /readDriftView\(\{ orgId: await currentOrgId\(\) \}\)/);
+  // The page also resolves once and threads that same tenant through both current and retained data.
+  assert.equal(page.match(/await currentOrgId\(\)/g)?.length, 1);
+  assert.match(page, /const orgId = await currentOrgId\(\);/);
+  assert.match(page, /readDriftView\(\{ orgId \}\)/);
+  assert.match(page, /listDriftRuns\(10, orgId\)/);
 });
 
 test('sweep feedback reads the persisted response score shape', () => {
