@@ -75,9 +75,9 @@ test('validateUserEdit: trims names, keeps only provided fields', () => {
 });
 
 test('validateUserEdit: accepts a valid email and normalizes emailVerified/enabled', () => {
-  const r = validateUserEdit({ email: ' aarav.sharma@absli.co.in ', emailVerified: true, enabled: false });
+  const r = validateUserEdit({ email: ' aarav.sharma@suraksha.co.in ', emailVerified: true, enabled: false });
   assert.deepEqual(r, {
-    patch: { email: 'aarav.sharma@absli.co.in', emailVerified: true, enabled: false },
+    patch: { email: 'aarav.sharma@suraksha.co.in', emailVerified: true, enabled: false },
   });
 });
 

@@ -29,7 +29,7 @@ test('analytical-model store lifecycle (real Postgres)', { skip: dbUp ? false : 
   const orgId = `org-${marker}`;
   const otherOrg = `org-other-${marker}`;
 
-  // ── create v1 (a view over the ABSLI claims warehouse table) ──
+  // ── create v1 (a view over the Suraksha Life claims warehouse table) ──
   const created = await createModel(
     {
       name: `${marker}_claims_daily`,

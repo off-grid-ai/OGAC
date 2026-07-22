@@ -71,7 +71,7 @@ test('analytical-model service lifecycle (real Postgres + stub warehouse)', {
     {
       name,
       kind: 'view',
-      database: 'absli_warehouse',
+      database: 'suraksha_warehouse',
       definition: { selectSql: 'SELECT toDate(filed_at) d, count() n FROM claims GROUP BY d' },
       note: 'initial view',
     },
@@ -82,7 +82,7 @@ test('analytical-model service lifecycle (real Postgres + stub warehouse)', {
   createdId = created.ok ? created.value.id : '';
   assert.equal(wh.ran.length, 1, 'DDL applied exactly once');
   assert.deepEqual(wh.ran[0], [
-    'CREATE OR REPLACE VIEW `absli_warehouse`.`' + name + '` AS SELECT toDate(filed_at) d, count() n FROM claims GROUP BY d',
+    'CREATE OR REPLACE VIEW `suraksha_warehouse`.`' + name + '` AS SELECT toDate(filed_at) d, count() n FROM claims GROUP BY d',
   ]);
   const d1 = created.ok ? created.value : null;
   assert.equal(d1!.currentVersion, 1);
@@ -129,7 +129,7 @@ test('analytical-model service lifecycle (real Postgres + stub warehouse)', {
   const wh4 = stubWarehouse();
   const del = await deleteModelLive(createdId, orgId, wh4.port);
   assert.equal(del.ok, true);
-  assert.deepEqual(wh4.ran[0], ['DROP VIEW IF EXISTS `absli_warehouse`.`' + name + '`']);
+  assert.deepEqual(wh4.ran[0], ['DROP VIEW IF EXISTS `suraksha_warehouse`.`' + name + '`']);
   assert.equal(await getModel(createdId, orgId), null, 'store rows gone');
   createdId = '';
 });

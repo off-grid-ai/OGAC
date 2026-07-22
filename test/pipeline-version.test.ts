@@ -45,7 +45,7 @@ test('validateVersionLabel: rejects over the length cap', () => {
 // ─── diffSnapshots ────────────────────────────────────────────────────────────────────────────────
 
 const baseSnap = {
-  name: 'ABSLI Claims Triage',
+  name: 'Suraksha Life Claims Triage',
   description: 'Life-insurance claims',
   visibility: 'org',
   status: 'published',

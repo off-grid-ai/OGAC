@@ -29,20 +29,20 @@ test('version annotate + targeted rollback (real Postgres)', { skip: dbUp ? fals
 
   // v1 created with allowlist [pan-domain]; edit to v2 (widen), edit to v3 (widen more).
   const p = await createPipeline(
-    { name: `${marker} ABSLI claims`, dataAllowlist: ['pan-domain'], gatewayId: 'gw_onprem' },
-    'ops@absli.example',
+    { name: `${marker} Suraksha Life claims`, dataAllowlist: ['pan-domain'], gatewayId: 'gw_onprem' },
+    'ops@suraksha.example',
     orgId,
   );
   t.after(async () => {
     await deletePipeline(p.id, orgId).catch(() => {});
   });
 
-  await updatePipeline(p.id, { dataAllowlist: ['pan-domain', 'ifsc-domain'] }, orgId, 'ops@absli.example');
+  await updatePipeline(p.id, { dataAllowlist: ['pan-domain', 'ifsc-domain'] }, orgId, 'ops@suraksha.example');
   const afterV3 = await updatePipeline(
     p.id,
     { dataAllowlist: ['pan-domain', 'ifsc-domain', 'aadhaar-domain'] },
     orgId,
-    'ops@absli.example',
+    'ops@suraksha.example',
   );
   assert.equal(afterV3!.version, 3, 'two edits ⇒ v3 is current');
 
@@ -68,7 +68,7 @@ test('version annotate + targeted rollback (real Postgres)', { skip: dbUp ? fals
   assert.equal(await annotatePipelineVersion(p.id, 99, 'x', orgId), null);
 
   // ── targeted rollback to v1 (the operator's explicit choice) ──
-  const rb = await rollbackToVersion(p.id, 1, { orgId, by: 'ops@absli.example', detail: 'reverting ceiling widen' });
+  const rb = await rollbackToVersion(p.id, 1, { orgId, by: 'ops@suraksha.example', detail: 'reverting ceiling widen' });
   assert.equal(rb.rolledBack, true, 'rolled back to v1');
   assert.equal(rb.toVersion, 1);
   assert.equal(rb.fromVersion, 3);
