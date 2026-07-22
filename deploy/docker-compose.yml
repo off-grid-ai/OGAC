@@ -790,12 +790,18 @@ services:
   # dedicated MinIO if a connector strictly needs an isolated bucket namespace — prefer SeaweedFS.
 
   # ── DATA QUALITY (Great Expectations sidecar — mirrors the evidently/ragas sidecar pattern) ──
-  # Thin Apache-2.0 service the console's data-quality adapter calls; runs GE checkpoints against a
-  # supplied dataset (or a warehouse-clickhouse query result) and returns pass/fail + failed rules.
+  # GX Core 1.19 lifecycle service: authenticated tenant-scoped suite CRUD, governed asset
+  # inspection, real GX validations, and retained validation results. State is a named volume; the
+  # service token is supplied by the deployment environment and is never committed.
   great-expectations:
     build: ./sidecars/great-expectations
     profiles: [dataquality, all]
     ports: ['8003:8003']
+    environment:
+      GX_STATE_ROOT: /var/lib/offgrid-gx
+      OFFGRID_GX_SERVICE_TOKEN: ${OFFGRID_GX_SERVICE_TOKEN:-}
+    volumes:
+      - gxdata:/var/lib/offgrid-gx
     healthcheck:
       test: ['CMD-SHELL', 'python -c "import urllib.request;urllib.request.urlopen(\"http://127.0.0.1:8003/\")"']
       interval: 10s
@@ -895,5 +901,6 @@ volumes:
   airbytedb:
   airbyteworkspace:
   airbytedata:
+  gxdata:
   kestradb:
   kestradata:
