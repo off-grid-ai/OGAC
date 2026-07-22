@@ -1,9 +1,6 @@
+# Current supported GX Core line. 0.18.x is deliberately not used: its legacy PandasDataset API
+# would make the service depend on an implementation Great Expectations replaced in GX Core 1.x.
+great_expectations==1.19.0
+pandas==2.2.3
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
-# Optional REAL Great Expectations engine. If these are installed the sidecar uses GE's own
-# validators (engine: "great-expectations"); if NOT, it falls back to its own faithful native
-# evaluator (engine: "native") which computes the SAME real per-expectation unexpected counts for
-# the console's vocabulary. GE is heavy (pulls pandas + a lot), so it's opt-in — uncomment to run
-# the library engine on S2.
-# great-expectations==0.18.19
-# pandas==2.2.3
