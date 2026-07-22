@@ -13,6 +13,9 @@ export const IMAGE_REDACTION_LIMITS = {
   timeoutMs: 20_000,
 } as const;
 
+export const IMAGE_REDACTION_MAX_REQUEST_BYTES =
+  Math.ceil((IMAGE_REDACTION_LIMITS.maxBytes * 4) / 3) + 64 * 1024;
+
 export const IMAGE_REDACTION_MEDIA_TYPES = ['image/png', 'image/jpeg'] as const;
 export type ImageRedactionMediaType = (typeof IMAGE_REDACTION_MEDIA_TYPES)[number];
 
