@@ -10,16 +10,23 @@
 //
 // The validation + RBAC correctness lives in the PURE teams-policy.ts; this file only persists + reads.
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { teams, teamMembers } from '@/db/schema';
 import type { Team as TeamRowDb, TeamMember as TeamMemberRowDb } from '@/db/schema';
 import {
+  type ActorContext,
   type Membership,
   type TeamMemberRole,
   normalizeDepartment,
   normalizeTeamMemberRole,
 } from '@/lib/teams-policy';
+import {
+  type TeamAccessDecision,
+  type TeamEntityAction,
+  type TeamGovernedEntity,
+  canActOnTeamEntity,
+} from '@/lib/team-access';
 
 const DEFAULT_ORG = 'default';
 
@@ -58,6 +65,23 @@ export async function ensureTeamsSchema(): Promise<void> {
       sql`CREATE INDEX IF NOT EXISTS team_members_user_idx ON team_members (user_id);`,
     );
     // The pipelines.team_id column lives in pipelines.ensurePipelinesSchema (same table's owner).
+    // ── app → team governance (M2, app tier) ──────────────────────────────────────────────────────
+    // An app/agent may be GOVERNED BY a team, giving that team's members delegated access to it (the
+    // same membership+role scoping pipelines get). A JOIN table (not an apps.team_id column) keeps the
+    // binding fully in the team module's lane — no edit to the apps table's owner. UNIQUE(org,app) ⇒
+    // an app belongs to at most one team, mirroring pipelines.team_id.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS team_apps (
+        id text PRIMARY KEY,
+        team_id text NOT NULL,
+        org_id text NOT NULL DEFAULT 'default',
+        app_id text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now());
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS team_apps_team_idx ON team_apps (team_id);`);
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS team_apps_app_uidx ON team_apps (org_id, app_id);`,
+    );
   })().catch((e) => {
     ensurePromise = null;
     throw e;
@@ -221,6 +245,11 @@ export async function deleteTeam(id: string, orgId: string = DEFAULT_ORG): Promi
     await db
       .delete(teamMembers)
       .where(and(eq(teamMembers.teamId, id), eq(teamMembers.orgId, orgId)));
+    // Drop this team's app-governance bindings too (an app falls back to owner+admin access). The
+    // pipeline un-assign lives in the route (cross-table clear); team_apps is this module's own table.
+    await db.execute(
+      sql`DELETE FROM team_apps WHERE team_id = ${id} AND org_id = ${orgId};`,
+    );
   }
   return rows.length > 0;
 }
@@ -321,4 +350,82 @@ export async function listAllMemberships(orgId: string = DEFAULT_ORG): Promise<M
     userId: r.userId,
     role: normalizeTeamMemberRole(r.role),
   }));
+}
+
+// ─── app → team governance (the app tier of the TEAM/RBAC scope) ────────────────────────────────────
+// A team can GOVERN apps/agents just as it owns pipelines: binding an app to a team gives that team's
+// members delegated access to it (scored by the SAME pure rule via team-access.ts). One team per app
+// (UNIQUE(org,app)); re-binding an already-bound app MOVES it to the new team (upsert). Thin I/O only.
+
+interface TeamAppRow {
+  app_id: string;
+  team_id: string;
+}
+
+/** Bind `appId` to `teamId` (moves it if already bound elsewhere). Org-scoped. */
+export async function bindAppToTeam(
+  teamId: string,
+  appId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<void> {
+  await ensureTeamsSchema();
+  const id = `tap_${randomUUID().slice(0, 12)}`;
+  await db.execute(sql`
+    INSERT INTO team_apps (id, team_id, org_id, app_id)
+    VALUES (${id}, ${teamId}, ${orgId}, ${appId})
+    ON CONFLICT (org_id, app_id) DO UPDATE SET team_id = EXCLUDED.team_id;
+  `);
+}
+
+/** Unbind an app from whatever team governs it. Org-scoped. Returns whether a binding was removed. */
+export async function unbindApp(appId: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
+  await ensureTeamsSchema();
+  const res = await db.execute(sql`
+    DELETE FROM team_apps WHERE app_id = ${appId} AND org_id = ${orgId} RETURNING app_id;
+  `);
+  return (res.rows as unknown[]).length > 0;
+}
+
+/** The app ids governed by a team, stable order. Org-scoped. */
+export async function listTeamAppIds(
+  teamId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<string[]> {
+  await ensureTeamsSchema();
+  const res = await db.execute(sql`
+    SELECT app_id FROM team_apps WHERE team_id = ${teamId} AND org_id = ${orgId} ORDER BY app_id ASC;
+  `);
+  return (res.rows as unknown as TeamAppRow[]).map((r) => r.app_id);
+}
+
+/** The team id governing an app, or null if none. Org-scoped. */
+export async function getAppTeamId(
+  appId: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<string | null> {
+  await ensureTeamsSchema();
+  const res = await db.execute(sql`
+    SELECT team_id FROM team_apps WHERE app_id = ${appId} AND org_id = ${orgId} LIMIT 1;
+  `);
+  const row = (res.rows as unknown as TeamAppRow[])[0];
+  return row ? row.team_id : null;
+}
+
+// ─── the ONE impure access seam — resolve a team-scoped decision for ANY governed entity ────────────
+// Composes the actor's real team memberships (I/O) with the PURE canActOnTeamEntity rule. Every surface
+// that scopes a pipeline OR app by team membership calls THIS — the role arithmetic itself is never
+// re-implemented in a route/UI. Admins short-circuit without a membership read (mirrors
+// pipeline-lifecycle.resolvePipelineRole). `entity` is the {ownerId, teamId} of the pipeline/app.
+export async function resolveTeamEntityAccess(args: {
+  actor: ActorContext;
+  entity: TeamGovernedEntity;
+  action: TeamEntityAction;
+  orgId?: string;
+}): Promise<TeamAccessDecision> {
+  const orgId = args.orgId ?? DEFAULT_ORG;
+  if (args.actor.isAdmin) {
+    return canActOnTeamEntity(args.actor, args.entity, [], args.action);
+  }
+  const memberships = await listMembershipsForUser(args.actor.email, orgId);
+  return canActOnTeamEntity(args.actor, args.entity, memberships, args.action);
 }
