@@ -295,6 +295,50 @@ export function normalizeIdps(raw: KcRawIdp[]): KcIdp[] {
   return raw.map(normalizeIdp).sort((a, b) => a.alias.localeCompare(b.alias));
 }
 
+// Config keys whose values are secrets — never surfaced to the client. The detail view shows a
+// placeholder ("configured") instead of the value, and an update leaves them untouched unless a new
+// value is explicitly supplied (see mergeIdpUpdate). Single source of truth so the detail normalizer
+// and the update-merge agree on what's sensitive.
+export const IDP_SECRET_CONFIG_KEYS: readonly string[] = ['clientSecret'] as const;
+
+export function isIdpSecretConfigKey(key: string): boolean {
+  return IDP_SECRET_CONFIG_KEYS.includes(key);
+}
+
+// The full IdP view for the DETAIL page — everything normalizeIdp surfaces PLUS the complete config
+// map with secret values redacted (so the raw clientSecret never crosses the wire). `secretKeysConfigured`
+// flags which keys are configured-but-hidden, so the edit form can show "leave blank to keep" affordances.
+export interface KcIdpDetail extends KcIdp {
+  config: Record<string, string>; // secret values replaced with ''
+  secretKeysConfigured: string[]; // secret keys that currently hold a non-empty value
+}
+
+export function normalizeIdpDetail(raw: KcRawIdp): KcIdpDetail {
+  const base = normalizeIdp(raw);
+  const rawConfig = raw.config ?? {};
+  const config: Record<string, string> = {};
+  const secretKeysConfigured: string[] = [];
+  for (const [key, value] of Object.entries(rawConfig)) {
+    if (isIdpSecretConfigKey(key)) {
+      if (value) secretKeysConfigured.push(key);
+      config[key] = ''; // redact — never echo a secret back
+    } else {
+      config[key] = value;
+    }
+  }
+  return { ...base, config, secretKeysConfigured };
+}
+
+// Validate an IdP alias (shared by OIDC + SAML builders — DRY). Returns an error string or null.
+export function validateIdpAlias(alias: string | undefined): string | null {
+  const trimmed = alias?.trim();
+  if (!trimmed) return 'alias is required';
+  if (!/^[a-z0-9_-]+$/i.test(trimmed)) {
+    return 'alias may only contain letters, numbers, hyphen and underscore';
+  }
+  return null;
+}
+
 export interface CreateOidcIdpInput {
   alias: string;
   displayName?: string;
@@ -305,16 +349,14 @@ export interface CreateOidcIdpInput {
 }
 
 // Validate + build the IdP representation to POST for an OIDC provider. Keycloak's IdP create is
-// config-heavy; we support the common OIDC case (authorization-code flow) and leave SAML / advanced
-// mappers to the Keycloak admin console. Returns { error } on invalid input so the route stays thin.
+// config-heavy; we support the common OIDC case (authorization-code flow). Returns { error } on
+// invalid input so the route stays thin.
 export function buildOidcIdpRep(
   input: CreateOidcIdpInput,
 ): { rep: KcRawIdp } | { error: string } {
-  const alias = input.alias?.trim();
-  if (!alias) return { error: 'alias is required' };
-  if (!/^[a-z0-9_-]+$/i.test(alias)) {
-    return { error: 'alias may only contain letters, numbers, hyphen and underscore' };
-  }
+  const aliasError = validateIdpAlias(input.alias);
+  if (aliasError) return { error: aliasError };
+  const alias = input.alias.trim();
   if (!input.authorizationUrl?.trim()) return { error: 'authorizationUrl is required' };
   if (!input.tokenUrl?.trim()) return { error: 'tokenUrl is required' };
   if (!input.clientId?.trim()) return { error: 'clientId is required' };
@@ -337,6 +379,81 @@ export function buildOidcIdpRep(
       },
     },
   };
+}
+
+export interface CreateSamlIdpInput {
+  alias: string;
+  displayName?: string;
+  singleSignOnServiceUrl: string;
+  entityId?: string; // this SP/realm's entity id sent to the IdP (optional)
+  singleLogoutServiceUrl?: string;
+}
+
+// Validate + build the IdP representation to POST for a SAML v2 provider (POST-binding, persistent
+// NameID — the common enterprise SSO case). Keycloak's SAML config is large; we set the operationally
+// essential keys and leave signing-cert/advanced-mapper tuning to the identity provider's own console.
+// Returns { error } on invalid input.
+export function buildSamlIdpRep(
+  input: CreateSamlIdpInput,
+): { rep: KcRawIdp } | { error: string } {
+  const aliasError = validateIdpAlias(input.alias);
+  if (aliasError) return { error: aliasError };
+  const alias = input.alias.trim();
+  if (!input.singleSignOnServiceUrl?.trim()) return { error: 'singleSignOnServiceUrl is required' };
+
+  const config: Record<string, string> = {
+    singleSignOnServiceUrl: input.singleSignOnServiceUrl.trim(),
+    nameIDPolicyFormat: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+    postBindingResponse: 'true',
+    postBindingAuthnRequest: 'true',
+    postBindingLogout: 'true',
+    wantAuthnRequestsSigned: 'false',
+    syncMode: 'IMPORT',
+  };
+  if (input.entityId?.trim()) config.entityId = input.entityId.trim();
+  if (input.singleLogoutServiceUrl?.trim()) {
+    config.singleLogoutServiceUrl = input.singleLogoutServiceUrl.trim();
+  }
+
+  return {
+    rep: {
+      alias,
+      displayName: input.displayName?.trim() || alias,
+      providerId: 'saml',
+      enabled: true,
+      config,
+    },
+  };
+}
+
+export interface IdpUpdatePatch {
+  enabled?: boolean;
+  displayName?: string;
+  config?: Record<string, string>;
+}
+
+// CRITICAL: merge, don't clobber. Keycloak's PUT /identity-provider/instances/{alias} replaces the
+// WHOLE rep, so we take the current full raw rep and overwrite only the fields the operator changed.
+// Secret config keys (clientSecret) are left untouched when the patch omits them or sends an empty
+// value — so editing a display name never wipes the stored secret, and the redacted '' the detail
+// view sends back is ignored rather than persisted as an empty secret. `alias` and `providerId` are
+// immutable (Keycloak keys the instance on alias). Pure — unit-testable, zero-IO.
+export function mergeIdpUpdate(current: KcRawIdp, patch: IdpUpdatePatch): KcRawIdp {
+  const merged: KcRawIdp = { ...current };
+  if (typeof patch.enabled === 'boolean') merged.enabled = patch.enabled;
+  if (patch.displayName !== undefined && patch.displayName.trim() !== '') {
+    merged.displayName = patch.displayName.trim();
+  }
+  if (patch.config) {
+    const nextConfig: Record<string, string> = { ...(current.config ?? {}) };
+    for (const [key, value] of Object.entries(patch.config)) {
+      // A redacted/blank secret means "keep the stored one" — never overwrite with empty.
+      if (isIdpSecretConfigKey(key) && value.trim() === '') continue;
+      nextConfig[key] = value;
+    }
+    merged.config = nextConfig;
+  }
+  return merged;
 }
 
 // ── Token / session lifetimes ────────────────────────────────────────────────────

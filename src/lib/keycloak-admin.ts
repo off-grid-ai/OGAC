@@ -484,11 +484,26 @@ export class KeycloakAdminClient {
     return this.fetchJson<unknown[]>('/identity-provider/instances');
   }
 
-  // Create an IdP from a prepared representation (built + validated by buildOidcIdpRep).
+  // A single IdP instance by alias. GET /identity-provider/instances/{alias}. null on 404 so a stale
+  // deep-link renders "not found" instead of a 500.
+  async getIdentityProvider(alias: string): Promise<unknown | null> {
+    return this.fetchNullable<unknown>(`/identity-provider/instances/${encodeURIComponent(alias)}`);
+  }
+
+  // Create an IdP from a prepared representation (built + validated by buildOidcIdpRep/buildSamlIdpRep).
   // POST /identity-provider/instances.
   async createIdentityProvider(rep: unknown): Promise<void> {
     await this.fetchJson<void>('/identity-provider/instances', {
       method: 'POST',
+      body: JSON.stringify(rep),
+    });
+  }
+
+  // Overwrite an IdP instance. PUT /identity-provider/instances/{alias}. CAUTION: Keycloak replaces
+  // the whole rep — callers MUST pass a merge of the current rep (mergeIdpUpdate), never a bare patch.
+  async updateIdentityProvider(alias: string, rep: unknown): Promise<void> {
+    await this.fetchJson<void>(`/identity-provider/instances/${encodeURIComponent(alias)}`, {
+      method: 'PUT',
       body: JSON.stringify(rep),
     });
   }
