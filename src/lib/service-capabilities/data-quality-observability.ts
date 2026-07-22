@@ -482,11 +482,11 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
         'partial', 'Quality runs show scores without full Langfuse annotation management.',
         'yes', 'Fleet-proven: two production-style interactions scored live on-prem via judge=agent_system_ai_quality_judge → pl_system_ai_quality_judge → gw_seed_default_onprem-cluster (gemma-4-e4b) — grounded answer 1/1, contradicted answer 0/0 with correct reasoning, both posted to Langfuse (posted:true) with trace attribution.',
       ]),
-      capability('prompts-datasets', 'Prompt and dataset lifecycle', 'Version prompts, manage labels, create datasets, and run dataset experiments.', '/solutions/quality/evaluators', 'Open quality tooling', 'The console owns separate prompt and eval stores. No Langfuse prompt/dataset CRUD adapter reconciles the two systems.', [
+      capability('prompts-datasets', 'Prompt and dataset lifecycle', 'Version prompts, manage labels, create datasets, and run dataset experiments.', '/insights/ai/langfuse-prompts', 'Manage prompts & datasets', 'Dataset-experiment RUNS are read-only in the console (created by eval jobs, not authored here); prompt/version/label + dataset/item CRUD is fully live.', [
         'yes', 'Langfuse 3.30.0 provides prompt management, datasets, items, and experiment runs.',
-        'no', 'No Langfuse prompt or dataset adapter is registered.',
-        'no', 'No UI manages Langfuse-native prompts or datasets.',
-        'no', 'No production workflow consumes Langfuse prompt or dataset state.',
+        'yes', 'langfuse-prompts/langfuse-datasets adapters (over langfuse-http) do full CRUD on Langfuse v2 prompts (versions/labels), datasets, dataset-items, and read experiment runs — pure shaping/validation in langfuse-prompts.ts/langfuse-datasets.ts.',
+        'partial', 'Insights → AI → Prompts/Datasets are list→detail management surfaces: create prompt/version, move labels (production/latest), delete; create dataset, add/delete items, and VIEW experiment runs — but authoring/triggering a dataset-experiment run is not yet a console action.',
+        'yes', 'Fleet-proven live: a text prompt (rm-cross-sell-system v1, labels production+latest, isProduction) and a dataset (cross-sell-eval-set) were created through the console admin routes against the live Langfuse and read back in list + detail.',
       ]),
       capability('projects-api-keys-retention', 'Projects, API keys, and retention', 'Manage projects, credentials, membership, and retention settings.', '/operations/services/langfuse', 'Inspect Langfuse', 'One seeded project is evidence of deployment, not lifecycle integration. Keep identity and credentials deployment-owned or add guarded management with secret rotation.', [
         'yes', 'Langfuse includes project, organization, API-key, membership, and retention capabilities.',
