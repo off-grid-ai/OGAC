@@ -63,6 +63,7 @@
     "src/lib/victoria-metrics.ts",
     "src/lib/victoria-logs.ts",
     "src/lib/jaeger.ts",
+    "src/lib/adapters/jaeger.ts",
     "src/lib/superset.ts",
     "src/lib/superset-provision.ts",
     "src/lib/superset-data.ts",
