@@ -64,7 +64,7 @@ governed step execution, human pause/resume, failure recovery, and output persis
 | Indemnity/FNOL             | `enterprise-source-minio/object-read-write` | Y/N/P/N  | The pinned service provides S3 APIs; only source ontology is visible.                        | Implement governed bucket/key-scoped claim-document read/write with limits, provenance, and workflow proof.            |
 | Delinquency and cross-sell | `enterprise-source-corebank/sql-read`       | N/Y/Y/Y  | Bounded PostgreSQL reads, Data Sources UI, and retained lender/claims lookup evidence exist. | Pin the mutable source and repeat schema/count/read evidence.                                                          |
 | Delinquency and cross-sell | `enterprise-source-crm/rest-read`           | N/Y/Y/Y  | Bounded CRM reads, UI journeys, and retained customer/cross-sell lookup evidence exist.      | Pin the mutable source and repeat discovery/read evidence.                                                             |
-| Delinquency and cross-sell | `enterprise-source-crm/write-sync-webhooks` | N/P/P/N  | Only bounded GET behavior is implemented and partly visible.                                 | Add typed pagination, governed writes, incremental state, rate-limit handling, and verified webhook/workflow evidence. |
+| Delinquency and cross-sell | `enterprise-source-crm/write-sync-webhooks` | N/P/P/N  | Governed task/opportunity writes and nontechnical human-approval UI are code-wired; no live Console workflow proof exists. | Deploy and prove one exact bank action/replay; retain typed pagination, incremental state, rate-limit, and webhook gaps. |
 
 ## Insurance indemnity / FNOL
 
@@ -111,7 +111,8 @@ governed step execution, human pause/resume, failure recovery, and output persis
 ### Ordered implementation
 
 1. Pin Core Banking and CRM source identities.
-2. Implement bounded CRM task/action write-back so intervention becomes work, not merely advice.
+2. Deploy the code-wired bounded CRM task/action path and prove approval, one mutation, retained
+   receipt, and idempotent replay so intervention becomes verified work, not merely advice.
 3. Bind the adoptable blueprint to loan-account and repayment-history domains and its exact pipeline.
 4. Audit/stamp `app-worker`; reverify Gateway, OPA, and Temporal.
 5. Add attributed collections-playbook retrieval and complete lineage delivery evidence.
@@ -141,7 +142,7 @@ governed step execution, human pause/resume, failure recovery, and output persis
 
 1. Define the exact data domains, eligibility constraints, RM decision, write-back, and outcome
    contract.
-2. Pin Core Banking and CRM; implement CRM opportunity/task write-back.
+2. Pin Core Banking and CRM; deploy and prove the code-wired CRM opportunity/task write-back.
 3. Add the RM review step and audit/stamp `app-worker`.
 4. Reverify Gateway, OPA, and Temporal; retain Qdrant product-rule attribution.
 5. Retain lineage from holdings/product rules through recommendation, RM decision, and CRM outcome.
@@ -160,7 +161,8 @@ governed step execution, human pause/resume, failure recovery, and output persis
 
 1. **Product contracts (code complete):** apply the catalog/runtime seed and retain tenant-scoped
    adoptability evidence for indemnity, delinquency, and cross-sell.
-2. **Action seams:** S3 claim documents, claims write-back, and CRM write-back.
+2. **Action seams:** implement S3 claim documents and claims write-back; deploy and prove the
+   code-wired CRM write-back.
 3. **Runtime proof:** audit `app-worker`; pin/reverify Gateway, OPA, Temporal, and source identities.
 4. **Evidence spine:** Qdrant provider/filter attribution and Marquez delivery receipts.
 5. **Three tenant journeys:** real human decisions and system write-back, not seeded counters.

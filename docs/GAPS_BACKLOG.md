@@ -1131,6 +1131,21 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   Console deployment and integration verification. Generic webhook ingestion and broad CRM CRUD are
   explicitly outside this action seam rather than being falsely claimed as implemented.
 
+- **[G-ACTION-PLANE] CODE-WIRED / LIVE DEPLOYMENT PENDING — the App runtime now composes the bounded
+  CRM seam behind human approval.** A catalogued Action step exposes create-task, update-task, and
+  update-opportunity choices in plain language; accepts only approved internal CRM connections;
+  requires a preceding Human review step; previews the record and effect without echoing free text;
+  and carries the same impact into the review screen. Runtime execution verifies that exact approved
+  ancestor, derives idempotency from the run and step, blocks all side effects in shadow mode, reuses
+  the tenant-scoped CRM adapters, and persists approval evidence plus the signed provider receipt.
+  Source and integration evidence at `dac5034d`, `9ef9b99e`, `5061e43b`, and `a1f29e87` covers invalid
+  graphs, missing/incorrect approval, shadow interception, execute/replay, persistence, worker resume,
+  and nontechnical builder/review rendering. Closure still requires one exact-SHA deployment and a
+  retained bank journey proving pending review → authorized approval → one live CRM mutation → replay
+  without duplication, plus wide/narrow visual evidence. The action catalogue currently contains
+  only the three CRM mutations; pagination, incremental sync, webhooks, generic CRM CRUD, and other
+  enterprise action families remain future audited slices.
+
 ## Insurance claim disposition source ownership (2026-07-20)
 
 - **[G-CLAIM-SOURCE] RESOLVED IN CODE — do not write claims through the Advisor/HR MySQL fixture.**

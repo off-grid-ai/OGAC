@@ -56,6 +56,26 @@ canonical agent-run id. Marquez distinguishes `accepted`, `rejected`, `unreachab
 No Qdrant or Marquez A/I/UI/W gate changes at this checkpoint: focused tests and typecheck prove
 the code contract, not the selected live deployment or a completed BFSI workflow.
 
+### Governed Action Plane code-wired delta
+
+The first bounded Action Plane slice is wired in source without promoting live proof. App authors can
+select one of three catalogued CRM mutations, bind an approved internal CRM connection and a prior
+Human review step, complete purpose-specific fields, and see a plain-language impact preview. The
+runtime requires the exact approved human ancestor, derives the replay key from the run and step,
+intercepts all mutations in shadow mode, delegates live execution to the existing tenant-scoped CRM
+task/opportunity adapters, and retains the reviewer decision, impact, changed resource, and signed
+provider receipt on the run.
+
+| Evidence slice                    | Source state | Retained source proof                    | Still required before live verification                                                                                   |
+| --------------------------------- | ------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Action catalogue and builder      | code-wired   | `dac5034d`, `86fa9c38`, `40258303`       | Render and inspect the exact deployed builder at wide and narrow viewports with a real tenant connector.                  |
+| Approval, shadow, and CRM runtime | code-wired   | `9ef9b99e`, `5061e43b`, `a1f29e87`       | Deploy one immutable SHA; prove pending review → approval → one CRM mutation → replay without duplication, plus shadow.   |
+
+`enterprise-source-crm/write-sync-webhooks` remains `N/P/P/N`: the stale source identity still
+normalizes Available to `no`, writes are only one narrow part of the audited denominator, and no
+live Console workflow proof exists yet. Pagination, incremental sync, rate-limit handling, webhook
+ingestion, and broad CRM CRUD remain explicitly outside this slice.
+
 ### LLM Guard 0.3.16 audit delta
 
 `llm-guard` now has a seven-item, version-matched denominator pinned to upstream tag
