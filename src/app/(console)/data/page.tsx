@@ -146,7 +146,7 @@ export default async function DataPage() {
                         {c.lastSync ? c.lastSync.slice(0, 10) : 'never'}
                       </TableCell>
                       <TableCell>
-                        <ConnectorActions id={c.id} name={c.name} />
+                        <ConnectorActions id={c.id} name={c.name} type={c.type} />
                       </TableCell>
                     </TableRow>
                   ))}

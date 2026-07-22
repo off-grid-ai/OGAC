@@ -5,7 +5,9 @@ import {
   Plugs,
   ArrowsClockwise as RefreshCw,
   Trash as Trash2,
+  SlidersHorizontal,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -17,9 +19,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export function ConnectorActions({ id, name }: Readonly<{ id: string; name: string }>) {
+export function ConnectorActions({
+  id,
+  name,
+  type,
+}: Readonly<{ id: string; name: string; type?: string }>) {
   const router = useRouter();
   const [testing, setTesting] = useState(false);
+
+  if (type?.toLowerCase() === 'kafka') {
+    return (
+      <Button asChild variant="outline" size="sm">
+        <Link href={`/data/connectors/${encodeURIComponent(id)}`}>
+          <SlidersHorizontal className="size-4" /> Manage source
+        </Link>
+      </Button>
+    );
+  }
 
   async function test() {
     if (testing) return;
@@ -27,7 +43,10 @@ export function ConnectorActions({ id, name }: Readonly<{ id: string; name: stri
     const toastId = toast.loading(`Testing ${name}…`);
     try {
       const res = await fetch(`/api/v1/admin/connectors/${id}/test`, { method: 'POST' });
-      const body = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+      const body = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        message?: string;
+      } | null;
       if (res.ok && body?.ok) {
         toast.success(body.message ?? 'Connected', { id: toastId });
       } else {

@@ -89,32 +89,53 @@ test('connectorCatalogByCategory groups in canonical order, drops empties, loses
   assert.deepEqual(flat, all, 'grouping lost or duplicated a type');
 });
 
-test('HONESTY: liveQuery flag agrees with connector-exec detectDialect for a representative endpoint', () => {
+test('HONESTY: every liveQuery claim names a real dialect or dedicated governed adapter', () => {
   // For each type, build a representative endpoint from its hint and check the catalog's liveQuery
   // flag matches whether detectDialect resolves a live dialect. This ties the catalog to the REAL
   // exec layer, so a type can never claim to live-query when the backend can't.
   for (const t of CONNECTOR_TYPES) {
     const dialect = detectDialect(t.connectorType, t.endpointHint);
-    const canLiveQuery = dialect !== null;
+    const canLiveQuery = dialect !== null || t.queryAdapter === 'governed-kafka-source';
     assert.equal(
       t.liveQuery,
       canLiveQuery,
-      `${t.id}: liveQuery=${t.liveQuery} but detectDialect(${t.connectorType}, hint)=${dialect}`,
+      `${t.id}: liveQuery=${t.liveQuery}, dialect=${dialect}, adapter=${t.queryAdapter ?? 'none'}`,
     );
   }
 });
 
-test('HONESTY: exactly the DB + REST types are live-queryable; warehouse/streaming/NoSQL/object are metadata-only', () => {
-  const live = liveQueryableTypes().map((t) => t.id).sort();
+test('HONESTY: only sources with a canonical runtime path are live-queryable', () => {
+  const live = liveQueryableTypes()
+    .map((t) => t.id)
+    .sort();
   assert.deepEqual(
     live,
-    ['gsheets', 'mysql', 'mssql', 'postgres', 'rest', 'salesforce'].sort(),
-    'live-queryable set must be exactly the postgres/mysql/mssql + rest-backed types',
+    ['gsheets', 'kafka', 'mysql', 'mssql', 'postgres', 'rest', 'salesforce'].sort(),
+    'live-queryable set must be exactly the SQL/REST dialects plus governed Kafka',
   );
   // Explicitly metadata-only.
-  for (const id of ['snowflake', 'bigquery', 'databricks', 's3', 'minio', 'kafka', 'mongodb', 'redis', 'elasticsearch', 'oracle', 'sqlite']) {
+  for (const id of [
+    'snowflake',
+    'bigquery',
+    'databricks',
+    's3',
+    'minio',
+    'mongodb',
+    'redis',
+    'elasticsearch',
+    'oracle',
+    'sqlite',
+  ]) {
     assert.equal(getConnectorType(id)!.liveQuery, false, `${id} must be metadata-only`);
   }
+  assert.equal(getConnectorType('kafka')!.queryAdapter, 'governed-kafka-source');
+});
+
+test('Kafka cannot silently fall back to the generic connector-exec dialect path', () => {
+  const kafka = getConnectorType('kafka')!;
+  assert.equal(detectDialect(kafka.connectorType, kafka.endpointHint), null);
+  assert.equal(kafka.liveQuery, true);
+  assert.equal(kafka.queryAdapter, 'governed-kafka-source');
 });
 
 test('filterConnectorCatalog: empty query + null category returns the full set', () => {
@@ -123,10 +144,16 @@ test('filterConnectorCatalog: empty query + null category returns the full set',
 });
 
 test('filterConnectorCatalog: text query matches name / type / description', () => {
-  assert.ok(filterConnectorCatalog(CONNECTOR_TYPES, 'postgres', null).some((t) => t.id === 'postgres'));
-  assert.ok(filterConnectorCatalog(CONNECTOR_TYPES, 'warehouse', null).some((t) => t.id === 'snowflake'));
+  assert.ok(
+    filterConnectorCatalog(CONNECTOR_TYPES, 'postgres', null).some((t) => t.id === 'postgres'),
+  );
+  assert.ok(
+    filterConnectorCatalog(CONNECTOR_TYPES, 'warehouse', null).some((t) => t.id === 'snowflake'),
+  );
   // 'kafka' in description of the kafka entry.
-  assert.ok(filterConnectorCatalog(CONNECTOR_TYPES, 'redpanda', null).some((t) => t.id === 'kafka'));
+  assert.ok(
+    filterConnectorCatalog(CONNECTOR_TYPES, 'redpanda', null).some((t) => t.id === 'kafka'),
+  );
   assert.equal(filterConnectorCatalog(CONNECTOR_TYPES, 'zzznotathing', null).length, 0);
 });
 
@@ -151,8 +178,16 @@ test('isBlankEndpoint detects empty / whitespace / missing', () => {
 
 test('isAddable requires a name AND a real operator-supplied endpoint', () => {
   const pg = getConnectorType('postgres')!;
-  assert.equal(isAddable(pg, { name: '', endpoint: 'postgres://x' }), false, 'no name → not addable');
-  assert.equal(isAddable(pg, { name: 'Core bank', endpoint: '' }), false, 'no endpoint → not addable');
+  assert.equal(
+    isAddable(pg, { name: '', endpoint: 'postgres://x' }),
+    false,
+    'no name → not addable',
+  );
+  assert.equal(
+    isAddable(pg, { name: 'Core bank', endpoint: '' }),
+    false,
+    'no endpoint → not addable',
+  );
   assert.equal(isAddable(pg, { name: 'Core bank', endpoint: '   ' }), false, 'blank endpoint');
   assert.equal(isAddable(pg, { name: 'Core bank', endpoint: 'postgres://host/db' }), true);
   assert.equal(isAddable(null, { name: 'x', endpoint: 'y' }), false, 'no type → not addable');

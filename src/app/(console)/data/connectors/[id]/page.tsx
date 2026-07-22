@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, Database, FolderOpen } from '@phosphor-icons/rea
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
+import { KafkaSourceManager } from '@/components/integrations/KafkaSourceManager';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -101,7 +102,9 @@ export default async function ConnectorDetailPage({
                     <FolderOpen className="size-4" /> Browse objects
                   </Link>
                 ) : null}
-                <ConnectorActions id={c.id} name={c.name} />
+                {c.type.toLowerCase() === 'kafka' ? null : (
+                  <ConnectorActions id={c.id} name={c.name} type={c.type} />
+                )}
               </div>
             </div>
           </div>
@@ -185,6 +188,8 @@ export default async function ConnectorDetailPage({
               </CardContent>
             </Card>
           </div>
+
+          {c.type.toLowerCase() === 'kafka' ? <KafkaSourceManager connectorId={c.id} /> : null}
 
           <Card className="shadow-sm">
             <CardHeader>

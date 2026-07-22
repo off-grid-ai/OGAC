@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { KafkaSourceForm } from '@/components/integrations/KafkaSourceForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,7 +91,7 @@ export function ConnectorCatalog() {
 
   const setOpen = useCallback(
     (id: string | null) => {
-      router.replace(
+      router.push(
         withParams((sp) => {
           if (id) sp.set('add', id);
           else sp.delete('add');
@@ -117,10 +118,8 @@ export function ConnectorCatalog() {
       <div>
         <h2 className="text-sm font-semibold text-foreground">Add a data source</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Pick a source type from the curated catalog and add it in one step — no hand-configuring.
-          Databases and REST APIs are <b>live-queryable</b> (they read rows for sync and can be bound
-          into a data domain); warehouses, object stores, streaming and NoSQL sources are catalogued
-          as <b>metadata-only</b> today.
+          Pick a source type and follow its governed setup. Live-query sources can be used by apps;
+          metadata-only entries are retained in the directory but cannot be read yet.
         </p>
       </div>
 
@@ -218,7 +217,17 @@ export function ConnectorCatalog() {
         </div>
       )}
 
-      {openType ? (
+      {openType?.id === 'kafka' ? (
+        <KafkaSourceForm
+          open={true}
+          onClose={() => setOpen(null)}
+          onSaved={(source) => {
+            setOpen(null);
+            router.push(`/data/connectors/${encodeURIComponent(source.connectorId)}`);
+            router.refresh();
+          }}
+        />
+      ) : openType ? (
         <AddFromCatalogSheet
           type={openType}
           open={true}
@@ -234,7 +243,10 @@ export function ConnectorCatalog() {
 }
 
 // ─── AddFromCatalogSheet — prefilled create form for one catalog entry ────────────────────────────
-// Prefills the connector name + endpoint hint from the catalog entry, collects the entry's fields
+// Prefills the connector name + endpoint hint for generic connector types. Kafka uses the dedicated
+// governed source form above because its Connector, DataDomain, schema and vault binding are one
+// lifecycle and must never pass through the generic connector-create route. This component collects
+// the entry's fields
 // (secret fields masked), and on submit builds the EXACT create body via the pure buildAddPayload and
 // POSTs it to the EXISTING route. Secret-field values stay client-side (they belong in a secret
 // store); only the endpoint (which for DBs carries the DSN the exec layer needs) is persisted.
@@ -336,7 +348,11 @@ function AddFromCatalogSheet({
           ) : null}
         </SheetBody>
         <SheetFooter>
-          <Button onClick={add} disabled={busy || !name.trim() || !endpoint.trim()} className="w-full">
+          <Button
+            onClick={add}
+            disabled={busy || !name.trim() || !endpoint.trim()}
+            className="w-full"
+          >
             {busy ? 'Adding…' : `Add ${type.name}`}
           </Button>
         </SheetFooter>

@@ -25,12 +25,7 @@
 
 // ─── Category — the group a connector sorts under in the browse UI ────────────────────────────────
 export type ConnectorCategory =
-  | 'Relational DB'
-  | 'Warehouse'
-  | 'Object store'
-  | 'Streaming'
-  | 'SaaS/REST'
-  | 'NoSQL';
+  'Relational DB' | 'Warehouse' | 'Object store' | 'Streaming' | 'SaaS/REST' | 'NoSQL';
 
 export const CONNECTOR_CATEGORIES: ConnectorCategory[] = [
   'Relational DB',
@@ -86,6 +81,8 @@ export interface ConnectorType {
    * design: the UI must not imply a metadata-only source will stream rows.
    */
   liveQuery: boolean;
+  /** Dedicated governed adapter when this source does not use the SQL/REST dialect resolver. */
+  queryAdapter?: 'governed-kafka-source';
 }
 
 // The endpoint field every type needs — a small helper so each entry stays readable.
@@ -239,21 +236,22 @@ export const CONNECTOR_TYPES: ConnectorType[] = [
     liveQuery: false,
   },
 
-  // ── Streaming (metadata-only today) ───────────────────────────────────────────────────────────────
+  // ── Streaming ─────────────────────────────────────────────────────────────────────────────────────
   {
     id: 'kafka',
     name: 'Apache Kafka',
     category: 'Streaming',
     connectorType: 'kafka',
     description:
-      'Register an Apache Kafka (or Redpanda) event stream — upstream events and change feeds. Catalogued as a data source; stream consumption is not wired through the console yet.',
+      'Connect one approved Kafka or Redpanda topic and exact schema for governed apps to read.',
     authKind: 'none',
     endpointHint: 'kafka://broker.internal:9092',
     fields: [
-      endpointField('Bootstrap broker(s)', 'kafka://broker.internal:9092'),
-      { key: 'topic', label: 'Topic', required: false, placeholder: 'events' },
+      endpointField('Bootstrap endpoint', 'broker.internal:9093'),
+      { key: 'topic', label: 'Topic', required: true, placeholder: 'enterprise.events' },
     ],
-    liveQuery: false,
+    liveQuery: true,
+    queryAdapter: 'governed-kafka-source',
   },
 
   // ── SaaS / REST (rest/http IS live-queryable via detectDialect) ───────────────────────────────────

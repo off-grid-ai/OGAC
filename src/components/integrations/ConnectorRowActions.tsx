@@ -1,6 +1,13 @@
 'use client';
 
-import { ArrowsClockwise, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react/dist/ssr';
+import {
+  ArrowsClockwise,
+  DotsThree,
+  PencilSimple,
+  SlidersHorizontal,
+  Trash,
+} from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -50,8 +57,7 @@ export function ConnectorRowActions({ connector }: Readonly<{ connector: Connect
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // This row's edit panel is open only when the URL targets this connector's id.
-  const editOpen =
-    params.get('panel') === 'edit-connector' && params.get('id') === connector.id;
+  const editOpen = params.get('panel') === 'edit-connector' && params.get('id') === connector.id;
 
   // edit form state
   const [name, setName] = useState(connector.name);
@@ -141,6 +147,16 @@ export function ConnectorRowActions({ connector }: Readonly<{ connector: Connect
     }
   }
 
+  if (connector.type.toLowerCase() === 'kafka') {
+    return (
+      <Button asChild variant="outline" size="sm">
+        <Link href={`/data/connectors/${encodeURIComponent(connector.id)}`}>
+          <SlidersHorizontal className="size-4" /> Manage
+        </Link>
+      </Button>
+    );
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -185,74 +201,74 @@ export function ConnectorRowActions({ connector }: Readonly<{ connector: Connect
           </Button>
         }
       >
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-name">Name</Label>
-              <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-auth">Auth</Label>
-              <select
-                id="edit-auth"
-                value={auth}
-                onChange={(e) => setAuth(e.target.value)}
-                className={SELECT}
-              >
-                <option value="none">None</option>
-                <option value="api-key">API key</option>
-                <option value="oauth">OAuth</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-endpoint">Endpoint</Label>
-              <Input
-                id="edit-endpoint"
-                placeholder="https://…"
-                value={endpoint}
-                onChange={(e) => setEndpoint(e.target.value)}
-              />
-            </div>
-            {connector.type === 's3' ? (
-              <div className="space-y-3 rounded-md border border-border p-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Rotate access keys</p>
-                  <p className="text-xs text-muted-foreground">
-                    Leave both fields blank to keep the keys already stored in the vault.
-                  </p>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-name">Name</Label>
+            <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-auth">Auth</Label>
+            <select
+              id="edit-auth"
+              value={auth}
+              onChange={(e) => setAuth(e.target.value)}
+              className={SELECT}
+            >
+              <option value="none">None</option>
+              <option value="api-key">API key</option>
+              <option value="oauth">OAuth</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-endpoint">Endpoint</Label>
+            <Input
+              id="edit-endpoint"
+              placeholder="https://…"
+              value={endpoint}
+              onChange={(e) => setEndpoint(e.target.value)}
+            />
+          </div>
+          {connector.type === 's3' ? (
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Rotate access keys</p>
+                <p className="text-xs text-muted-foreground">
+                  Leave both fields blank to keep the keys already stored in the vault.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-s3-access">Access key ID</Label>
+                  <Input
+                    id="edit-s3-access"
+                    value={accessKey}
+                    autoComplete="off"
+                    onChange={(e) => setAccessKey(e.target.value)}
+                  />
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="edit-s3-access">Access key ID</Label>
-                    <Input
-                      id="edit-s3-access"
-                      value={accessKey}
-                      autoComplete="off"
-                      onChange={(e) => setAccessKey(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="edit-s3-secret">Secret access key</Label>
-                    <Input
-                      id="edit-s3-secret"
-                      type="password"
-                      value={secretKey}
-                      autoComplete="new-password"
-                      onChange={(e) => setSecretKey(e.target.value)}
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-s3-secret">Secret access key</Label>
+                  <Input
+                    id="edit-s3-secret"
+                    type="password"
+                    value={secretKey}
+                    autoComplete="new-password"
+                    onChange={(e) => setSecretKey(e.target.value)}
+                  />
                 </div>
               </div>
-            ) : null}
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-desc">Description (when to use)</Label>
-              <Textarea
-                id="edit-desc"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
             </div>
+          ) : null}
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-desc">Description (when to use)</Label>
+            <Textarea
+              id="edit-desc"
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
           </div>
+        </div>
       </FormSheet>
 
       {/* Delete confirm — stays a confirmation modal per the NO-MODALS delete carve-out */}
