@@ -5,8 +5,10 @@ import {
   BrainAuthorizationError,
   BrainPolicyError,
   brainDocumentSetName,
+  requireBrainCapability,
   requireBrainIngestionConnection,
   resolveBrainAuthorization,
+  resolveBrainSourceBinding,
   selectAuthorizedBrainDocumentSet,
   type BrainAuthorizationContext,
 } from '../src/lib/organizational-brain/contracts.ts';
@@ -16,12 +18,22 @@ const policy = [
     tenantId: 'bank-one',
     roles: ['relationship-manager'],
     documentSetSlugs: ['customer-360', 'policies'],
+    capabilities: ['retrieve', 'ingest', 'manageSources'],
     ingestionConnectionId: 42,
+    sourceBindings: [
+      {
+        id: 'salesforce-main',
+        sourceType: 'salesforce',
+        providerCredentialId: 7,
+        allowedProviderConfigKeys: ['objects', 'batch_size'],
+      },
+    ],
   },
   {
     tenantId: 'bank-one',
     subjectIds: ['auditor@bank.example'],
     documentSetSlugs: ['audit-evidence'],
+    capabilities: ['retrieve'],
   },
 ] as const;
 
@@ -55,7 +67,7 @@ test('authorization fails closed for absent, empty, foreign-tenant, and invalid 
     () =>
       resolveBrainAuthorization(
         { tenantId: 'bank-one', subjectId: 'rm@bank.example', role: 'relationship-manager' },
-        [{ tenantId: 'bank-one', roles: ['relationship-manager'], documentSetSlugs: [] }],
+        [{ tenantId: 'bank-one', roles: ['relationship-manager'], documentSetSlugs: [], capabilities: ['retrieve'] }],
       ),
     BrainPolicyError,
   );
@@ -84,6 +96,8 @@ test('ingestion and document-set selection require their independently authorize
   assert.throws(() => requireBrainIngestionConnection(auditor), BrainAuthorizationError);
   assert.throws(() => selectAuthorizedBrainDocumentSet(auditor, 'policies'), BrainAuthorizationError);
   assert.equal(selectAuthorizedBrainDocumentSet(auditor, 'audit-evidence'), 'ogac:bank-one:audit-evidence');
+  assert.doesNotThrow(() => requireBrainCapability(auditor, 'retrieve'));
+  assert.throws(() => requireBrainCapability(auditor, 'manageSources'), BrainAuthorizationError);
 });
 
 test('conflicting server policy is rejected instead of choosing an ingestion target', () => {
@@ -97,10 +111,41 @@ test('conflicting server policy is rejected instead of choosing an ingestion tar
             tenantId: 'bank-one',
             roles: ['relationship-manager'],
             documentSetSlugs: ['policies'],
+            capabilities: ['ingest'],
             ingestionConnectionId: 99,
           },
         ],
       ),
     BrainPolicyError,
   );
+});
+
+test('source-management bindings are server-resolved, secret-free, and source-specific', () => {
+  const manager = resolveBrainAuthorization(
+    { tenantId: 'bank-one', subjectId: 'rm@bank.example', role: 'relationship-manager' },
+    policy,
+  );
+
+  assert.deepEqual(resolveBrainSourceBinding(manager, 'salesforce-main', { objects: ['Account'] }), {
+    id: 'salesforce-main',
+    sourceType: 'salesforce',
+    providerCredentialId: 7,
+    providerConfig: { objects: ['Account'] },
+  });
+  assert.throws(
+    () => resolveBrainSourceBinding(manager, 'salesforce-main', { api_token: 'do-not-accept' }),
+    BrainAuthorizationError,
+  );
+  assert.throws(
+    () => resolveBrainSourceBinding(manager, 'salesforce-main', { unknown: true }),
+    BrainAuthorizationError,
+  );
+});
+
+test('retrieval-only grants cannot manage sources even with a known binding id', () => {
+  const auditor = resolveBrainAuthorization(
+    { tenantId: 'bank-one', subjectId: 'auditor@bank.example', role: 'auditor' },
+    policy,
+  );
+  assert.throws(() => resolveBrainSourceBinding(auditor, 'salesforce-main', {}), BrainAuthorizationError);
 });

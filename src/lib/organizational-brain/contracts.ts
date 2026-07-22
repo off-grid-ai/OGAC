@@ -4,12 +4,23 @@ export type BrainActor = Readonly<{
   role?: string;
 }>;
 
+export type BrainOperationCapability = 'retrieve' | 'ingest' | 'manageSources';
+
+export type BrainSourceBindingPolicy = Readonly<{
+  id: string;
+  sourceType: string;
+  providerCredentialId: number;
+  allowedProviderConfigKeys: readonly string[];
+}>;
+
 export type BrainAccessPolicyEntry = Readonly<{
   tenantId: string;
   subjectIds?: readonly string[];
   roles?: readonly string[];
   documentSetSlugs: readonly string[];
+  capabilities: readonly BrainOperationCapability[];
   ingestionConnectionId?: number;
+  sourceBindings?: readonly BrainSourceBindingPolicy[];
 }>;
 
 const issuedAuthorizations = new WeakSet<object>();
@@ -20,8 +31,19 @@ export type BrainAuthorizationContext = Readonly<{
   subjectId: string;
   role?: string;
   documentSetNames: readonly string[];
+  capabilities: readonly BrainOperationCapability[];
   ingestionConnectionId?: number;
+  sourceBindings: readonly BrainSourceBindingPolicy[];
   [brainAuthorizationBrand]: true;
+}>;
+
+declare const brainSourceBindingBrand: unique symbol;
+export type ResolvedBrainSourceBinding = Readonly<{
+  id: string;
+  sourceType: string;
+  providerCredentialId: number;
+  providerConfig: Readonly<Record<string, unknown>>;
+  [brainSourceBindingBrand]: true;
 }>;
 
 export class BrainAuthorizationError extends Error {
@@ -44,6 +66,9 @@ export class BrainPolicyError extends Error {
 
 const TENANT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const DOCUMENT_SET_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+const BINDING_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+const SECRET_KEY_PATTERN = /(?:password|passwd|secret|token|api[_-]?key|private[_-]?key|credential|bearer)/i;
+const VALID_CAPABILITIES = new Set<BrainOperationCapability>(['retrieve', 'ingest', 'manageSources']);
 
 function normalized(value: string | undefined): string {
   return value?.trim() ?? '';
@@ -82,12 +107,27 @@ function validatePolicyEntry(entry: BrainAccessPolicyEntry): void {
   if (!entry.documentSetSlugs.length) {
     throw new BrainPolicyError('policy entry must authorize at least one document set');
   }
+  if (!entry.capabilities.length || entry.capabilities.some((capability) => !VALID_CAPABILITIES.has(capability))) {
+    throw new BrainPolicyError('policy entry must contain recognized organizational-brain capabilities');
+  }
   for (const slug of entry.documentSetSlugs) brainDocumentSetName(entry.tenantId, slug);
   if (
     entry.ingestionConnectionId !== undefined &&
     (!Number.isSafeInteger(entry.ingestionConnectionId) || entry.ingestionConnectionId <= 0)
   ) {
     throw new BrainPolicyError('ingestion connection id must be a positive integer');
+  }
+  for (const binding of entry.sourceBindings ?? []) {
+    if (
+      !BINDING_ID_PATTERN.test(binding.id) ||
+      !binding.sourceType.trim() ||
+      !Number.isSafeInteger(binding.providerCredentialId) ||
+      binding.providerCredentialId <= 0 ||
+      !binding.allowedProviderConfigKeys.length ||
+      binding.allowedProviderConfigKeys.some((key) => !key.trim() || SECRET_KEY_PATTERN.test(key))
+    ) {
+      throw new BrainPolicyError('source binding is invalid or permits a secret-bearing configuration key');
+    }
   }
 }
 
@@ -127,12 +167,22 @@ export function resolveBrainAuthorization(
     throw new BrainPolicyError('matching policy entries disagree on the ingestion connection');
   }
 
+  const capabilities = [...new Set(matches.flatMap((entry) => entry.capabilities))].sort() as BrainOperationCapability[];
+  const sourceBindings = matches.flatMap((entry) => entry.sourceBindings ?? []);
+  const bindingIds = new Set<string>();
+  for (const binding of sourceBindings) {
+    if (bindingIds.has(binding.id)) throw new BrainPolicyError('matching policy entries contain duplicate source binding ids');
+    bindingIds.add(binding.id);
+  }
+
   const grant = Object.freeze({
     tenantId,
     subjectId,
     role,
     documentSetNames: Object.freeze(documentSetNames),
+    capabilities: Object.freeze(capabilities),
     ingestionConnectionId: ingestionConnectionIds[0],
+    sourceBindings: Object.freeze(sourceBindings.map((binding) => Object.freeze({ ...binding }))),
   }) as BrainAuthorizationContext;
   issuedAuthorizations.add(grant);
   return grant;
@@ -146,14 +196,26 @@ export function assertBrainAuthorization(context: BrainAuthorizationContext): vo
   if (
     !context.documentSetNames.length ||
     new Set(context.documentSetNames).size !== context.documentSetNames.length ||
-    context.documentSetNames.some((name) => !name.startsWith(prefix))
+    context.documentSetNames.some((name) => !name.startsWith(prefix)) ||
+    !context.capabilities.length ||
+    context.capabilities.some((capability) => !VALID_CAPABILITIES.has(capability))
   ) {
     throw new BrainAuthorizationError('organizational-brain scope is empty or has escaped its tenant namespace');
   }
 }
 
-export function requireBrainIngestionConnection(context: BrainAuthorizationContext): number {
+export function requireBrainCapability(
+  context: BrainAuthorizationContext,
+  capability: BrainOperationCapability,
+): void {
   assertBrainAuthorization(context);
+  if (!context.capabilities.includes(capability)) {
+    throw new BrainAuthorizationError(`organizational-brain ${capability} operation is not authorized`);
+  }
+}
+
+export function requireBrainIngestionConnection(context: BrainAuthorizationContext): number {
+  requireBrainCapability(context, 'ingest');
   if (!context.ingestionConnectionId) {
     throw new BrainAuthorizationError('organizational-brain ingestion is not authorized for this principal');
   }
@@ -170,6 +232,41 @@ export function selectAuthorizedBrainDocumentSet(
     throw new BrainAuthorizationError('selected document set is not authorized');
   }
   return selected;
+}
+
+function assertProviderConfigHasNoSecrets(value: unknown, path = 'providerConfig'): void {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertProviderConfigHasNoSecrets(item, `${path}[${index}]`));
+    return;
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    if (SECRET_KEY_PATTERN.test(key)) {
+      throw new BrainAuthorizationError(`${path}.${key} is secret-bearing and cannot cross the source-management API`);
+    }
+    assertProviderConfigHasNoSecrets(nested, `${path}.${key}`);
+  }
+}
+
+export function resolveBrainSourceBinding(
+  context: BrainAuthorizationContext,
+  bindingId: string,
+  providerConfig: Readonly<Record<string, unknown>>,
+): ResolvedBrainSourceBinding {
+  requireBrainCapability(context, 'manageSources');
+  const binding = context.sourceBindings.find((candidate) => candidate.id === bindingId);
+  if (!binding) throw new BrainAuthorizationError('source connection binding is not authorized');
+  assertProviderConfigHasNoSecrets(providerConfig);
+  const allowedKeys = new Set(binding.allowedProviderConfigKeys);
+  if (Object.keys(providerConfig).some((key) => !allowedKeys.has(key))) {
+    throw new BrainAuthorizationError('source configuration contains a field not approved for this source binding');
+  }
+  return Object.freeze({
+    id: binding.id,
+    sourceType: binding.sourceType,
+    providerCredentialId: binding.providerCredentialId,
+    providerConfig: Object.freeze({ ...providerConfig }),
+  }) as ResolvedBrainSourceBinding;
 }
 
 export type BrainDocument = Readonly<{
@@ -191,7 +288,8 @@ export type BrainCitation = Readonly<{
   title: string;
   excerpt: string;
   sourceType: string;
-  sourceUri?: string;
+  providerLink?: string;
+  provenanceUri?: string;
   version?: string;
   checksum?: string;
   updatedAt?: string;
@@ -207,7 +305,6 @@ export type BrainSourceState = 'scheduled' | 'indexing' | 'active' | 'paused' | 
 export type BrainSource = Readonly<{
   id: string;
   connectionId: string;
-  credentialReference: string;
   name: string;
   sourceType: string;
   state: BrainSourceState;
@@ -217,14 +314,14 @@ export type BrainSource = Readonly<{
   lastSuccessfulSyncAt?: string;
   lastPrunedAt?: string;
   repeatedError: boolean;
+  connectionConfigured: boolean;
 }>;
 
 export type CreateBrainSourceInput = Readonly<{
   name: string;
-  sourceType: string;
   inputType: 'load_state' | 'poll' | 'event';
   providerConfig: Readonly<Record<string, unknown>>;
-  credentialReference: string;
+  connectionBindingId: string;
   documentSetSlug: string;
   refreshSeconds?: number;
   pruneSeconds?: number;
@@ -235,7 +332,17 @@ export interface OrganizationalBrainPort {
     context: BrainAuthorizationContext,
     input: Readonly<{ query: string; limit?: number }>,
   ): Promise<BrainSearchResult>;
-  upsertDocument(context: BrainAuthorizationContext, document: BrainDocument): Promise<Readonly<{ id: string; created: boolean }>>;
+  upsertDocument(
+    context: BrainAuthorizationContext,
+    document: BrainDocument,
+  ): Promise<
+    Readonly<{
+      id: string;
+      created: boolean;
+      provenanceUri: string;
+      originalSourceUri?: string;
+    }>
+  >;
   deleteDocument(context: BrainAuthorizationContext, documentId: string): Promise<void>;
   listSources(context: BrainAuthorizationContext): Promise<readonly BrainSource[]>;
   createSource(context: BrainAuthorizationContext, input: CreateBrainSourceInput): Promise<BrainSource>;
