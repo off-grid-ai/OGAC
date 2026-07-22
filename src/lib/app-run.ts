@@ -26,7 +26,14 @@
 //   runApp(spec, input, ctx)                    → AppRunOutcome (run the whole spec inline)
 
 import { randomUUID } from 'node:crypto';
-import type { AppSpec, AppStep } from '@/lib/app-model';
+import type { AppSpec, AppStep, ActionStep } from '@/lib/app-model';
+import {
+  hasApprovedMakerChecker,
+  planActionImpact,
+  type ActionImpact,
+  type ActionReceipt,
+} from '@/lib/action-contract';
+import type { ActionExecutionContext, ActionExecutionResult } from '@/lib/adapters/action-crm';
 import {
   type RunMode,
   buildWouldPerform,
@@ -103,6 +110,10 @@ export interface StepResult {
    * screen can render the dry-run action clearly. Absent on every executed (live) step.
    */
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
+  /** Governed mutation preview/impact, present for every action result. */
+  actionImpact?: ActionImpact;
+  /** Signed execution evidence. Present only after a real live mutation/replay. */
+  actionReceipt?: ActionReceipt;
 }
 
 export interface AppRunOutcome {
@@ -158,6 +169,12 @@ export interface AppRunDeps {
   listDomains: (orgId: string) => Promise<DomainLike[]>;
   /** Fetch a connector by id, org-scoped. Null if absent. */
   getConnector: (connectorId: string, orgId: string) => Promise<ConnectorLike | null>;
+  /** Typed mutation boundary. Production reuses the existing CRM task/opportunity adapters. */
+  executeAction?: (
+    connector: ConnectorLike,
+    step: ActionStep,
+    context: ActionExecutionContext,
+  ) => Promise<ActionExecutionResult>;
   /** Run a governed READ against a domain's bound connector. */
   queryDomain: (
     domain: DomainLike,
@@ -246,16 +263,18 @@ export interface AppRunDeps {
    * OUTPUT SINK — post the run's outcome to Slack via a vaulted incoming-webhook URL. Injected for
    * unit-testability; production wires postSlack. The body is already masked/leash-approved.
    */
-  sendSlack: (
-    input: { text: string; channel?: string },
-  ) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  sendSlack: (input: {
+    text: string;
+    channel?: string;
+  }) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
   /**
    * OUTPUT SINK — send the run's outcome via the on-prem WhatsApp gateway (air-gapped). Injected for
    * unit-testability; production wires sendWhatsApp. HONEST: no gateway URL → { configured:false }.
    */
-  sendWhatsApp: (
-    input: { to: string; text: string },
-  ) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  sendWhatsApp: (input: {
+    to: string;
+    text: string;
+  }) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
 }
 
 // ─── defaultDeps — wire the real subsystems (lazy imports keep this module light + test-friendly) ─
@@ -277,6 +296,10 @@ export function defaultDeps(): AppRunDeps {
       const all = await listConnectors(orgId);
       const c = all.find((x) => x.id === connectorId);
       return c ? { id: c.id, type: c.type, endpoint: c.endpoint } : null;
+    },
+    async executeAction(connector, step, context) {
+      const { executeCrmAction } = await import('@/lib/adapters/action-crm');
+      return executeCrmAction(connector, step, context);
     },
     async queryDomain(domain, connector, opts) {
       const { queryDomain, describeDecision } = await import('@/lib/adapters/connector-query');
@@ -468,6 +491,28 @@ export async function executeStep(
           status: 'awaiting_human',
           detail: `awaiting human decision at "${step.label || step.id}"`,
         };
+      case 'action': {
+        const approved = hasApprovedMakerChecker(step, priorResults);
+        const impact = planActionImpact(step, approved);
+        if (shouldIntercept(ctx.mode ?? 'live', step)) {
+          const would = {
+            sink: `action:${step.actionId}`,
+            recipient: `${impact.system}:${impact.target}`,
+            subject: impact.label,
+            payloadPreview: impact.summary,
+          };
+          return {
+            stepId: step.id,
+            kind: 'action',
+            status: 'done',
+            output: aggregateOutcome(priorResults),
+            detail: `SHADOW: ${impact.summary}`,
+            wouldPerform: would,
+            actionImpact: impact,
+          };
+        }
+        return executeActionStep(step, priorResults, ctx, deps);
+      }
       case 'output':
         // SHADOW-MODE INTERCEPT (BFSI blast-radius) — an ADDITIONAL gate IN FRONT of the sink's own
         // egress/PII governance. In shadow, a side-effecting sink (email/report/whatsapp) NO-OPs and
@@ -493,6 +538,64 @@ export async function executeStep(
   } catch (err) {
     return errorResult(step, err instanceof Error ? err.message : String(err));
   }
+}
+
+async function executeActionStep(
+  step: ActionStep,
+  priorResults: StepResult[],
+  ctx: AppRunContext,
+  deps: AppRunDeps,
+): Promise<StepResult> {
+  const impact = planActionImpact(step, hasApprovedMakerChecker(step, priorResults));
+  const approval = priorResults.find((result) => result.stepId === step.approvalStepId);
+  if (!hasApprovedMakerChecker(step, priorResults) || !approval?.detail) {
+    return {
+      ...errorResult(step, 'action held: a different person must approve it before CRM can change'),
+      actionImpact: impact,
+    };
+  }
+  const connector = await deps.getConnector(step.connectorId, ctx.orgId);
+  if (!connector) {
+    return {
+      ...errorResult(step, `action held: CRM connection '${step.connectorId}' is unavailable`),
+      actionImpact: impact,
+    };
+  }
+  const execute = deps.executeAction ?? defaultDeps().executeAction;
+  if (!execute) {
+    return {
+      ...errorResult(step, 'action held: governed action adapter is unavailable'),
+      actionImpact: impact,
+    };
+  }
+  const result = await execute(connector, step, {
+    orgId: ctx.orgId,
+    runId: ctx.runId,
+    stepId: step.id,
+    approval: {
+      stepId: approval.stepId,
+      evidence: approval.detail,
+    },
+  });
+  if (!result.ok) {
+    return {
+      ...errorResult(step, `action held: ${result.message}`),
+      actionImpact: result.impact ?? impact,
+    };
+  }
+  return {
+    stepId: step.id,
+    kind: 'action',
+    status: 'done',
+    output: aggregateOutcome(priorResults),
+    refs: [
+      { name: `${result.receipt.system}:${result.receipt.target}` },
+      { name: `action-receipt:${result.receipt.idempotencyKey}` },
+    ],
+    detail: `${result.receipt.label} — ${result.receipt.status} in ${result.receipt.system}; receipt retained`,
+    actionImpact: result.impact,
+    actionReceipt: result.receipt,
+  };
 }
 
 async function executeAgentStep(
@@ -935,7 +1038,10 @@ async function deliverGovernedSink(
   const decision = planSinkGovernance({ descriptor, contract, outcome, scan });
   emit(decision.audits);
   if (decision.verdict === 'blocked') {
-    return errorResult(step, `${descriptor.label} delivery blocked by pipeline egress leash: ${decision.reason}`);
+    return errorResult(
+      step,
+      `${descriptor.label} delivery blocked by pipeline egress leash: ${decision.reason}`,
+    );
   }
   if (decision.verdict === 'held') {
     return errorResult(step, `${descriptor.label} send held: ${decision.reason}`);
@@ -976,7 +1082,12 @@ function dispatchSinkDelivery(
   const cfg = step.config ?? {};
   const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
   if (sink === 'webhook') {
-    return deps.sendWebhook(cfg, { runId: ctx.runId, orgId: ctx.orgId, appId: spec.id, outcome: body });
+    return deps.sendWebhook(cfg, {
+      runId: ctx.runId,
+      orgId: ctx.orgId,
+      appId: spec.id,
+      outcome: body,
+    });
   }
   if (sink === 'slack') {
     return deps.sendSlack({ text: body, channel: str(cfg.channel) });
@@ -1088,7 +1199,12 @@ function aggregateOutcome(results: StepResult[]): string {
 // the model to make a global comparison that grounding could not verify. Keep the prompt bounded,
 // but retain complete small operational tables and state explicitly when a larger result is clipped.
 export const MAX_GOVERNED_SOURCE_ROWS = 20;
-export function summarizeRows(label: string, resource: string, rows: unknown[], count: number): string {
+export function summarizeRows(
+  label: string,
+  resource: string,
+  rows: unknown[],
+  count: number,
+): string {
   const shown = rows.slice(0, MAX_GOVERNED_SOURCE_ROWS);
   const head = `${label} (${resource}): ${count} row(s).`;
   if (shown.length === 0) return head;
@@ -1096,7 +1212,10 @@ export function summarizeRows(label: string, resource: string, rows: unknown[], 
   // Repeating every object key for a 20-row reference table bloats the guardrail/model payload and
   // can exceed a content-scanner deadline. Columnar JSON preserves every value and relationship
   // while naming each field once. Small results stay in the friendlier row-object form.
-  if (shown.length <= 5 || shown.some((row) => !row || typeof row !== 'object' || Array.isArray(row))) {
+  if (
+    shown.length <= 5 ||
+    shown.some((row) => !row || typeof row !== 'object' || Array.isArray(row))
+  ) {
     return `${head}${coverage}\n${JSON.stringify(shown)}`;
   }
   const columns = Array.from(

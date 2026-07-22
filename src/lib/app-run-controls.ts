@@ -41,13 +41,7 @@ export interface StepShape {
 }
 
 /** The output sinks that actually LEAVE THE BOX or make a durable/crypto side effect. PURE. */
-const SIDE_EFFECTING_SINKS = new Set<string>([
-  'report',
-  'email',
-  'whatsapp',
-  'webhook',
-  'slack',
-]);
+const SIDE_EFFECTING_SINKS = new Set<string>(['report', 'email', 'whatsapp', 'webhook', 'slack']);
 
 /**
  * Is this step side-effecting (would it ACT on the outside world)? PURE. Only `output` steps can be —
@@ -55,6 +49,7 @@ const SIDE_EFFECTING_SINKS = new Set<string>([
  * external-write step kind can be added to this rule in ONE place. Everything else is read/reason.
  */
 export function isSideEffectingStep(step: StepShape): boolean {
+  if (step.kind === 'action') return true;
   if (step.kind !== 'output') return false;
   const sink = (step.sink ?? 'console').trim();
   return SIDE_EFFECTING_SINKS.has(sink);
