@@ -97,4 +97,37 @@ test('opa decision-log store: ingest → list/filter → detail → aggregate �
   const afterDelete = await listDecisions(validateDecisionQuery({}), ORG);
   assert.equal(afterDelete.length, 1);
   assert.equal(afterDelete[0].decisionId, 'dec-deny-1');
+
+  // ── bare event: no input/result/timestamp → the null-write branches ──
+  const bare = normalizeDecisionEvents([{ decision_id: 'dec-bare', path: 'offgrid/authz' }]);
+  await persistDecisions(bare, ORG);
+  const bareRow = await getDecision('dec-bare', ORG);
+  assert.ok(bareRow);
+  assert.equal(bareRow.input, null);
+  assert.equal(bareRow.result, null);
+  assert.equal(bareRow.timestamp, ''); // no decided_at → '' via toEvent
+  assert.deepEqual(bareRow.labels, {});
+});
+
+// Empty org string falls back to DEFAULT_ORG — exercises the `orgId || DEFAULT_ORG` branch and the
+// default-parameter path without touching the dedicated test org. Reads only (no writes asserted).
+test('opa decision-log store: empty/absent org resolves to default (read paths)', {
+  skip: dbUp ? false : SKIP_MESSAGE,
+}, async () => {
+  const { persistDecisions, listDecisions, getDecision, aggregateForOrg, deleteDecision } =
+    await import('@/lib/opa-decision-log-store');
+  const { validateDecisionQuery, normalizeDecisionEvents } = await import('@/lib/opa-audit');
+  // empty-string org → DEFAULT_ORG branch
+  assert.ok(Array.isArray(await listDecisions(validateDecisionQuery({}), '')));
+  // default-parameter path (no org arg) — persist to the 'default' org with a unique id, then purge,
+  // exercising persistDecisions' default org parameter without leaving residue.
+  const uniqueId = `dec-default-probe-${Date.now()}`;
+  const probe = normalizeDecisionEvents([
+    { decision_id: uniqueId, path: 'offgrid/authz', result: { allow: true } },
+  ]);
+  assert.equal(await persistDecisions(probe), 1); // default org
+  assert.ok(await getDecision(uniqueId)); // default org read
+  assert.ok(typeof (await aggregateForOrg()).total === 'number');
+  assert.equal(await deleteDecision(uniqueId), true); // default org delete (cleanup)
+  assert.equal(await getDecision('definitely-absent-id'), null);
 });
