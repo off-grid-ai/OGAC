@@ -14,12 +14,17 @@ import {
   User,
   Warning,
 } from '@phosphor-icons/react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { InheritanceBanner } from '@/components/build/InheritanceBanner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  forgePreviewFromQuery,
+  forgePreviewHref,
+  type ForgePreview,
+} from '@/lib/builder-navigation';
 import type { OrgContextSummary } from '@/lib/org-context';
 
 // ─── Studio Forge — the conversational app builder (bolt.new / lovable pattern, governed) ──────────
@@ -76,8 +81,11 @@ const EXAMPLES = [
   'A KYC assistant that answers questions about a customer from our own records, with PII masked',
 ];
 
-const PANES = ['App', 'Flow', 'Governance'] as const;
-type Pane = (typeof PANES)[number];
+const PREVIEWS: readonly { id: ForgePreview; label: string }[] = [
+  { id: 'app', label: 'App' },
+  { id: 'flow', label: 'Flow' },
+  { id: 'governance', label: 'Governance' },
+];
 
 export function StudioForge({
   summary,
@@ -87,6 +95,9 @@ export function StudioForge({
   pipelineOptions: { id: string; name: string }[];
 }>) {
   const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const preview = forgePreviewFromQuery(params);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [brief, setBrief] = useState(''); // accumulated description the compiler sees
   const [input, setInput] = useState('');
@@ -94,8 +105,12 @@ export function StudioForge({
   const [gaps, setGaps] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [pane, setPane] = useState<Pane>('App');
   const threadRef = useRef<HTMLDivElement>(null);
+
+  const navigatePreview = (nextPreview: ForgePreview) => {
+    if (nextPreview === preview) return;
+    router.push(forgePreviewHref(pathname, params.toString(), nextPreview), { scroll: false });
+  };
 
   const scrollDown = () => requestAnimationFrame(() => threadRef.current?.scrollTo({ top: 1e9, behavior: 'smooth' }));
 
@@ -126,7 +141,7 @@ export function StudioForge({
         ...t,
         { role: 'forge', text: `Built "${data.spec.title}" — ${stepWord}, running on ${pipelineName(data.spec.pipelineId)}.${gapWord} See the preview →` },
       ]);
-      setPane(data.gaps?.length ? 'Governance' : 'App');
+      navigatePreview(data.gaps?.length ? 'governance' : 'app');
       scrollDown();
     } catch (e) {
       setTurns((t) => [...t, { role: 'forge', text: e instanceof Error ? e.message : 'Build failed' }]);
@@ -253,18 +268,23 @@ export function StudioForge({
       <div className="flex min-w-0 flex-1 flex-col rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
           <div className="flex gap-1">
-            {PANES.map((p) => (
+            {PREVIEWS.map((item) => (
               <button
-                key={p}
+                key={item.id}
                 type="button"
-                onClick={() => setPane(p)}
+                onClick={() => navigatePreview(item.id)}
+                aria-pressed={preview === item.id}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 ${
-                  pane === p ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
+                  preview === item.id
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {p}
-                {p === 'Governance' && gaps.length > 0 ? (
-                  <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 text-[10px] text-amber-600">{gaps.length}</span>
+                {item.label}
+                {item.id === 'governance' && gaps.length > 0 ? (
+                  <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 text-[10px] text-amber-600">
+                    {gaps.length}
+                  </span>
                 ) : null}
               </button>
             ))}
@@ -282,9 +302,9 @@ export function StudioForge({
               </div>
               <InheritanceBanner summary={summary} />
             </div>
-          ) : pane === 'App' ? (
+          ) : preview === 'app' ? (
             <AppPreview spec={spec} pipelineName={pipelineName(spec.pipelineId)} />
-          ) : pane === 'Flow' ? (
+          ) : preview === 'flow' ? (
             <FlowPreview spec={spec} />
           ) : (
             <GovernancePane spec={spec} summary={summary} pipelineName={pipelineName(spec.pipelineId)} gaps={gaps} />
