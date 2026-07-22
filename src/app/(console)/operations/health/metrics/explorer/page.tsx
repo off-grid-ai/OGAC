@@ -1,4 +1,5 @@
 import { MetricsExplorer } from '@/components/operations/MetricsExplorer';
+import { MetricsSubnav } from '@/components/operations/MetricsSubnav';
 import { requireModuleForUser } from '@/lib/module-access';
 import { normalizeRange, type RangeWindow } from '@/lib/victoriametrics-query';
 
@@ -14,5 +15,10 @@ export default async function MetricsExplorerPage({
   const sp = await searchParams;
   const q = (typeof sp.q === 'string' ? sp.q : sp.q?.at(0)) ?? '';
   const range: RangeWindow = normalizeRange(typeof sp.range === 'string' ? sp.range : sp.range?.at(0));
-  return <MetricsExplorer initialQuery={q} initialRange={range} />;
+  return (
+    <div className="w-full space-y-4">
+      <MetricsSubnav active="explorer" />
+      <MetricsExplorer initialQuery={q} initialRange={range} />
+    </div>
+  );
 }

@@ -1,4 +1,5 @@
 import { MetricsAlerts } from '@/components/operations/MetricsAlerts';
+import { MetricsSubnav } from '@/components/operations/MetricsSubnav';
 import { rulesAndAlerts } from '@/lib/adapters/victoriametrics';
 import { requireModuleForUser } from '@/lib/module-access';
 import {
@@ -17,22 +18,22 @@ export const dynamic = 'force-dynamic';
 export default async function MetricsAlertsPage() {
   await requireModuleForUser('platform-health');
   const result = await rulesAndAlerts();
-  if (!result.configured) {
-    return <MetricsAlerts configured={false} engineDeployed={false} />;
-  }
-  if (!result.engineDeployed) {
-    return <MetricsAlerts configured engineDeployed={false} engineError={result.error} />;
-  }
-  const { recording, alerting } = partitionRules(normalizeRules(result.rules));
-  const alerts = normalizeAlerts(result.alerts);
+  const { recording, alerting } = result.engineDeployed
+    ? partitionRules(normalizeRules(result.rules))
+    : { recording: [], alerting: [] };
+  const alerts = result.engineDeployed ? normalizeAlerts(result.alerts) : [];
   return (
-    <MetricsAlerts
-      configured
-      engineDeployed
-      recording={recording}
-      alerting={alerting}
-      alerts={alerts}
-      summary={summarizeAlerts(alerts)}
-    />
+    <div className="w-full space-y-4">
+      <MetricsSubnav active="alerts" />
+      <MetricsAlerts
+        configured={result.configured}
+        engineDeployed={result.engineDeployed}
+        engineError={result.error}
+        recording={recording}
+        alerting={alerting}
+        alerts={alerts}
+        summary={summarizeAlerts(alerts)}
+      />
+    </div>
   );
 }
