@@ -50,6 +50,12 @@ export const MODEL_DESTINATIONS = [
     description: 'Cost, tokens, and request volume attributed by model, key, and time.',
     route: '/runtime/models/spend',
   },
+  {
+    id: 'cache',
+    label: 'Cache',
+    description: 'Response-cache status, flush controls, and hit-rate / tokens-saved.',
+    route: '/runtime/models/cache',
+  },
 ] as const;
 
 export const API_BUDGET_DESTINATIONS = [

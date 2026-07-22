@@ -93,6 +93,7 @@ export type ContextualDestinationId =
   | 'providers'
   | 'tuning'
   | 'spend'
+  | 'cache'
   | 'budgets'
   | 'traces'
   | 'prompt-registry'
