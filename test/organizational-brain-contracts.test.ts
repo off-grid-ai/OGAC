@@ -149,3 +149,41 @@ test('retrieval-only grants cannot manage sources even with a known binding id',
   );
   assert.throws(() => resolveBrainSourceBinding(auditor, 'salesforce-main', {}), BrainAuthorizationError);
 });
+
+test('issued source policy and resolved nested config are immutable snapshots', () => {
+  const allowedProviderConfigKeys = ['objects'];
+  const mutablePolicy = [
+    {
+      tenantId: 'bank-one',
+      roles: ['brain-manager'],
+      documentSetSlugs: ['policies'],
+      capabilities: ['manageSources'] as const,
+      sourceBindings: [
+        {
+          id: 'salesforce-main',
+          sourceType: 'salesforce',
+          providerCredentialId: 7,
+          allowedProviderConfigKeys,
+        },
+      ],
+    },
+  ];
+  const grant = resolveBrainAuthorization(
+    { tenantId: 'bank-one', subjectId: 'manager@bank.example', role: 'brain-manager' },
+    mutablePolicy,
+  );
+  allowedProviderConfigKeys.push('api_token');
+  const objects = [{ name: 'Account' }];
+  const providerConfig = { objects };
+  const binding = resolveBrainSourceBinding(grant, 'salesforce-main', providerConfig);
+  objects[0]!.name = 'Mutated';
+  objects.push({ name: 'Opportunity' });
+
+  assert.deepEqual(binding.providerConfig, { objects: [{ name: 'Account' }] });
+  assert.equal(Object.isFrozen(binding.providerConfig), true);
+  assert.equal(Object.isFrozen((binding.providerConfig.objects as unknown[])[0]), true);
+  assert.throws(
+    () => resolveBrainSourceBinding(grant, 'salesforce-main', { api_token: 'still-denied' }),
+    BrainAuthorizationError,
+  );
+});

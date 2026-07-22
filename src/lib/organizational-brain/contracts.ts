@@ -182,7 +182,14 @@ export function resolveBrainAuthorization(
     documentSetNames: Object.freeze(documentSetNames),
     capabilities: Object.freeze(capabilities),
     ingestionConnectionId: ingestionConnectionIds[0],
-    sourceBindings: Object.freeze(sourceBindings.map((binding) => Object.freeze({ ...binding }))),
+    sourceBindings: Object.freeze(
+      sourceBindings.map((binding) =>
+        Object.freeze({
+          ...binding,
+          allowedProviderConfigKeys: Object.freeze([...binding.allowedProviderConfigKeys]),
+        }),
+      ),
+    ),
   }) as BrainAuthorizationContext;
   issuedAuthorizations.add(grant);
   return grant;
@@ -248,6 +255,32 @@ function assertProviderConfigHasNoSecrets(value: unknown, path = 'providerConfig
   }
 }
 
+function cloneAndFreezeJson(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new BrainAuthorizationError('source configuration numbers must be finite');
+    return value;
+  }
+  if (typeof value !== 'object') {
+    throw new BrainAuthorizationError('source configuration must contain only JSON-safe values');
+  }
+  if (seen.has(value)) throw new BrainAuthorizationError('source configuration cannot contain cycles');
+  seen.add(value);
+  if (Array.isArray(value)) {
+    const cloned = value.map((item) => cloneAndFreezeJson(item, seen));
+    seen.delete(value);
+    return Object.freeze(cloned);
+  }
+  if (Object.getPrototypeOf(value) !== Object.prototype) {
+    throw new BrainAuthorizationError('source configuration objects must be plain JSON objects');
+  }
+  const cloned = Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [key, cloneAndFreezeJson(nested, seen)]),
+  );
+  seen.delete(value);
+  return Object.freeze(cloned);
+}
+
 export function resolveBrainSourceBinding(
   context: BrainAuthorizationContext,
   bindingId: string,
@@ -265,7 +298,7 @@ export function resolveBrainSourceBinding(
     id: binding.id,
     sourceType: binding.sourceType,
     providerCredentialId: binding.providerCredentialId,
-    providerConfig: Object.freeze({ ...providerConfig }),
+    providerConfig: cloneAndFreezeJson(providerConfig) as Readonly<Record<string, unknown>>,
   }) as ResolvedBrainSourceBinding;
 }
 
