@@ -102,6 +102,7 @@ export type ContextualDestinationId =
   | 'scorecards'
   | 'drift'
   | 'metrics'
+  | 'alerts'
   | 'settings'
   | 'feature-flags'
   | 'adapters'

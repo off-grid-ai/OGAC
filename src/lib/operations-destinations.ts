@@ -2,8 +2,14 @@ export const HEALTH_DESTINATIONS = [
   {
     id: 'metrics',
     label: 'Metrics',
-    description: 'Read live service and infrastructure metrics from VictoriaMetrics.',
-    route: '/operations/health/metrics',
+    description: 'Explore live PromQL metrics from VictoriaMetrics and save named queries.',
+    route: '/operations/health/metrics/explorer',
+  },
+  {
+    id: 'alerts',
+    label: 'Alerts',
+    description: 'View VictoriaMetrics alerting + recording rules and currently-firing alerts.',
+    route: '/operations/health/metrics/alerts',
   },
   {
     id: 'logs',
