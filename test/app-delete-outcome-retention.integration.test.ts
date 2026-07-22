@@ -35,7 +35,10 @@ test(
   { skip: dbUp ? false : SKIP_MESSAGE },
   async () => {
     const pool = new Pool({ connectionString: prepared!.databaseUrl });
-    await pool.query(`INSERT INTO apps (id, org_id) VALUES ('app_retained', 'org_retained')`);
+    await pool.query(
+      `INSERT INTO apps (id, org_id, owner_id)
+       VALUES ('app_retained', 'org_retained', 'retention-test')`,
+    );
     await pool.query(
       `INSERT INTO app_runs (id, org_id, app_id) VALUES ('run_retained', 'org_retained', 'app_retained')`,
     );

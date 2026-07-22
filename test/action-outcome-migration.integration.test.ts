@@ -55,7 +55,10 @@ test(
       assert.ok(indexNames.includes(required), `missing ${required}`);
     }
 
-    await pool.query(`INSERT INTO apps (id, org_id) VALUES ('app_constraints', 'org_constraints')`);
+    await pool.query(
+      `INSERT INTO apps (id, org_id, owner_id)
+       VALUES ('app_constraints', 'org_constraints', 'migration-test')`,
+    );
     await pool.query(
       `INSERT INTO app_runs (id, org_id, app_id) VALUES ('run_constraints', 'org_constraints', 'app_constraints')`,
     );
