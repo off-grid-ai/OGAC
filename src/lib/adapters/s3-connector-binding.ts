@@ -1,22 +1,19 @@
 import { createS3ObjectStore, type ObjectStorePort } from '@/lib/adapters/s3-object-store';
 import { getConnector } from '@/lib/connector-detail';
+import { parseObjectStoreCredential } from '@/lib/connector-policy';
 import { resolveConnectorSecret } from '@/lib/connector-secrets';
 import { listDomains } from '@/lib/data-domains-store';
-import {
-  parseObjectStoreCredential,
-  resolveObjectAccessScope,
-  type ObjectAccessScope,
-} from '@/lib/object-store';
+import { resolveObjectAccessScope, type ObjectAccessScope } from '@/lib/object-store';
 
 export type ConnectorObjectBindingFailure =
   'unknown-source' | 'not-object-store' | 'unapproved-scope' | 'missing-credential';
 
 export class ConnectorObjectBindingError extends Error {
-  constructor(
-    readonly code: ConnectorObjectBindingFailure,
-    message: string,
-  ) {
+  readonly code: ConnectorObjectBindingFailure;
+
+  constructor(code: ConnectorObjectBindingFailure, message: string) {
     super(message);
+    this.code = code;
     this.name = 'ConnectorObjectBindingError';
   }
 }

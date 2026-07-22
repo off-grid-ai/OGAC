@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  parseObjectStoreCredential,
+  serializeObjectStoreCredential,
+} from '@/lib/connector-policy';
+import {
   MAX_OBJECT_UPLOAD_BYTES,
   parseObjectScopeResource,
-  parseObjectStoreCredential,
   relativeObjectKey,
   resolveObjectAccessScope,
   scopedObjectKey,
   scopedObjectPrefix,
-  serializeObjectStoreCredential,
   validateObjectUpload,
 } from '@/lib/object-store';
 
@@ -131,6 +133,16 @@ test('uploads are bounded by size, approved media type and safe relative key', (
     }).ok,
     false,
   );
+  for (const contentType of [
+    'application/vnd.apache.parquet',
+    'application/x-ndjson',
+    'text/markdown',
+  ]) {
+    assert.equal(
+      validateObjectUpload({ relativeKey: 'evidence/data', size: 1, contentType }).ok,
+      true,
+    );
+  }
 });
 
 test('connector S3 keypair stays one opaque vaulted value and malformed values fail closed', () => {

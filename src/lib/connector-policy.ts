@@ -6,17 +6,22 @@
 // write + secret_ref column — lives in connector-secrets.ts, which imports this).
 //
 // What it decides:
-//   • the connector-type catalog (which types create+query today vs. coming-soon)
-//   • per-type field validation (SQL host/port/db/user/password; REST base URL + api key)
+//   • the connector-type catalog (which types have a complete product path vs. coming-soon)
+//   • per-type field validation (SQL, REST, and S3-compatible object stores)
 //   • the CREDENTIAL-FREE endpoint the row stores (never the password/token)
 //   • the SSRF host guard on every endpoint (create AND update reject private/link-local/loopback)
 //   • splicing a vault-resolved secret back into the endpoint at query time
-import { isPublicEndpointHost, isPublicHost } from '@/lib/connector-endpoint';
+import {
+  isInternalEnterpriseEndpoint,
+  isPublicEndpointHost,
+  isPublicHost,
+} from '@/lib/connector-endpoint';
 
 // ─── The connector-type catalog ───────────────────────────────────────────────
-// The queryable ('ready') set MUST match the dialects connector-exec.ts / detectDialect can reach.
+// `ready` means a complete usable path exists. SQL/REST use connector-exec; S3 uses the bounded
+// connector object route and the existing S3 object-store port.
 
-export type ConnectorFamily = 'sql' | 'rest';
+export type ConnectorFamily = 'sql' | 'rest' | 's3';
 
 export interface ConnectorTypeDef {
   type: string; // stored on the connector row (matches detectDialect's expectations)
@@ -24,7 +29,7 @@ export interface ConnectorTypeDef {
   family: ConnectorFamily; // drives which field set the form shows
   scheme: string; // endpoint scheme the credential-free URL is built with (e.g. 'postgres')
   defaultPort?: number;
-  status: 'ready' | 'coming-soon'; // 'ready' = create + query works end to end
+  status: 'ready' | 'coming-soon'; // 'ready' = create + its governed operation works end to end
   note?: string; // shown next to a coming-soon type
 }
 
@@ -34,10 +39,9 @@ export const CONNECTOR_TYPES: ConnectorTypeDef[] = [
   { type: 'mysql', label: 'MySQL / MariaDB', family: 'sql', scheme: 'mysql', defaultPort: 3306, status: 'ready' },
   { type: 'mssql', label: 'SQL Server', family: 'sql', scheme: 'mssql', defaultPort: 1433, status: 'ready' },
   { type: 'rest', label: 'REST / HTTP API', family: 'rest', scheme: 'https', status: 'ready' },
-  // Not yet wired to a live-query path — shown so the catalog is honest, disabled so no dead
-  // connector can be created. Wire these by adding a dialect to connector-exec.ts, then flip 'ready'.
+  // Types without a complete user journey stay visible but disabled so no dead connector is made.
   { type: 'snowflake', label: 'Snowflake', family: 'sql', scheme: 'snowflake', status: 'coming-soon', note: 'Warehouse connector coming soon.' },
-  { type: 's3', label: 'Amazon S3', family: 'rest', scheme: 'https', status: 'coming-soon', note: 'Object-store connector coming soon.' },
+  { type: 's3', label: 'S3-compatible object store', family: 's3', scheme: 'https', status: 'ready' },
   { type: 'kafka', label: 'Kafka', family: 'rest', scheme: 'https', status: 'coming-soon', note: 'Streaming connector coming soon.' },
   { type: 'salesforce', label: 'Salesforce', family: 'rest', scheme: 'https', status: 'coming-soon', note: 'CRM connector coming soon.' },
   { type: 'gdrive', label: 'Google Drive', family: 'rest', scheme: 'https', status: 'coming-soon', note: 'Drive connector coming soon.' },
@@ -66,7 +70,12 @@ export interface RestConnectorInput {
   apiKey?: unknown; // the token/api key; optional (public/unauth'd APIs)
 }
 
-export interface ConnectorCreateInput extends SqlConnectorInput, RestConnectorInput {
+export interface S3ConnectorInput {
+  accessKey?: unknown;
+  secretKey?: unknown;
+}
+
+export interface ConnectorCreateInput extends SqlConnectorInput, RestConnectorInput, S3ConnectorInput {
   name?: unknown;
   type?: unknown;
   description?: unknown;
@@ -191,6 +200,98 @@ function validateRest(def: ConnectorTypeDef, input: RestConnectorInput, name: st
   };
 }
 
+export interface ObjectStoreCredential {
+  accessKey: string;
+  secretKey: string;
+}
+
+/** One keypair is retained as one opaque value by the existing per-connector vault owner. */
+export function parseObjectStoreCredential(secret: string | null): ObjectStoreCredential | null {
+  if (!secret) return null;
+  try {
+    const value = JSON.parse(secret) as Record<string, unknown>;
+    const accessKey = typeof value.accessKey === 'string' ? value.accessKey.trim() : '';
+    const secretKey = typeof value.secretKey === 'string' ? value.secretKey.trim() : '';
+    if (!accessKey || !secretKey || accessKey.length > 256 || secretKey.length > 256) return null;
+    return { accessKey, secretKey };
+  } catch {
+    return null;
+  }
+}
+
+export function serializeObjectStoreCredential(credential: ObjectStoreCredential): string {
+  return JSON.stringify({ accessKey: credential.accessKey, secretKey: credential.secretKey });
+}
+
+export function validateObjectStoreCredentialPatch(input: S3ConnectorInput): {
+  ok: boolean;
+  secret: string | null;
+  errors: string[];
+} {
+  const accessKey = str(input.accessKey);
+  const secretKey = str(input.secretKey);
+  if (!accessKey && !secretKey) return { ok: true, secret: null, errors: [] };
+  const errors: string[] = [];
+  if (!accessKey) errors.push('An access key is required to rotate object-store credentials.');
+  if (!secretKey) errors.push('A secret key is required to rotate object-store credentials.');
+  if (accessKey.length > 256 || secretKey.length > 256) {
+    errors.push('Object-store keys must be 256 characters or fewer.');
+  }
+  return errors.length
+    ? { ok: false, secret: null, errors }
+    : {
+        ok: true,
+        secret: serializeObjectStoreCredential({ accessKey, secretKey }),
+        errors: [],
+      };
+}
+
+function validateS3(
+  def: ConnectorTypeDef,
+  input: S3ConnectorInput & RestConnectorInput,
+  name: string,
+  description: string,
+): CreateValidation {
+  const errors: string[] = [];
+  const baseUrl = str(input.baseUrl);
+  const accessKey = str(input.accessKey);
+  const secretKey = str(input.secretKey);
+  let endpoint = '';
+  try {
+    const url = new URL(baseUrl);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      errors.push('Object-store endpoint must use http:// or https://.');
+    } else if (url.username || url.password || url.search || url.hash) {
+      errors.push('Object-store endpoint must not contain credentials, a query, or a fragment.');
+    } else if (!isPublicEndpointHost(baseUrl) && !isInternalEnterpriseEndpoint(baseUrl)) {
+      errors.push('Object-store endpoint is not an approved public or on-prem enterprise address.');
+    } else {
+      endpoint = baseUrl.replace(/\/$/, '');
+    }
+  } catch {
+    errors.push('Object-store endpoint must be a valid URL.');
+  }
+  if (!accessKey) errors.push('An access key is required.');
+  if (!secretKey) errors.push('A secret key is required.');
+  if (accessKey.length > 256 || secretKey.length > 256) {
+    errors.push('Object-store keys must be 256 characters or fewer.');
+  }
+  if (errors.length) return { ok: false, value: null, errors };
+  return {
+    ok: true,
+    value: {
+      name,
+      type: def.type,
+      family: 's3',
+      endpoint,
+      secret: serializeObjectStoreCredential({ accessKey, secretKey }),
+      auth: 'api-key',
+      description,
+    },
+    errors: [],
+  };
+}
+
 // Validate + normalize a proposed create. Pure — the single gate the POST route goes through.
 export function validateConnectorCreate(input: ConnectorCreateInput): CreateValidation {
   const name = str(input.name);
@@ -200,9 +301,12 @@ export function validateConnectorCreate(input: ConnectorCreateInput): CreateVali
     return { ok: false, value: null, errors: [`${def.label} connectors are not available yet.`] };
   }
   const description = str(input.description);
-  const base = def.family === 'sql'
-    ? validateSql(def, input, name, description)
-    : validateRest(def, input, name, description);
+  const base =
+    def.family === 'sql'
+      ? validateSql(def, input, name, description)
+      : def.family === 's3'
+        ? validateS3(def, input, name, description)
+        : validateRest(def, input, name, description);
   // A missing name is reported alongside the type-specific errors so the user sees everything at once.
   if (!name) {
     return { ok: false, value: null, errors: ['A connector name is required.', ...base.errors] };
@@ -258,8 +362,17 @@ export function validateConnectorUpdate(patch: ConnectorUpdateInput): UpdateVali
       if (u && !UPDATE_ALLOWED_SCHEMES.has(u.protocol)) {
         errors.push('Endpoint must use http:// or https:// (or a supported database URL).');
       }
-      if (u && !isPublicEndpointHost(endpoint)) {
-        errors.push('Endpoint must be a public address (private/loopback hosts are blocked).');
+      const isObjectStore = str(patch.type) === 's3';
+      if (
+        u &&
+        !isPublicEndpointHost(endpoint) &&
+        !(isObjectStore && isInternalEnterpriseEndpoint(endpoint))
+      ) {
+        errors.push(
+          isObjectStore
+            ? 'Object-store endpoint is not an approved public or on-prem enterprise address.'
+            : 'Endpoint must be a public address (private/loopback hosts are blocked).',
+        );
       }
     }
   }

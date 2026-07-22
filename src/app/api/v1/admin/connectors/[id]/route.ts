@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { validateConnectorUpdate } from '@/lib/connector-policy';
+import {
+  validateConnectorUpdate,
+  validateObjectStoreCredentialPatch,
+} from '@/lib/connector-policy';
 import { splitEndpointSecret, persistConnectorSecret } from '@/lib/connector-secrets';
+import { getConnector } from '@/lib/connector-detail';
 import { deleteConnector, updateConnector } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -16,6 +20,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!body) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
   if (body.auth !== undefined && !AUTHS.has(body.auth as string)) {
     return NextResponse.json({ error: 'auth must be none | api-key | oauth' }, { status: 400 });
+  }
+  const orgId = await currentOrgId();
+  const existing = await getConnector(id, orgId);
+  if (!existing) return NextResponse.json({ error: 'unknown connector' }, { status: 404 });
+  if (body.type !== undefined && body.type !== existing.type) {
+    return NextResponse.json(
+      { error: 'Connector type cannot be changed after creation.' },
+      { status: 400 },
+    );
   }
 
   // If the edit carries an endpoint, peel any embedded SQL password off it (pure split) so the row
@@ -32,21 +45,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // We validate the SANITIZED endpoint (post-split) so the host guard sees exactly what would be
   // stored/reached.
   const gateResult = validateConnectorUpdate({
-    type: body.type,
+    type: existing.type,
     endpoint: cleanEndpoint,
   });
   if (!gateResult.ok) {
     return NextResponse.json({ error: gateResult.errors.join(' ') }, { status: 400 });
   }
+  const credentialResult = validateObjectStoreCredentialPatch({
+    accessKey: body.accessKey,
+    secretKey: body.secretKey,
+  });
+  if (existing.type === 's3' && !credentialResult.ok) {
+    return NextResponse.json({ error: credentialResult.errors.join(' ') }, { status: 400 });
+  }
 
   // Scope the mutation to the caller's org — a guessed id from another tenant resolves to no row
   // (→ 404), never a cross-tenant edit (P1 IDOR fix).
-  const orgId = await currentOrgId();
   const updated = await updateConnector(
     id,
     {
       name: body.name as string | undefined,
-      type: body.type as string | undefined,
       endpoint: cleanEndpoint,
       auth: body.auth as string | undefined,
       description: body.description as string | undefined,
@@ -58,9 +76,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Vault the peeled credential (if any) AFTER the row update succeeds, so a rotated password from an
   // edited endpoint lands in OpenBao and the DB stays clean. A vault failure is surfaced (502) — the
   // endpoint is already sanitized, so we never silently keep a plaintext secret around.
-  if (peeledSecret) {
+  const replacementSecret =
+    existing.type === 's3' ? credentialResult.secret : peeledSecret;
+  if (replacementSecret) {
     try {
-      await persistConnectorSecret(id, peeledSecret);
+      await persistConnectorSecret(id, replacementSecret);
     } catch (e) {
       console.error('vault write failed on connector update:', e);
       return NextResponse.json(

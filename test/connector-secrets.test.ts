@@ -7,7 +7,11 @@ import {
   buildSqlEndpoint,
   validateConnectorCreate,
   connectorSecretKey,
+  parseObjectStoreCredential,
+  serializeObjectStoreCredential,
   spliceCredential,
+  validateConnectorUpdate,
+  validateObjectStoreCredentialPatch,
 } from '../src/lib/connector-policy.ts';
 // The live-query dialect detector is the SOURCE OF TRUTH for what can be queried. Every `ready`
 // connector type MUST resolve to a dialect (else it's a dead connector). Exercise the real function.
@@ -17,8 +21,8 @@ import { detectDialect } from '../src/lib/connector-exec.ts';
 // a credential-FREE endpoint is built, the secret is split out, and every creatable type is actually
 // queryable. The vault write + secretRef stamping are I/O and covered by the integration test.
 
-test('every ready connector type resolves to a real live-query dialect (no dead connectors)', () => {
-  for (const def of CONNECTOR_TYPES.filter((d) => d.status === 'ready')) {
+test('every ready query connector resolves to a real live-query dialect', () => {
+  for (const def of CONNECTOR_TYPES.filter((d) => d.status === 'ready' && d.family !== 's3')) {
     // Build the endpoint the create path would store, then confirm detectDialect can query it.
     const endpoint =
       def.family === 'sql'
@@ -33,12 +37,70 @@ test('every ready connector type resolves to a real live-query dialect (no dead 
 
 test('coming-soon types are not creatable', () => {
   assert.equal(isCreatableType('snowflake'), false);
-  assert.equal(isCreatableType('s3'), false);
+  assert.equal(isCreatableType('s3'), true);
   assert.equal(isCreatableType('salesforce'), false);
   assert.equal(isCreatableType('gdrive'), false);
   assert.equal(isCreatableType('kafka'), false);
   assert.equal(isCreatableType('postgres'), true);
   assert.equal(isCreatableType('rest'), true);
+});
+
+test('S3-compatible create stores a credential-free endpoint and one opaque vault keypair', () => {
+  const result = validateConnectorCreate({
+    name: 'Claims evidence',
+    type: 's3',
+    baseUrl: 'http://minio.internal:9000/',
+    accessKey: 'operator',
+    secretKey: 'vault-only-secret',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.value?.endpoint, 'http://minio.internal:9000');
+  assert.ok(!result.value?.endpoint.includes('operator'));
+  assert.deepEqual(parseObjectStoreCredential(result.value?.secret ?? null), {
+    accessKey: 'operator',
+    secretKey: 'vault-only-secret',
+  });
+});
+
+test('S3-compatible create rejects missing keys and unsafe service endpoints', () => {
+  assert.equal(
+    validateConnectorCreate({
+      name: 'x', type: 's3', baseUrl: 'http://minio.internal:9000', accessKey: '', secretKey: '',
+    }).ok,
+    false,
+  );
+  assert.equal(
+    validateConnectorCreate({
+      name: 'x', type: 's3', baseUrl: 'http://169.254.169.254', accessKey: 'a', secretKey: 's',
+    }).ok,
+    false,
+  );
+});
+
+test('S3 credential rotation is all-or-nothing and accepts blank as keep-current', () => {
+  assert.deepEqual(validateObjectStoreCredentialPatch({}), { ok: true, secret: null, errors: [] });
+  assert.equal(validateObjectStoreCredentialPatch({ accessKey: 'new', secretKey: '' }).ok, false);
+  const rotated = validateObjectStoreCredentialPatch({ accessKey: 'new', secretKey: 'secret' });
+  assert.equal(rotated.ok, true);
+  assert.equal(
+    rotated.secret,
+    serializeObjectStoreCredential({ accessKey: 'new', secretKey: 'secret' }),
+  );
+});
+
+test('S3 updates allow approved internal endpoints without weakening REST', () => {
+  assert.equal(
+    validateConnectorUpdate({ type: 's3', endpoint: 'http://minio.internal:9000' }).ok,
+    true,
+  );
+  assert.equal(
+    validateConnectorUpdate({ type: 'rest', endpoint: 'http://10.0.0.5:9000' }).ok,
+    false,
+  );
+  assert.equal(
+    validateConnectorUpdate({ type: 's3', endpoint: 'http://169.254.169.254/latest' }).ok,
+    false,
+  );
 });
 
 test('buildSqlEndpoint produces a credential-FREE URL (never the password)', () => {

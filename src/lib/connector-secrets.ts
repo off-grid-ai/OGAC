@@ -19,11 +19,16 @@ export {
   validateConnectorCreate,
   connectorSecretKey,
   spliceCredential,
+  parseObjectStoreCredential,
+  serializeObjectStoreCredential,
+  validateObjectStoreCredentialPatch,
   type ConnectorFamily,
   type ConnectorTypeDef,
   type ConnectorCreateInput,
   type NormalizedConnectorCreate,
   type CreateValidation,
+  type ObjectStoreCredential,
+  type S3ConnectorInput,
 } from './connector-policy';
 
 // Re-export the inverse (URL → {sanitized endpoint, secret}) pure helper so the update route has ONE

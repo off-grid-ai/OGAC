@@ -92,7 +92,7 @@ export interface ObjectStorePort {
   deleteBucket(name: string): Promise<void>;
   listObjects(
     bucket: string,
-    opts?: { prefix?: string; delimiter?: string; token?: string },
+    opts?: { prefix?: string; delimiter?: string; token?: string; maxKeys?: number },
   ): Promise<ObjectListing>;
   headObject(bucket: string, key: string): Promise<ObjectDetail | null>;
   putObject(
@@ -162,7 +162,10 @@ export function createS3ObjectStore(config: S3ObjectStoreConfig): ObjectStorePor
     async listObjects(bucket, opts = {}) {
       const prefix = opts.prefix ?? '';
       const delimiter = opts.delimiter ?? '/';
-      const params = new URLSearchParams({ 'list-type': '2', 'max-keys': '1000' });
+      const params = new URLSearchParams({
+        'list-type': '2',
+        'max-keys': String(Math.max(1, Math.min(opts.maxKeys ?? 1000, 1000))),
+      });
       if (prefix) params.set('prefix', prefix);
       if (delimiter) params.set('delimiter', delimiter);
       if (opts.token) params.set('continuation-token', opts.token);
