@@ -819,7 +819,7 @@ services:
       timeout: 5s
       retries: 10
   kestra:
-    image: kestra/kestra:latest
+    image: kestra/kestra:latest  # TODO pin by digest once pulled with a manifest
     profiles: [kestra, all]
     restart: unless-stopped
     user: root
@@ -843,8 +843,12 @@ services:
             password: kestra
         kestra:
           server:
+            # Kestra OSS 0.24+ REQUIRES basic auth (the `enabled` flag is ignored). Username must be a
+            # valid email. These are DEMO credentials on the demo box (recorded in fleet SECRET_INVENTORY);
+            # the console's Kestra adapter authenticates the API with them.
             basicAuth:
-              enabled: false
+              username: admin@offgrid.local
+              password: OffGridKestra2026
           repository:
             type: postgres
           storage:
