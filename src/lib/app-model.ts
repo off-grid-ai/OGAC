@@ -5,11 +5,7 @@
 // old templates keep working. No imports, no I/O — the storage layer (apps-store.ts) adapts this to
 // the `apps` table. Keeping the rules here pure makes them unit-testable in isolation.
 
-import {
-  isApprovalAncestor,
-  validateActionEnvelope,
-  type ActionId,
-} from '@/lib/action-contract';
+import { isApprovalAncestor, validateActionEnvelope, type ActionId } from '@/lib/action-contract';
 
 // ─── FormField — one field of an input form (collected before a run) ──────────
 export interface FormField {
@@ -94,12 +90,7 @@ export interface ActionStep {
 }
 
 export type AppStep =
-  | AgentStep
-  | ConnectorQueryStep
-  | GuardrailStep
-  | HumanStep
-  | OutputStep
-  | ActionStep;
+  AgentStep | ConnectorQueryStep | GuardrailStep | HumanStep | OutputStep | ActionStep;
 
 export type AppStepKind = AppStep['kind'];
 

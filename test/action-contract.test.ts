@@ -118,8 +118,14 @@ test('action approval must be a human ancestor in the App graph', () => {
   assert.equal(isApprovalAncestor('act', 'read', steps, edges), false);
 
   const spec: AppSpec = {
-    id: 'app', orgId: 'org', ownerId: 'maker', title: 'Cross-sell follow-up', summary: '',
-    visibility: 'private', published: false, trigger: { kind: 'on-demand' },
+    id: 'app',
+    orgId: 'org',
+    ownerId: 'maker',
+    title: 'Cross-sell follow-up',
+    summary: '',
+    visibility: 'private',
+    published: false,
+    trigger: { kind: 'on-demand' },
     steps: [
       { id: 'review', label: 'RM approves', kind: 'human' },
       { ...ACTION, label: 'Create follow-up' },

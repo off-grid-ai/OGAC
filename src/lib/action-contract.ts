@@ -77,6 +77,12 @@ export interface ActionReceipt {
   idempotencyKey: string;
   status: 'executed' | 'replayed';
   executedAt: string;
+  approval: {
+    stepId: string;
+    evidence: string;
+    /** Current resume records do not persist reviewer identity; omitted rather than fabricated. */
+    reviewer?: string;
+  };
   /** The existing domain adapter's signed, versioned receipt. */
   providerReceipt: Record<string, unknown>;
 }
@@ -135,10 +141,7 @@ export function actionIdempotencyKey(command: Record<string, unknown>): string {
 }
 
 /** Plain-language, bounded, PII-minimising preview. Free-text command fields are never echoed. */
-export function planActionImpact(
-  step: ActionStepShape,
-  approved = false,
-): ActionImpact {
+export function planActionImpact(step: ActionStepShape, approved = false): ActionImpact {
   const descriptor = getActionDescriptor(step.actionId);
   const target = actionTarget(step.actionId, step.command).slice(0, 128);
   const required = descriptor.approval === 'maker-checker';
@@ -177,9 +180,9 @@ export function hasApprovedMakerChecker(
   const approval = priorResults.find((result) => result.stepId === step.approvalStepId);
   return Boolean(
     approval &&
-      approval.kind === 'human' &&
-      approval.status === 'done' &&
-      /\bapproved\b/i.test(approval.detail ?? ''),
+    approval.kind === 'human' &&
+    approval.status === 'done' &&
+    /\bapproved\b/i.test(approval.detail ?? ''),
   );
 }
 
