@@ -209,7 +209,7 @@ function documentSets(): unknown[] {
       description: 'Policies',
       cc_pair_summaries: [summary(10, 'bank-one')],
       is_up_to_date: true,
-      is_public: true,
+      is_public: false,
       users: [],
       groups: [],
       federated_connector_summaries: [],
@@ -315,7 +315,16 @@ test('source lifecycle filters foreign connections and uses exact Onyx v4.4.1 ma
     groups: [],
   });
   const documentSetPatch = fake.calls.find((call) => call.method === 'PATCH');
-  assert.deepEqual((documentSetPatch?.body as Record<string, unknown>).cc_pair_ids, [10, 31]);
+  assert.deepEqual(documentSetPatch?.body, {
+    id: 1,
+    name: 'ogac:bank-one:policies',
+    description: 'Policies',
+    cc_pair_ids: [10, 31],
+    is_public: false,
+    users: [],
+    groups: [],
+    federated_connectors: [],
+  });
 
   await brain.setSourceState(manager, '10', 'paused');
   await brain.triggerSourceSync(manager, '20', true);
@@ -327,6 +336,42 @@ test('source lifecycle filters foreign connections and uses exact Onyx v4.4.1 ma
   assert.deepEqual(
     fake.calls.find((call) => call.url.endsWith('/deletion-attempt'))?.body,
     { connector_id: 20, credential_id: 7 },
+  );
+});
+
+test('source creation makes an absent governed tenant document set private', async () => {
+  const fake = boundary((call) => {
+    const path = new URL(call.url).pathname;
+    if (call.method === 'POST' && path === '/api/manage/admin/connector') return json({ id: 30 });
+    if (call.method === 'PUT' && path === '/api/manage/connector/30/credential/7') {
+      return json({ success: true, data: 31 });
+    }
+    if (call.method === 'GET' && path === '/api/manage/document-set') return json([]);
+    if (call.method === 'POST' && path === '/api/manage/admin/document-set') return json(undefined);
+    return json({ detail: `${call.method} ${path} not implemented by fake` }, 500);
+  });
+
+  await adapter(fake.fetch).createSource(manager, {
+    name: 'CRM new',
+    inputType: 'poll',
+    providerConfig: { objects: ['Account'] },
+    connectionBindingId: 'salesforce-main',
+    documentSetSlug: 'policies',
+  });
+
+  assert.deepEqual(
+    fake.calls.find(
+      (call) => call.method === 'POST' && call.url.endsWith('/manage/admin/document-set'),
+    )?.body,
+    {
+      name: 'ogac:bank-one:policies',
+      description: 'OGAC governed source set for bank-one',
+      cc_pair_ids: [31],
+      is_public: false,
+      users: [],
+      groups: [],
+      federated_connectors: [],
+    },
   );
 });
 
