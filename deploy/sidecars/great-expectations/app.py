@@ -132,7 +132,9 @@ async def lifecycle_error(_request: Request, error: LifecycleError) -> JSONRespo
     return JSONResponse(status_code=error.status, content={"error": str(error)})
 
 
-def _ge_validate(rows: List[Dict[str, Any]], expectations: List[Expectation]) -> dict:
+def _ge_validate(
+    suite_label: str, rows: List[Dict[str, Any]], expectations: List[Expectation]
+) -> dict:
     """Run the legacy wire contract through GX Core 1.19's public ValidationDefinition API."""
     specs = [
         {
@@ -151,7 +153,7 @@ def _ge_validate(rows: List[Dict[str, Any]], expectations: List[Expectation]) ->
         for expectation in expectations
     ]
     try:
-        result = gx_lifecycle().validate_legacy_checkpoint("inline", rows, specs)
+        result = gx_lifecycle().validate_legacy_checkpoint(suite_label, rows, specs)
     except LifecycleError:
         raise
     except Exception as error:
@@ -193,7 +195,7 @@ def health() -> dict:
 def checkpoint(suite: str, cp: Checkpoint) -> dict:
     # No silent native fallback: GX is pinned in the image, and execution failure is a bounded 502
     # so the Console's existing adapter produces a fail-closed verdict.
-    return _ge_validate(cp.rows, cp.expectations)
+    return _ge_validate(validated_identifier(suite, "suite label"), cp.rows, cp.expectations)
 
 
 @app.get("/v1/capabilities")

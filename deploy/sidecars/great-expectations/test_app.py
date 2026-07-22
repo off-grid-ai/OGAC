@@ -173,6 +173,25 @@ class LifecycleApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 502, response.text)
         self.assertEqual(response.json(), {"error": "GX checkpoint execution failed."})
 
+    def test_legacy_checkpoint_suite_labels_do_not_alias_and_retries_reuse(self) -> None:
+        request = {
+            "rows": [{"pan": "ABCDE1234F"}],
+            "expectations": [
+                {"type": "expect_column_values_to_not_be_null", "column": "pan"}
+            ],
+        }
+
+        first = self.client.post("/checkpoint/customer-import", json=request)
+        second = self.client.post("/checkpoint/claims-import", json=request)
+        retry = self.client.post("/checkpoint/customer-import", json=request)
+
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertEqual(retry.status_code, 200, retry.text)
+        suites = app_module.gx_lifecycle().context("legacy_internal").suites.all()
+        self.assertEqual(len(suites), 2)
+        self.assertEqual(len({suite.name for suite in suites}), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
