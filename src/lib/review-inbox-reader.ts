@@ -21,6 +21,8 @@ import {
   scopeInbox,
 } from '@/lib/review-inbox';
 import { getReviewTrace } from '@/lib/review-trace-reader';
+import { listConnectors } from '@/lib/store';
+import { isInternalEnterpriseEndpoint } from '@/lib/connector-endpoint';
 
 // resolveReviewApp — the app + its effective access policy, shaped for the pure logic. null when the
 // app is gone (a run whose app was deleted is dropped from the inbox).
@@ -34,6 +36,7 @@ async function resolveReviewApp(appId: string, orgId: string): Promise<ReviewApp
     summary: app.summary,
     ownerId: app.ownerId ?? '',
     policy,
+    steps: app.steps,
   };
 }
 
@@ -73,6 +76,24 @@ export async function getReviewDetail(
   if (!run) return null;
   const app = await resolveReviewApp(run.appId, orgId);
   if (!app) return null;
+  const connectors = await listConnectors(orgId);
+  const connectorsById = new Map(connectors.map((connector) => [connector.id, connector]));
+  app.actionConnectorBoundaries = Object.fromEntries(
+    (app.steps ?? [])
+      .filter((step) => step.kind === 'action')
+      .map((step) => {
+        if (step.kind !== 'action') return ['', 'missing' as const];
+        const connector = connectorsById.get(step.connectorId);
+        return [
+          step.connectorId,
+          !connector
+            ? 'missing'
+            : isInternalEnterpriseEndpoint(connector.endpoint)
+              ? 'internal'
+              : 'external',
+        ];
+      }),
+  );
   // The child agent-run backing the draft (citations + faithfulness + guardrail notes). Best-effort:
   // a missing trace degrades to "no trace" in the UI. Read via the thin trace reader (a direct row
   // read) — not the agent-run runtime — so this stays free of the gateway/audit chain.

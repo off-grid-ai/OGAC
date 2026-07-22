@@ -115,6 +115,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     decision: body.decision,
     output: body.output,
     note: body.note,
+    reviewer: gate.user.email ?? undefined,
   });
 
   // resumedInline tracks which path completed the review, for the response + audit.
@@ -131,7 +132,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         app,
         paused,
         run.input ?? {},
-        { decision: body.decision, output: body.output, note: body.note },
+        {
+          decision: body.decision,
+          output: body.output,
+          note: body.note,
+          reviewer: gate.user.email ?? undefined,
+        },
         { orgId, actor: gate.user.email ?? undefined, runId: run.id },
         defaultDeps(),
       );

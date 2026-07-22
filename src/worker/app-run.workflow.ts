@@ -60,6 +60,8 @@ export interface ResumeStepDecision {
   output?: string;
   /** Optional short note recorded on the step detail. */
   note?: string;
+  /** Authenticated reviewer identity supplied by the review route. */
+  reviewer?: string;
 }
 
 /** Signal the console sends to resume a paused human step. */
@@ -186,13 +188,17 @@ function foldResult(result: StepResult): StepResultInput {
     refs: result.refs,
     detail: result.detail,
     childRunId: result.childRunId,
+    reviewer: result.reviewer,
+    wouldPerform: result.wouldPerform,
+    actionImpact: result.actionImpact,
+    actionReceipt: result.actionReceipt,
   };
 }
 
 // ─── resolveHumanStep — apply a human decision to a paused step (pure) ────────────────────────────
 // approve → 'done' with the (optionally edited) output carried forward for downstream steps.
 // reject  → 'error', which halts the run (the reducer rolls the run up to 'error').
-function resolveHumanStep(
+export function resolveHumanStep(
   step: AppStep,
   decision: ResumeStepDecision,
   paused: StepResult,
@@ -203,6 +209,7 @@ function resolveHumanStep(
       kind: 'human',
       status: 'error',
       detail: `human rejected at "${step.label || step.id}"${decision.note ? `: ${decision.note}` : ''}`,
+      ...(decision.reviewer ? { reviewer: decision.reviewer } : {}),
     };
   }
   const output = decision.output !== undefined ? decision.output : paused.output;
@@ -212,5 +219,6 @@ function resolveHumanStep(
     status: 'done',
     output,
     detail: `human approved at "${step.label || step.id}"${decision.note ? `: ${decision.note}` : ''}`,
+    ...(decision.reviewer ? { reviewer: decision.reviewer } : {}),
   };
 }

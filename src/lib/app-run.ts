@@ -104,6 +104,8 @@ export interface StepResult {
   refs?: { name: string; position?: number }[];
   detail?: string;
   childRunId?: string;
+  /** Signed-in reviewer identity for an approved/rejected human step; never inferred. */
+  reviewer?: string;
   /**
    * When this step was INTERCEPTED in shadow mode: what it WOULD have performed (sink + recipient +
    * subject + payload preview). Present only on shadowed side-effecting steps so the trace + review
@@ -575,6 +577,7 @@ async function executeActionStep(
     approval: {
       stepId: approval.stepId,
       evidence: approval.detail,
+      ...(approval.reviewer ? { reviewer: approval.reviewer } : {}),
     },
   });
   if (!result.ok) {
@@ -825,6 +828,10 @@ export function buildInRunView(
       refs: (r.refs ?? []).map((x) => x.name),
       detail: r.detail,
       childRunId: r.childRunId,
+      reviewer: r.reviewer,
+      wouldPerform: r.wouldPerform,
+      actionImpact: r.actionImpact,
+      actionReceipt: r.actionReceipt,
     })),
     outcome: aggregateOutcome(priorResults),
     provenance: null,
@@ -1151,7 +1158,10 @@ export async function driveRunnableSteps(
         refs: result.refs,
         detail: result.detail,
         childRunId: result.childRunId,
+        reviewer: result.reviewer,
         wouldPerform: result.wouldPerform,
+        actionImpact: result.actionImpact,
+        actionReceipt: result.actionReceipt,
       });
       await deps.persist(state, input, ctx.orgId);
 

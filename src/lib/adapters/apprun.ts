@@ -215,7 +215,13 @@ async function runInline(
 export async function signalAppRun(
   appId: string,
   runId: string,
-  decision: { stepId: string; decision: 'approve' | 'reject'; output?: string; note?: string },
+  decision: {
+    stepId: string;
+    decision: 'approve' | 'reject';
+    output?: string;
+    note?: string;
+    reviewer?: string;
+  },
 ): Promise<AppRunSignalResult> {
   if (!appDurableEnabled()) return { ok: false, reason: 'not_configured', error: NOT_CONFIGURED };
   const cfg = appDurableConfigFromEnv(process.env);

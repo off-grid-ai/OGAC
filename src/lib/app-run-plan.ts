@@ -44,8 +44,11 @@ export interface StepState {
   detail?: string;
   /** For an agent step: the child agentRuns.id, so the run is traceable/lineage-linked. */
   childRunId?: string;
+  reviewer?: string;
   /** When intercepted in SHADOW mode: what the step WOULD have performed (sink/recipient/preview). */
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
+  actionImpact?: import('@/lib/action-contract').ActionImpact;
+  actionReceipt?: import('@/lib/action-contract').ActionReceipt;
   startedAt?: string;
   finishedAt?: string;
 }
@@ -139,7 +142,11 @@ export function predecessorsOf(spec: AppSpec, stepId: string): string[] {
 
 // ─── isStepReady — a step is runnable when all its predecessors have completed ────────────────────
 // "Completed" = present in `completedIds`. A step already in `completedIds` is not runnable again.
-export function isStepReady(spec: AppSpec, stepId: string, completedIds: Iterable<string>): boolean {
+export function isStepReady(
+  spec: AppSpec,
+  stepId: string,
+  completedIds: Iterable<string>,
+): boolean {
   const done = new Set(completedIds);
   if (done.has(stepId)) return false;
   return predecessorsOf(spec, stepId).every((p) => done.has(p));
@@ -171,7 +178,10 @@ export interface StepResultInput {
   refs?: { name: string; position?: number }[];
   detail?: string;
   childRunId?: string;
+  reviewer?: string;
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
+  actionImpact?: import('@/lib/action-contract').ActionImpact;
+  actionReceipt?: import('@/lib/action-contract').ActionReceipt;
 }
 
 // ─── deriveRunStatus — the aggregate run status from the per-step array (pure) ────────────────────
@@ -208,7 +218,10 @@ export function applyStepResult(
       ...(result.refs !== undefined ? { refs: result.refs } : {}),
       ...(result.detail !== undefined ? { detail: result.detail } : {}),
       ...(result.childRunId !== undefined ? { childRunId: result.childRunId } : {}),
+      ...(result.reviewer !== undefined ? { reviewer: result.reviewer } : {}),
       ...(result.wouldPerform !== undefined ? { wouldPerform: result.wouldPerform } : {}),
+      ...(result.actionImpact !== undefined ? { actionImpact: result.actionImpact } : {}),
+      ...(result.actionReceipt !== undefined ? { actionReceipt: result.actionReceipt } : {}),
     };
     if (result.status === 'running' && !s.startedAt) next.startedAt = now;
     if (result.status === 'done' || result.status === 'error') {
@@ -239,13 +252,21 @@ export interface PersistedStepRow {
   refs?: string[];
   detail?: string;
   childRunId?: string;
+  reviewer?: string;
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
+  actionImpact?: import('@/lib/action-contract').ActionImpact;
+  actionReceipt?: import('@/lib/action-contract').ActionReceipt;
   startedAt?: string;
   finishedAt?: string;
 }
 
 const KNOWN_STEP_STATUSES: ReadonlySet<StepRunStatus> = new Set<StepRunStatus>([
-  'queued', 'running', 'awaiting_human', 'done', 'error', 'skipped',
+  'queued',
+  'running',
+  'awaiting_human',
+  'done',
+  'error',
+  'skipped',
 ]);
 
 // ─── rebuildAppRunState — reconstruct the pure AppRunState from a persisted row (PURE, inverse of
@@ -275,7 +296,10 @@ export function rebuildAppRunState(
       ...(s.refs !== undefined ? { refs: s.refs.map((name) => ({ name })) } : {}),
       ...(s.detail !== undefined ? { detail: s.detail } : {}),
       ...(s.childRunId !== undefined ? { childRunId: s.childRunId } : {}),
+      ...(s.reviewer !== undefined ? { reviewer: s.reviewer } : {}),
       ...(s.wouldPerform !== undefined ? { wouldPerform: s.wouldPerform } : {}),
+      ...(s.actionImpact !== undefined ? { actionImpact: s.actionImpact } : {}),
+      ...(s.actionReceipt !== undefined ? { actionReceipt: s.actionReceipt } : {}),
       ...(s.startedAt !== undefined ? { startedAt: s.startedAt } : {}),
       ...(s.finishedAt !== undefined ? { finishedAt: s.finishedAt } : {}),
     };

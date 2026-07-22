@@ -32,6 +32,13 @@ import {
   awaitingStep,
   priorContextForReview,
 } from '@/lib/app-runs-view';
+import {
+  confirmOnPremActionImpact,
+  planActionImpact,
+  type ActionImpact,
+  type ActionReceipt,
+} from '@/lib/action-contract';
+import type { AppStep } from '@/lib/app-model';
 
 // ─── the minimal app shape the inbox/detail needs (structural — no store import) ──────────────────
 export interface ReviewAppLike {
@@ -41,6 +48,10 @@ export interface ReviewAppLike {
   ownerId: string;
   /** The access policy bound to this app (the EFFECTIVE policy the reader resolved). */
   policy: AppAccessPolicy;
+  /** Actual App steps; used to preview the exact governed action this human decision unlocks. */
+  steps?: AppStep[];
+  /** Reader-supplied, org-scoped endpoint verdict for every action connector used by this App. */
+  actionConnectorBoundaries?: Record<string, 'internal' | 'external' | 'missing'>;
 }
 
 // ─── the child agent-run shape the detail pulls its citations + eval + guardrail notes from ────────
@@ -101,6 +112,50 @@ export interface ReviewDetail {
   canApprove: boolean;
   /** When canApprove is false, WHY (the authority reason) — shown as a gentle notice, not a crash. */
   approveBlockedReason: string | null;
+  /** Exact downstream action impact, or retained impact from an already executed action. */
+  actionImpact: ActionImpact | null;
+  /** Signed execution evidence when this run already performed an action. */
+  actionReceipt: ActionReceipt | null;
+  actionBoundaryReady: boolean | null;
+  actionBoundaryBlockedReason: string | null;
+}
+
+export function actionEvidenceForReview(
+  run: AppRunView,
+  app: ReviewAppLike,
+): {
+  actionImpact: ActionImpact | null;
+  actionReceipt: ActionReceipt | null;
+  actionBoundaryReady: boolean | null;
+  actionBoundaryBlockedReason: string | null;
+} {
+  const pending = awaitingStep(run.steps);
+  const downstream = pending
+    ? app.steps?.find(
+        (step): step is Extract<AppStep, { kind: 'action' }> =>
+          step.kind === 'action' && step.approvalStepId === pending.id,
+      )
+    : undefined;
+  const retained = [...run.steps].reverse().find((step) => step.actionImpact || step.actionReceipt);
+  const boundary = downstream ? app.actionConnectorBoundaries?.[downstream.connectorId] : undefined;
+  const planned = downstream ? planActionImpact(downstream, false) : null;
+  const boundaryReady = downstream ? boundary === 'internal' : null;
+  const boundaryReason =
+    downstream && boundary !== 'internal'
+      ? boundary === 'external'
+        ? 'This action needs an on-prem CRM connection before it can be approved.'
+        : 'The CRM connection for this action is unavailable. Connect it before approving.'
+      : null;
+  return {
+    actionImpact: planned
+      ? boundaryReady
+        ? confirmOnPremActionImpact(planned)
+        : planned
+      : (retained?.actionImpact ?? null),
+    actionReceipt: retained?.actionReceipt ?? null,
+    actionBoundaryReady: boundaryReady,
+    actionBoundaryBlockedReason: boundaryReason,
+  };
 }
 
 // ─── amount / threshold formatting (USD) ──────────────────────────────────────────────────────────
@@ -386,6 +441,7 @@ export function buildReviewDetail(
   const pending = awaitingStep(run.steps);
   const approve = canReviewerApprove(app, input, caller);
   const draft = recommendationFrom(run);
+  const actionEvidence = actionEvidenceForReview(run, app);
   return {
     runId: run.id,
     appId: run.appId,
@@ -409,8 +465,11 @@ export function buildReviewDetail(
     guardrailNotes: guardrailNotesFrom(trace),
     inputPairs: inputPairs(input),
     policyContext: policyContextFrom(app, input),
-    canApprove: approve.allow,
-    approveBlockedReason: approve.allow ? null : approve.reason,
+    canApprove: approve.allow && actionEvidence.actionBoundaryReady !== false,
+    approveBlockedReason: !approve.allow
+      ? approve.reason
+      : actionEvidence.actionBoundaryBlockedReason,
+    ...actionEvidence,
   };
 }
 

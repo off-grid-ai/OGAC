@@ -103,6 +103,7 @@ export interface ActionApprovalEvidence {
   kind: string;
   status: string;
   detail?: string;
+  reviewer?: string;
 }
 
 export interface ActionValidationResult {

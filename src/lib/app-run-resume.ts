@@ -26,11 +26,7 @@ import {
   defaultDeps,
   driveRunnableSteps,
 } from '@/lib/app-run';
-import {
-  type AppRunState,
-  type StepState,
-  applyStepResult,
-} from '@/lib/app-run-plan';
+import { type AppRunState, type StepState, applyStepResult } from '@/lib/app-run-plan';
 
 // The reviewer's decision, as the review route captures it (approve|reject + optional edit/note).
 export interface ResumeDecision {
@@ -39,6 +35,8 @@ export interface ResumeDecision {
   output?: string;
   /** A free-text note recorded on the step detail (audit/context for downstream + the trace). */
   note?: string;
+  /** Signed-in reviewer identity supplied by the authenticated review route. */
+  reviewer?: string;
 }
 
 // ─── stepResultFromState — a completed step's StepState → the StepResult shape the engine threads ──
@@ -56,7 +54,10 @@ export function stepResultFromState(s: StepState): StepResult {
     ...(s.refs !== undefined ? { refs: s.refs } : {}),
     ...(s.detail !== undefined ? { detail: s.detail } : {}),
     ...(s.childRunId !== undefined ? { childRunId: s.childRunId } : {}),
+    ...(s.reviewer !== undefined ? { reviewer: s.reviewer } : {}),
     ...(s.wouldPerform !== undefined ? { wouldPerform: s.wouldPerform } : {}),
+    ...(s.actionImpact !== undefined ? { actionImpact: s.actionImpact } : {}),
+    ...(s.actionReceipt !== undefined ? { actionReceipt: s.actionReceipt } : {}),
   };
 }
 
@@ -102,6 +103,7 @@ export async function resumeAppRun(
     let next = applyStepResult(state, pending.id, {
       status: 'error',
       detail: `rejected by reviewer${noteSuffix}`,
+      ...(decision.reviewer ? { reviewer: decision.reviewer } : {}),
     });
     next = { ...next, status: 'cancelled' };
     await deps.persist(next, input, ctx.orgId);
@@ -125,6 +127,7 @@ export async function resumeAppRun(
     status: 'done',
     ...(approvedOutput !== undefined ? { output: approvedOutput } : {}),
     detail: `approved by reviewer${noteSuffix}`,
+    ...(decision.reviewer ? { reviewer: decision.reviewer } : {}),
   });
   await deps.persist(resumed, input, ctx.orgId);
 

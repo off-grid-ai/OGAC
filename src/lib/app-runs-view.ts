@@ -20,8 +20,11 @@ export interface AppRunStepRow {
   refs?: string[];
   detail?: string;
   childRunId?: string;
+  reviewer?: string;
   /** SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered). */
   wouldPerform?: { sink: string; recipient?: string; subject?: string; payloadPreview: string };
+  actionImpact?: import('@/lib/action-contract').ActionImpact;
+  actionReceipt?: import('@/lib/action-contract').ActionReceipt;
   startedAt?: string;
   finishedAt?: string;
 }
@@ -34,7 +37,12 @@ export interface AppRunView {
   input: Record<string, unknown>;
   steps: AppRunStepRow[];
   outcome: string;
-  provenance: { signature: string; algorithm: string; publicKey: string | null; signedAt: string } | null;
+  provenance: {
+    signature: string;
+    algorithm: string;
+    publicKey: string | null;
+    signedAt: string;
+  } | null;
   startedAt: string | null;
   finishedAt: string | null;
 }

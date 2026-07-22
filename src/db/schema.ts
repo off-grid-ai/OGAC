@@ -1094,6 +1094,7 @@ export const appRuns = pgTable('app_runs', {
       refs?: string[];
       detail?: string;
       childRunId?: string; // agent-step child agentRuns.id, for lineage
+      reviewer?: string; // authenticated reviewer identity for a human decision
       // SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered).
       wouldPerform?: {
         sink: string;
@@ -1101,6 +1102,8 @@ export const appRuns = pgTable('app_runs', {
         subject?: string;
         payloadPreview: string;
       };
+      actionImpact?: import('@/lib/action-contract').ActionImpact;
+      actionReceipt?: import('@/lib/action-contract').ActionReceipt;
       startedAt?: string;
       finishedAt?: string;
     }[]

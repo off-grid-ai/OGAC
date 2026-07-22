@@ -26,7 +26,10 @@ function toRowSteps(steps: StepState[]): AppRunRow['steps'] {
     refs: (s.refs ?? []).map((r) => r.name),
     detail: s.detail,
     childRunId: s.childRunId,
+    reviewer: s.reviewer,
     wouldPerform: s.wouldPerform,
+    actionImpact: s.actionImpact,
+    actionReceipt: s.actionReceipt,
     startedAt: s.startedAt,
     finishedAt: s.finishedAt,
   }));
@@ -49,7 +52,8 @@ export async function upsertAppRunState(
   input: Record<string, unknown> = {},
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
-  const finished = state.status === 'done' || state.status === 'error' || state.status === 'cancelled';
+  const finished =
+    state.status === 'done' || state.status === 'error' || state.status === 'cancelled';
   const values = {
     id: state.runId,
     orgId,
@@ -98,7 +102,10 @@ export async function markAppRunCancelled(
 
 // ─── reads (back the status / review / analytics screens) ────────────────────────────────────────
 
-export async function getAppRun(id: string, orgId: string = DEFAULT_ORG): Promise<AppRunRow | null> {
+export async function getAppRun(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<AppRunRow | null> {
   const [row] = await db
     .select()
     .from(appRuns)
