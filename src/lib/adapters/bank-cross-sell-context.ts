@@ -10,11 +10,13 @@ export type BankCrossSellContextFailure =
   'missing-domain' | 'missing-connector' | 'source-unavailable' | 'source-empty';
 
 export class BankCrossSellContextUnavailableError extends Error {
-  constructor(
-    readonly code: BankCrossSellContextFailure,
-    readonly source: 'customer data' | 'pricing rate card',
-  ) {
+  readonly code: BankCrossSellContextFailure;
+  readonly source: 'customer data' | 'pricing rate card';
+
+  constructor(code: BankCrossSellContextFailure, source: 'customer data' | 'pricing rate card') {
     super(`${source} is ${code.replaceAll('-', ' ')}`);
+    this.code = code;
+    this.source = source;
     this.name = 'BankCrossSellContextUnavailableError';
   }
 }

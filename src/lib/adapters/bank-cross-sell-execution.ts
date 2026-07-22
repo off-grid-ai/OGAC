@@ -26,11 +26,11 @@ export type BankCrossSellExecutionFailure =
   | 'runtime-unavailable';
 
 export class BankCrossSellExecutionError extends Error {
-  constructor(
-    readonly code: BankCrossSellExecutionFailure,
-    message: string,
-  ) {
+  readonly code: BankCrossSellExecutionFailure;
+
+  constructor(code: BankCrossSellExecutionFailure, message: string) {
     super(message);
+    this.code = code;
     this.name = 'BankCrossSellExecutionError';
   }
 }
