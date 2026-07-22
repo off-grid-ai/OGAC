@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { describeStepBinding, type ActionStepPatch, type BindingNames } from '@/lib/app-builder';
 import type { AppStep, AppStepKind, OutputStep } from '@/lib/app-model';
+import type { BuilderSurfaceContextState } from '@/lib/builder-surface-access';
 
 // ─── Tool catalog shape (mirrors GET /api/v1/admin/tool-catalog) ──────────────────────────────────
 interface AppToolEntry {
@@ -119,6 +120,7 @@ export function AppStepEditor({
   appId,
   connectors = [],
   approvalSteps = [],
+  capabilityContext,
 }: Readonly<{
   step: AppStep;
   index: number;
@@ -129,6 +131,7 @@ export function AppStepEditor({
   appId?: string;
   connectors?: { id: string; name: string; type: string; endpoint?: string }[];
   approvalSteps?: { id: string; label: string }[];
+  capabilityContext: BuilderSurfaceContextState;
 }>) {
   const meta = KIND_META[step.kind];
   const binding = describeStepBinding(step, names);
@@ -218,6 +221,7 @@ export function AppStepEditor({
             configure={handlers.onConfigureAction}
             connectors={connectors}
             approvalSteps={approvalSteps}
+            capabilityContext={capabilityContext}
           />
         ) : null}
         {step.kind === 'guardrail' ? (

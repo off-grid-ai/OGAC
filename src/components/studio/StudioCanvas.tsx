@@ -56,6 +56,7 @@ import {
   validateAppSpec,
 } from '@/lib/app-model';
 import type { StepResult } from '@/lib/app-run';
+import type { BuilderSurfaceContextState } from '@/lib/builder-surface-access';
 import {
   KIND_LABEL,
   emptySpec,
@@ -169,6 +170,7 @@ export function StudioCanvas({
   agents = [],
   initialSpec,
   onSpecChange,
+  capabilityContext,
 }: Readonly<{
   domains?: { id: string; label: string }[];
   agents?: { id: string; name: string }[];
@@ -178,6 +180,7 @@ export function StudioCanvas({
    *  AppSpec. The canvas's own describe/save/publish/run chrome is hidden (the parent owns it). */
   initialSpec?: AppSpec | null;
   onSpecChange?: (spec: AppSpec) => void;
+  capabilityContext: BuilderSurfaceContextState;
 }>) {
   const controlled = onSpecChange !== undefined;
   // The AppSpec is the single source of truth. In controlled mode we seed from initialSpec.
@@ -798,6 +801,7 @@ export function StudioCanvas({
             total={spec.steps.length}
             names={names}
             handlers={handlersFor(selectedStep.id)}
+            capabilityContext={capabilityContext}
           />
         </div>
       ) : null}

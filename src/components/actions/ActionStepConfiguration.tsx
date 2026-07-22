@@ -1,42 +1,50 @@
 'use client';
 
+import Link from 'next/link';
 import { ActionImpactSummary } from '@/components/actions/ActionImpactSummary';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ActionStepPatch } from '@/lib/app-builder';
 import {
-  ACTION_DESCRIPTORS,
   confirmOnPremActionImpact,
+  isActionId,
   planActionImpact,
   validateActionCommandReadiness,
-  type ActionId,
 } from '@/lib/action-contract';
-import { isInternalEnterpriseEndpoint } from '@/lib/connector-endpoint';
+import { isCompatibleCrmActionConnector } from '@/lib/action-connector-compatibility';
 import type { AppStep } from '@/lib/app-model';
-
-const ACTION_IDS = Object.keys(ACTION_DESCRIPTORS) as ActionId[];
+import { buildBuilderActionOptions } from '@/lib/builder-action-options';
+import type { BuilderSurfaceContextState } from '@/lib/builder-surface-access';
 
 export function ActionStepConfiguration({
   step,
   configure,
   connectors,
   approvalSteps,
+  capabilityContext,
 }: Readonly<{
   step: Extract<AppStep, { kind: 'action' }>;
   configure?: (patch: ActionStepPatch) => void;
   connectors: { id: string; name: string; type: string; endpoint?: string }[];
   approvalSteps: { id: string; label: string }[];
+  capabilityContext: BuilderSurfaceContextState;
 }>) {
-  const crmConnectors = connectors.filter(
-    (connector) =>
-      /crm|salesforce/i.test(`${connector.type} ${connector.name}`) &&
-      isInternalEnterpriseEndpoint(connector.endpoint ?? ''),
+  const crmConnectors = connectors.filter((connector) =>
+    isCompatibleCrmActionConnector({ ...connector, endpoint: connector.endpoint ?? '' }),
+  );
+  const actionChoices = buildBuilderActionOptions(capabilityContext, step.actionId);
+  const selectedAction = actionChoices.options.find((option) => option.selected);
+  const unavailableActions = actionChoices.options.filter((option) => !option.selectable);
+  const canConfigureSelectedAction = Boolean(
+    configure && !actionChoices.selectionDisabled && selectedAction?.selectable,
   );
   const approval = approvalSteps.find((candidate) => candidate.id === step.approvalStepId);
   const selectedConnector = crmConnectors.find((connector) => connector.id === step.connectorId);
-  const plannedImpact = planActionImpact(step);
-  const impact = selectedConnector ? confirmOnPremActionImpact(plannedImpact) : plannedImpact;
-  const readiness = validateActionCommandReadiness(step);
+  const knownAction = isActionId(step.actionId);
+  const plannedImpact = knownAction ? planActionImpact(step) : null;
+  const impact =
+    plannedImpact && selectedConnector ? confirmOnPremActionImpact(plannedImpact) : plannedImpact;
+  const readiness = knownAction ? validateActionCommandReadiness(step) : { ok: false, errors: [] };
 
   return (
     <div className="space-y-4">
@@ -44,12 +52,19 @@ export function ActionStepConfiguration({
         <ActionSelect
           label="What should happen?"
           value={step.actionId}
-          disabled={!configure}
-          onChange={(value) => configure?.({ actionId: value as ActionId })}
+          disabled={!configure || actionChoices.selectionDisabled}
+          onChange={(value) => {
+            if (isActionId(value)) configure?.({ actionId: value });
+          }}
         >
-          {ACTION_IDS.map((actionId) => (
-            <option key={actionId} value={actionId}>
-              {ACTION_DESCRIPTORS[actionId].label}
+          {actionChoices.options.length === 0 ? (
+            <option value={step.actionId}>No actions available</option>
+          ) : null}
+          {actionChoices.options.map((option) => (
+            <option key={option.actionId} value={option.actionId} disabled={!option.selectable}>
+              {option.label}
+              {option.requiresApproval ? ' (approval required)' : ''}
+              {!option.selectable ? ` (${option.statusLabel})` : ''}
             </option>
           ))}
         </ActionSelect>
@@ -57,7 +72,7 @@ export function ActionStepConfiguration({
         <ActionSelect
           label="Which CRM connection?"
           value={step.connectorId}
-          disabled={!configure || crmConnectors.length === 0}
+          disabled={!canConfigureSelectedAction || crmConnectors.length === 0}
           onChange={(value) => configure?.({ connectorId: value })}
         >
           <option value="">Pick a CRM connection</option>
@@ -71,7 +86,7 @@ export function ActionStepConfiguration({
         <ActionSelect
           label="Who checks it before it runs?"
           value={step.approvalStepId ?? ''}
-          disabled={!configure || approvalSteps.length === 0}
+          disabled={!canConfigureSelectedAction || approvalSteps.length === 0}
           onChange={(value) => configure?.({ approvalStepId: value || null })}
         >
           <option value="">Pick a previous review step</option>
@@ -82,6 +97,51 @@ export function ActionStepConfiguration({
           ))}
         </ActionSelect>
       </div>
+
+      {actionChoices.guidance ? (
+        <p className="text-xs text-muted-foreground" role="status">
+          {actionChoices.guidance}
+        </p>
+      ) : null}
+      {selectedAction?.selectable &&
+      selectedAction.requiresApproval &&
+      selectedAction.approvalGuidance ? (
+        <div className="border-l-2 border-primary/40 pl-3 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">{selectedAction.approvalGuidance.heading}</p>
+          <p>{selectedAction.approvalGuidance.guidance}</p>
+          {selectedAction.approvalGuidance.eligibleSteps.length > 0 ? (
+            <p className="mt-1">
+              Available review steps:{' '}
+              {selectedAction.approvalGuidance.eligibleSteps
+                .map((candidate) => candidate.label)
+                .join(', ')}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {unavailableActions.length > 0 ? (
+        <div className="space-y-2 border-t border-border/70 pt-3" aria-label="Unavailable actions">
+          <p className="text-xs font-medium text-foreground">Not available yet</p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {unavailableActions.map((option) => (
+              <li key={option.actionId} className="rounded-md border border-border/70 p-2.5">
+                <p className="text-xs font-medium text-foreground">{option.label}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  {option.explanation}
+                </p>
+                {option.remedyHref ? (
+                  <Link
+                    href={option.remedyHref}
+                    className="mt-1.5 inline-flex min-h-11 items-center text-[11px] text-primary underline-offset-4 hover:underline"
+                  >
+                    Fix setup
+                  </Link>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {crmConnectors.length === 0 ? (
         <p className="text-xs text-muted-foreground" role="status">
@@ -99,9 +159,18 @@ export function ActionStepConfiguration({
         </p>
       ) : null}
 
-      {configure ? (
+      {configure && !canConfigureSelectedAction ? (
+        <p className="text-xs text-muted-foreground" role="status">
+          This saved action stays unchanged until you choose an available action.
+        </p>
+      ) : null}
+
+      {canConfigureSelectedAction && knownAction ? (
         <>
-          <ActionCommandFields step={step} onCommandChange={(command) => configure({ command })} />
+          <ActionCommandFields
+            step={step}
+            onCommandChange={(command) => configure?.({ command })}
+          />
           {!readiness.ok ? (
             <p className="text-xs text-muted-foreground" role="alert">
               Complete the required action details above before saving.
@@ -110,11 +179,13 @@ export function ActionStepConfiguration({
         </>
       ) : null}
 
-      <ActionImpactSummary
-        impact={impact}
-        approver={approval ? `Reviewer at "${approval.label}"` : undefined}
-        evidence={['Approval decision', 'Changed CRM record', 'Signed execution receipt']}
-      />
+      {impact ? (
+        <ActionImpactSummary
+          impact={impact}
+          approver={approval ? `Reviewer at "${approval.label}"` : undefined}
+          evidence={['Approval decision', 'Changed CRM record', 'Signed execution receipt']}
+        />
+      ) : null}
     </div>
   );
 }
