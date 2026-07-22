@@ -69,6 +69,7 @@ export const kestraCatalog: KestraCatalogPort = {
       if (!r.ok) return [];
       return normalizePluginList(parse(r.text));
     } catch (err) {
+      // eslint-disable-next-line no-console -- best-effort diagnostic on a graceful degrade
       console.warn('[orchestration] kestra listPlugins failed:', describeKestraError(err));
       return [];
     }
@@ -82,6 +83,7 @@ export const kestraCatalog: KestraCatalogPort = {
       if (!body) return null;
       return normalizePluginSchema(type, body);
     } catch (err) {
+      // eslint-disable-next-line no-console -- best-effort diagnostic on a graceful degrade
       console.warn('[orchestration] kestra getPluginSchema failed:', describeKestraError(err));
       return null;
     }
@@ -93,6 +95,7 @@ export const kestraCatalog: KestraCatalogPort = {
       if (!r.ok) return [];
       return normalizeNamespaceList(parse(r.text));
     } catch (err) {
+      // eslint-disable-next-line no-console -- best-effort diagnostic on a graceful degrade
       console.warn('[orchestration] kestra listNamespaces failed:', describeKestraError(err));
       return [];
     }
@@ -105,6 +108,7 @@ export const kestraCatalog: KestraCatalogPort = {
       const rows = normalizeNamespaceList([parse(r.text)]);
       return rows[0] ?? null;
     } catch (err) {
+      // eslint-disable-next-line no-console -- best-effort diagnostic on a graceful degrade
       console.warn('[orchestration] kestra getNamespace failed:', describeKestraError(err));
       return null;
     }
@@ -116,6 +120,7 @@ export const kestraCatalog: KestraCatalogPort = {
       if (!r.ok) return { readOnly: true, keys: [], total: 0 };
       return normalizeSecretCatalog(parse(r.text));
     } catch (err) {
+      // eslint-disable-next-line no-console -- best-effort diagnostic on a graceful degrade
       console.warn('[orchestration] kestra listSecrets failed:', describeKestraError(err));
       return { readOnly: true, keys: [], total: 0 };
     }
@@ -127,6 +132,7 @@ export const kestraCatalog: KestraCatalogPort = {
       if (!r.ok) return [];
       return normalizeKvList(parse(r.text));
     } catch (err) {
+      // eslint-disable-next-line no-console -- best-effort diagnostic on a graceful degrade
       console.warn('[orchestration] kestra listKv failed:', describeKestraError(err));
       return [];
     }
