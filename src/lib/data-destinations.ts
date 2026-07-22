@@ -32,6 +32,12 @@ export const WAREHOUSE_DESTINATIONS = [
     description: 'Explore warehouse data with read-only SQL.',
     route: '/data/warehouse/query',
   },
+  {
+    id: 'models',
+    label: 'Models',
+    description: 'Define governed views, materialized views, and tables — applied live with a versioned rollback trail.',
+    route: '/data/warehouse/models',
+  },
 ] as const;
 
 export const CATALOG_DESTINATIONS = [
