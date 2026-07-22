@@ -3,15 +3,15 @@ import test from 'node:test';
 import {
   DELETE,
   PATCH,
-} from '../src/app/api/v1/admin/app-runs/[runId]/actions/[stepId]/outcomes/[outcomeId]/route.ts';
+} from '../src/app/api/v1/admin/app-runs/[id]/actions/[stepId]/outcomes/[outcomeId]/route.ts';
 import {
   GET,
   POST,
-} from '../src/app/api/v1/admin/app-runs/[runId]/actions/[stepId]/outcomes/route.ts';
+} from '../src/app/api/v1/admin/app-runs/[id]/actions/[stepId]/outcomes/route.ts';
 
-const params = { params: Promise.resolve({ runId: 'run_1', stepId: 'act_1' }) };
+const params = { params: Promise.resolve({ id: 'run_1', stepId: 'act_1' }) };
 const itemParams = {
-  params: Promise.resolve({ runId: 'run_1', stepId: 'act_1', outcomeId: 'aout_1' }),
+  params: Promise.resolve({ id: 'run_1', stepId: 'act_1', outcomeId: 'aout_1' }),
 };
 
 test('real collection route rejects an unauthenticated read before touching the store', async () => {

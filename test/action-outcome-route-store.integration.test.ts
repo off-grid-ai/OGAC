@@ -47,9 +47,9 @@ test(
   { skip: dbUp ? false : SKIP_MESSAGE },
   async () => {
     const collection =
-      await import('../src/app/api/v1/admin/app-runs/[runId]/actions/[stepId]/outcomes/route.ts');
+      await import('../src/app/api/v1/admin/app-runs/[id]/actions/[stepId]/outcomes/route.ts');
     const item =
-      await import('../src/app/api/v1/admin/app-runs/[runId]/actions/[stepId]/outcomes/[outcomeId]/route.ts');
+      await import('../src/app/api/v1/admin/app-runs/[id]/actions/[stepId]/outcomes/[outcomeId]/route.ts');
     const pool = new Pool({ connectionString: prepared!.databaseUrl });
     const executedAt = new Date(Date.now() - 60_000).toISOString();
     const observedAt = new Date(Date.now() - 30_000).toISOString();
@@ -93,7 +93,7 @@ test(
     );
 
     const routeParams = {
-      params: Promise.resolve({ runId: receipt.runId, stepId: receipt.stepId }),
+      params: Promise.resolve({ id: receipt.runId, stepId: receipt.stepId }),
     };
     const acceptedBody = {
       outcomeCode: 'accepted',
@@ -145,7 +145,7 @@ test(
 
     const acceptedParams = {
       params: Promise.resolve({
-        runId: receipt.runId,
+        id: receipt.runId,
         stepId: receipt.stepId,
         outcomeId: accepted.observation.id,
       }),
@@ -171,7 +171,7 @@ test(
 
     const convertedParams = {
       params: Promise.resolve({
-        runId: receipt.runId,
+        id: receipt.runId,
         stepId: receipt.stepId,
         outcomeId: converted.observation.id,
       }),

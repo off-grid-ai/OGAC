@@ -9,13 +9,13 @@ import { actionOutcomeErrorResponse } from './_http';
 export const dynamic = 'force-dynamic';
 
 interface RouteContext {
-  params: Promise<{ runId: string; stepId: string }>;
+  params: Promise<{ id: string; stepId: string }>;
 }
 
 export async function GET(req: Request, { params }: RouteContext) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const { runId, stepId } = await params;
+  const { id: runId, stepId } = await params;
   const orgId = await currentOrgId();
   const data = await listActionOutcomes(runId, stepId, orgId);
   return NextResponse.json({ data });
@@ -24,7 +24,7 @@ export async function GET(req: Request, { params }: RouteContext) {
 export async function POST(req: Request, { params }: RouteContext) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  const { runId, stepId } = await params;
+  const { id: runId, stepId } = await params;
   const parsed = parseActionOutcomeRequest(await req.json().catch(() => ({})), {
     runId,
     stepId,
