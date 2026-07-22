@@ -1,4 +1,5 @@
 import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
+import { ModuleCard, type ModuleLink } from '@/components/ModuleCard';
 import { PageFrame } from '@/components/PageFrame';
 import { listAgentRuns } from '@/lib/agentrun';
 import { buildDomainDashboard } from '@/lib/domain-dashboard';
@@ -51,7 +52,29 @@ export default async function InsightsPage() {
 
   return (
     <PageFrame>
-      <DomainDashboard model={model} />
+      <div className="space-y-6">
+        <DomainDashboard model={model} />
+        <div className="border-t border-border pt-6">
+          <h2 className="text-base font-normal text-foreground">Inspect evidence</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            See how the AI behaves — quality, drift, cost, usage, and outcomes from real runs.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {INSIGHTS_MODULES.map((m) => (
+            <ModuleCard key={m.href} {...m} />
+          ))}
+        </div>
+      </div>
     </PageFrame>
   );
 }
+
+const INSIGHTS_MODULES: ModuleLink[] = [
+  { title: 'Quality', href: '/insights/quality', description: 'Eval scores + LLM-judge faithfulness on governed answers.' },
+  { title: 'Drift', href: '/insights/drift', description: 'Dataset + behaviour drift detection over time.' },
+  { title: 'Cost', href: '/insights/cost', description: 'Spend by model, pipeline, user, and project.' },
+  { title: 'Usage', href: '/insights/usage', description: 'Request volume, tokens, and adoption trends.' },
+  { title: 'Outcomes', href: '/insights/outcomes', description: 'Business outcomes + ROI from shipped app runs.' },
+  { title: 'Audit', href: '/insights/audit', description: 'Who-did-what, what was blocked, and the SIEM feed.' },
+];

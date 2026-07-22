@@ -1,4 +1,5 @@
 import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
+import { ModuleCard, type ModuleLink } from '@/components/ModuleCard';
 import { PageFrame } from '@/components/PageFrame';
 import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { getOrgPolicy, listAudit, listUsers } from '@/lib/store';
@@ -67,7 +68,29 @@ export default async function GovernancePage() {
 
   return (
     <PageFrame>
-      <DomainDashboard model={model} />
+      <div className="space-y-6">
+        <DomainDashboard model={model} />
+        <div className="border-t border-border pt-6">
+          <h2 className="text-base font-normal text-foreground">Manage controls</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Set policy, guardrails, secrets, access, and evidence — inherited everywhere they apply.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {GOVERNANCE_MODULES.map((m) => (
+            <ModuleCard key={m.href} {...m} />
+          ))}
+        </div>
+      </div>
     </PageFrame>
   );
 }
+
+const GOVERNANCE_MODULES: ModuleLink[] = [
+  { title: 'Policies', href: '/governance/policies', description: 'Egress leash, data ceilings, and the OPA authz rules pipelines inherit.' },
+  { title: 'Guardrails', href: '/governance/guardrails', description: 'PII, injection, and toxicity scanners applied on every governed run.' },
+  { title: 'Secrets', href: '/governance/secrets', description: 'Vaulted connector + service credentials and dynamic database access.' },
+  { title: 'Access', href: '/governance/access', description: 'People, machine clients, roles, sessions, and federation.' },
+  { title: 'Teams', href: '/governance/teams', description: 'Delegated-access groups that scope pipelines + apps by member role.' },
+  { title: 'Evidence', href: '/governance/evidence/audit', description: 'The audit trail, provenance, and exportable compliance evidence.' },
+];

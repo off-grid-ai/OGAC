@@ -82,13 +82,13 @@ export const IA_ROUTE_MIGRATIONS = Object.freeze([
   { from: '/data/pipelines', to: '/data/flows/replication', children: true },
   { from: '/data/etl', to: '/data/flows/orchestration', children: true },
   { from: '/data/retrieval', to: '/data/knowledge/indexes', children: true },
-  { from: '/governance', to: '/governance/posture' },
+  // NOTE: no `/governance` → sub-route redirect — /governance renders its own section OVERVIEW page.
   { from: '/governance/policy', to: '/governance/policies', children: true },
   { from: '/governance/provenance', to: '/governance/evidence/provenance', children: true },
   { from: '/governance/exporters', to: '/governance/evidence/export', children: true },
   { from: '/governance/regulatory', to: '/governance/trust/regulatory', children: true },
   { from: '/governance/reports', to: '/governance/trust/reports', children: true },
-  { from: '/insights', to: '/insights/ai' },
+  // NOTE: no `/insights` → sub-route redirect — /insights renders its own section OVERVIEW page.
   { from: '/insights/copilot', to: '/insights/ai/copilot', children: true },
   { from: '/insights/evals', to: '/insights/quality/evals', children: true },
   { from: '/insights/platform', to: '/operations/health', children: true },
