@@ -25,11 +25,7 @@ import {
 } from '@/lib/object-store';
 import { signS3Request } from '@/lib/s3-sigv4';
 import { getServiceCredential } from '@/lib/service-credentials';
-import {
-  buildLifecycleXml,
-  parseLifecycleXml,
-  type LifecycleRule,
-} from '@/lib/storage-lifecycle';
+import { buildLifecycleXml, parseLifecycleXml, type LifecycleRule } from '@/lib/storage-lifecycle';
 
 const S3 = (process.env.OFFGRID_SEAWEEDFS_URL || 'http://127.0.0.1:8333').replace(/\/$/, '');
 
@@ -45,8 +41,15 @@ function keyPath(key: string): string {
 }
 
 // The one S3 request seam — SigV4-signs when a keypair is provisioned, else issues unsigned.
-async function s3Fetch(url: string, init: RequestInit & { body?: Uint8Array } = {}): Promise<Response> {
-  const cred = await getServiceCredential('seaweedfs');
+type S3Credential = Awaited<ReturnType<typeof getServiceCredential>>;
+type S3CredentialResolver = () => Promise<S3Credential>;
+
+async function s3Fetch(
+  url: string,
+  init: RequestInit & { body?: Uint8Array } = {},
+  credential: S3CredentialResolver = () => getServiceCredential('seaweedfs'),
+): Promise<Response> {
+  const cred = await credential();
   if (cred.kind !== 's3') return fetch(url, init);
   const method = (init.method ?? 'GET').toUpperCase();
   const callerHeaders = (init.headers as Record<string, string>) ?? {};
@@ -87,113 +90,177 @@ export interface ObjectStorePort {
   listBuckets(): Promise<BucketRow[]>;
   createBucket(name: string): Promise<void>;
   deleteBucket(name: string): Promise<void>;
-  listObjects(bucket: string, opts?: { prefix?: string; delimiter?: string; token?: string }): Promise<ObjectListing>;
+  listObjects(
+    bucket: string,
+    opts?: { prefix?: string; delimiter?: string; token?: string },
+  ): Promise<ObjectListing>;
   headObject(bucket: string, key: string): Promise<ObjectDetail | null>;
-  putObject(bucket: string, key: string, body: Buffer, contentType: string, metadata?: Record<string, string>): Promise<void>;
+  putObject(
+    bucket: string,
+    key: string,
+    body: Buffer,
+    contentType: string,
+    metadata?: Record<string, string>,
+  ): Promise<void>;
   getObject(bucket: string, key: string): Promise<GetObjectResult | null>;
   deleteObject(bucket: string, key: string): Promise<boolean>;
   getLifecycle(bucket: string): Promise<LifecyclePortState>;
   setLifecycle(bucket: string, rules: LifecycleRule[]): Promise<LifecyclePortState>;
 }
 
+export interface S3ObjectStoreConfig {
+  endpoint: string;
+  credential?: S3CredentialResolver;
+}
+
+/** Two real S3 endpoints share this one port implementation; callers only supply endpoint + auth. */
+export function createS3ObjectStore(config: S3ObjectStoreConfig): ObjectStorePort {
+  const parsed = new URL(config.endpoint);
+  if (
+    (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new TypeError('S3 endpoint must be a credential-free http(s) origin or base path.');
+  }
+  const endpoint = config.endpoint.replace(/\/$/, '');
+  const credential = config.credential ?? (() => getServiceCredential('seaweedfs'));
+  const request = (url: string, init?: RequestInit & { body?: Uint8Array }) =>
+    s3Fetch(url, init, credential);
+
+  return {
+    async health() {
+      try {
+        const res = await request(endpoint, { method: 'GET', signal: AbortSignal.timeout(2500) });
+        return res.ok || res.status === 403;
+      } catch {
+        return false;
+      }
+    },
+
+    async listBuckets() {
+      const res = await request(endpoint, { method: 'GET' });
+      if (!res.ok) throw new Error(`listBuckets failed: ${await errorContext(res)}`);
+      return parseListBucketsXml(await res.text());
+    },
+
+    async createBucket(name) {
+      const res = await request(`${endpoint}/${encodeURIComponent(name)}`, { method: 'PUT' });
+      // 200 created; 409 BucketAlreadyOwnedByYou is idempotent-OK.
+      if (!res.ok && res.status !== 409)
+        throw new Error(`createBucket failed: ${await errorContext(res)}`);
+    },
+
+    async deleteBucket(name) {
+      const res = await request(`${endpoint}/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      if (!res.ok && res.status !== 404)
+        throw new Error(`deleteBucket failed: ${await errorContext(res)}`);
+    },
+
+    async listObjects(bucket, opts = {}) {
+      const prefix = opts.prefix ?? '';
+      const delimiter = opts.delimiter ?? '/';
+      const params = new URLSearchParams({ 'list-type': '2', 'max-keys': '1000' });
+      if (prefix) params.set('prefix', prefix);
+      if (delimiter) params.set('delimiter', delimiter);
+      if (opts.token) params.set('continuation-token', opts.token);
+      const res = await request(`${endpoint}/${encodeURIComponent(bucket)}?${params.toString()}`, {
+        method: 'GET',
+      });
+      if (!res.ok) throw new Error(`listObjects failed: ${await errorContext(res)}`);
+      return parseListObjectsXml(await res.text(), prefix);
+    },
+
+    async headObject(bucket, key) {
+      const res = await request(`${endpoint}/${encodeURIComponent(bucket)}/${keyPath(key)}`, {
+        method: 'HEAD',
+      });
+      if (!res.ok) return null;
+      const headers: Record<string, string> = {};
+      res.headers.forEach((v, k) => {
+        headers[k.toLowerCase()] = v;
+      });
+      return shapeObjectDetail(bucket, key, headers);
+    },
+
+    async putObject(bucket, key, body, contentType, metadata) {
+      const metaHeaders: Record<string, string> = {};
+      for (const [k, v] of Object.entries(metadata ?? {}))
+        metaHeaders[`x-amz-meta-${k}`] = encodeURIComponent(v);
+      const res = await request(`${endpoint}/${encodeURIComponent(bucket)}/${keyPath(key)}`, {
+        method: 'PUT',
+        headers: { 'content-type': contentType || 'application/octet-stream', ...metaHeaders },
+        body: new Uint8Array(body),
+      });
+      if (!res.ok) throw new Error(`putObject failed: ${await errorContext(res)}`);
+    },
+
+    async getObject(bucket, key) {
+      const res = await request(`${endpoint}/${encodeURIComponent(bucket)}/${keyPath(key)}`, {
+        method: 'GET',
+      });
+      if (!res.ok) return null;
+      const buf = Buffer.from(await res.arrayBuffer());
+      return {
+        bytes: buf,
+        contentType: res.headers.get('content-type') || 'application/octet-stream',
+        size: buf.length,
+      };
+    },
+
+    async deleteObject(bucket, key) {
+      const res = await request(`${endpoint}/${encodeURIComponent(bucket)}/${keyPath(key)}`, {
+        method: 'DELETE',
+      });
+      return res.ok || res.status === 204;
+    },
+
+    async getLifecycle(bucket) {
+      const res = await request(`${endpoint}/${encodeURIComponent(bucket)}?lifecycle=`, {
+        method: 'GET',
+      });
+      if (res.status === 404 || res.status === 204) return { supported: true, rules: [] };
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        if (/NoSuchLifecycleConfiguration/i.test(body)) return { supported: true, rules: [] };
+        if (res.status === 501 || res.status === 405)
+          return {
+            supported: false,
+            rules: [],
+            note: `SeaweedFS S3 returned ${res.status} for GetBucketLifecycle`,
+          };
+        return { supported: false, rules: [], note: `lifecycle read failed (${res.status})` };
+      }
+      return { supported: true, rules: parseLifecycleXml(await res.text()) };
+    },
+
+    async setLifecycle(bucket, rules) {
+      const res = await request(`${endpoint}/${encodeURIComponent(bucket)}?lifecycle=`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/xml' },
+        body: new Uint8Array(Buffer.from(buildLifecycleXml(rules))),
+      });
+      if (!res.ok) {
+        if (res.status === 501 || res.status === 405)
+          return {
+            supported: false,
+            rules: [],
+            note: `SeaweedFS S3 returned ${res.status} for PutBucketLifecycle`,
+          };
+        const body = await res.text().catch(() => '');
+        return {
+          supported: false,
+          rules: [],
+          note: `lifecycle write failed (${res.status}) ${body.slice(0, 200)}`,
+        };
+      }
+      return this.getLifecycle(bucket);
+    },
+  };
+}
+
 // ── SeaweedFS implementation ─────────────────────────────────────────────────────────────────────
-export const seaweedfsObjectStore: ObjectStorePort = {
-  async health() {
-    try {
-      const res = await s3Fetch(S3, { method: 'GET', signal: AbortSignal.timeout(2500) });
-      return res.ok || res.status === 403;
-    } catch {
-      return false;
-    }
-  },
-
-  async listBuckets() {
-    const res = await s3Fetch(S3, { method: 'GET' });
-    if (!res.ok) throw new Error(`listBuckets failed: ${await errorContext(res)}`);
-    return parseListBucketsXml(await res.text());
-  },
-
-  async createBucket(name) {
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(name)}`, { method: 'PUT' });
-    // 200 created; 409 BucketAlreadyOwnedByYou is idempotent-OK.
-    if (!res.ok && res.status !== 409) throw new Error(`createBucket failed: ${await errorContext(res)}`);
-  },
-
-  async deleteBucket(name) {
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(name)}`, { method: 'DELETE' });
-    if (!res.ok && res.status !== 404) throw new Error(`deleteBucket failed: ${await errorContext(res)}`);
-  },
-
-  async listObjects(bucket, opts = {}) {
-    const prefix = opts.prefix ?? '';
-    const delimiter = opts.delimiter ?? '/';
-    const params = new URLSearchParams({ 'list-type': '2', 'max-keys': '1000' });
-    if (prefix) params.set('prefix', prefix);
-    if (delimiter) params.set('delimiter', delimiter);
-    if (opts.token) params.set('continuation-token', opts.token);
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(bucket)}?${params.toString()}`, { method: 'GET' });
-    if (!res.ok) throw new Error(`listObjects failed: ${await errorContext(res)}`);
-    return parseListObjectsXml(await res.text(), prefix);
-  },
-
-  async headObject(bucket, key) {
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(bucket)}/${keyPath(key)}`, { method: 'HEAD' });
-    if (!res.ok) return null;
-    const headers: Record<string, string> = {};
-    res.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
-    return shapeObjectDetail(bucket, key, headers);
-  },
-
-  async putObject(bucket, key, body, contentType, metadata) {
-    const metaHeaders: Record<string, string> = {};
-    for (const [k, v] of Object.entries(metadata ?? {})) metaHeaders[`x-amz-meta-${k}`] = encodeURIComponent(v);
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(bucket)}/${keyPath(key)}`, {
-      method: 'PUT',
-      headers: { 'content-type': contentType || 'application/octet-stream', ...metaHeaders },
-      body: new Uint8Array(body),
-    });
-    if (!res.ok) throw new Error(`putObject failed: ${await errorContext(res)}`);
-  },
-
-  async getObject(bucket, key) {
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(bucket)}/${keyPath(key)}`, { method: 'GET' });
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    return {
-      bytes: buf,
-      contentType: res.headers.get('content-type') || 'application/octet-stream',
-      size: buf.length,
-    };
-  },
-
-  async deleteObject(bucket, key) {
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(bucket)}/${keyPath(key)}`, { method: 'DELETE' });
-    return res.ok || res.status === 204;
-  },
-
-  async getLifecycle(bucket) {
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(bucket)}?lifecycle=`, { method: 'GET' });
-    if (res.status === 404 || res.status === 204) return { supported: true, rules: [] };
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      if (/NoSuchLifecycleConfiguration/i.test(body)) return { supported: true, rules: [] };
-      if (res.status === 501 || res.status === 405) return { supported: false, rules: [], note: `SeaweedFS S3 returned ${res.status} for GetBucketLifecycle` };
-      return { supported: false, rules: [], note: `lifecycle read failed (${res.status})` };
-    }
-    return { supported: true, rules: parseLifecycleXml(await res.text()) };
-  },
-
-  async setLifecycle(bucket, rules) {
-    const res = await s3Fetch(`${S3}/${encodeURIComponent(bucket)}?lifecycle=`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/xml' },
-      body: new Uint8Array(Buffer.from(buildLifecycleXml(rules))),
-    });
-    if (!res.ok) {
-      if (res.status === 501 || res.status === 405) return { supported: false, rules: [], note: `SeaweedFS S3 returned ${res.status} for PutBucketLifecycle` };
-      const body = await res.text().catch(() => '');
-      return { supported: false, rules: [], note: `lifecycle write failed (${res.status}) ${body.slice(0, 200)}` };
-    }
-    return this.getLifecycle(bucket);
-  },
-};
+// Byte-compatible default: same endpoint and service-token credential owner as before.
+export const seaweedfsObjectStore: ObjectStorePort = createS3ObjectStore({ endpoint: S3 });

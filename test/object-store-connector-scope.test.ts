@@ -3,10 +3,12 @@ import test from 'node:test';
 import {
   MAX_OBJECT_UPLOAD_BYTES,
   parseObjectScopeResource,
+  parseObjectStoreCredential,
   relativeObjectKey,
   resolveObjectAccessScope,
   scopedObjectKey,
   scopedObjectPrefix,
+  serializeObjectStoreCredential,
   validateObjectUpload,
 } from '@/lib/object-store';
 
@@ -61,7 +63,7 @@ test('scope resolver requires the active org, connector and exact domain togethe
       bindings,
     }).ok,
     false,
-    'an org cannot select another tenant\'s domain even on a same-id connector',
+    "an org cannot select another tenant's domain even on a same-id connector",
   );
   assert.equal(
     resolveObjectAccessScope({
@@ -92,7 +94,13 @@ test('relative navigation cannot escape its approved prefix or bucket', () => {
   assert.deepEqual(scopedObjectPrefix(scope, 'july'), { ok: true, prefix: 'settled/2026/july/' });
   assert.equal(relativeObjectKey(scope, 'settled/2026/july/claim-12.pdf'), 'july/claim-12.pdf');
   assert.equal(relativeObjectKey(scope, 'private/claim-12.pdf'), null);
-  for (const escape of ['../private.pdf', 'july/../../private.pdf', '/private.pdf', 'a\\b.pdf', '']) {
+  for (const escape of [
+    '../private.pdf',
+    'july/../../private.pdf',
+    '/private.pdf',
+    'a\\b.pdf',
+    '',
+  ]) {
     assert.equal(scopedObjectKey(scope, escape).ok, false, escape);
   }
   assert.equal(scopedObjectPrefix(scope, '../private').ok, false);
@@ -103,9 +111,18 @@ test('uploads are bounded by size, approved media type and safe relative key', (
     validateObjectUpload({ relativeKey: 'claim-12.pdf', size: 42, contentType: 'application/pdf' }),
     { ok: true },
   );
-  assert.equal(validateObjectUpload({ relativeKey: '../x', size: 1, contentType: 'text/plain' }).ok, false);
-  assert.equal(validateObjectUpload({ relativeKey: 'x.html', size: 1, contentType: 'text/html' }).ok, false);
-  assert.equal(validateObjectUpload({ relativeKey: 'x.pdf', size: 0, contentType: 'application/pdf' }).ok, false);
+  assert.equal(
+    validateObjectUpload({ relativeKey: '../x', size: 1, contentType: 'text/plain' }).ok,
+    false,
+  );
+  assert.equal(
+    validateObjectUpload({ relativeKey: 'x.html', size: 1, contentType: 'text/html' }).ok,
+    false,
+  );
+  assert.equal(
+    validateObjectUpload({ relativeKey: 'x.pdf', size: 0, contentType: 'application/pdf' }).ok,
+    false,
+  );
   assert.equal(
     validateObjectUpload({
       relativeKey: 'x.pdf',
@@ -114,4 +131,15 @@ test('uploads are bounded by size, approved media type and safe relative key', (
     }).ok,
     false,
   );
+});
+
+test('connector S3 keypair stays one opaque vaulted value and malformed values fail closed', () => {
+  const encoded = serializeObjectStoreCredential({ accessKey: 'access', secretKey: 'secret' });
+  assert.deepEqual(parseObjectStoreCredential(encoded), {
+    accessKey: 'access',
+    secretKey: 'secret',
+  });
+  for (const malformed of [null, '', 'access:secret', '{}', '{"accessKey":"only"}', 'not-json']) {
+    assert.equal(parseObjectStoreCredential(malformed), null);
+  }
 });
