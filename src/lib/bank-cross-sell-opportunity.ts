@@ -107,13 +107,28 @@ function eligibleScheme(rows: readonly Record<string, unknown>[]): EligibleSchem
 
 function recommendation(
   snapshot: BankCrossSellSourceSnapshot,
+  customer: Record<string, unknown>,
   industry: string,
   priority: string,
   scheme: EligibleScheme | null,
   customerId: string,
 ): CrossSellRecommendation | null {
   if (!scheme || !priority) return null;
-  const eligible = industry === priority;
+  const groupSize = amount(customer, ['group_size', 'member_count', 'employee_count']);
+  const constraints: string[] = [];
+  if (industry !== priority) {
+    constraints.push(`The governed cohort policy currently prioritises ${priority}.`);
+  }
+  if (groupSize === 0) {
+    constraints.push(
+      `Customer group size is not available to prove the minimum of ${scheme.minimumGroupSize}.`,
+    );
+  } else if (groupSize < scheme.minimumGroupSize) {
+    constraints.push(
+      `Customer group size ${groupSize} is below the governed minimum of ${scheme.minimumGroupSize}.`,
+    );
+  }
+  const eligible = constraints.length === 0;
   const rate = Number.isFinite(scheme.ageBandRate)
     ? `${scheme.ageBandRate} per mille for age 31–40`
     : 'the currently governed rate card';
@@ -122,7 +137,7 @@ function recommendation(
     rationale: `${priority} is the largest customer cohort. ${scheme.name} has the lowest minimum group size (${scheme.minimumGroupSize}) and ${rate}.`,
     confidence: eligible ? 0.86 : 0.68,
     eligible,
-    constraints: eligible ? [] : [`The governed cohort policy currently prioritises ${priority}.`],
+    constraints,
     citations: [
       {
         source: snapshot.customerDomain,
@@ -151,7 +166,7 @@ export function assembleBankCrossSellOpportunities(
     const industry = text(row, ['industry', 'sector']);
     return [
       {
-        opportunityId: text(row, ['opportunity_id', 'opportunityId']) || `account-${customerId}`,
+        opportunityId: text(row, ['opportunity_id', 'opportunityId']) || `candidate:${customerId}`,
         customerId,
         customerName,
         relationshipManager:
@@ -159,14 +174,14 @@ export function assembleBankCrossSellOpportunities(
         segment: text(row, ['segment', 'tier']) || 'Not recorded',
         region: text(row, ['region', 'city', 'branch_region']) || 'Not recorded',
         currentProducts: list(row, ['current_products', 'holdings', 'products']),
-        opportunityValueInr: amount(row, ['opportunity_value_inr', 'arr', 'value']),
+        opportunityValueInr: amount(row, ['opportunity_value_inr', 'cross_sell_value_inr']),
         source: {
           kind: 'live' as const,
           customerDomain: snapshot.customerDomain,
           eligibilityDomain: snapshot.eligibilityDomain,
           readAt: snapshot.readAt,
         },
-        recommendation: recommendation(snapshot, industry, priority, scheme, customerId),
+        recommendation: recommendation(snapshot, row, industry, priority, scheme, customerId),
         runId: null,
         rmDecision: { status: 'pending' as const, reason: null, reviewer: null, decidedAt: null },
         actionReceipt: null,

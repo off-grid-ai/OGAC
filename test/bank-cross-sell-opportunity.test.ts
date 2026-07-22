@@ -16,6 +16,7 @@ test('assembles an eligible RM opportunity from live customer and rate-card fact
         industry: 'Insurance',
         tier: 'enterprise',
         arr: 2_000_000,
+        group_size: 40,
         owner: 'RM A',
       },
       {
@@ -24,6 +25,7 @@ test('assembles an eligible RM opportunity from live customer and rate-card fact
         industry: 'Insurance',
         tier: 'enterprise',
         arr: 1_000_000,
+        group_size: 30,
         owner: 'RM B',
       },
       {
@@ -32,6 +34,7 @@ test('assembles an eligible RM opportunity from live customer and rate-card fact
         industry: 'Banking',
         tier: 'mid-market',
         arr: 900_000,
+        group_size: 30,
         owner: 'RM C',
       },
     ],
@@ -43,6 +46,8 @@ test('assembles an eligible RM opportunity from live customer and rate-card fact
 
   assert.equal(views.length, 3);
   assert.equal(views[0].source.kind, 'live');
+  assert.equal(views[0].opportunityId, 'candidate:1');
+  assert.equal(views[0].opportunityValueInr, 0, 'account ARR is not cross-sell opportunity value');
   assert.equal(views[0].recommendation?.product, 'Scheme A');
   assert.equal(views[0].recommendation?.eligible, true);
   assert.equal(views[2].recommendation?.eligible, false);
@@ -53,6 +58,22 @@ test('assembles an eligible RM opportunity from live customer and rate-card fact
     views[0].recommendation?.citations.map((citation) => citation.record),
     ['accounts/1', 'pricing_rate_card/2'],
   );
+});
+
+test('ranking does not become eligibility without customer facts proving the rate-card constraint', () => {
+  const [view] = assembleBankCrossSellOpportunities({
+    customerDomain: 'customer data',
+    eligibilityDomain: 'pricing rate card',
+    customerResource: 'accounts',
+    eligibilityResource: 'pricing_rate_card',
+    readAt: '2026-07-23T00:00:00.000Z',
+    customerRows: [{ id: 1, name: 'Alpha Ltd', industry: 'Insurance', arr: 2_000_000 }],
+    eligibilityRows: [{ scheme_type: 'Scheme A', age_band: '31-40', min_group_size: 10 }],
+  });
+  assert.equal(view.recommendation?.eligible, false);
+  assert.deepEqual(view.recommendation?.constraints, [
+    'Customer group size is not available to prove the minimum of 10.',
+  ]);
 });
 
 test('never manufactures an opportunity when the customer source lacks an identity', () => {
