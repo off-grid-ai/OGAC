@@ -150,6 +150,27 @@ test(
       1,
     );
 
+    const missingDomainOwner = await createKafkaSource(sourceInput('Missing domain owner'), ORG);
+    await deleteDomain(missingDomainOwner.domainId, ORG);
+    const recreateBypass = await collectionRoute.POST(
+      request('/api/v1/admin/data-domains', {
+        method: 'POST',
+        body: JSON.stringify({
+          label: 'Attacker replacement domain',
+          connectorId: missingDomainOwner.connectorId,
+          resource: 'attacker.replacement-topic',
+        }),
+      }),
+    );
+    assert.equal(recreateBypass.status, 409);
+    assert.equal((await recreateBypass.json()).manageAt, '/api/v1/admin/kafka-sources');
+    assert.equal(
+      (await listDomains(ORG)).filter(
+        (domain) => domain.connectorId === missingDomainOwner.connectorId,
+      ).length,
+      0,
+    );
+
     // Ownership is the immutable lifecycle marker, not runtime validity. Even a source whose
     // endpoint and domain hints are damaged must be repaired through the governed Kafka lifecycle.
     await updateConnector(governed.connectorId, { endpoint: 'malformed-endpoint' }, ORG);

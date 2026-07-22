@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { connectors, dataDomains, ingestJobs } from '@/db/schema';
 import {
   isGovernedKafkaBinding,
+  isGovernedKafkaConnector as isGovernedKafkaConnectorOwner,
   resolveKafkaConnectorBinding,
 } from '@/lib/adapters/kafka-connector-binding';
 import {
@@ -150,11 +151,7 @@ export async function isGovernedKafkaConnector(
   connectorId: string,
   orgId: string,
 ): Promise<boolean> {
-  const domains = (await listDomains(orgId)).filter((domain) => domain.connectorId === connectorId);
-  for (const domain of domains) {
-    if (await isGovernedKafkaBinding({ orgId, connectorId, domainId: domain.id })) return true;
-  }
-  return false;
+  return isGovernedKafkaConnectorOwner({ orgId, connectorId });
 }
 
 /**

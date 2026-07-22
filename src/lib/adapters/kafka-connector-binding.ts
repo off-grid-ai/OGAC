@@ -201,16 +201,23 @@ function parseBootstrapBroker(endpoint: string): { broker: string; tls: boolean 
  * repair bypass. Generic Kafka metadata fixtures remain outside this owner because they lack the
  * exact canonical connector secret reference.
  */
+export async function isGovernedKafkaConnector(input: {
+  orgId: string;
+  connectorId: string;
+}): Promise<boolean> {
+  const connector = await getConnector(input.connectorId, input.orgId);
+  if (!connector || connector.type.toLowerCase() !== 'kafka') return false;
+  return (await getConnectorSecretRef(connector.id)) === connectorSecretKey(connector.id);
+}
+
 export async function isGovernedKafkaBinding(input: {
   orgId: string;
   connectorId: string;
   domainId: string;
 }): Promise<boolean> {
-  const connector = await getConnector(input.connectorId, input.orgId);
-  if (!connector || connector.type.toLowerCase() !== 'kafka') return false;
+  if (!(await isGovernedKafkaConnector(input))) return false;
   const domain = await getDomain(input.domainId, input.orgId);
-  if (!domain || domain.connectorId !== connector.id) return false;
-  return (await getConnectorSecretRef(connector.id)) === connectorSecretKey(connector.id);
+  return domain?.connectorId === input.connectorId;
 }
 
 /**
