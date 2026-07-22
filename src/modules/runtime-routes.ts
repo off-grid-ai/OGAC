@@ -44,6 +44,12 @@ export const MODEL_DESTINATIONS = [
     description: 'Model tuning and runtime parameters.',
     route: '/runtime/models/tuning',
   },
+  {
+    id: 'spend',
+    label: 'Spend',
+    description: 'Cost, tokens, and request volume attributed by model, key, and time.',
+    route: '/runtime/models/spend',
+  },
 ] as const;
 
 export const API_BUDGET_DESTINATIONS = [

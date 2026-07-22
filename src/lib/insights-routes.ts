@@ -13,9 +13,21 @@ export const INSIGHTS_AI_DESTINATIONS = [
   },
   {
     id: 'prompt-registry',
-    label: 'Prompt registry',
-    description: 'Read back prompts, datasets, and sessions from the tracing store.',
+    label: 'Registry',
+    description: 'Read back prompt, dataset, and session versions recorded by the tracing store.',
     route: '/insights/ai/prompt-registry',
+  },
+  {
+    id: 'langfuse-prompts',
+    label: 'Prompts',
+    description: 'Manage tracing-store prompts: versions, labels, and rollout — full lifecycle.',
+    route: '/insights/ai/langfuse-prompts',
+  },
+  {
+    id: 'langfuse-datasets',
+    label: 'Datasets',
+    description: 'Manage tracing-store datasets, items, and experiment runs.',
+    route: '/insights/ai/langfuse-datasets',
   },
   {
     id: 'copilot',
