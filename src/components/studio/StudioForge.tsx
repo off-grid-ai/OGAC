@@ -188,9 +188,9 @@ export function StudioForge({
   }
 
   return (
-    <div className="flex h-[calc(100vh-8.5rem)] gap-3">
+    <div className="flex min-h-[calc(100vh-8.5rem)] flex-col gap-3 lg:h-[calc(100vh-8.5rem)] lg:min-h-0 lg:flex-row">
       {/* ── LEFT: conversation ─────────────────────────────────────────────────────── */}
-      <div className="flex w-full max-w-[440px] shrink-0 flex-col rounded-lg border border-border bg-card">
+      <div className="flex min-h-[32rem] w-full shrink-0 flex-col rounded-lg border border-border bg-card lg:min-h-0 lg:max-w-[440px]">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <Lightning weight="fill" className="size-4 text-primary" />
           <div>
@@ -265,7 +265,7 @@ export function StudioForge({
       </div>
 
       {/* ── RIGHT: live preview ────────────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col rounded-lg border border-border bg-card">
+      <div className="flex min-h-[32rem] min-w-0 flex-1 flex-col rounded-lg border border-border bg-card lg:min-h-0">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
           <div className="flex gap-1">
             {PREVIEWS.map((item) => (
