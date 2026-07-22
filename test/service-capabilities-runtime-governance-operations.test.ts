@@ -104,9 +104,14 @@ test('LLM Guard has a pinned archived denominator without conflating Off Grid sh
       ]),
     ),
     {
-      'prompt-sanitization': ['yes', 'yes', 'yes', 'no'],
+      // prompt redaction proven live: /analyze/prompt redacts PAN→[REDACTED] + email→[REDACTED_EMAIL...]
+      // (is_valid:false, Anonymize/Regex fired) + retained on governed run run_b542fcf7. Per-request
+      // custom-recognizer reconfiguration is a scanner-policy-lifecycle concern, tracked there.
+      'prompt-sanitization': ['yes', 'yes', 'yes', 'yes'],
       'prompt-threat-scanning': ['yes', 'partial', 'partial', 'partial'],
-      'output-safety-quality': ['yes', 'no', 'partial', 'no'],
+      // output scanning proven live: /analyze/output trips Toxicity:1 → is_valid:false; retained per
+      // run (run_f7aa3cb5). workflow stays partial: no retained run where the output guard BLOCKS.
+      'output-safety-quality': ['yes', 'yes', 'partial', 'partial'],
       'scanner-policy-lifecycle': ['yes', 'partial', 'partial', 'no'],
       'api-auth-rate-limits': ['yes', 'yes', 'no', 'partial'],
       'availability-failure-policy': ['yes', 'partial', 'partial', 'partial'],
@@ -229,11 +234,15 @@ test('stale common execution spine records name exact immutable-identity blocker
     [gatewayGovernance.gates.adapter.status, gatewayGovernance.gates.workflow.status],
     ['partial', 'partial'],
   );
+  // OPA's capabilities are CLOSED + verified live (OFFGRID_ADAPTER_POLICY=opa; a live decision is
+  // attributed engine:opa; Rego deploy/reload/rollback proven) — only its immutable image digest is
+  // still unpinned, which is why auditState stays `stale` (see auditStateEvidence above). So the
+  // capability gates are `yes`; the staleness is a provenance/digest axis, not a capability gap.
   assert.deepEqual(
     [opaDecisions.gates.adapter.status, opaDecisions.gates.workflow.status],
-    ['partial', 'no'],
+    ['yes', 'yes'],
   );
-  assert.equal(opaLifecycle.gates.workflow.status, 'no');
+  assert.equal(opaLifecycle.gates.workflow.status, 'yes');
 });
 
 test('audited services have version evidence and honest item-level four-gate evidence', () => {

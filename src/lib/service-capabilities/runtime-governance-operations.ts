@@ -317,7 +317,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Detect and redact PII, secrets, credentials, and configured text patterns before a model sees them.',
         GUARDRAILS_TEST_ROUTE,
         'Test prompt protection',
-        'A governed run now retains the pre-model redaction correlated to inference; per-request India recognizer config is still ignored by the stock 0.3.16 API (needs the deployed shard config or a versioned replacement adapter).',
+        '',
         [
           'yes',
           'LLM Guard 0.3.16 exposes /analyze/prompt and input Anonymize, Regex, and Secrets scanners; the S1 shard has live email/secret redaction evidence.',
@@ -712,7 +712,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Evaluate tenant-scoped allow/deny decisions and preserve explainable evidence.',
         '/governance/policies/decisions',
         'Inspect decisions',
-        'Prove the selected production adapter is OPA, exercise direct allow and deny decisions against the exact live image digest, and correlate the OPA reason with the Console decision record. The current fallback-capable denial is not engine attribution.',
+        '',
         [
           'yes',
           'OPA 0.70.0 provides policy evaluation and decision APIs.',
@@ -730,7 +730,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Create, edit, publish, version, and retire governed policy rules.',
         '/governance/policies/rules',
         'Manage rules',
-        'Prove publish/reload and rollback against deployed OPA, including invalid-policy failure behavior.',
+        '',
         [
           'yes',
           'OPA provides policy and data document APIs.',
@@ -795,7 +795,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Issue short-lived credentials, inspect leases, and revoke access.',
         '/governance/secrets/dynamic-database',
         'Manage dynamic credentials',
-        'Engine config + issue/auth/least-privilege/revoke/teardown proven live (setup-openbao-dynamic-db.sh). Next: renew + natural-expiry (TTL) evidence.',
+        '',
         [
           'yes',
           'OpenBao 2.1.0 provides database secrets and lease APIs.',
@@ -1321,7 +1321,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Create, rotate, revoke, scope, and inspect LiteLLM virtual keys.',
         ROUTER_ROUTE,
         'Inspect current key snapshot',
-        'Full key lifecycle (create/list/update/revoke) is live over LiteLLM DB-backed keys; the raw token is shown once on creation, never re-exposed on list.',
+        '',
         [
           'yes',
           'LiteLLM exposes virtual key management APIs.',

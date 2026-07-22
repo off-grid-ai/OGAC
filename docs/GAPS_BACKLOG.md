@@ -1171,3 +1171,9 @@ gate-status vs gap-text reconciliation (do NOT rubber-stamp gates to green the t
    `llm-guard` (output-safety-quality, prompt-sanitization) and the common execution-spine record that
    no longer match the map. Reconcile the test to the *verified* map, or the map to reality — after
    confirming each gate live, not from the snapshot.
+
+### RESOLVED 2026-07-22 — Capability-map honesty drift closed
+All map-honesty test failures reconciled to VERIFIED-LIVE truth (not rubber-stamped):
+- **llm-guard** re-verified live: `/analyze/prompt` redacts PAN→[REDACTED] + email (is_valid:false, Anonymize/Regex fired); `/analyze/output` trips Toxicity:1 → is_valid:false. Confirms prompt-sanitization [y,y,y,y] + output-safety-quality [y,y,partial,partial] (workflow partial: no retained BLOCKED-output run). Test snapshot updated to match.
+- **OPA** re-verified live: `OFFGRID_ADAPTER_POLICY=opa`, a live decision attributed `engine:opa`. policy-decisions + policy-lifecycle are CLOSED (gates yes, stale item gaps cleared). auditState stays `stale` — only the immutable image digest is unpinned (that residual lives in auditStateEvidence, a provenance axis, not a capability gap). Spine test updated: OPA capability gates are `yes` while it remains identity-stale.
+- Cleared vestigial completion-statement gaps on all-yes+verified records: openbao/dynamic-credentials, litellm/virtual-keys, ragas/faithfulness, ragas/answer-relevancy. Full map suite (43 tests) green.
