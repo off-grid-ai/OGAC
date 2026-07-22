@@ -19,6 +19,11 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
+import {
+  BuilderCapabilityContext,
+  useBuilderCapabilityContext,
+  type BuilderCapabilityContextState,
+} from '@/components/build/BuilderCapabilityContext';
 import { InheritanceBanner } from '@/components/build/InheritanceBanner';
 import { DomainFormPanel, type ConnectorOption } from '@/components/data-domains/DomainFormPanel';
 import { StudioCanvas } from '@/components/studio/StudioCanvas';
@@ -56,6 +61,7 @@ import {
   mergeFixIts,
   type FixIt,
 } from '@/lib/builder-gaps';
+import { resolveBuilderSurfaceAccess } from '@/lib/builder-surface-access';
 import type { OrgContextSummary } from '@/lib/org-context';
 
 // ─── AppBuilder (Builder Epic #115) — the USABLE guided BUILD screen ──────────────────────────────
@@ -139,6 +145,8 @@ export function AppBuilder({
   const pathname = usePathname();
   const params = useSearchParams();
   const editing = !!initialApp;
+  const capabilityContext = useBuilderCapabilityContext(initialApp?.id);
+  const access = resolveBuilderSurfaceAccess(capabilityContext.state, editing);
 
   const rawPhase = params.get('phase');
   const phase: Phase = editing || rawPhase === 'refine' ? 'refine' : 'describe';
@@ -198,6 +206,10 @@ export function AppBuilder({
   // Compile the plain-language description → an AppSpec skeleton + honest gaps.
   async function compile() {
     if (description.trim().length < 8 || compiling) return;
+    if (!access.canCreate) {
+      toast.error(access.createExplanation);
+      return;
+    }
     setCompiling(true);
     try {
       const res = await fetch('/api/v1/admin/apps/compile', {
@@ -221,6 +233,10 @@ export function AppBuilder({
   // Save the refined spec → route to the saved app's own surface (Build tab).
   async function save() {
     if (!spec || saving) return;
+    if (!access.canSave) {
+      toast.error(access.saveExplanation);
+      return;
+    }
     const check = validateAppSpec(spec);
     if (!check.ok) {
       toast.error(check.errors[0] ?? 'Resolve the flagged steps first');
@@ -263,7 +279,15 @@ export function AppBuilder({
   // Act on a fix-it: data-source gaps open the inline create panel; step gaps scroll to + highlight
   // the step so its own binding editor is right there.
   function actOnFixIt(f: FixIt) {
+    if (!access.canSave) {
+      toast.error(access.saveExplanation);
+      return;
+    }
     if (f.action === 'wire-data-source') {
+      if (!access.canConfigureData) {
+        toast.error(access.configureDataExplanation);
+        return;
+      }
       setWirePhrase(f.phrase ?? '');
       return;
     }
@@ -309,6 +333,7 @@ export function AppBuilder({
   return (
     <div className="w-full space-y-5">
       <InheritanceBanner summary={summary} />
+      <BuilderCapabilityContext state={capabilityContext.state} onRetry={capabilityContext.retry} />
 
       {phase === 'describe' ? (
         <DescribePhase
@@ -316,6 +341,8 @@ export function AppBuilder({
           setDescription={setDescription}
           compiling={compiling}
           onCompile={compile}
+          canCreate={access.canCreate}
+          accessMessage={access.createExplanation}
         />
       ) : null}
 
@@ -335,7 +362,16 @@ export function AppBuilder({
 
           {/* THE FIX-IT PANEL — the founder's usability bar: warnings become one-click actions. */}
           {fixIts.length > 0 ? (
-            <FixItPanel items={fixIts} onAct={actOnFixIt} />
+            <FixItPanel
+              items={fixIts}
+              onAct={actOnFixIt}
+              disabledReason={(item) => {
+                if (!access.canSave) return access.saveExplanation;
+                if (item.action === 'wire-data-source' && !access.canConfigureData) {
+                  return access.configureDataExplanation;
+                }
+              }}
+            />
           ) : (
             <div className="flex items-center gap-2 rounded-md border border-primary/25 bg-primary/[0.05] px-3 py-2 text-xs text-primary">
               <CheckCircle className="size-4" weight="fill" />
@@ -344,15 +380,18 @@ export function AppBuilder({
           )}
 
           {view === 'guided' ? (
-            <GuidedRefine
-              spec={spec}
-              names={names}
-              pipelines={pipelines}
-              highlightStep={highlightStep}
-              handlersFor={handlersFor}
-              connectors={connectors}
-              onSpec={setSpec}
-            />
+            <fieldset disabled={!access.canSave} className="m-0 min-w-0 border-0 p-0">
+              <GuidedRefine
+                spec={spec}
+                names={names}
+                pipelines={pipelines}
+                highlightStep={highlightStep}
+                handlersFor={handlersFor}
+                connectors={connectors}
+                onSpec={setSpec}
+                capabilityContext={capabilityContext.state}
+              />
+            </fieldset>
           ) : (
             <>
               {/* Mobile: the drag-and-connect node canvas needs pointer precision and width it can't
@@ -380,20 +419,37 @@ export function AppBuilder({
                 </CardContent>
               </Card>
               <Card className="hidden shadow-sm md:block">
-                <CardContent className="p-3">
-                  <StudioCanvas
-                    domains={domains}
-                    agents={agents}
-                    initialSpec={spec}
-                    onSpecChange={(next) => setSpec(next)}
-                  />
+                <CardContent className="space-y-3 p-3">
+                  {!access.canSave ? (
+                    <div className="rounded-md border border-border bg-muted/40 px-3 py-2">
+                      <p className="text-xs font-medium text-foreground">
+                        The visual editor is read-only
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {access.saveExplanation}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div
+                    aria-disabled={!access.canSave}
+                    className={!access.canSave ? 'pointer-events-none select-none opacity-75' : ''}
+                    inert={!access.canSave ? true : undefined}
+                  >
+                    <StudioCanvas
+                      domains={domains}
+                      agents={agents}
+                      initialSpec={spec}
+                      onSpecChange={(next) => setSpec(next)}
+                      capabilityContext={capabilityContext.state}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </>
           )}
 
           {/* Save bar */}
-          <div className="flex items-center justify-between border-t border-border pt-4">
+          <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
             {editing ? (
               <span className="text-xs text-muted-foreground">Editing {spec.title}</span>
             ) : (
@@ -407,8 +463,13 @@ export function AppBuilder({
                 Back to describe
               </Button>
             )}
-            <div className="flex items-center gap-3">
-              {blockers > 0 ? (
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+              {!access.canSave ? (
+                <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                  <Info className="size-3.5" />
+                  {access.saveExplanation}
+                </span>
+              ) : blockers > 0 ? (
                 <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
                   <Warning className="size-3.5" />
                   {blockers} thing{blockers === 1 ? '' : 's'} to resolve first
@@ -431,7 +492,7 @@ export function AppBuilder({
               )}
               <Button
                 onClick={save}
-                disabled={saving || !validation?.ok || blockers > 0}
+                disabled={!access.canSave || saving || !validation?.ok || blockers > 0}
                 className="gap-1.5"
               >
                 <FloppyDisk className="size-4" />
@@ -444,7 +505,7 @@ export function AppBuilder({
 
       {/* Inline data-domain create — resolves a "no data source" fix-it without leaving. */}
       <DomainFormPanel
-        open={wirePhrase !== null}
+        open={wirePhrase !== null && access.canConfigureData && access.canSave}
         onOpenChange={(o) => !o && setWirePhrase(null)}
         title="Wire a data source"
         description="Point this app at where the data actually lives — pick the connector and the table / path / object it reads."
@@ -472,6 +533,7 @@ function GuidedRefine({
   handlersFor,
   connectors,
   onSpec,
+  capabilityContext,
 }: Readonly<{
   spec: AppSpec;
   names: BindingNames;
@@ -480,6 +542,7 @@ function GuidedRefine({
   handlersFor: (id: string) => StepEditorHandlers;
   connectors: ConnectorOption[];
   onSpec: (fn: (s: AppSpec | null) => AppSpec | null) => void;
+  capabilityContext: BuilderCapabilityContextState;
 }>) {
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
@@ -518,6 +581,7 @@ function GuidedRefine({
                       .slice(0, i)
                       .filter((candidate) => candidate.kind === 'human')
                       .map((candidate) => ({ id: candidate.id, label: candidate.label }))}
+                    capabilityContext={capabilityContext}
                   />
                 </div>
               </div>
@@ -647,11 +711,15 @@ function DescribePhase({
   setDescription,
   compiling,
   onCompile,
+  canCreate,
+  accessMessage,
 }: Readonly<{
   description: string;
   setDescription: (v: string) => void;
   compiling: boolean;
   onCompile: () => void;
+  canCreate: boolean;
+  accessMessage: string;
 }>) {
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
@@ -675,14 +743,17 @@ function DescribePhase({
               placeholder="e.g. Reimbursement approval — read the invoice, check the employee's quota, decide if they're eligible, then have a manager approve or reject."
               className="text-sm"
             />
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] text-muted-foreground">
-                We only bind steps to data sources your org has declared — never a fabricated one.
-              </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5 text-[11px] text-muted-foreground">
+                <p>
+                  We only bind steps to data sources your org has declared — never a fabricated one.
+                </p>
+                {!canCreate ? <p>{accessMessage}</p> : null}
+              </div>
               <Button
                 onClick={onCompile}
-                disabled={description.trim().length < 8 || compiling}
-                className="gap-1.5"
+                disabled={!canCreate || description.trim().length < 8 || compiling}
+                className="self-start gap-1.5 sm:self-auto"
               >
                 <Sparkle className="size-4" />
                 {compiling ? 'Carving steps…' : 'Build the steps'}
@@ -728,7 +799,15 @@ function DescribePhase({
 //     here: you can still save and run — the app just won't read that source until you add it, which
 //     you can do right here or from the app's screens anytime. This is what lets a first-time,
 //     non-technical user finish and save their app without setting up connectors first.
-function FixItPanel({ items, onAct }: Readonly<{ items: FixIt[]; onAct: (f: FixIt) => void }>) {
+function FixItPanel({
+  items,
+  onAct,
+  disabledReason,
+}: Readonly<{
+  items: FixIt[];
+  onAct: (f: FixIt) => void;
+  disabledReason: (f: FixIt) => string | undefined;
+}>) {
   const blockers = items.filter((i) => i.severity === 'blocker');
   const advisories = items.filter((i) => i.severity === 'advisory');
   // Optional items that still carry a one-click remedy (e.g. wire-data-source) get an action button;
@@ -750,7 +829,13 @@ function FixItPanel({ items, onAct }: Readonly<{ items: FixIt[]; onAct: (f: FixI
       {blockers.length > 0 ? (
         <div className="mt-2.5 grid grid-cols-1 gap-2 lg:grid-cols-2">
           {blockers.map((f) => (
-            <FixItRow key={f.id} item={f} onAct={onAct} tone="blocker" />
+            <FixItRow
+              key={f.id}
+              item={f}
+              onAct={onAct}
+              tone="blocker"
+              disabledReason={disabledReason(f)}
+            />
           ))}
         </div>
       ) : null}
@@ -761,7 +846,13 @@ function FixItPanel({ items, onAct }: Readonly<{ items: FixIt[]; onAct: (f: FixI
           </p>
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
             {optionalActions.map((f) => (
-              <FixItRow key={f.id} item={f} onAct={onAct} tone="optional" />
+              <FixItRow
+                key={f.id}
+                item={f}
+                onAct={onAct}
+                tone="optional"
+                disabledReason={disabledReason(f)}
+              />
             ))}
           </div>
         </div>
@@ -792,28 +883,36 @@ function FixItRow({
   item,
   onAct,
   tone,
+  disabledReason,
 }: Readonly<{
   item: FixIt;
   onAct: (f: FixIt) => void;
   tone: 'blocker' | 'optional';
+  disabledReason?: string;
 }>) {
   const cta = fixItCta(item.action);
   const Icon =
     item.action === 'wire-data-source' || item.action === 'bind-step' ? Database : PencilSimple;
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-background px-3 py-2">
-      <span className="min-w-0 truncate text-xs text-foreground" title={item.title}>
-        {item.title}
-      </span>
-      <Button
-        size="sm"
-        variant={tone === 'optional' ? 'outline' : 'default'}
-        className="h-7 shrink-0 gap-1 text-xs"
-        onClick={() => onAct(item)}
-      >
-        <Icon className="size-3.5" />
-        {cta}
-      </Button>
+    <div className="rounded-md border border-amber-500/30 bg-background px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 truncate text-xs text-foreground" title={item.title}>
+          {item.title}
+        </span>
+        <Button
+          size="sm"
+          variant={tone === 'optional' ? 'outline' : 'default'}
+          className="h-7 shrink-0 gap-1 text-xs"
+          disabled={!!disabledReason}
+          onClick={() => onAct(item)}
+        >
+          <Icon className="size-3.5" />
+          {cta}
+        </Button>
+      </div>
+      {disabledReason ? (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{disabledReason}</p>
+      ) : null}
     </div>
   );
 }

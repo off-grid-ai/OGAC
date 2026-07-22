@@ -11,19 +11,15 @@ import { ErrorState } from '@/components/ui/states';
 import {
   type BuilderCapabilityItem,
   type BuilderCapabilityView,
-  type BuilderControlId,
-  type BuilderIntentControl,
 } from '@/lib/builder-capability-view';
+import type { BuilderSurfaceContextState } from '@/lib/builder-surface-access';
 import { loadBuilderCapabilityContext } from '@/lib/enterprise-context-client';
 
 const LOAD_TIMEOUT_MS = 10_000;
 const VISIBLE_ITEMS_PER_SLICE = 4;
 const BUILDER_SLICE_ORDER = ['data', 'capabilities', 'pipelines', 'actions'] as const;
 
-export type BuilderCapabilityContextState =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | { status: 'ready'; view: BuilderCapabilityView };
+export type BuilderCapabilityContextState = BuilderSurfaceContextState;
 
 export function useBuilderCapabilityContext(appId?: string): {
   state: BuilderCapabilityContextState;
@@ -66,15 +62,6 @@ export function useBuilderCapabilityContext(appId?: string): {
   }, [appId, attempt]);
 
   return { state, retry };
-}
-
-export function builderIntentControl(
-  state: BuilderCapabilityContextState,
-  id: BuilderControlId,
-): BuilderIntentControl | undefined {
-  return state.status === 'ready'
-    ? state.view.controls.find((control) => control.id === id)
-    : undefined;
 }
 
 function ItemLinks({ item }: Readonly<{ item: BuilderCapabilityItem }>) {
