@@ -100,7 +100,7 @@ export interface ObjectStorePort {
 export const seaweedfsObjectStore: ObjectStorePort = {
   async health() {
     try {
-      const res = await s3Fetch(S3, { method: 'GET', signal: AbortSignal.timeout(2500) } as RequestInit);
+      const res = await s3Fetch(S3, { method: 'GET', signal: AbortSignal.timeout(2500) });
       return res.ok || res.status === 403;
     } catch {
       return false;
