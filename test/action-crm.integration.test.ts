@@ -101,8 +101,10 @@ test('maker-checker blocks the CRM boundary before any side effect', async () =>
 test('generic action creates and replays a tenant-scoped CRM task through real HTTP', async (t) => {
   const ledger = new Map<string, { hash: string; task: Record<string, unknown> }>();
   const seenOrgs: string[] = [];
+  const seenPaths: string[] = [];
   let writes = 0;
   const server = createServer(async (req, res) => {
+    seenPaths.push(String(req.url));
     const org = String(req.headers['x-offgrid-org-id'] ?? '');
     seenOrgs.push(org);
     const body = await readJson(req);
@@ -131,7 +133,7 @@ test('generic action creates and replays a tenant-scoped CRM task through real H
   const connector = {
     id: 'crm_bharat',
     type: 'rest',
-    endpoint: `http://127.0.0.1:${address.port}`,
+    endpoint: `http://127.0.0.1:${address.port}/db`,
   };
 
   const created = await executeCrmAction(connector, CREATE, CONTEXT);
@@ -172,6 +174,11 @@ test('generic action creates and replays a tenant-scoped CRM task through real H
   assert.equal(conflict.ok, false);
   if (!conflict.ok) assert.equal(conflict.code, 'idempotency-conflict');
   assert.equal(writes, 2);
+  assert.deepEqual(
+    seenPaths,
+    ['/v1/tasks', '/v1/tasks', '/v1/tasks', '/v1/tasks'],
+    'the legacy /db read suffix is removed without changing the CRM origin',
+  );
 });
 
 test('generic action updates a CRM opportunity through its existing signed adapter', async (t) => {

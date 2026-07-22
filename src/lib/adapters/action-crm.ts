@@ -56,6 +56,21 @@ export type ActionExecutionResult =
       impact?: ActionImpact;
     };
 
+// Seeded CRM connectors predate the typed mutation API and point at the legacy read collection
+// (`.../db`). Governed actions use the same connector identity and host, but must address the
+// versioned API from that host root. Strip only that exact legacy pathname; every other connector
+// path is preserved, so this cannot redirect an action to a different origin or broaden its scope.
+export function normalizeCrmActionConnector(connector: ConnectorTarget): ConnectorTarget {
+  try {
+    const endpoint = new URL(connector.endpoint);
+    if (endpoint.pathname !== '/db' && endpoint.pathname !== '/db/') return connector;
+    endpoint.pathname = '/';
+    return { ...connector, endpoint: endpoint.toString().replace(/\/$/, '') };
+  } catch {
+    return connector;
+  }
+}
+
 export async function executeCrmAction(
   connector: ConnectorTarget,
   step: ActionStepShape,
@@ -115,10 +130,11 @@ export async function executeCrmAction(
   // Non-technical builders never own replay semantics. Override any supplied key at the final
   // boundary so a malicious/stale AppSpec cannot replay another run's action.
   const command = commandWithRuntimeIdempotency(step, context);
+  const actionConnector = normalizeCrmActionConnector(connector);
   const result =
     step.actionId === 'crm.create-task' || step.actionId === 'crm.update-task'
-      ? await writeCrmTask(connector, command, context.orgId, clock)
-      : await writeCrmOpportunityFollowUp(connector, command, context.orgId, clock);
+      ? await writeCrmTask(actionConnector, command, context.orgId, clock)
+      : await writeCrmOpportunityFollowUp(actionConnector, command, context.orgId, clock);
   if (!result.ok) return { ...result, impact: confirmedImpact };
 
   const descriptor = getActionDescriptor(step.actionId);
