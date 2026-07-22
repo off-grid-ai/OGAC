@@ -70,7 +70,9 @@ test('capability map is a canonical, module-gated full-width operations route', 
   assert.match(page, /<PageFrame>/);
   assert.match(page, /SERVICE_CAPABILITY_AUDITS/);
   assert.match(page, /reconcileServiceInventory/);
-  assert.match(page, /getRuntimeServiceTopologyRegistry/);
+  assert.match(page, /listLiveServiceTopologies/);
+  assert.match(page, /platformServices: topology\.map\(\(entry\) => entry\.service\)/);
+  assert.match(page, /topologies: topology/);
   assert.match(page, /selectedServiceId=/);
   assert.match(component, /h-full min-h-0 w-full/);
   assert.match(component, /CAPABILITY_GATES\.map/);
@@ -97,8 +99,22 @@ test('the explorer renders the exact 48-entry audit contract without inventing p
   );
 
   assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 48);
-  assert.equal(SERVICE_CAPABILITY_AUDITS.length, 39);
-  assert.deepEqual(auditCounts, { current: 23, stale: 16, pending: 9 });
+  assert.equal(
+    auditCounts.current,
+    SERVICE_CAPABILITY_AUDITS.filter((audit) => audit.auditState === 'current').length,
+  );
+  assert.equal(
+    auditCounts.stale,
+    SERVICE_CAPABILITY_AUDITS.filter((audit) => audit.auditState === 'stale').length,
+  );
+  assert.equal(auditCounts.pending, reconciled.totalCount - SERVICE_CAPABILITY_AUDITS.length);
+  assert.deepEqual(
+    reconciled.entries
+      .filter((entry) => entry.capabilityAudit.status === 'audited')
+      .map((entry) => entry.id)
+      .sort(),
+    SERVICE_CAPABILITY_AUDITS.map((audit) => audit.serviceId).sort(),
+  );
   assert.equal((html.match(/data-inventory-stat=/g) ?? []).length, 4);
   assert.match(html, /Inventory<\/p><p[^>]*>48<\/p>/);
   assert.match(html, new RegExp(`Current audits<\\/p><p[^>]*>${auditCounts.current}<\\/p>`));

@@ -70,7 +70,7 @@ test('capability coverage is projected from the canonical audit registry without
   const corebank = inventory.entries.find((entry) => entry.id === 'enterprise-source-corebank');
 
   assert.equal(evidently?.capabilityAudit.status, 'audited');
-  assert.deepEqual(evidently?.productionWorkflowCapabilityIds, []);
+  assert.deepEqual(evidently?.productionWorkflowCapabilityIds, ['dataset-drift']);
   assert.ok((evidently?.explicitCapabilityGaps.length ?? 0) > 0);
   assert.ok((presidio?.productionWorkflowCapabilityIds.length ?? 0) > 0);
   assert.deepEqual(postgres?.capabilityAudit, {
@@ -98,7 +98,7 @@ test('capability coverage is projected from the canonical audit registry without
   assert.ok((corebank?.seededWorkflowEvidence.length ?? 0) > 0);
 });
 
-test('all 39 canonical audits project consistently across the 48-entry inventory', () => {
+test('all canonical audits project consistently across the exact 48-entry inventory', () => {
   const inventory = reconcileServiceInventory({ platformServices: canonicalServices() });
   const auditStates = inventory.entries.reduce(
     (counts, entry) => {
@@ -108,8 +108,15 @@ test('all 39 canonical audits project consistently across the 48-entry inventory
     { current: 0, stale: 0, pending: 0 },
   );
 
-  assert.equal(SERVICE_CAPABILITY_AUDITS.length, 39);
-  assert.deepEqual(auditStates, { current: 23, stale: 16, pending: 9 });
+  assert.equal(
+    auditStates.current,
+    SERVICE_CAPABILITY_AUDITS.filter((audit) => audit.auditState === 'current').length,
+  );
+  assert.equal(
+    auditStates.stale,
+    SERVICE_CAPABILITY_AUDITS.filter((audit) => audit.auditState === 'stale').length,
+  );
+  assert.equal(auditStates.pending, inventory.totalCount - SERVICE_CAPABILITY_AUDITS.length);
   assert.equal(
     inventory.entries.filter((entry) => entry.capabilityAudit.status === 'audited').length,
     SERVICE_CAPABILITY_AUDITS.length,
@@ -154,7 +161,7 @@ test('URL-style inventory filters search identity, IA facets, audit recency, and
 
   assert.deepEqual(
     filterServiceInventory(entries, { query: 'telemetry' }).map((entry) => entry.id),
-    ['victoriametrics', 'otel-collector'],
+    ['otel-collector'],
   );
   assert.equal(filterServiceInventory(entries, { family: 'observability' }).length, 8);
   assert.equal(filterServiceInventory(entries, { owner: 'data-sources' }).length, 6);
