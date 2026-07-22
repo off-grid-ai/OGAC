@@ -1,5 +1,10 @@
+import { PageFrame } from '@/components/PageFrame';
 import { ProvenanceSurface } from '@/app/(console)/governance/provenance/ProvenanceSurface';
 
 export default function EvidenceProvenancePage() {
-  return <ProvenanceSurface embedded />;
+  return (
+    <PageFrame embedded>
+      <ProvenanceSurface embedded />
+    </PageFrame>
+  );
 }
