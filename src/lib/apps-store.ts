@@ -17,6 +17,17 @@ import {
   type FormField,
   validateAppSpec,
 } from '@/lib/app-model';
+import {
+  cloneAppSpec,
+  type AppLineage,
+  type CloneOrigin,
+} from '@/lib/app-clone';
+import {
+  bindTemplateVars,
+  validateVarSchema,
+  type BindResult,
+  type TemplateVarSchema,
+} from '@/lib/app-template-vars';
 import { hideDemoTestArtifact } from '@/lib/demo-test-artifacts';
 import { ensurePipelinesSchema } from '@/lib/pipelines';
 import { ensureOrgSchema } from '@/lib/store';
@@ -99,9 +110,16 @@ export async function ensureAppsSchema(): Promise<void> {
     `);
       // Post-hoc column for the pipeline binding (CONSUMERS-BIND #166) on a pre-existing apps table.
       await tx.execute(sql`ALTER TABLE apps ADD COLUMN IF NOT EXISTS pipeline_id text;`);
+      // SOP / template reuse: template-publish + clone-lineage columns on a pre-existing apps table.
+      await tx.execute(
+        sql`ALTER TABLE apps ADD COLUMN IF NOT EXISTS is_template boolean NOT NULL DEFAULT false;`,
+      );
+      await tx.execute(sql`ALTER TABLE apps ADD COLUMN IF NOT EXISTS template_vars jsonb;`);
+      await tx.execute(sql`ALTER TABLE apps ADD COLUMN IF NOT EXISTS lineage jsonb;`);
       await tx.execute(sql`CREATE INDEX IF NOT EXISTS apps_org_idx ON apps (org_id);`);
       await tx.execute(sql`CREATE INDEX IF NOT EXISTS apps_slug_idx ON apps (slug);`);
       await tx.execute(sql`CREATE INDEX IF NOT EXISTS apps_pipeline_idx ON apps (pipeline_id);`);
+      await tx.execute(sql`CREATE INDEX IF NOT EXISTS apps_template_idx ON apps (is_template);`);
       // Runtime-agent ownership is database-enforced and tenant-safe. The composite target prevents
       // an owner id from pointing at an App in another org; CASCADE makes App deletion atomic.
       await tx.execute(sql`ALTER TABLE custom_agents ADD COLUMN IF NOT EXISTS owner_app_id text;`);
@@ -609,4 +627,306 @@ function mintSlug(title: string): string {
       .replace(/^-+|-+$/g, '')
       .slice(0, 40) || 'app';
   return `${base}-${randomUUID().slice(0, 6)}`;
+}
+
+// ─── SOP / template reuse (#TEMPLATE-REUSE) ────────────────────────────────────
+// Cross-team workflow-template library + app cloning. The pure rules live in app-clone.ts and
+// app-template-vars.ts; this section is the I/O adapter that reads the app's lineage/template columns
+// and persists a clone or a template-publish. It never re-implements the clone/substitution rule.
+
+/** A row from the org/public TEMPLATE library — an app published as a reusable SOP. */
+export interface TemplateView {
+  id: string;
+  orgId: string;
+  ownerId: string;
+  title: string;
+  summary: string;
+  visibility: 'private' | 'org' | 'public';
+  slug?: string;
+  stepCount: number;
+  templateVars: TemplateVarSchema;
+  updatedAt: string;
+}
+
+/** Raised when a template publish is rejected because its declared var schema is incoherent. */
+export class TemplateVarSchemaError extends Error {
+  errors: string[];
+  constructor(errors: string[]) {
+    super(`invalid template variable schema: ${errors.join('; ')}`);
+    this.name = 'TemplateVarSchemaError';
+    this.errors = errors;
+  }
+}
+
+/** Raised when a clone/adoption produced honest gaps (missing/unbound/undeclared vars). */
+export class TemplateBindError extends Error {
+  bind: BindResult;
+  constructor(bind: BindResult) {
+    const gaps = [
+      bind.missingRequired.length ? `missing required: ${bind.missingRequired.join(', ')}` : '',
+      bind.unbound.length ? `unbound: ${bind.unbound.join(', ')}` : '',
+      bind.undeclared.length ? `undeclared: ${bind.undeclared.join(', ')}` : '',
+    ]
+      .filter(Boolean)
+      .join('; ');
+    super(`template variables not fully bound: ${gaps}`);
+    this.name = 'TemplateBindError';
+    this.bind = bind;
+  }
+}
+
+function toTemplateVars(value: unknown): TemplateVarSchema {
+  if (value && typeof value === 'object' && Array.isArray((value as TemplateVarSchema).vars)) {
+    return value as TemplateVarSchema;
+  }
+  return { vars: [] };
+}
+
+// ─── getTemplateVars — the declared var schema of an app (empty if none) ────────
+export async function getTemplateVars(id: string, orgId: string): Promise<TemplateVarSchema> {
+  await ensureAppsSchema();
+  const [row] = await db
+    .select({ templateVars: apps.templateVars })
+    .from(apps)
+    .where(and(eq(apps.id, id), eq(apps.orgId, orgId || DEFAULT_ORG)))
+    .limit(1);
+  return toTemplateVars(row?.templateVars);
+}
+
+// ─── getLineage — provenance of a cloned/adopted app (null if authored) ─────────
+export async function getLineage(id: string, orgId: string): Promise<AppLineage | null> {
+  await ensureAppsSchema();
+  const [row] = await db
+    .select({ lineage: apps.lineage })
+    .from(apps)
+    .where(and(eq(apps.id, id), eq(apps.orgId, orgId || DEFAULT_ORG)))
+    .limit(1);
+  return (row?.lineage as AppLineage | null) ?? null;
+}
+
+// ─── getAppReuseMeta — the reuse state of an app in one read (for the app shell) ─
+// The AppSpec model deliberately omits template/lineage fields; this returns them together so the
+// per-app lifecycle shell can render the reuse toolbar (template badge + var schema + lineage chip)
+// without three round-trips. Null when the app isn't in the org.
+export interface AppReuseMeta {
+  isTemplate: boolean;
+  templateVars: TemplateVarSchema;
+  lineage: AppLineage | null;
+}
+
+export async function getAppReuseMeta(id: string, orgId: string): Promise<AppReuseMeta | null> {
+  await ensureAppsSchema();
+  const [row] = await db
+    .select({
+      isTemplate: apps.isTemplate,
+      templateVars: apps.templateVars,
+      lineage: apps.lineage,
+    })
+    .from(apps)
+    .where(and(eq(apps.id, id), eq(apps.orgId, orgId || DEFAULT_ORG)))
+    .limit(1);
+  if (!row) return null;
+  return {
+    isTemplate: row.isTemplate === true,
+    templateVars: toTemplateVars(row.templateVars),
+    lineage: (row.lineage as AppLineage | null) ?? null,
+  };
+}
+
+// ─── cloneApp — persist a deep clone of an app into a (possibly different) org ──
+// The pure cloneAppSpec decides WHAT carries over / resets + records lineage; this fn does the I/O:
+// mint the id, insert the row with its lineage + (optional) inherited template var schema. When
+// `provided` values are supplied (a template adoption), the pure binder substitutes them and any
+// honest gap (missing/unbound/undeclared) fails the clone rather than persisting a half-bound spec.
+export async function cloneApp(
+  source: AppSpec,
+  opts: {
+    orgId: string;
+    ownerId: string;
+    origin: CloneOrigin;
+    sourceTemplateId?: string;
+    title?: string;
+    /** Template-var schema to bind (defaults to the source's own declared schema). */
+    varSchema?: TemplateVarSchema;
+    /** Adopter-supplied variable values (only meaningful with a var schema). */
+    provided?: Record<string, string>;
+    now?: Date;
+  },
+): Promise<AppSpec> {
+  await ensureAppsSchema();
+  const clonedAt = (opts.now ?? new Date()).toISOString();
+  const { spec, lineage } = cloneAppSpec(source, {
+    orgId: opts.orgId || DEFAULT_ORG,
+    ownerId: opts.ownerId,
+    mintId: () => `app_${randomUUID().slice(0, 8)}`,
+    origin: opts.origin,
+    sourceTemplateId: opts.sourceTemplateId,
+    title: opts.title,
+    clonedAt,
+  });
+
+  // Bind template variables when a schema is in play. An honest gap fails the whole clone.
+  let boundSpec = spec;
+  const schema = opts.varSchema;
+  if (schema && schema.vars.length > 0 && opts.provided) {
+    const result = bindTemplateVars(spec, schema, opts.provided);
+    if (!result.ok) throw new TemplateBindError(result);
+    boundSpec = result.spec;
+  }
+
+  const check = validateAppSpec(boundSpec);
+  if (!check.ok) throw new AppValidationError(check.errors);
+
+  const [row] = await db
+    .insert(apps)
+    .values({
+      id: boundSpec.id,
+      orgId: boundSpec.orgId,
+      ownerId: boundSpec.ownerId,
+      title: boundSpec.title,
+      summary: boundSpec.summary,
+      visibility: boundSpec.visibility,
+      pipelineId: null,
+      slug: null,
+      published: false,
+      isTemplate: false,
+      // A clone is a working app, not a template — it does not inherit the source's `isTemplate`.
+      // It keeps the declared var schema (informational) so an operator can see what was parameterized.
+      templateVars: (schema ?? null) as never,
+      lineage: lineage as never,
+      trigger: boundSpec.trigger,
+      inputForm: (boundSpec.inputForm ?? null) as never,
+      steps: boundSpec.steps as never,
+      edges: boundSpec.edges,
+    })
+    .returning();
+  return toAppSpec(row);
+}
+
+// ─── publishAppAsTemplate — mark an app a reusable org/public SOP template ──────
+// Flips is_template + published, stores the declared {{var}} schema, mints a slug if needed, and
+// sets visibility (default 'org' — a template another TEAM adopts). Rejects an incoherent var schema
+// via the pure validator (DRY — one rule). The app remains a normal, runnable app too.
+export async function publishAppAsTemplate(
+  id: string,
+  orgId: string,
+  opts: { varSchema: TemplateVarSchema; visibility?: 'org' | 'public' },
+): Promise<AppSpec | null> {
+  await ensureAppsSchema();
+  const scopedOrgId = orgId || DEFAULT_ORG;
+  const current = await getApp(id, scopedOrgId);
+  if (!current) return null;
+
+  const schema: TemplateVarSchema = { vars: opts.varSchema?.vars ?? [] };
+  const errors = validateVarSchema(schema, current);
+  if (errors.length) throw new TemplateVarSchemaError(errors);
+
+  const visibility = opts.visibility === 'public' ? 'public' : 'org';
+  const slug = current.slug ?? mintSlug(current.title);
+  const [row] = await db
+    .update(apps)
+    .set({
+      isTemplate: true,
+      published: true,
+      visibility,
+      slug,
+      templateVars: schema as never,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(apps.id, id), eq(apps.orgId, scopedOrgId)))
+    .returning();
+  return row ? toAppSpec(row) : null;
+}
+
+// ─── unpublishTemplate — retract an app from the template library ───────────────
+// Clears is_template (and the exported var schema). Idempotent; keeps the slug so a re-publish keeps
+// the same link. Returns null if the app isn't in the org. Does NOT delete the app itself.
+export async function unpublishTemplate(id: string, orgId: string): Promise<AppSpec | null> {
+  await ensureAppsSchema();
+  const scopedOrgId = orgId || DEFAULT_ORG;
+  const [row] = await db
+    .update(apps)
+    .set({ isTemplate: false, templateVars: null, updatedAt: new Date() })
+    .where(and(eq(apps.id, id), eq(apps.orgId, scopedOrgId)))
+    .returning();
+  return row ? toAppSpec(row) : null;
+}
+
+// ─── listTemplates — the SOP library visible to an org ──────────────────────────
+// A viewer sees templates that are (a) their own org's org-visible templates, OR (b) any public
+// template from any org (cross-team adoption). Newest first. This is the library surface's read.
+export async function listTemplates(orgId: string): Promise<TemplateView[]> {
+  await ensureAppsSchema();
+  const scopedOrgId = orgId || DEFAULT_ORG;
+  const rows = await db
+    .select()
+    .from(apps)
+    .where(
+      and(
+        eq(apps.isTemplate, true),
+        or(
+          eq(apps.visibility, 'public'),
+          and(eq(apps.orgId, scopedOrgId), eq(apps.visibility, 'org')),
+        ),
+      ),
+    )
+    .orderBy(desc(apps.updatedAt));
+  return rows
+    .filter((r) => !hideDemoTestArtifact(r.orgId, { title: r.title, ownerId: r.ownerId }))
+    .map(toTemplateView);
+}
+
+// ─── getTemplate — one template by id, honouring the same visibility rule ───────
+export async function getTemplate(id: string, orgId: string): Promise<TemplateView | null> {
+  await ensureAppsSchema();
+  const scopedOrgId = orgId || DEFAULT_ORG;
+  const [row] = await db
+    .select()
+    .from(apps)
+    .where(and(eq(apps.id, id), eq(apps.isTemplate, true)))
+    .limit(1);
+  if (!row) return null;
+  const visible =
+    row.visibility === 'public' || (row.orgId === scopedOrgId && row.visibility === 'org');
+  return visible ? toTemplateView(row) : null;
+}
+
+// ─── getTemplateSourceSpec — the source AppSpec of a template, for adoption ─────
+// Reads the template's own definition (from ITS org) so a cross-org adopter can clone it, gated by
+// the SAME org/public visibility rule as getTemplate: only a public template — or the caller's own
+// org template — is adoptable. Returns null when the viewer may not adopt it. This is the only place
+// a read crosses org scope, and it is deliberately narrow: template + published + visible.
+export async function getTemplateSourceSpec(
+  id: string,
+  viewerOrgId: string,
+): Promise<AppSpec | null> {
+  await ensureAppsSchema();
+  const scopedOrgId = viewerOrgId || DEFAULT_ORG;
+  const [row] = await db
+    .select()
+    .from(apps)
+    .where(and(eq(apps.id, id), eq(apps.isTemplate, true)))
+    .limit(1);
+  if (!row) return null;
+  const visible =
+    row.visibility === 'public' || (row.orgId === scopedOrgId && row.visibility === 'org');
+  return visible ? toAppSpec(row) : null;
+}
+
+function toTemplateView(row: App): TemplateView {
+  return {
+    id: row.id,
+    orgId: row.orgId,
+    ownerId: row.ownerId,
+    title: row.title,
+    summary: row.summary,
+    visibility: normalizeVisibility(row.visibility),
+    slug: row.slug ?? undefined,
+    stepCount: Array.isArray(row.steps) ? row.steps.length : 0,
+    templateVars: toTemplateVars(row.templateVars),
+    updatedAt: (row.updatedAt instanceof Date
+      ? row.updatedAt
+      : new Date(row.updatedAt as unknown as string)
+    ).toISOString(),
+  };
 }

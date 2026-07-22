@@ -12,6 +12,7 @@ export type CanonicalOwnerId =
   | 'files'
   | 'solution-library'
   | 'solution-deployments'
+  | 'templates'
   | 'apps'
   | 'agents'
   | 'reviews'
@@ -223,6 +224,15 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     label: 'Deployed',
     description: 'Blueprint bindings to tenant Apps, runs, and measured evidence.',
     route: '/solutions/deployed',
+    gate: 'studio',
+    placement: 'sidebar',
+  },
+  {
+    id: 'templates',
+    section: 'solutions',
+    label: 'Templates',
+    description: 'Reusable workflow SOPs one team publishes for another team to adopt.',
+    route: '/solutions/templates',
     gate: 'studio',
     placement: 'sidebar',
   },

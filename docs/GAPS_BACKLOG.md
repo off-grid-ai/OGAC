@@ -1204,3 +1204,35 @@ webhook/slack/whatsapp sinks are code+wired+tested+build-clean and merged to mai
 sink-config UI + a real governed send via the local UI harness → docs/screenshots/capabilities/;
 (2) add an honest capability-map entry at /operations/services/capability-map (gates: code=yes,
 wired=yes, verified=partial until the live shot). Do NOT flip verified→yes without the screenshot.
+
+### SOP / cross-team workflow-template reuse — DELIVERED + VERIFIED LIVE (2026-07-22, feat/sop-template-reuse)
+App cloning + parameterized template variables + org SOP/template library. Code / wired / verified:
+- **PURE engines (unit-tested, ≥85% all metrics):** `src/lib/app-clone.ts` (deep-clone AppSpec →
+  fresh app, reset id/slug/published/pipeline, strip source-owned runtime agentIds, record lineage)
+  and `src/lib/app-template-vars.ts` ({{var}} typed schema, resolve defaults, substitute, surface
+  missing/unbound/undeclared vars as HONEST gaps — never leaves a raw placeholder). Coverage:
+  app-clone 100/88.88/100/100, app-template-vars 100/90.36/100/100, studio-template 100/93.65/100/100.
+- **Store (apps-store.ts, integration-tested on real PG):** cloneApp, publishAppAsTemplate,
+  unpublishTemplate, listTemplates/getTemplate (org+public visibility), getTemplateSourceSpec (narrow
+  cross-org read for adoption), getAppReuseMeta. Schema: apps.is_template/template_vars/lineage
+  (+ idempotent migration drizzle/0011 + self-migrate DDL).
+- **Routes (thin):** POST /admin/apps/[id]/clone; POST+DELETE /admin/apps/[id]/publish-as-template;
+  GET /admin/apps/templates; GET /admin/apps/templates/[id]; POST /admin/apps/templates/[id]/use.
+- **UI:** /solutions/templates (list→detail, deep-linkable, full-width grid) + URL-driven adopt form
+  (?adopt=1); per-app-shell AppReuseActions (Duplicate / Publish-as-template dialog / Unpublish /
+  lineage chip). Registered Templates nav item in ownership.ts.
+- **VERIFIED LIVE (scripts/verify-sop-template-reuse.mjs):** create multi-step app → publish as org
+  template with {{team}} → library card → detail (workflow+vars) → adopt with team=Claims → adopted
+  app lands with prompt/summary bound to "Claims" (no raw {{team}}) + "Adopted from template" lineage
+  chip. Build passes (all 7 routes compiled); typecheck clean; 59 feature tests green.
+
+FOLLOW-UP (owned by another agent, intentionally NOT done here): run-time wiring of template-var
+substitution into `app-run.ts`. This slice built + tested the PURE engine and exposed it through the
+clone/instantiate flow only (per task scope). Adopted apps are fully bound AT ADOPTION time, so this
+follow-up is only needed if variables are ever bound lazily at run time rather than at adoption.
+
+NOTE (pre-existing, NOT introduced by this branch): the full `npm test` suite shows 14 failing tests
+(data-destinations / operations-destinations / quality-canonical-routes / route-presentation-ownership
+`data/lake` / service-capability-map / humanize / masked-detail). Confirmed present at branch point
+8e1c8eab with this branch's changes reverted — they belong to the data/lake + capability-map work,
+outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass ≥85%.

@@ -916,9 +916,37 @@ export const apps = pgTable('apps', {
     .$type<{ from: string; to: string; when?: string }[]>()
     .notNull()
     .default([]),
+  // SOP / template reuse (#TEMPLATE-REUSE): when this app is published as a reusable org/public
+  // TEMPLATE, `isTemplate` is true and `templateVars` carries the declared {{var}} schema another
+  // team fills in on adoption. Shape owned by lib/app-template-vars.ts (TemplateVarSchema).
+  isTemplate: boolean('is_template').notNull().default(false),
+  templateVars: jsonb('template_vars').$type<{
+    vars: {
+      name: string;
+      type: string;
+      description?: string;
+      default?: string;
+      required?: boolean;
+      options?: string[];
+    }[];
+  } | null>(),
+  // Provenance for a cloned/adopted app — where it descends from (lib/app-clone.ts AppLineage).
+  // null ⇒ authored from scratch. Never affects governance; it makes duplicate work traceable.
+  lineage: jsonb('lineage').$type<{
+    origin: string;
+    sourceAppId?: string;
+    sourceTemplateId?: string;
+    sourceTitle?: string;
+    clonedAt: string;
+    clonedBy: string;
+  } | null>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('apps_org_idx').on(t.orgId), index('apps_slug_idx').on(t.slug)]);
+}, (t) => [
+  index('apps_org_idx').on(t.orgId),
+  index('apps_slug_idx').on(t.slug),
+  index('apps_template_idx').on(t.isTemplate),
+]);
 
 // Stable catalog identity. User edits append an immutable solution_blueprint_versions row; tenant
 // deployments pin that exact version so later library edits cannot rewrite deployed contracts.

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   normalizeVisibility,
+  parseProvidedVars,
   parseTemplatePatch,
+  parseTemplateVarSchema,
   slugFromTitle,
 } from '../src/lib/studio-template.ts';
 
@@ -29,6 +31,21 @@ test('normalizeVisibility: coerces to the allowed set', () => {
 test('parseTemplatePatch: only present keys are written', () => {
   const patch = parseTemplatePatch({ summary: '  hi  ' }, { slug: null, title: 'T' });
   assert.deepEqual(patch, { summary: 'hi' });
+});
+
+test('parseTemplatePatch: a visibility edit is coerced through the allowed set', () => {
+  assert.deepEqual(parseTemplatePatch({ visibility: 'org' }, { slug: null, title: 'T' }), {
+    visibility: 'org',
+  });
+  assert.deepEqual(parseTemplatePatch({ visibility: 'nonsense' }, { slug: null, title: 'T' }), {
+    visibility: 'private',
+  });
+});
+
+test('parseTemplatePatch: a non-string summary edit is normalized to empty', () => {
+  assert.deepEqual(parseTemplatePatch({ summary: 42 }, { slug: null, title: 'T' }), {
+    summary: '',
+  });
 });
 
 test('parseTemplatePatch: blank title → null', () => {
@@ -62,4 +79,52 @@ test('parseTemplatePatch: publish uses the new title for the slug when renaming'
     { slug: null, title: 'Old' },
   );
   assert.ok(patch?.slug?.startsWith('fresh-name-'));
+});
+
+test('parseTemplateVarSchema: coerces a valid vars body, keeps only meaningful fields', () => {
+  const schema = parseTemplateVarSchema([
+    { name: '  team  ', type: 'text', required: true, description: '  the team  ' },
+    { name: 'region', type: 'select', options: ['APAC', '', 'EU'], default: 'APAC' },
+    { name: 'x', type: 'number', default: '' }, // empty default dropped
+  ]);
+  assert.deepEqual(schema.vars, [
+    { name: 'team', type: 'text', description: 'the team', required: true },
+    { name: 'region', type: 'select', default: 'APAC', options: ['APAC', 'EU'] },
+    { name: 'x', type: 'number' },
+  ]);
+});
+
+test('parseTemplateVarSchema: unknown type falls back to text; options only for select', () => {
+  const schema = parseTemplateVarSchema([
+    { name: 'a', type: 'weird', options: ['x'] },
+    { name: 'b', type: 'text', options: ['y'] }, // non-select options ignored
+  ]);
+  assert.deepEqual(schema.vars, [
+    { name: 'a', type: 'text' },
+    { name: 'b', type: 'text' },
+  ]);
+});
+
+test('parseTemplateVarSchema: drops entries with no name / non-object / non-array input', () => {
+  assert.deepEqual(parseTemplateVarSchema([{ type: 'text' }, null, 'nope', { name: '  ' }]).vars, []);
+  assert.deepEqual(parseTemplateVarSchema(null).vars, []);
+  assert.deepEqual(parseTemplateVarSchema('not an array').vars, []);
+});
+
+test('parseTemplateVarSchema: select with no valid options drops options', () => {
+  const schema = parseTemplateVarSchema([{ name: 's', type: 'select', options: ['', '  '] }]);
+  assert.deepEqual(schema.vars, [{ name: 's', type: 'select' }]);
+});
+
+test('parseProvidedVars: coerces string/number/boolean values, drops the rest', () => {
+  assert.deepEqual(
+    parseProvidedVars({ team: 'Claims', count: 3, live: true, obj: {}, arr: [], empty: '' }),
+    { team: 'Claims', count: '3', live: 'true', empty: '' },
+  );
+});
+
+test('parseProvidedVars: non-object input → empty map', () => {
+  assert.deepEqual(parseProvidedVars(null), {});
+  assert.deepEqual(parseProvidedVars('x'), {});
+  assert.deepEqual(parseProvidedVars(42), {});
 });

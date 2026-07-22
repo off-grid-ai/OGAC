@@ -2,6 +2,7 @@
 // and shaping an untrusted edit body into a validated DB patch. Shared by the templates routes so
 // slug/visibility logic lives in one tested place. No DB, no React. See test/studio-template.test.ts.
 
+import type { TemplateVar, TemplateVarSchema, TemplateVarType } from '@/lib/app-template-vars';
 import { randomToken } from '@/lib/rand';
 
 export type Visibility = 'private' | 'org' | 'public';
@@ -65,4 +66,53 @@ export function parseTemplatePatch(
     }
   }
   return patch;
+}
+
+// ─── parseTemplateVarSchema — shape an untrusted `vars` body into a TemplateVarSchema (PURE) ────────
+// The publish-as-template route accepts a raw JSON `vars` array from the client; this coerces it to
+// the typed schema shape ONCE, defensively (unknown types fall back to 'text', options/default only
+// kept for select, required/description normalized). It does NOT decide coherence — validateVarSchema
+// (in app-template-vars.ts) owns that rule, run inside the store on publish. DRY: the parsing lives
+// here, the validity rule lives there, neither duplicates the other.
+const VAR_TYPES: readonly TemplateVarType[] = ['text', 'number', 'boolean', 'select'];
+
+export function parseTemplateVarSchema(raw: unknown): TemplateVarSchema {
+  const list = Array.isArray(raw) ? raw : [];
+  const vars: TemplateVar[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const name = typeof o.name === 'string' ? o.name.trim() : '';
+    if (!name) continue;
+    const type: TemplateVarType = VAR_TYPES.includes(o.type as TemplateVarType)
+      ? (o.type as TemplateVarType)
+      : 'text';
+    const v: TemplateVar = { name, type };
+    if (typeof o.description === 'string' && o.description.trim()) {
+      v.description = o.description.trim();
+    }
+    if (typeof o.default === 'string' && o.default !== '') v.default = o.default;
+    if (o.required === true) v.required = true;
+    if (type === 'select' && Array.isArray(o.options)) {
+      const options = o.options.filter((x): x is string => typeof x === 'string' && x.trim() !== '');
+      if (options.length) v.options = options;
+    }
+    vars.push(v);
+  }
+  return { vars };
+}
+
+// ─── parseProvidedVars — shape an untrusted variable-values body into a string map (PURE) ──────────
+// The "Use this template" adoption form sends { values: { name: value } }. Coerce every value to a
+// string (the substitution engine binds strings), dropping non-string-coercible entries. Keeps the
+// route thin and the coercion rule in one tested place.
+export function parseProvidedVars(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [k, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (!k) continue;
+    if (typeof val === 'string') out[k] = val;
+    else if (typeof val === 'number' || typeof val === 'boolean') out[k] = String(val);
+  }
+  return out;
 }
