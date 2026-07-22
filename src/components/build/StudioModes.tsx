@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AppBuilder } from '@/components/build/AppBuilder';
 import type { ConnectorOption } from '@/components/data-domains/DomainFormPanel';
 import { StudioForge } from '@/components/studio/StudioForge';
+import { builderModeFromQuery, builderModeHref, type BuilderMode } from '@/lib/builder-navigation';
 import type { OrgContextSummary } from '@/lib/org-context';
 
 // ─── Studio — ONE builder, two views (App + Forge unified) ────────────────────────────────────────
@@ -13,8 +14,6 @@ import type { OrgContextSummary } from '@/lib/org-context';
 // builder — precise editing + the pipeline/data/model bindings). Both produce the SAME governed app
 // and save to the same place; a user drafts in Chat and refines in Build, or stays in whichever fits.
 // The mode lives in ?mode so it's shareable and Back-able.
-
-type Mode = 'chat' | 'build';
 
 export function StudioModes({
   summary,
@@ -32,17 +31,21 @@ export function StudioModes({
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const mode: Mode = params.get('mode') === 'chat' ? 'chat' : 'build';
+  const mode = builderModeFromQuery(params);
 
-  const setMode = (m: Mode) => {
-    const next = new URLSearchParams(params.toString());
-    next.set('mode', m);
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  const setMode = (nextMode: BuilderMode) => {
+    if (nextMode === mode) return;
+    router.push(builderModeHref(pathname, params.toString(), nextMode), { scroll: false });
   };
 
-  const tabs: { id: Mode; label: string; hint: string; icon: typeof ChatCircleDots }[] = [
+  const tabs: { id: BuilderMode; label: string; hint: string; icon: typeof ChatCircleDots }[] = [
     { id: 'chat', label: 'Chat', hint: 'Describe it and refine by chatting', icon: ChatCircleDots },
-    { id: 'build', label: 'Build', hint: 'Guided steps + data/pipeline bindings', icon: SlidersHorizontal },
+    {
+      id: 'build',
+      label: 'Build',
+      hint: 'Guided steps + data/pipeline bindings',
+      icon: SlidersHorizontal,
+    },
   ];
 
   return (
@@ -57,7 +60,9 @@ export function StudioModes({
               onClick={() => setMode(t.id)}
               title={t.hint}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150 active:scale-95 ${
-                active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'
+                active
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <t.icon weight={active ? 'fill' : 'regular'} className="size-4" />
