@@ -38,6 +38,11 @@ export function traceMatchesEntity(trace: LangfuseTrace, match: EntityMatch): bo
   if (idSet.has(trace.id)) return true;
   const subs = (match.tags ?? []).map((t) => t.trim()).filter(Boolean);
   if (subs.length === 0) return false;
+  // PRIMARY: the trace's Langfuse `tags[]` — stamped EXACTLY at emission (e.g. `pipeline:<id>`). This
+  // is the canonical signal the write path (chat-trace/emitRunTrace) sets; match it exactly.
+  const traceTags = Array.isArray(trace.tags) ? trace.tags : [];
+  if (subs.some((s) => traceTags.includes(s))) return true;
+  // FALLBACK (legacy best-effort): the tag as a substring of the trace name/userId.
   const hay = `${trace.name ?? ''} ${trace.userId ?? ''}`;
   return subs.some((s) => hay.includes(s));
 }

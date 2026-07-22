@@ -70,6 +70,8 @@ export interface LangfuseTrace {
   name?: string | null;
   timestamp?: string;
   userId?: string | null;
+  /** Langfuse tags[] stamped at emission (e.g. `pipeline:<id>`) — the canonical per-entity signal. */
+  tags?: string[] | null;
   latency?: number | null;
   totalCost?: number | null;
   observations?: number;

@@ -262,3 +262,13 @@ test('scoresForTrace shapes + sorts a trace scores newest-first', () => {
   assert.equal(out[1].name, 'faithfulness');
   assert.equal(out[1].value, 0.9);
 });
+
+test('traceMatchesEntity: matches on the Langfuse tags[] exactly (the emission signal)', () => {
+  const match = { id: 'pl_x', tags: ['pipeline:pl_x', 'pl_x'] };
+  // tagged at emission with pipeline:pl_x, name/userId do NOT contain the id → must still match via tags[]
+  assert.equal(traceMatchesEntity({ id: 't1', name: 'agent-run', userId: 'agent', tags: ['pipeline:pl_x'] }, match), true);
+  // a different pipeline's tag → no match
+  assert.equal(traceMatchesEntity({ id: 't2', name: 'agent-run', userId: 'agent', tags: ['pipeline:pl_other'] }, match), false);
+  // no tags + name carries the id substring → legacy fallback still matches
+  assert.equal(traceMatchesEntity({ id: 't3', name: 'run pl_x', userId: 'agent', tags: [] }, match), true);
+});
