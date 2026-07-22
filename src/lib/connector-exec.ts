@@ -77,15 +77,20 @@ export interface ConnectorQuery {
   op?: 'read' | 'count'; // default 'read'
   limit?: number; // row cap for reads (default 100)
   params?: Record<string, unknown>; // reserved for equality filters (applied where safe)
-  /** Server-resolved domain identity required by policy-bound source dialects such as S3. */
-  binding?: { orgId: string; domainId: string };
+  /** Server-resolved identity required by policy-bound source dialects such as S3 and Kafka. */
+  binding?: { orgId: string; domainId: string; actorId?: string };
+}
+
+/** Injectable only at uncontrollable source boundaries; all Off Grid policy and adapters stay real. */
+export interface ConnectorQueryRuntimeDependencies {
+  kafkaSource?: import('@/lib/adapters/kafka-enterprise-source').KafkaEnterpriseSourceDependencies;
 }
 
 // The result of a READ: the rows plus the row count that came back and the dialect used.
 export interface ConnectorQueryResult {
   rows: Record<string, unknown>[];
   count: number;
-  dialect: 'postgres' | 'mysql' | 'mssql' | 'rest' | 's3';
+  dialect: 'postgres' | 'mysql' | 'mssql' | 'rest' | 's3' | 'kafka';
 }
 
 // ─── Dialect detection (pure) ─────────────────────────────────────────────────
@@ -189,6 +194,7 @@ export async function recordCount(type: string, endpoint: string): Promise<numbe
 export async function execConnectorQuery(
   conn: ConnectorTarget,
   query: ConnectorQuery,
+  dependencies: ConnectorQueryRuntimeDependencies = {},
 ): Promise<ConnectorQueryResult | null> {
   // S3 cannot be selected from an endpoint alone: the persisted org/domain binding owns the bucket
   // and prefix, and the connector id owns the vaulted keypair. Dispatch before generic dialect
@@ -209,6 +215,67 @@ export async function execConnectorQuery(
       rows: outcome.result.rows.map((row) => ({ ...row })),
       count: outcome.result.count,
       dialect: 's3',
+    };
+  }
+  // Kafka source requests can name only the tenant-owned connector/domain and bounded read
+  // parameters. Broker, topic, schema and credentials are resolved from their canonical stores;
+  // actor identity is supplied by the App runtime, never by step params.
+  if ((conn.type ?? '').trim().toLowerCase() === 'kafka') {
+    if (!conn.id || !query.binding?.orgId || !query.binding.domainId || !query.binding.actorId) {
+      return null;
+    }
+    const { KAFKA_SOURCE_MAX_RECORDS, parseKafkaSourceReadRequest } =
+      await import('@/lib/kafka-enterprise-source');
+    const request = parseKafkaSourceReadRequest({
+      orgId: query.binding.orgId,
+      connectorId: conn.id,
+      domainId: query.binding.domainId,
+      op: query.op ?? 'read',
+      limit: query.limit ?? KAFKA_SOURCE_MAX_RECORDS,
+      params: query.params ?? {},
+    });
+    const { resolveKafkaConnectorBinding } = await import('@/lib/adapters/kafka-connector-binding');
+    const binding = await resolveKafkaConnectorBinding({
+      orgId: request.orgId,
+      connectorId: request.connectorId,
+      domainId: request.domainId,
+    });
+    const { readKafkaEnterpriseSource } = await import('@/lib/adapters/kafka-enterprise-source');
+    const outcome = await readKafkaEnterpriseSource(
+      {
+        request,
+        binding,
+        actor: { orgId: request.orgId, actorId: query.binding.actorId },
+      },
+      dependencies.kafkaSource,
+    );
+    return {
+      rows: outcome.records.map((record) => ({
+        value: { ...record.value },
+        provenance: {
+          orgId: outcome.provenance.orgId,
+          connectorId: outcome.provenance.connectorId,
+          domainId: outcome.provenance.domainId,
+          topic: record.topic,
+          partition: record.partition,
+          offset: record.offset,
+          key: record.key,
+          keyEncoding: record.keyEncoding,
+          timestamp: record.timestamp,
+          schema: { ...record.schema },
+          consumerGroup: outcome.provenance.consumerGroup,
+          schemaSubject: outcome.provenance.schemaSubject,
+          schemaVersion: outcome.provenance.schemaVersion,
+          schemaId: outcome.provenance.schemaId,
+          schemaSha256: outcome.provenance.schemaSha256,
+          correlationId: record.correlationId,
+          actorId: record.actorId,
+          consumedAt: outcome.provenance.consumedAt,
+          partitionWindows: outcome.provenance.partitionWindows.map((window) => ({ ...window })),
+        },
+      })),
+      count: outcome.records.length,
+      dialect: 'kafka',
     };
   }
   const dialect = detectDialect(conn.type, conn.endpoint);

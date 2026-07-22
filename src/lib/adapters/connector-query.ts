@@ -14,13 +14,19 @@
 // `ResolutionDecision` describing the bind + outcome, and the caller (route / executor) is expected
 // to persist it via the existing audit helper. See `describeDecision` for a ready log line.
 import { execConnectorQuery } from '@/lib/connector-exec';
-import type { ConnectorQueryResult, ConnectorTarget } from '@/lib/connector-exec';
+import type {
+  ConnectorQueryResult,
+  ConnectorQueryRuntimeDependencies,
+  ConnectorTarget,
+} from '@/lib/connector-exec';
 import type { DataDomain } from '@/lib/data-domains';
 
 export interface QueryDomainOpts {
   op?: 'read' | 'count';
   limit?: number;
   params?: Record<string, unknown>;
+  /** Trusted runtime actor. Never sourced from connector-query step params. */
+  actorId?: string;
 }
 
 // The auditable record of ONE resolution: what phrase/domain bound to what connector+resource, and
@@ -49,6 +55,7 @@ export async function queryDomain(
   domain: DataDomain,
   connector: ConnectorTarget,
   opts: QueryDomainOpts = {},
+  dependencies: ConnectorQueryRuntimeDependencies = {},
 ): Promise<QueryDomainResult> {
   const op = opts.op ?? 'read';
   // opHints may declare a default limit for this domain; caller override wins, then hint, then default.
@@ -67,13 +74,17 @@ export async function queryDomain(
     dialect: null,
   };
 
-  const result = await execConnectorQuery(connector, {
-    resource: domain.resource,
-    op,
-    limit,
-    params: opts.params,
-    binding: { orgId: domain.orgId, domainId: domain.id },
-  });
+  const result = await execConnectorQuery(
+    connector,
+    {
+      resource: domain.resource,
+      op,
+      limit,
+      params: opts.params,
+      binding: { orgId: domain.orgId, domainId: domain.id, actorId: opts.actorId },
+    },
+    dependencies,
+  );
 
   if (result) {
     decision.ok = true;

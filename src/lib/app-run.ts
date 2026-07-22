@@ -187,6 +187,8 @@ export interface AppRunDeps {
       params?: Record<string, unknown>;
       /** Trusted run tenant; never sourced from the App step or browser. */
       orgId?: string;
+      /** Trusted run actor; never sourced from the App step or browser. */
+      actorId?: string;
     },
   ) => Promise<{
     result: { rows: unknown[]; count: number; dialect: string } | null;
@@ -289,7 +291,9 @@ export interface AppRunDeps {
 // Each boundary is imported inside the closure so tests that inject their own deps never load the
 // DB/gateway/Temporal modules. resolveDomain is applied over listDomains BY ID/LABEL — the executor
 // binds a connector-query step to a DECLARED domain (a rule), never a fuzzy guess at runtime.
-export function defaultDeps(): AppRunDeps {
+export function defaultDeps(
+  runtimeDependencies: import('@/lib/connector-exec').ConnectorQueryRuntimeDependencies = {},
+): AppRunDeps {
   return {
     async runAgent(agentId, query, caller, requireReview, orgId, context) {
       const { runAgent } = await import('@/lib/agentrun');
@@ -326,6 +330,7 @@ export function defaultDeps(): AppRunDeps {
         // endpoint + secret from OpenBao). Without it, a vaulted connector would connect password-less.
         { type: connector.type, endpoint: connector.endpoint, id: connector.id },
         opts,
+        runtimeDependencies,
       );
       return {
         result: result ? { rows: result.rows, count: result.count, dialect: result.dialect } : null,
@@ -762,6 +767,7 @@ async function executeConnectorStep(
     op: step.op ?? 'read',
     params: step.params,
     orgId: ctx.orgId,
+    actorId: ctx.actor?.trim() || `app-run:${ctx.runId}`,
   });
   if (!result) {
     // A miss (unreachable / bad binding) — recorded honestly, not fabricated. This does not error
