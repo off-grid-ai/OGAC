@@ -1,0 +1,7 @@
+presidio-image-redactor==0.0.59
+# 3.8.14 is explicitly excluded by the next Presidio image-redactor release; stay on the last
+# compatible 3.8 patch rather than resolving onto that known-bad release.
+spacy==3.8.13
+fastapi==0.115.5
+uvicorn==0.32.1
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
