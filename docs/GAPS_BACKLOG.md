@@ -1157,9 +1157,16 @@ gate-status vs gap-text reconciliation (do NOT rubber-stamp gates to green the t
    it's an aspirational enhancement, capability genuinely complete). Records:
    `ragas/faithfulness`, `ragas/answer-relevancy`, `llm-guard/prompt-sanitization`,
    `opa/policy-decisions`, `opa/policy-lifecycle`, `openbao/dynamic-credentials`,
-   `litellm/budgets-rate-limits` (⚠ dollar-budgets are $0 no-ops on free models — workflow gate is
-   likely `partial`, not `yes`), `litellm/virtual-keys`, `litellm/spend-analytics`.
+   `litellm/virtual-keys`.
    (`evidently/dataset-drift` in this class was fixed — its gap referenced other line-items, not itself.)
+   - ✅ **RESOLVED `litellm/budgets-rate-limits`** — workflow gate downgraded `yes`→`partial`: RPM/TPM
+     enforce live (429 proven) but dollar-budgets are a $0 no-op on free on-prem models; gap already
+     documented this, so gap⇔incomplete is now consistent.
+   - ✅ **RESOLVED `litellm/spend-analytics`** — a genuine LiteLLM-native attribution surface was wired
+     (`/runtime/models/spend`: pure `src/lib/litellm-spend.ts` + `adapters/litellm-spend.ts` reading
+     LiteLLM `/spend/logs`, rolled up by model/virtual-key/time with a per-request drill-down and admin
+     routes under `/api/v1/admin/gateway/spend/**`). Workflow set to `partial` (LiteLLM-ledger path is
+     code+wired, not yet fleet-verified; console-native cost path remains proven) → gap consistent.
 2. **stale snapshot arrays**: `runtime-governance-operations.test.ts` locks exact gate arrays for
    `llm-guard` (output-safety-quality, prompt-sanitization) and the common execution-spine record that
    no longer match the map. Reconcile the test to the *verified* map, or the map to reality — after
