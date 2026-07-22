@@ -14,6 +14,7 @@ import {
   type BrainSourceState,
   type CreateBrainSourceInput,
   type OrganizationalBrainPort,
+  OrganizationalBrainProviderError,
 } from '@/lib/organizational-brain/contracts';
 import {
   buildBrainProvenanceUri,
@@ -35,12 +36,12 @@ export type OnyxOrganizationalBrainConfig = Readonly<{
   fetchImpl?: Fetch;
 }>;
 
-export class OnyxOrganizationalBrainError extends Error {
+export class OnyxOrganizationalBrainError extends OrganizationalBrainProviderError {
   readonly status?: number;
   readonly detail?: unknown;
 
   constructor(message: string, status?: number, detail?: unknown) {
-    super(message);
+    super(message, status === 404 ? 'notFound' : 'unavailable');
     this.name = 'OnyxOrganizationalBrainError';
     this.status = status;
     this.detail = detail;

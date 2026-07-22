@@ -73,6 +73,22 @@ export class BrainDocumentValidationError extends Error {
   }
 }
 
+export type OrganizationalBrainProviderFailure = 'notFound' | 'unavailable';
+
+/** Provider-neutral failure exposed at the organizational-brain boundary. */
+export class OrganizationalBrainProviderError extends Error {
+  readonly failure: OrganizationalBrainProviderFailure;
+
+  constructor(
+    message: string,
+    failure: OrganizationalBrainProviderFailure = 'unavailable',
+  ) {
+    super(message);
+    this.name = 'OrganizationalBrainProviderError';
+    this.failure = failure;
+  }
+}
+
 const TENANT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const DOCUMENT_SET_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const BINDING_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
