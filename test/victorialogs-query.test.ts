@@ -184,9 +184,9 @@ test('normalizeFieldValues: bare string array form', () => {
   ]);
 });
 
-test('normalizeFieldValues: drops blank values and non-finite hits → 0', () => {
+test('normalizeFieldValues: drops blank / missing values and non-finite hits → 0', () => {
   const out = normalizeFieldValues({
-    values: [{ value: '  ', hits: 5 }, { value: 'x', hits: 'nope' }],
+    values: [{ value: '  ', hits: 5 }, { hits: 9 }, { value: 'x', hits: 'nope' }],
   });
   assert.deepEqual(out, [{ value: 'x', hits: 0 }]);
 });
