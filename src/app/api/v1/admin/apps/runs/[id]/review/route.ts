@@ -9,7 +9,11 @@ import { getAppRunView } from '@/lib/app-runs-view-reader';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { getApp } from '@/lib/apps-store';
 import { auditFromSession } from '@/lib/audit-actor';
-import { requireAdmin } from '@/lib/authz';
+import {
+  buildBankCrossSellRuntimeSpecFromSnapshot,
+  parseBankCrossSellRunSnapshot,
+} from '@/lib/bank-cross-sell-execution';
+import { requireUser } from '@/lib/authz';
 import { assertSolutionRuntimeBinding } from '@/lib/solution-blueprints-store';
 import { solutionErrorResponse } from '@/lib/solution-http';
 import { currentOrgId } from '@/lib/tenancy';
@@ -38,7 +42,7 @@ export const dynamic = 'force-dynamic';
 // SOLID: thin handler — auth, org, load+guard (pure), resume (durable adapter OR pure inline resume),
 // audit. All scheduling/decision logic is pure (app-run-plan / app-run-resume); no loop lives here.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const gate = await requireAdmin(req);
+  const gate = await requireUser(req);
   if (gate instanceof NextResponse) return gate;
 
   const { id } = await params;
@@ -128,10 +132,46 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // is what makes Approve JUST WORK for a non-technical reviewer without the durable runtime.
     if (signal.reason === 'not_configured' || signal.reason === 'not_found') {
       const paused = rebuildAppRunState(run.id, run.appId, run.status, run.steps);
+      const runInput = run.input ?? {};
+      const hasCrossSellSnapshot =
+        typeof runInput === 'object' &&
+        runInput !== null &&
+        Object.prototype.hasOwnProperty.call(runInput, 'crossSell');
+      const crossSellSnapshot = parseBankCrossSellRunSnapshot(runInput.crossSell);
+      if (hasCrossSellSnapshot && !crossSellSnapshot) {
+        auditFromSession(gate, orgId, {
+          action: 'app.run.review',
+          resource: `app_run:${id}`,
+          outcome: 'blocked',
+        });
+        return NextResponse.json(
+          { error: 'The retained recommendation evidence is invalid. Nothing was changed.' },
+          { status: 409 },
+        );
+      }
+      let runtimeApp = app;
+      if (crossSellSnapshot) {
+        try {
+          runtimeApp = buildBankCrossSellRuntimeSpecFromSnapshot(app, crossSellSnapshot);
+        } catch {
+          auditFromSession(gate, orgId, {
+            action: 'app.run.review',
+            resource: `app_run:${id}`,
+            outcome: 'blocked',
+          });
+          return NextResponse.json(
+            {
+              error:
+                'This App changed after the recommendation was prepared. Nothing was changed; prepare it again.',
+            },
+            { status: 409 },
+          );
+        }
+      }
       await resumeAppRun(
-        app,
+        runtimeApp,
         paused,
-        run.input ?? {},
+        runInput,
         {
           decision: body.decision,
           output: body.output,
