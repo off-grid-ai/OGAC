@@ -102,6 +102,64 @@ class SuiteLifecycleTest(unittest.TestCase):
         with self.assertRaisesRegex(LifecycleError, "limit"):
             self.lifecycle.profile("org_a", "warehouse", "bad", sample_limit=100_001)
 
+    def test_real_gx_validation_returns_pass_and_fail_and_retains_results(self) -> None:
+        self.lifecycle.create_suite("org_a", "kyc", "PAN required", [NOT_NULL])
+        passing = self.lifecycle.validate(
+            "org_a",
+            "kyc",
+            {"kind": "inline", "rows": [{"pan": "ABCDE1234F"}]},
+            idempotency_key="run_pass",
+        )
+        self.assertTrue(passing["success"])
+        self.assertEqual(passing["engine"], "great-expectations")
+        self.assertEqual(passing["engineVersion"], "1.19.0")
+        self.assertEqual((passing["evaluated"], passing["failed"]), (1, 0))
+
+        failing = self.lifecycle.validate(
+            "org_a",
+            "kyc",
+            {"kind": "inline", "rows": [{"pan": None}]},
+            idempotency_key="run_fail",
+        )
+        self.assertFalse(failing["success"])
+        self.assertEqual((failing["evaluated"], failing["failed"]), (1, 1))
+        self.assertEqual(failing["outcomes"][0]["unexpectedCount"], 1)
+
+        context = self.lifecycle.context("org_a")
+        self.assertEqual(len(context.stores["validation_results_store"].list_keys()), 2)
+        self.assertEqual(len(context.validation_definitions.all()), 1)
+
+    def test_validation_is_idempotent_and_rejects_key_reuse_with_different_input(self) -> None:
+        self.lifecycle.create_suite("org_a", "kyc", "PAN required", [NOT_NULL])
+        request = {"kind": "inline", "rows": [{"pan": "ABCDE1234F"}]}
+        first = self.lifecycle.validate("org_a", "kyc", request, idempotency_key="same_run")
+        replay = self.lifecycle.validate("org_a", "kyc", request, idempotency_key="same_run")
+        self.assertEqual(replay, first)
+        context = self.lifecycle.context("org_a")
+        self.assertEqual(len(context.stores["validation_results_store"].list_keys()), 1)
+
+        with self.assertRaisesRegex(LifecycleError, "already used") as conflict:
+            self.lifecycle.validate(
+                "org_a", "kyc", {"kind": "inline", "rows": [{"pan": None}]}, "same_run"
+            )
+        self.assertEqual(conflict.exception.status, 409)
+
+    def test_validation_reads_a_governed_asset_without_accepting_a_caller_path(self) -> None:
+        self.lifecycle.create_suite("org_a", "kyc", "PAN required", [NOT_NULL])
+        asset = self.root / "tenants" / "org_a" / "assets" / "warehouse" / "customers.json"
+        asset.parent.mkdir(parents=True)
+        asset.write_text(json.dumps([{"pan": "ABCDE1234F"}, {"pan": None}]))
+        result = self.lifecycle.validate(
+            "org_a",
+            "kyc",
+            {"kind": "asset", "dataSourceId": "warehouse", "assetName": "customers", "limit": 50},
+        )
+        self.assertFalse(result["success"])
+        self.assertEqual(result["dataSourceId"], "warehouse")
+        self.assertEqual(result["assetName"], "customers")
+        with self.assertRaisesRegex(LifecycleError, "batch kind"):
+            self.lifecycle.validate("org_a", "kyc", {"kind": "path", "path": "/etc/passwd"})
+
 
 if __name__ == "__main__":
     unittest.main()

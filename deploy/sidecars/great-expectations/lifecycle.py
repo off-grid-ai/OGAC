@@ -8,14 +8,17 @@ Validation Results stores are physically separated on disk instead of relying on
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import great_expectations as gx
 import pandas as pd
+from great_expectations.core import RunIdentifier
 
 
 GX_CORE_VERSION = gx.__version__
@@ -219,6 +222,167 @@ class GxLifecycle:
             return context.suites.get(safe_name)
         except Exception as error:
             raise LifecycleError("expectation suite not found.", 404) from error
+
+    def _receipt_path(self, org_id: str, idempotency_key: str) -> Path:
+        safe_key = _identifier(idempotency_key, "idempotency key")
+        receipts = self._tenant_root(org_id) / "offgrid" / "idempotency"
+        receipts.mkdir(parents=True, exist_ok=True)
+        return receipts / f"{hashlib.sha256(safe_key.encode()).hexdigest()}.json"
+
+    @staticmethod
+    def _request_hash(suite_name: str, batch: Dict[str, Any]) -> str:
+        canonical = json.dumps(
+            {"suiteName": suite_name, "batch": batch},
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        return hashlib.sha256(canonical.encode()).hexdigest()
+
+    def _validation_rows(
+        self, org_id: str, batch: Dict[str, Any]
+    ) -> tuple[List[Dict[str, Any]], Optional[str], Optional[str]]:
+        kind = batch.get("kind")
+        if kind == "inline":
+            rows = batch.get("rows")
+            if (
+                not isinstance(rows, list)
+                or len(rows) > MAX_INLINE_ROWS
+                or any(not isinstance(row, dict) for row in rows)
+            ):
+                raise LifecycleError(f"inline rows must contain at most {MAX_INLINE_ROWS} objects.")
+            return rows, None, None
+        if kind == "asset":
+            data_source_id = _identifier(batch.get("dataSourceId"), "data source id")
+            asset_name = _identifier(batch.get("assetName"), "asset name")
+            limit = batch.get("limit", 1_000)
+            return (
+                self.load_asset_rows(org_id, data_source_id, asset_name, limit),
+                data_source_id,
+                asset_name,
+            )
+        raise LifecycleError("batch kind must be inline or asset.")
+
+    @staticmethod
+    def _runtime_batch_definition(context: Any, batch_key: str) -> Any:
+        try:
+            data_source = context.data_sources.get("offgrid_runtime")
+        except Exception:
+            data_source = context.data_sources.add_pandas(name="offgrid_runtime")
+        try:
+            asset = data_source.get_asset(batch_key)
+        except Exception:
+            asset = data_source.add_dataframe_asset(name=batch_key)
+        try:
+            return asset.get_batch_definition("whole_dataframe")
+        except Exception:
+            return asset.add_batch_definition_whole_dataframe(name="whole_dataframe")
+
+    @staticmethod
+    def _validation_view(
+        result: Any,
+        suite_version: int,
+        started_at: str,
+        completed_at: str,
+        data_source_id: Optional[str],
+        asset_name: Optional[str],
+    ) -> Dict[str, Any]:
+        outcomes: List[Dict[str, Any]] = []
+        for expectation_result in result.results:
+            payload = expectation_result.result if isinstance(expectation_result.result, dict) else {}
+            unexpected_count = payload.get("unexpected_count", 0)
+            if not isinstance(unexpected_count, int):
+                unexpected_count = 0
+            exception = expectation_result.exception_info
+            detail = "passed" if expectation_result.success else f"{unexpected_count} unexpected values"
+            if exception and exception.get("raised_exception"):
+                detail = str(exception.get("exception_message") or "expectation execution failed")
+            outcomes.append(
+                {
+                    "type": expectation_result.expectation_config.type,
+                    "success": bool(expectation_result.success),
+                    "unexpectedCount": unexpected_count,
+                    "detail": detail,
+                }
+            )
+        statistics = result.statistics if isinstance(result.statistics, dict) else {}
+        meta = result.meta if isinstance(result.meta, dict) else {}
+        return {
+            "id": str(meta.get("validation_id") or result.id or ""),
+            "suiteName": result.suite_name,
+            "suiteVersion": suite_version,
+            "success": bool(result.success),
+            "evaluated": int(statistics.get("evaluated_expectations") or len(outcomes)),
+            "failed": int(statistics.get("unsuccessful_expectations") or 0),
+            "outcomes": outcomes,
+            "startedAt": started_at,
+            "completedAt": completed_at,
+            "engine": "great-expectations",
+            "engineVersion": GX_CORE_VERSION,
+            "dataSourceId": data_source_id,
+            "assetName": asset_name,
+        }
+
+    def validate(
+        self,
+        org_id: str,
+        suite_name: str,
+        batch: Dict[str, Any],
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        safe_suite_name = _identifier(suite_name, "suite name")
+        if not isinstance(batch, dict):
+            raise LifecycleError("batch is required.")
+        request_hash = self._request_hash(safe_suite_name, batch)
+        with self._lock(org_id):
+            receipt = self._receipt_path(org_id, idempotency_key) if idempotency_key else None
+            if receipt and receipt.exists():
+                stored = json.loads(receipt.read_text())
+                if stored.get("requestHash") != request_hash:
+                    raise LifecycleError("idempotency key was already used for another validation.", 409)
+                response = stored.get("response")
+                if not isinstance(response, dict):
+                    raise LifecycleError("retained validation receipt is malformed.", 500)
+                return response
+
+            context = self.context(org_id)
+            suite = self._suite(context, safe_suite_name)
+            suite_version = _suite_view(suite)["version"]
+            rows, data_source_id, asset_name = self._validation_rows(org_id, batch)
+            batch_identity = "inline" if data_source_id is None else f"{data_source_id}\0{asset_name}"
+            batch_key = f"batch_{hashlib.sha256(batch_identity.encode()).hexdigest()[:24]}"
+            definition_identity = f"{safe_suite_name}\0{batch_key}"
+            definition_name = (
+                f"validate_{hashlib.sha256(definition_identity.encode()).hexdigest()[:24]}"
+            )
+            batch_definition = self._runtime_batch_definition(context, batch_key)
+            definition = context.validation_definitions.add_or_update(
+                gx.ValidationDefinition(
+                    name=definition_name,
+                    data=batch_definition,
+                    suite=suite,
+                )
+            )
+            started_at = _now()
+            run_name = f"offgrid_{uuid.uuid4().hex}"
+            result = definition.run(
+                batch_parameters={"dataframe": pd.DataFrame(rows)},
+                run_id=RunIdentifier(run_name=run_name),
+                result_format={"result_format": "SUMMARY", "partial_unexpected_count": 20},
+            )
+            response = self._validation_view(
+                result,
+                suite_version=suite_version,
+                started_at=started_at,
+                completed_at=_now(),
+                data_source_id=data_source_id,
+                asset_name=asset_name,
+            )
+            if receipt:
+                temporary = receipt.with_suffix(f".{uuid.uuid4().hex}.tmp")
+                temporary.write_text(json.dumps({"requestHash": request_hash, "response": response}))
+                temporary.replace(receipt)
+            return response
 
     def list_suites(self, org_id: str) -> List[Dict[str, Any]]:
         with self._lock(org_id):
