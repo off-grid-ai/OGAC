@@ -5,6 +5,12 @@
 // old templates keep working. No imports, no I/O — the storage layer (apps-store.ts) adapts this to
 // the `apps` table. Keeping the rules here pure makes them unit-testable in isolation.
 
+import {
+  isApprovalAncestor,
+  validateActionEnvelope,
+  type ActionId,
+} from '@/lib/action-contract';
+
 // ─── FormField — one field of an input form (collected before a run) ──────────
 export interface FormField {
   key: string;
@@ -75,7 +81,25 @@ export interface OutputStep {
   config?: Record<string, unknown>;
 }
 
-export type AppStep = AgentStep | ConnectorQueryStep | GuardrailStep | HumanStep | OutputStep;
+// An action step: a governed, typed mutation. The action catalogue owns semantics; an App carries
+// only its selected action, tenant-owned connector binding, bounded command and maker-checker link.
+export interface ActionStep {
+  id: string;
+  label: string;
+  kind: 'action';
+  actionId: ActionId;
+  connectorId: string;
+  command: Record<string, unknown>;
+  approvalStepId?: string;
+}
+
+export type AppStep =
+  | AgentStep
+  | ConnectorQueryStep
+  | GuardrailStep
+  | HumanStep
+  | OutputStep
+  | ActionStep;
 
 export type AppStepKind = AppStep['kind'];
 
@@ -125,6 +149,7 @@ const STEP_KINDS = new Set<AppStepKind>([
   'guardrail',
   'human',
   'output',
+  'action',
 ]);
 
 export function validateAppSpec(spec: AppSpec): ValidationResult {
@@ -201,6 +226,17 @@ export function validateAppSpec(spec: AppSpec): ValidationResult {
     }
   }
 
+  // Action approval is graph policy, not merely shape: the named checker must be a preceding human
+  // ancestor so a sibling/later review can never authorize an early mutation.
+  for (const step of steps) {
+    if (step.kind !== 'action' || !step.approvalStepId) continue;
+    if (!isApprovalAncestor(step.id, step.approvalStepId, steps, edges)) {
+      errors.push(
+        `action step ${step.id}: approval step ${step.approvalStepId} must be a preceding human step`,
+      );
+    }
+  }
+
   return { ok: errors.length === 0, errors };
 }
 
@@ -222,6 +258,9 @@ function validateStepShape(step: AppStep, errors: string[]): void {
       break;
     case 'output':
       if (!step.sink) errors.push(`output step ${step.id}: needs a sink`);
+      break;
+    case 'action':
+      errors.push(...validateActionEnvelope(step).errors);
       break;
     // guardrail + human have no required fields beyond id/label/kind.
     default:
