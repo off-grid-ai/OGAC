@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { OutcomeEntryForm } from '@/components/outcomes/OutcomeEntryForm';
 import { OutcomeReadOnlyNotice } from '@/components/outcomes/OutcomeReadOnlyNotice';
 import { getRunActionOutcomeContext } from '@/components/outcomes/outcome-page-data';
+import { presentActionOutcomes } from '@/lib/action-outcome-presenter';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -28,6 +29,10 @@ export default async function CorrectActionOutcomePage({
     orgId,
   });
   if (!context?.observation || context.observation.kind === 'withdrawn') notFound();
+  const presented = presentActionOutcomes(context.records).history.find(
+    (item) => item.record.id === context.observation!.id,
+  );
+  if (!presented?.canCorrect) notFound();
   if (session?.user?.role !== 'admin') {
     return <OutcomeReadOnlyNotice appId={id} runId={runId} />;
   }
