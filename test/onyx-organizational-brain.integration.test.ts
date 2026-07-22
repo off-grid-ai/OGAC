@@ -196,32 +196,34 @@ test('retrieval-only grants fail every ingestion and source-management operation
 });
 
 function documentSets(): unknown[] {
-  const descriptor = (connectionId: number, connectorId: number, credentialId: number, tenant: string) => ({
+  const summary = (connectionId: number, tenant: string) => ({
     id: connectionId,
     name: `ogac:${tenant}:CRM`,
-    connector: { id: connectorId, name: `ogac:${tenant}:CRM`, source: 'salesforce' },
-    credential: { id: credentialId },
+    source: 'salesforce',
+    access_type: 'public',
   });
   return [
     {
       id: 1,
       name: 'ogac:bank-one:policies',
       description: 'Policies',
-      cc_pair_descriptors: [descriptor(10, 20, 7, 'bank-one')],
+      cc_pair_summaries: [summary(10, 'bank-one')],
+      is_up_to_date: true,
       is_public: true,
       users: [],
       groups: [],
-      federated_connectors: [],
+      federated_connector_summaries: [],
     },
     {
       id: 2,
       name: 'ogac:bank-two:secrets',
       description: 'Foreign',
-      cc_pair_descriptors: [descriptor(11, 21, 8, 'bank-two')],
+      cc_pair_summaries: [summary(11, 'bank-two')],
+      is_up_to_date: true,
       is_public: true,
       users: [],
       groups: [],
-      federated_connectors: [],
+      federated_connector_summaries: [],
     },
   ];
 }
@@ -230,6 +232,14 @@ test('source lifecycle filters foreign connections and uses exact Onyx v4.4.1 ma
   const fake = boundary((call) => {
     const path = new URL(call.url).pathname;
     if (call.method === 'GET' && path === '/api/manage/document-set') return json(documentSets());
+    if (call.method === 'GET' && path === '/api/manage/admin/cc-pair/10') {
+      return json({
+        id: 10,
+        name: 'ogac:bank-one:CRM',
+        connector: { id: 20, name: 'ogac:bank-one:CRM', source: 'salesforce' },
+        credential: { id: 7 },
+      });
+    }
     if (call.method === 'POST' && path === '/api/manage/admin/connector/indexing-status') {
       return json([
         {
@@ -267,6 +277,11 @@ test('source lifecycle filters foreign connections and uses exact Onyx v4.4.1 ma
   assert.equal(listed[0]?.documentCount, 12);
   assert.equal(listed[0]?.connectionConfigured, true);
   assert.equal('credentialReference' in (listed[0] ?? {}), false);
+  assert.equal(
+    fake.calls.some((call) => call.url.endsWith('/manage/admin/cc-pair/11')),
+    false,
+    'foreign document-set connections are never hydrated',
+  );
 
   const created = await brain.createSource(manager, {
     name: 'CRM new',
@@ -313,6 +328,29 @@ test('source lifecycle filters foreign connections and uses exact Onyx v4.4.1 ma
     fake.calls.find((call) => call.url.endsWith('/deletion-attempt'))?.body,
     { connector_id: 20, credential_id: 7 },
   );
+});
+
+test('document-set parsing rejects the obsolete full-model shape instead of silently widening compatibility', async () => {
+  const fake = boundary((call) => {
+    if (call.url.endsWith('/manage/document-set')) {
+      return json([
+        {
+          id: 1,
+          name: 'ogac:bank-one:policies',
+          description: 'Policies',
+          cc_pair_descriptors: [],
+          is_public: true,
+          users: [],
+          groups: [],
+          federated_connectors: [],
+        },
+      ]);
+    }
+    return json({ detail: 'must not be reached' }, 500);
+  });
+
+  await assert.rejects(() => adapter(fake.fetch).listSources(manager), /connection summaries/);
+  assert.equal(fake.calls.length, 1);
 });
 
 test('source-specific configuration rejects secrets and unknown fields before network', async () => {
@@ -484,6 +522,14 @@ test('adapter bounds timeout and malformed provider responses', async () => {
 test('foreign source mutation returns not found after a scoped read and performs no write', async () => {
   const fake = boundary((call) => {
     if (call.method === 'GET' && call.url.endsWith('/manage/document-set')) return json(documentSets());
+    if (call.method === 'GET' && call.url.endsWith('/manage/admin/cc-pair/10')) {
+      return json({
+        id: 10,
+        name: 'ogac:bank-one:CRM',
+        connector: { id: 20, name: 'ogac:bank-one:CRM', source: 'salesforce' },
+        credential: { id: 7 },
+      });
+    }
     return json({ detail: 'write must not be reached' }, 500);
   });
 
@@ -491,7 +537,7 @@ test('foreign source mutation returns not found after a scoped read and performs
     () => adapter(fake.fetch).deleteSource(manager, '21'),
     (error: unknown) => error instanceof OnyxOrganizationalBrainError && error.status === 404,
   );
-  assert.deepEqual(fake.calls.map((call) => call.method), ['GET']);
+  assert.deepEqual(fake.calls.map((call) => call.method), ['GET', 'GET']);
 });
 
 test('constructor and delete boundary reject unsafe timeout and document ids before network', async () => {

@@ -23,18 +23,19 @@ const documentSets = [
     id: 1,
     name: 'ogac:bank-one:policies',
     description: 'Policies',
-    cc_pair_descriptors: [
+    cc_pair_summaries: [
       {
         id: 10,
         name: 'CRM',
-        connector: { id: 20, name: 'CRM', source: 'salesforce' },
-        credential: { id: 7 },
+        source: 'salesforce',
+        access_type: 'public',
       },
     ],
+    is_up_to_date: true,
     is_public: true,
     users: [],
     groups: [],
-    federated_connectors: [],
+    federated_connector_summaries: [],
   },
 ];
 
@@ -86,6 +87,14 @@ test('real organizational-brain routes enforce auth, tenant scope, validation, e
     }
     if (path.startsWith('/api/onyx-api/ingestion/') && method === 'DELETE') return response(undefined);
     if (path === '/api/manage/document-set' && method === 'GET') return response(documentSets);
+    if (path === '/api/manage/admin/cc-pair/10' && method === 'GET') {
+      return response({
+        id: 10,
+        name: 'CRM',
+        connector: { id: 20, name: 'CRM', source: 'salesforce' },
+        credential: { id: 7 },
+      });
+    }
     if (path === '/api/manage/admin/connector/indexing-status') {
       return response([
         {

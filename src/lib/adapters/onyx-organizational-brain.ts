@@ -59,12 +59,18 @@ type OnyxConnectorDescriptor = Readonly<{
   sourceType: string;
 }>;
 
+type OnyxConnectionSummary = Readonly<{
+  connectionId: number;
+  connectionName: string;
+  sourceType: string;
+}>;
+
 type OnyxDocumentSet = Readonly<{
   id: number;
   name: string;
   description: string;
   connectionIds: readonly number[];
-  descriptors: readonly OnyxConnectorDescriptor[];
+  connections: readonly OnyxConnectionSummary[];
   isPublic: boolean;
   users: readonly string[];
   groups: readonly number[];
@@ -99,6 +105,17 @@ function requiredInteger(value: unknown, label: string): number {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined;
+}
+
+function nullableString(value: unknown, label: string): string {
+  if (value === null) return '';
+  if (typeof value !== 'string') throw new OnyxOrganizationalBrainError(`Onyx returned an invalid ${label}`);
+  return value;
+}
+
+function requiredBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== 'boolean') throw new OnyxOrganizationalBrainError(`Onyx returned an invalid ${label}`);
+  return value;
 }
 
 export function mapOnyxSourceState(value: unknown): BrainSourceState {
@@ -285,31 +302,38 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
   private parseDocumentSets(payload: unknown): OnyxDocumentSet[] {
     return array(payload, 'document-set response').map((raw) => {
       const value = object(raw, 'document set');
-      const descriptors = array(value.cc_pair_descriptors, 'document-set connections').map((descriptorRaw) => {
-        const descriptor = object(descriptorRaw, 'document-set connection');
-        const connector = object(descriptor.connector, 'connector');
-        const credential = object(descriptor.credential, 'credential');
+      const connections = array(value.cc_pair_summaries, 'document-set connection summaries').map((summaryRaw) => {
+        const summary = object(summaryRaw, 'document-set connection summary');
+        requiredString(summary.access_type, 'connection access type');
         return {
-          connectionId: requiredInteger(descriptor.id, 'connection id'),
-          connectionName: requiredString(descriptor.name, 'connection name'),
-          connectorId: requiredInteger(connector.id, 'connector id'),
-          credentialId: requiredInteger(credential.id, 'credential id'),
-          connectorName: requiredString(connector.name, 'connector name'),
-          sourceType: requiredString(connector.source, 'connector source'),
+          connectionId: requiredInteger(summary.id, 'connection id'),
+          connectionName: requiredString(summary.name, 'connection name'),
+          sourceType: requiredString(summary.source, 'connection source'),
         };
       });
+      requiredBoolean(value.is_up_to_date, 'document-set freshness flag');
       return {
         id: requiredInteger(value.id, 'document-set id'),
         name: requiredString(value.name, 'document-set name'),
-        description: optionalString(value.description) ?? '',
-        connectionIds: descriptors.map((descriptor) => descriptor.connectionId),
-        descriptors,
-        isPublic: value.is_public === true,
-        users: array(value.users ?? [], 'document-set users').filter((user): user is string => typeof user === 'string'),
-        groups: array(value.groups ?? [], 'document-set groups').map((group) => requiredInteger(group, 'group id')),
-        federatedConnectors: array(value.federated_connectors ?? [], 'federated connectors').map((item) =>
-          object(item, 'federated connector'),
-        ),
+        description: nullableString(value.description, 'document-set description'),
+        connectionIds: connections.map((connection) => connection.connectionId),
+        connections,
+        isPublic: requiredBoolean(value.is_public, 'document-set public flag'),
+        users: array(value.users, 'document-set users').map((user) => requiredString(user, 'document-set user')),
+        groups: array(value.groups, 'document-set groups').map((group) => requiredInteger(group, 'group id')),
+        federatedConnectors: array(
+          value.federated_connector_summaries,
+          'federated connector summaries',
+        ).map((item) => {
+          const summary = object(item, 'federated connector summary');
+          const id = requiredInteger(summary.id, 'federated connector id');
+          requiredString(summary.name, 'federated connector name');
+          requiredString(summary.source, 'federated connector source');
+          return {
+            federated_connector_id: id,
+            entities: object(summary.entities, 'federated connector entities'),
+          };
+        }),
       };
     });
   }
@@ -320,11 +344,41 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
     return all.filter((documentSet) => context.documentSetNames.includes(documentSet.name));
   }
 
+  private async authorizedDescriptors(context: BrainAuthorizationContext): Promise<OnyxConnectorDescriptor[]> {
+    const summaries = (await this.authorizedDocumentSets(context)).flatMap((documentSet) => documentSet.connections);
+    const unique = [...new Map(summaries.map((summary) => [summary.connectionId, summary])).values()];
+    return Promise.all(
+      unique.map(async (summary) => {
+        const value = object(
+          await this.request(`/manage/admin/cc-pair/${summary.connectionId}`),
+          'connection detail',
+        );
+        const connector = object(value.connector, 'connector');
+        const credential = object(value.credential, 'credential');
+        const descriptor = {
+          connectionId: requiredInteger(value.id, 'connection id'),
+          connectionName: requiredString(value.name, 'connection name'),
+          connectorId: requiredInteger(connector.id, 'connector id'),
+          credentialId: requiredInteger(credential.id, 'credential id'),
+          connectorName: requiredString(connector.name, 'connector name'),
+          sourceType: requiredString(connector.source, 'connector source'),
+        };
+        if (
+          descriptor.connectionId !== summary.connectionId ||
+          descriptor.connectionName !== summary.connectionName ||
+          descriptor.sourceType !== summary.sourceType
+        ) {
+          throw new OnyxOrganizationalBrainError('Onyx connection detail does not match its document-set summary');
+        }
+        return descriptor;
+      }),
+    );
+  }
+
   async listSources(context: BrainAuthorizationContext): Promise<readonly BrainSource[]> {
     requireBrainCapability(context, 'manageSources');
-    const documentSets = await this.authorizedDocumentSets(context);
     const allowed = new Map(
-      documentSets.flatMap((documentSet) => documentSet.descriptors).map((descriptor) => [descriptor.connectionId, descriptor]),
+      (await this.authorizedDescriptors(context)).map((descriptor) => [descriptor.connectionId, descriptor]),
     );
     if (!allowed.size) return [];
     const groups = array(
@@ -490,7 +544,7 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
   ): Promise<OnyxConnectorDescriptor> {
     const id = Number(value);
     if (!Number.isSafeInteger(id) || id <= 0) throw new OnyxOrganizationalBrainError('source id is invalid');
-    const descriptors = (await this.authorizedDocumentSets(context)).flatMap((documentSet) => documentSet.descriptors);
+    const descriptors = await this.authorizedDescriptors(context);
     const descriptor = descriptors.find((candidate) => candidate[key] === id);
     if (!descriptor) throw new OnyxOrganizationalBrainError('source is outside the authorized tenant scope', 404);
     return descriptor;
