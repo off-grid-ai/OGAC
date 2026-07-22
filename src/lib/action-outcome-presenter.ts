@@ -101,4 +101,3 @@ export function presentActionOutcomes(records: ActionOutcomeRecord[]): ActionOut
     nextAction,
   };
 }
-

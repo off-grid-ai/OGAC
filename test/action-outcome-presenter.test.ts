@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { ActionReceipt } from '../src/lib/action-contract.ts';
-import {
-  actionOutcomeCopy,
-  presentActionOutcomes,
-} from '../src/lib/action-outcome-presenter.ts';
+import { actionOutcomeCopy, presentActionOutcomes } from '../src/lib/action-outcome-presenter.ts';
 import type { ActionOutcomeRecord } from '../src/lib/action-outcome-contract.ts';
 
 const receipt: ActionReceipt = {
@@ -72,6 +69,8 @@ test('presenter uses customer language and offers conversion after acceptance', 
   });
   assert.deepEqual(result.nextAction, { kind: 'record-conversion', label: 'Record conversion' });
   assert.equal(actionOutcomeCopy('rejected').label, 'Customer declined');
+  assert.equal(actionOutcomeCopy('cured').label, 'Account cured');
+  assert.equal(actionOutcomeCopy('settled').label, 'Claim settled');
 });
 
 test('accepted and converted remain independent facts while converted becomes current', () => {
@@ -111,4 +110,3 @@ test('correction and withdrawal retain history but remove superseded facts from 
   );
   assert.deepEqual(result.nextAction, { kind: 'record-result', label: 'Record customer result' });
 });
-
