@@ -100,7 +100,7 @@ This live Outcome slice does not inflate the broader capability denominator. The
 mutable, while automatic CRM/system ingestion, portfolio reporting, pagination, incremental sync,
 rate-limit handling, webhooks, and broader CRM CRUD remain partial or absent.
 
-### Enterprise Context and Catalogue-driven Builder source-verified delta — `3313c502`
+### Enterprise Context and Catalogue-driven Builder live-verified delta — `df60a318847b7669296e428f0ecfa22b96b1bba1`
 
 The Builder now consumes one tenant-safe Enterprise Context and Permission Resolver contract across
 guided creation, saved-App editing, conversational Forge, data/tool/pipeline/action pickers, compile
@@ -111,9 +111,9 @@ the operator.
 
 | Evidence slice | State | Retained proof | Remaining boundary |
 | --- | --- | --- | --- |
-| Resolver contract and tenant envelope | source-verified | Pure projection tests, real Postgres route tests, failed-slice fail-closed tests, strict `private,no-store` API response | Exact Console deployment and live tenant probe |
-| Nontechnical catalogue experience | browser-verified locally | 1600×1000 and 768×1024 had zero horizontal overflow; 390×844 showed the intentional larger-screen handoff; ready, approval-required, and setup-needed options carried plain-language remedies | Conversational Forge needs an explicit pipeline picker when an org has zero or multiple eligible pipelines |
-| Compile and persistence enforcement | source-verified | Resolver-filtered data preview; server rejection of unavailable/cross-tenant data, tools, pipelines, and actions; the sole eligible governed pipeline was selected and retained on the saved App detail | Re-run the exact workflow after Console-only deployment |
+| Resolver contract and tenant envelope | live-verified | Bharat returned 53 visible resources: 45 ready, four approval-required, three unavailable and one denied; source retains pure projection, real Postgres route, failed-slice and `private,no-store` tests | Extend the same contract to later Builder-owned surfaces |
+| Nontechnical catalogue experience | live-verified | Authenticated 1600×1000 describe → compile → pipeline select → save → detail showed zero horizontal overflow; local 768×1024 and 390×844 checks retained the responsive and intentional handoff evidence | Conversational Forge needs an explicit pipeline picker when an org has zero or multiple eligible pipelines |
+| Compile and persistence enforcement | live-verified | KYC compiled with zero gaps, bound declared `customers` data, selected resolver-ready `KYC Verification`, and retained `pl_seed_org_bharat_kyc-verification` on API and browser read-back; both QA Apps were deleted (`204`, then `404`) | Keep new write surfaces on the same server validation seam |
 
 The browser adversarial pass caught and closed a misleading default before release: an unbound App
 was previously labelled as using the org default. New Apps now bind the sole eligible pipeline

@@ -1288,16 +1288,18 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
 
 ## Enterprise Context and Catalogue-driven Builder (2026-07-23)
 
-- **[G-CONTEXT-BUILDER] RESOLVED IN SOURCE — one governed catalogue now controls what an App can
+- **[G-CONTEXT-BUILDER] RESOLVED + LIVE — one governed catalogue now controls what an App can
   preview, select, and persist.** The tenant-safe resolver drives Guided, Forge, every real picker,
   compile preview, and POST/PATCH/publish validation. Loading, failed, denied, unavailable, and
   approval-required states fail closed without hiding the remedy. The browser journey exposed a
   false “org default” pipeline claim; `3313c502` fixed it, automatically bound the sole eligible
   governed pipeline, retained that binding after Save, and labelled a truly missing binding as
-  **No pipeline (unbound)**. Local evidence: coverage gate exit 0; 320/321 integration tests with
-  zero failures; clean typecheck and production build; real create → compile → save → detail →
-  cleanup at 1600/768/390 widths with no horizontal overflow. Live deployment evidence is still
-  required before this item becomes RESOLVED + LIVE.
+  **No pipeline (unbound)**. Exact Console `df60a318847b7669296e428f0ecfa22b96b1bba1`
+  is live through the Console-only scope. Bharat returned 53 visible resources (45 ready, four
+  approval-required, three unavailable, one denied); KYC compiled with zero gaps, selected the
+  resolver-ready `KYC Verification` pipeline, retained that exact binding on API and browser
+  read-back, and removed both QA Apps (`204`, then `404`). The live 1600×1000 journey had no
+  horizontal overflow; local 768/390 evidence retains the responsive/handoff proof.
 
 - **[G-CONTEXT-FORGE-PIPELINE] OPEN — Forge has no explicit pipeline chooser for zero/multiple
   eligible pipelines.** When exactly one pipeline is eligible, the compiler binds it explicitly.

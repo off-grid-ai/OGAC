@@ -17,11 +17,11 @@ test('context-builder records separate first-party evidence from the upstream de
 
   assert.match(map, /## First-party capability planes/);
   assert.match(map, /do not create synthetic services or\s+inflate an upstream denominator/);
-  assert.match(status, /Enterprise Context and Catalogue-driven Builder source-verified delta/);
-  assert.match(status, /3313c502/);
+  assert.match(status, /Enterprise Context and Catalogue-driven Builder live-verified delta/);
+  assert.match(status, /df60a318847b7669296e428f0ecfa22b96b1bba1/);
   assert.match(status, /No pipeline \(unbound\)/);
   assert.match(status, /does not alter the 171 upstream capability denominator/);
-  assert.match(gaps, /\[G-CONTEXT-BUILDER\] RESOLVED IN SOURCE/);
+  assert.match(gaps, /\[G-CONTEXT-BUILDER\] RESOLVED \+ LIVE/);
   assert.match(gaps, /\[G-CONTEXT-FORGE-PIPELINE\] OPEN/);
 });
 
