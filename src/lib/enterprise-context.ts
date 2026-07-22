@@ -530,6 +530,7 @@ function actionCandidates(
 function intentDecision(
   intent: EnterpriseIntentDecision['intent'],
   permissions: Settled<Permissions>,
+  actorRole: string | undefined,
   requiredModules: ModuleId[],
   method: 'POST' | 'PATCH',
   appEditAllowed: boolean | null,
@@ -561,7 +562,9 @@ function intentDecision(
       ),
     };
   }
-  const gate = decideAdminGate(permissions.value.baseRole, method);
+  // Builder writes are enforced by requireAdmin, which evaluates the raw session role. Keep this
+  // projection on that same role instead of granting a custom role based on its inherited baseline.
+  const gate = decideAdminGate(actorRole, method);
   if (gate !== 'allow') {
     return {
       intent,
@@ -654,12 +657,12 @@ export async function getEnterpriseContext(
   }
 
   const intentDecisions: EnterpriseIntentDecision[] = [
-    intentDecision('build.create', permissions, ['studio'], 'POST', appEditAllowed),
-    intentDecision('build.edit', permissions, ['studio'], 'PATCH', appEditAllowed),
-    intentDecision('data.configure', permissions, ['data'], 'POST', appEditAllowed),
-    intentDecision('tool.select', permissions, ['studio', 'tools'], 'PATCH', appEditAllowed),
-    intentDecision('action.configure', permissions, ['studio'], 'PATCH', appEditAllowed),
-    intentDecision('publish', permissions, ['studio'], 'PATCH', appEditAllowed),
+    intentDecision('build.create', permissions, request.actor.role, ['studio'], 'POST', appEditAllowed),
+    intentDecision('build.edit', permissions, request.actor.role, ['studio'], 'PATCH', appEditAllowed),
+    intentDecision('data.configure', permissions, request.actor.role, ['data'], 'POST', appEditAllowed),
+    intentDecision('tool.select', permissions, request.actor.role, ['studio', 'tools'], 'PATCH', appEditAllowed),
+    intentDecision('action.configure', permissions, request.actor.role, ['studio'], 'PATCH', appEditAllowed),
+    intentDecision('publish', permissions, request.actor.role, ['studio'], 'PATCH', appEditAllowed),
   ];
   const intent = (id: EnterpriseIntentDecision['intent']): EnterpriseIntentDecision =>
     intentDecisions.find((decision) => decision.intent === id)!;

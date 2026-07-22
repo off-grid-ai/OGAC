@@ -239,6 +239,32 @@ test('viewer, operator, and admin intent decisions reflect the actual admin-gate
   );
 });
 
+test('custom roles never project Builder writes that the raw requireAdmin gate rejects', async () => {
+  const result = await getEnterpriseContext(
+    request('custom-app-owner'),
+    sources({
+      async resolvePermissions() {
+        return {
+          role: 'custom-app-owner',
+          baseRole: 'admin',
+          isCustom: true,
+          modules: new Set(allModuleIds()),
+        };
+      },
+    }),
+  );
+
+  assert.deepEqual(result.allowedIntents, []);
+  assert.equal(
+    result.intentDecisions.every((decision) => decision.reasonCode === 'admin-required'),
+    true,
+  );
+  assert.equal(
+    result.resources.every((resource) => resource.canSelect === false),
+    true,
+  );
+});
+
 test('one failed source degrades only its slices and never exposes static actions without resolved availability', async () => {
   const result = await getEnterpriseContext(
     request('admin'),
