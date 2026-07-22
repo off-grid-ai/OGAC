@@ -1190,3 +1190,17 @@ The deployed LiteLLM proxy has no cache initialized (/cache/ping → 503 "litell
 The console cache surface (status/flush/hit-rate) is live-verified and degrades honestly, but no cache
 hit/flush workflow can be proven until caching is enabled in the proxy config + reloaded — a deploy/
 service concern, NOT a Next.js change. response-cache workflow gate held at `no`.
+
+### Pre-existing test failure: service-inventory expects `victoriametrics` (2026-07-22)
+`test/service-inventory.test.ts:152` expects `['victoriametrics','otel-collector']` but the inventory
+now returns only `['otel-collector']`. Fails on `main` independent of the actions-out merge (no
+service-inventory files were touched). A prior session dropped victoriametrics from the inventory
+without updating the test (or the drop was unintended). Fix: decide whether victoriametrics belongs in
+the inventory — if yes, restore it; if no, update the test expectation. Unrelated to sinks/templates.
+
+### Actions-out sinks merged but NOT yet live-screenshot-verified (2026-07-22)
+webhook/slack/whatsapp sinks are code+wired+tested+build-clean and merged to main
+(commit 7dafccc2). Still owed per the verification protocol: (1) authed-screenshot the AppStepEditor
+sink-config UI + a real governed send via the local UI harness → docs/screenshots/capabilities/;
+(2) add an honest capability-map entry at /operations/services/capability-map (gates: code=yes,
+wired=yes, verified=partial until the live shot). Do NOT flip verified→yes without the screenshot.
