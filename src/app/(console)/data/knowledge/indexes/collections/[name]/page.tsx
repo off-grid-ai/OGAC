@@ -16,7 +16,7 @@ export default async function CollectionDetailPage({
   if (!validateCollectionName(decoded).ok) notFound();
   return (
     <PageFrame>
-      <SnapshotManager collectionName={decoded} />
+      <SnapshotManager collectionName={decoded} basePath="/data/knowledge/indexes" />
     </PageFrame>
   );
 }

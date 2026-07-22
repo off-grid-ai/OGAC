@@ -9,7 +9,7 @@ export default async function CollectionsPage() {
   await requireModuleForUser('retrieval');
   return (
     <PageFrame>
-      <CollectionsManager />
+      <CollectionsManager basePath="/data/knowledge/indexes" />
     </PageFrame>
   );
 }
