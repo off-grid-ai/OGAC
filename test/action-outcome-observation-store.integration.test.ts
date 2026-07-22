@@ -165,6 +165,8 @@ test(
       null,
     );
     assert.deepEqual(await store.listActionOutcomes(receipt.runId, receipt.stepId, 'org_other'), []);
+    assert.equal(await store.hasActionOutcomesForApp('app_cross_sell', receipt.orgId), true);
+    assert.equal(await store.hasActionOutcomesForApp('app_cross_sell', 'org_other'), false);
 
     const pending = await store.recordActionOutcome(
       {

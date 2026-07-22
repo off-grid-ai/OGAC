@@ -266,3 +266,18 @@ export async function getActionOutcome(
     .limit(1);
   return row ? toRecord(row) : null;
 }
+
+/** Audit evidence is retained; App deletion must surface a deliberate conflict instead of an FK 500. */
+export async function hasActionOutcomesForApp(appId: string, orgId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: actionOutcomeObservations.id })
+    .from(actionOutcomeObservations)
+    .where(
+      and(
+        eq(actionOutcomeObservations.appId, appId),
+        eq(actionOutcomeObservations.orgId, orgId),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}

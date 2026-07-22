@@ -10,6 +10,7 @@ import {
   type AppPatch,
 } from '@/lib/apps-store';
 import { auditFromSession } from '@/lib/audit-actor';
+import { hasActionOutcomesForApp } from '@/lib/action-outcome-observation-store';
 import { requireAdmin } from '@/lib/authz';
 import { currentOrgId } from '@/lib/tenancy';
 import { hasSolutionDeploymentsForApp } from '@/lib/solution-blueprints-store';
@@ -90,6 +91,16 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const orgId = await currentOrgId();
+  if (await hasActionOutcomesForApp(id, orgId)) {
+    return NextResponse.json(
+      {
+        error: 'This App has retained business-result evidence and cannot be deleted',
+        code: 'referenced',
+        action: 'keep the App so its audit history remains available',
+      },
+      { status: 409 },
+    );
+  }
   if (await hasSolutionDeploymentsForApp(id, orgId)) {
     return NextResponse.json(
       {
