@@ -68,9 +68,10 @@ test(
       approval: { stepId: 'review', evidence: 'RM approved', reviewer: 'rm@bank.local' },
       providerReceipt: { signature: 'signed-provider-receipt' },
     };
-    await pool.query(`INSERT INTO apps (id, org_id) VALUES ($1, $2)`, [
+    await pool.query(`INSERT INTO apps (id, org_id, owner_id) VALUES ($1, $2, $3)`, [
       'app_route_cross_sell',
       receipt.orgId,
+      'rm@bank.local',
     ]);
     await pool.query(
       `INSERT INTO app_runs (id, org_id, app_id, steps, finished_at)

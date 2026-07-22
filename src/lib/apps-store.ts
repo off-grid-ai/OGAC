@@ -347,6 +347,19 @@ export async function getApp(id: string, orgId: string): Promise<AppSpec | null>
   return row ? toAppSpec(row) : null;
 }
 
+/** Minimal, non-migrating app identity read for policy gates around an already-persisted run. */
+export async function getAppAccessSubject(
+  id: string,
+  orgId: string,
+): Promise<{ id: string; ownerId: string } | null> {
+  const [row] = await db
+    .select({ id: apps.id, ownerId: apps.ownerId })
+    .from(apps)
+    .where(and(eq(apps.id, id), eq(apps.orgId, orgId || DEFAULT_ORG)))
+    .limit(1);
+  return row ?? null;
+}
+
 // ─── getAppBySlug — public lookup for /app/<slug> (slug is globally unique) ─────
 // Not org-scoped: a published app is served by its slug regardless of the viewer's org.
 export async function getAppBySlug(slug: string): Promise<AppSpec | null> {

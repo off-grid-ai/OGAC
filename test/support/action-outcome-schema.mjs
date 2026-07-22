@@ -23,7 +23,8 @@ export async function prepareActionOutcomeSchema(label) {
     await client.query(`SET search_path TO ${schema}`);
     await client.query(`CREATE TABLE apps (
       id text PRIMARY KEY,
-      org_id text NOT NULL
+      org_id text NOT NULL,
+      owner_id text NOT NULL
     )`);
     await client.query(`CREATE TABLE app_runs (
       id text PRIMARY KEY,
