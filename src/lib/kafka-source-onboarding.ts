@@ -78,7 +78,8 @@ const SASL_MODES: readonly KafkaSaslMode[] = [
 ];
 const REGISTRY_AUTH_MODES: readonly KafkaRegistryAuthMode[] = ['none', 'bearer', 'basic'];
 const TOPIC_RE = /^[A-Za-z0-9._-]{1,249}$/;
-const TENANT_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_.]{0,127}$/;
+const SCHEMA_SUBJECT_RE = /^[A-Za-z0-9._-]{1,249}$/;
+const TENANT_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/i;
 
 function text(value: unknown): string {
@@ -196,7 +197,7 @@ export function validateKafkaSource(
   if (!TOPIC_RE.test(topic) || topic === '.' || topic === '..') {
     errors.topic = 'Use a Kafka topic name with letters, numbers, dots, hyphens, or underscores.';
   }
-  if (!schemaSubject || schemaSubject.length > 255 || /[\r\n]/.test(schemaSubject)) {
+  if (!SCHEMA_SUBJECT_RE.test(schemaSubject)) {
     errors.schemaSubject = 'Enter the exact registered schema subject.';
   }
   if (!schemaVersion) errors.schemaVersion = 'Enter a positive schema version.';
