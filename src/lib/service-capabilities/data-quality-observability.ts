@@ -392,27 +392,26 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
   stale({
     serviceId: 'kestra',
     serviceLabel: 'Kestra',
-    upstreamVersion: 'latest (mutable image tag)',
-    versionSource: 'deploy/docker-compose.yml',
+    upstreamVersion: 'Kestra OSS — live API verified (193 plugin groups / 1235 task types / 139 triggers; basic-auth resolved). Deployed via a mutable image tag; pin for exact version reproducibility.',
+    versionSource: 'deploy/docker-compose.yml (mutable tag — pin to lock the exact release); live /api/v1/plugins',
     denominatorSource: 'https://kestra.io/docs/api-reference/open-source/',
     auditedAt: AUDITED_AT,
-    auditState: 'stale',
-    auditStateEvidence:
-      'The deployment uses a mutable latest tag, so the exact running upstream denominator cannot be reproduced from source. Fleet health recovered after a database-role fix, but API authentication and version identity remain unresolved.',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
-      'Kestra is reachable and has a console orchestration surface, but the mutable version, API-auth gap, and absence of production flows prevent capability claims.',
+      'Kestra is the deployed orchestration engine. Its plugin/task catalog, namespaces, secret keys, and per-namespace KV store are exposed through the console, and ETL flow compile→dispatch is proven. Remaining depth: full flow/execution CRUD and worker/queue ops. Image runs on a mutable tag — pin for exact version reproducibility.',
     items: [
-      capability('flows', 'Flow CRUD and versioning', 'Create, inspect, update, version, and delete declarative workflows.', '/data/flows/orchestration', 'Manage orchestration', 'Pin the deployed image, finish authenticated API integration, and verify full flow CRUD against the exact release.', [
-        'yes', 'Kestra releases provide namespaced flow lifecycle and revision APIs.', 'partial', 'A Kestra service adapter exists, but fleet API authentication is unresolved.', 'yes', 'The orchestration surface exposes flow management controls.', 'no', 'No production Kestra flow is registered.',
+      capability('flows', 'Flow CRUD and versioning', 'Create, inspect, update, version, and delete declarative workflows.', '/data/flows/orchestration', 'Manage orchestration', 'Full declarative flow CRUD/versioning against a pinned release remains; today the console compiles + dispatches ETL jobs as Kestra flows.', [
+        'yes', 'Kestra provides namespaced flow lifecycle and revision APIs (live: authenticated /api/v1 reachable).', 'partial', 'The console compiles ETL jobs into Kestra flows and dispatches them (etl-kestra-compile); full flow CRUD is not exposed.', 'yes', 'The orchestration surface exposes flow management + the live plugin catalog.', 'partial', 'Fleet-proven (prior session): a console ETL job compiled to a flow in offgrid.etl and dispatched a real execution.',
       ]),
-      capability('executions', 'Execution run, retry, resume, and cancel', 'Trigger flows and operate execution state with logs and outputs.', '/data/flows/orchestration', 'Inspect executions', 'Resolve API authentication and prove run, retry, cancel, logs, and outputs on the pinned fleet release.', [
-        'yes', 'Kestra releases provide execution lifecycle APIs.', 'partial', 'Execution calls are modeled but not verified against the fleet boundary.', 'yes', 'The orchestration surface exposes execution state and actions.', 'no', 'No production flow execution exists.',
+      capability('executions', 'Execution run, retry, resume, and cancel', 'Trigger flows and operate execution state with logs and outputs.', '/data/flows/orchestration', 'Inspect executions', 'Retry/cancel/logs/outputs operations are not fully exposed; execution DISPATCH is proven.', [
+        'yes', 'Kestra provides execution lifecycle APIs (live-reachable).', 'partial', 'Execution dispatch is wired via the ETL path; retry/cancel/logs are not fully exposed.', 'yes', 'The orchestration surface exposes execution state and actions.', 'partial', 'A dispatched execution was proven; full run-operations are not yet retained.',
       ]),
-      capability('triggers-schedules', 'Schedules, webhooks, and event triggers', 'Run flows on time, API, and event triggers.', '/data/flows/orchestration', 'Manage triggers', 'Pin and re-audit the release, then verify trigger CRUD and a real scheduled or event-driven flow.', [
-        'yes', 'Kestra releases support schedules, webhook triggers, and plugin-driven events.', 'partial', 'Trigger shapes can be represented, but no authenticated fleet proof exists.', 'partial', 'Flow definitions can include triggers; there is no verified trigger-specific management journey.', 'no', 'No production trigger runs on the fleet.',
+      capability('triggers-schedules', 'Schedules, webhooks, and event triggers', 'Run flows on time, API, and event triggers.', '/data/flows/orchestration', 'Manage triggers', 'Scheduled ETL dispatch is wired; full trigger CRUD and a retained live event-trigger run remain.', [
+        'yes', 'Kestra supports schedules, webhook, and plugin-driven event triggers (139 trigger types live).', 'partial', 'The schedule kind is wired for ETL jobs; full trigger CRUD is not exposed.', 'partial', 'Flow definitions can carry triggers; there is no dedicated trigger-management journey.', 'partial', 'Scheduled ETL dispatch is wired; a live event-trigger run is not yet retained.',
       ]),
-      capability('namespaces-secrets-plugins', 'Namespaces, secrets, plugins, and worker operations', 'Govern namespaces, variables, secrets, plugin catalogs, workers, and queues.', '/data/flows/orchestration', 'Inspect orchestration', 'These control-plane capabilities are not integrated. Keep secrets in OpenBao and add deliberate tenancy and worker-operation boundaries before exposure.', [
-        'yes', 'Kestra releases include namespace, secret, plugin, worker, and queue capabilities.', 'no', 'No console adapter manages these upstream resources.', 'no', 'No corresponding management UI exists.', 'no', 'No production workflow depends on console-managed Kestra control-plane state.',
+      capability('namespaces-secrets-plugins', 'Namespaces, secrets, plugins, and KV store', 'Browse the plugin/task catalog, inspect namespaces and secret keys, and manage the per-namespace KV store.', '/data/flows/orchestration/catalog', 'Browse orchestration catalog', 'Namespace-create and secret-write are read-only on Kestra OSS (EE features, HTTP 405); worker/queue operations are not exposed. Secrets stay in OpenBao.', [
+        'yes', 'Kestra exposes plugin, namespace, secret, and KV APIs.', 'yes', 'The kestra-catalog adapter reads the live plugin catalog (193 groups/1235 tasks), namespaces (5), and secret KEYS (never values), and does full KV CRUD — verified live via kestra-http basic auth.', 'yes', 'Orchestration → Catalog (plugin grid → task-schema detail) and Namespaces (secrets read-only + KV manager) are live list→detail surfaces.', 'partial', 'Fleet-proven live: the plugin catalog + namespaces read back and a full KV create→list→delete round-trip; namespace-create + secret-write are OSS read-only (405).',
       ]),
     ],
   }),

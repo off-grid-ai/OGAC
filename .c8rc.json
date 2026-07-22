@@ -203,7 +203,8 @@
     "// warehouse-model orchestration glue: sequences the pure plan (schema-model.ts) + the ClickHouse adapter (adapters/warehouse.ts) + the store (schema-model-store.ts); every decision (plan/validate/status) is pure & tested in schema-model.test.ts, verified live by warehouse-model-service.integration.test.ts.",
     "src/lib/warehouse-model-service.ts",
     "src/lib/opa-decision-log-store.ts",
-    "src/lib/adapters/opa-audit.ts"
+    "src/lib/adapters/opa-audit.ts",
+    "src/lib/adapters/litellm-callbacks.ts"
   ],
   "excludeNodeModules": true,
   "skip-full": false,
