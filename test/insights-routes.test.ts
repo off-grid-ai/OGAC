@@ -17,6 +17,8 @@ test('Insights AI destinations expose the durable level-three places', () => {
       ['overview', '/insights/ai/overview'],
       ['traces', '/insights/ai/traces'],
       ['prompt-registry', '/insights/ai/prompt-registry'],
+      ['langfuse-prompts', '/insights/ai/langfuse-prompts'],
+      ['langfuse-datasets', '/insights/ai/langfuse-datasets'],
       ['copilot', '/insights/ai/copilot'],
     ],
   );

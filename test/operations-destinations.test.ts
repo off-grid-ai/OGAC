@@ -17,7 +17,8 @@ test('Operations exposes each level-three place as a stable route', () => {
   assert.deepEqual(
     HEALTH_DESTINATIONS.map(({ id, route }) => [id, route]),
     [
-      ['metrics', '/operations/health/metrics'],
+      ['metrics', '/operations/health/metrics/explorer'],
+      ['alerts', '/operations/health/metrics/alerts'],
       ['logs', '/operations/health/logs'],
       ['traces', '/operations/health/traces'],
     ],
@@ -96,7 +97,7 @@ test('legacy health tabs become durable leaves without losing filters', () => {
     legacyHealthHref({ tab: ['traces'], svc: 'gateway' }),
     '/operations/health/traces?svc=gateway',
   );
-  assert.equal(legacyHealthHref({ tab: 'unknown' }), '/operations/health/metrics');
+  assert.equal(legacyHealthHref({ tab: 'unknown' }), '/operations/health/metrics/explorer');
 });
 
 test('adapter run timestamps use stable relative labels', () => {

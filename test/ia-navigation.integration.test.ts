@@ -178,8 +178,15 @@ test('canonical operations service routes reuse the topology-backed list and det
   );
   assert.match(canonicalDetail, /LegacyServiceDetailPage/);
   assert.match(canonicalDetail, /serviceId.*id/s);
-  assert.match(topologyList, /getRuntimeServiceTopologyRegistry\(\)\.list\(\)/);
-  assert.match(topologyDetail, /getRuntimeServiceTopologyRegistry\(\)\.find\(id\)/);
+  assert.match(topologyList, /const topologies = await listLiveServiceTopologies\(\)/);
+  assert.match(topologyList, /toServiceTopologyDirectoryEntries\(topologies\)/);
+  assert.match(
+    topologyDetail,
+    /const topology = \(await listLiveServiceTopologies\(\)\)\.find\(\(entry\) => entry\.service\.id === id\)/,
+  );
+  assert.match(topologyDetail, /toServiceTopologyDetailEntry\(topology\)/);
+  assert.doesNotMatch(topologyList, /getRuntimeServiceTopologyRegistry/);
+  assert.doesNotMatch(topologyDetail, /getRuntimeServiceTopologyRegistry/);
 });
 
 test('fleet route shells consume the registry and never encode deployment membership', () => {

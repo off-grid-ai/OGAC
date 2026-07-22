@@ -23,6 +23,7 @@ test('Data exposes each existing management place as a stable route', () => {
     [
       ['tables', '/data/warehouse'],
       ['query', '/data/warehouse/query'],
+      ['models', '/data/warehouse/models'],
     ],
   );
   assert.deepEqual(
