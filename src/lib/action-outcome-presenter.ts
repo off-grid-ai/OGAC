@@ -130,9 +130,8 @@ export function presentActionOutcomes(records: ActionOutcomeRecord[]): ActionOut
   const current = newest(effective);
   const successorKindById = new Map(
     records
-      .filter(
-        (record): record is ActionOutcomeRecord & { supersedesId: string } =>
-          Boolean(record.supersedesId),
+      .filter((record): record is ActionOutcomeRecord & { supersedesId: string } =>
+        Boolean(record.supersedesId),
       )
       .map((record) => [record.supersedesId, record.kind]),
   );

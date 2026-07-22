@@ -5,10 +5,7 @@ import { OutcomeWithdrawButton } from '@/components/outcomes/OutcomeWithdrawButt
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ActionOutcomeRecord } from '@/lib/action-outcome-contract';
-import {
-  presentActionOutcomes,
-  presentOutcomeMeasurement,
-} from '@/lib/action-outcome-presenter';
+import { presentActionOutcomes, presentOutcomeMeasurement } from '@/lib/action-outcome-presenter';
 import { appRunHref, correctActionOutcomeHref } from '@/lib/action-outcome-routes';
 
 interface OutcomeDetailProps {

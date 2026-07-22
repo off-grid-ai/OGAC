@@ -265,7 +265,9 @@ export function OutcomeEntryForm({
           <h2 className="mt-3 text-sm font-medium text-foreground">What this creates</h2>
           <ul className="mt-3 space-y-3 text-xs leading-relaxed text-muted-foreground">
             <li>The result is linked to the exact system change shown on this run.</li>
-            <li>The time, person, evidence and optional before-and-after values are kept with it.</li>
+            <li>
+              The time, person, evidence and optional before-and-after values are kept with it.
+            </li>
             <li>If saving is retried, the same result is not added twice.</li>
             <li>A correction or withdrawal keeps the original record for review.</li>
           </ul>
