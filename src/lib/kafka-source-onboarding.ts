@@ -130,13 +130,11 @@ function normalizeBootstrapEndpoint(raw: string, tls: boolean): string | null {
       url.password ||
       url.search ||
       url.hash ||
-      (url.pathname !== '' && url.pathname !== '/') ||
-      (tls && url.protocol !== 'kafkas:') ||
-      (!tls && url.protocol !== 'kafka:')
+      (url.pathname !== '' && url.pathname !== '/')
     ) {
       return null;
     }
-    return `${url.protocol}//${url.hostname}:${url.port}`;
+    return `${tls ? 'kafkas:' : 'kafka:'}//${url.hostname}:${url.port}`;
   } catch {
     return null;
   }

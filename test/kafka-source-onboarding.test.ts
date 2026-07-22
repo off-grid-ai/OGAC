@@ -54,6 +54,19 @@ test('normalizes one credential-free Kafka source and exact schema binding', () 
   assert.equal(result.value?.connectorEndpoint.includes('@'), false);
 });
 
+test('treats the TLS control as authoritative when rotating an existing endpoint', () => {
+  const encrypted = validateKafkaSource(
+    validInput({ bootstrapEndpoint: 'kafka://events.internal:9092', tls: true }),
+  );
+  assert.equal(encrypted.ok, true);
+  assert.equal(encrypted.value?.connectorEndpoint, 'kafkas://events.internal:9092');
+  const unencrypted = validateKafkaSource(
+    validInput({ bootstrapEndpoint: 'kafkas://events.internal:9093', tls: false }),
+  );
+  assert.equal(unencrypted.ok, true);
+  assert.equal(unencrypted.value?.connectorEndpoint, 'kafka://events.internal:9093');
+});
+
 test('puts Kafka and Schema Registry credentials only in the opaque vault value', () => {
   const result = validateKafkaSource(
     validInput({
