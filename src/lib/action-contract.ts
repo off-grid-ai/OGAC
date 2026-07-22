@@ -5,8 +5,10 @@
 // Future Kestra/catalog actions extend this catalogue and adapter dispatch instead of creating a
 // parallel registry or exposing arbitrary URLs, methods, and payloads to an App.
 
-import { validateCrmTaskCommand } from '@/lib/crm-task-writeback';
-import { validateCrmOpportunityWriteback } from '@/lib/crm-writeback';
+import {
+  validateCrmOpportunityWriteback,
+  validateCrmTaskCommand,
+} from '@/lib/crm-writeback-validation';
 
 export const ACTION_DESCRIPTORS = {
   'crm.create-task': {
