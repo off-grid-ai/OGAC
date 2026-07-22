@@ -2,6 +2,7 @@ import { ArrowLeft, Pulse } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppRunStatus } from '@/components/build/AppRunStatus';
+import { RunOutcomeEvidence } from '@/components/outcomes/RunOutcomeEvidence';
 import { getAppRunView } from '@/lib/app-runs-view-reader';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -55,6 +56,7 @@ export default async function AppRunDetail({
       ) : null}
 
       <AppRunStatus initial={run} />
+      <RunOutcomeEvidence run={run} />
     </div>
   );
 }
