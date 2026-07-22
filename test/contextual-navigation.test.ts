@@ -25,6 +25,7 @@ test('contextual modules own complete canonical level-3 route trees', () => {
       ['golden-cases', '/solutions/quality/golden-cases'],
       ['executions', '/solutions/quality/runs'],
       ['drift', '/solutions/quality/drift'],
+      ['drift-monitoring', '/solutions/quality/drift-monitoring'],
       ['performance', '/solutions/quality/performance'],
       ['release-gates', '/solutions/quality/release-gates'],
     ],
