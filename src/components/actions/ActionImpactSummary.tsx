@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ActionImpact } from '@/lib/action-contract';
 
 /**
- * The plain-language contract shown before an enterprise action can run.
+ * Plain-language presentation of the canonical action impact returned by the action service.
  *
- * This is deliberately a view model rather than the execution contract. The action service owns
- * policy and side effects; callers adapt its immutable decision into these serializable facts.
+ * The action service owns policy and side effects. This component only adds reviewer-facing labels
+ * and optional context such as the approver role and the evidence the host retains.
  */
 export function ActionImpactSummary({
   impact,
@@ -20,7 +20,7 @@ export function ActionImpactSummary({
   evidence = [],
 }: Readonly<{ impact: ActionImpact; approver?: string; evidence?: string[] }>) {
   return (
-    <Card aria-label="Action impact" className="border-border shadow-sm">
+    <Card aria-label="Action impact" className="border-border">
       <CardHeader className="space-y-2 pb-3">
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
           Before this runs
@@ -62,7 +62,7 @@ export function ActionImpactSummary({
             <div className="space-y-1.5 text-xs">
               <p className="font-medium text-foreground">Approval required before execution.</p>
               <p className="text-muted-foreground">
-                Maker-checker policy keeps the change paused until a different person approves it.
+                A different person must approve this before it runs.
               </p>
               {approver ? (
                 <p className="text-muted-foreground">

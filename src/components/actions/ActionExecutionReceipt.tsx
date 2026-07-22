@@ -7,13 +7,10 @@ const STATUS_COPY: Record<ActionReceipt['status'], string> = {
   replayed: 'Completed from the retained receipt',
 };
 
-export function ActionExecutionReceipt({
-  receipt,
-  approvedBy,
-  evidence = [],
-}: Readonly<{ receipt: ActionReceipt; approvedBy?: string; evidence?: string[] }>) {
+export function ActionExecutionReceipt({ receipt }: Readonly<{ receipt: ActionReceipt }>) {
+  const retainedEvidence = [receipt.approval.evidence, 'Signed provider receipt'].filter(Boolean);
   return (
-    <Card aria-label="Execution receipt" className="border-border shadow-sm">
+    <Card aria-label="Execution receipt" className="border-border">
       <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -39,7 +36,7 @@ export function ActionExecutionReceipt({
           <ReceiptFact label="Changed record" value={receipt.target} />
           <ReceiptFact
             label="Approved by"
-            value={approvedBy ?? 'Approval retained with this run'}
+            value={receipt.approval.reviewer ?? 'Reviewer identity was not recorded'}
           />
           <ReceiptFact label="Completed" value={receipt.executedAt} />
           <ReceiptFact label="Run" value={receipt.runId} />
@@ -50,9 +47,9 @@ export function ActionExecutionReceipt({
           <h3 className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Retained evidence
           </h3>
-          {evidence.length > 0 ? (
+          {retainedEvidence.length > 0 ? (
             <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
-              {evidence.map((item) => (
+              {retainedEvidence.map((item) => (
                 <li key={item} className="min-w-0 break-words">
                   {item}
                 </li>

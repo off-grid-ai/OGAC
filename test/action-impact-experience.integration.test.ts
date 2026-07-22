@@ -71,22 +71,22 @@ test('completed action receipt keeps the execution proof visible', () => {
     idempotencyKey: 'act_01JY7',
     status: 'executed',
     executedAt: '22 Jul 2026, 20:41',
+    approval: {
+      stepId: 'approve-1',
+      evidence: 'Approved by the branch manager',
+      reviewer: 'Branch Manager',
+    },
     providerReceipt: { id: 'crm-8421' },
   };
 
-  const html = renderToStaticMarkup(
-    createElement(ActionExecutionReceipt, {
-      receipt,
-      approvedBy: 'Branch Manager',
-      evidence: ['CRM task crm-8421', 'Masked payload digest sha256:1234'],
-    }),
-  );
+  const html = renderToStaticMarkup(createElement(ActionExecutionReceipt, { receipt }));
 
   assert.match(html, /Execution receipt/);
   assert.match(html, /Completed/);
   assert.match(html, /Receipt act_01JY7/);
   assert.match(html, /Branch Manager/);
-  assert.match(html, /CRM task crm-8421/);
+  assert.match(html, /Approved by the branch manager/);
+  assert.match(html, /Signed provider receipt/);
   assert.match(html, /Retained evidence/);
 });
 
@@ -101,7 +101,7 @@ test('replayed receipt states that the retained result prevented a duplicate cha
   );
   assert.match(replayed, /role="status"/);
   assert.match(replayed, /Completed from the retained receipt/);
-  assert.match(replayed, /No supporting artifacts were attached/);
+  assert.match(replayed, /Signed provider receipt/);
 });
 
 function receiptFixture(): ActionReceipt {
@@ -117,6 +117,7 @@ function receiptFixture(): ActionReceipt {
     idempotencyKey: 'act_01JY7',
     status: 'executed',
     executedAt: '22 Jul 2026, 20:41',
+    approval: { stepId: 'approve-1', evidence: 'Approved' },
     providerReceipt: { id: 'crm-8421' },
   };
 }
