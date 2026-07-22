@@ -52,6 +52,21 @@ test('unconfigured when no analyzer/anonymizer URL is set', async () => {
   assert.match(res.reason ?? '', /not configured/);
 });
 
+test('defaults: no deps + no Presidio env resolves to unconfigured (real config/fetch defaults)', async () => {
+  const saved = { ...process.env };
+  delete process.env.OFFGRID_PRESIDIO_ANALYZER_URL;
+  delete process.env.OFFGRID_PRESIDIO_URL;
+  delete process.env.OFFGRID_PRESIDIO_ANONYMIZER_URL;
+  try {
+    const res = await anonymizeWithPolicy('My PAN is ABCDE1234F');
+    assert.equal(res.configured, false);
+    assert.equal(res.status, 'unconfigured');
+    assert.equal(res.text, 'My PAN is ABCDE1234F');
+  } finally {
+    process.env = saved;
+  }
+});
+
 test('applied: analyzer detects, anonymizer masks per the operator policy', async () => {
   const seen: { analyze?: unknown; anonymize?: unknown } = {};
   const fetcher = fakeFetch({
