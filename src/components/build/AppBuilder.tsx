@@ -718,8 +718,8 @@ export function BuilderPipelinePicker({
       <CardContent className="space-y-1.5">
         <SelectRow
           active={!selectedPipelineId}
-          label="Org default (governed)"
-          hint="Resolve to your org's default pipeline at run time"
+          label="No pipeline (unbound)"
+          hint="Runs without a governing pipeline. Choose a ready pipeline whenever one is available."
           disabled={capabilityContext.status !== 'ready' || choices.selectionDisabled}
           onClick={() => onSelect(null)}
         />

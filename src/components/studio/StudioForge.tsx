@@ -161,8 +161,8 @@ export function StudioForge({
   }
 
   function pipelineName(id?: string | null): string {
-    if (!id) return 'the org default pipeline';
-    return pipelineOptions.find((p) => p.id === id)?.name ?? 'the org default pipeline';
+    if (!id) return 'no pipeline yet';
+    return pipelineOptions.find((p) => p.id === id)?.name ?? 'a governed pipeline';
   }
 
   async function save() {

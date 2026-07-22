@@ -50,6 +50,8 @@ export interface CompileCtx {
   ownerId: string;
   /** Resolver-approved data refs for generated bindings. Omitted only by pure/unit callers. */
   allowedDataDomainIds?: ReadonlySet<string>;
+  /** A resolver-approved pipeline that the generated App binds explicitly. */
+  defaultPipelineId?: string | null;
 }
 
 // ─── Dependency seams (injected in tests; real defaults in prod) ─────────────────────────────────
@@ -348,6 +350,7 @@ export function finalizeSpec(
     summary: assembled.summary || description.trim(),
     visibility: 'private',
     published: false,
+    ...(ctx.defaultPipelineId ? { pipelineId: ctx.defaultPipelineId } : {}),
     trigger: { kind: 'on-demand' },
     steps,
     edges,

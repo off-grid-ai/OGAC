@@ -118,6 +118,14 @@ export function selectableAppCapabilityRefs(
   );
 }
 
+/** Pick a safe generated default only when exactly one governed pipeline is selectable. */
+export function soleSelectableAppPipelineId(
+  context: EnterpriseContextResolution,
+): string | null {
+  const refs = [...selectableAppCapabilityRefs(context, 'pipeline')];
+  return refs.length === 1 ? refs[0].slice('pipeline:'.length) : null;
+}
+
 /**
  * Validate submitted App selections against the tenant-safe resolver projection. Error messages are
  * bounded to one per capability kind and never echo a hidden or attacker-supplied identifier.

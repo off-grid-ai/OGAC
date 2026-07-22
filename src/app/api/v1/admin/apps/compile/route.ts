@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { selectableAppCapabilityRefs } from '@/lib/app-capability-selection';
+import {
+  selectableAppCapabilityRefs,
+  soleSelectableAppPipelineId,
+} from '@/lib/app-capability-selection';
 import { compileAppSpec } from '@/lib/app-compile';
 import { requireAdmin } from '@/lib/authz';
 import { getEnterpriseContext } from '@/lib/enterprise-context';
@@ -39,6 +42,7 @@ export async function POST(req: Request) {
     orgId,
     ownerId,
     allowedDataDomainIds,
+    defaultPipelineId: soleSelectableAppPipelineId(context),
   });
   return NextResponse.json({ object: 'app_compile', spec, gaps });
 }

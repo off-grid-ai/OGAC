@@ -75,6 +75,16 @@ test('LLM path: reimbursement produces the canonical step kinds and binds quota+
   assert.equal(spec.edges.length, spec.steps.length - 1);
 });
 
+test('a resolver-approved generated default is persisted as an explicit pipeline binding', async () => {
+  const { spec } = await compileAppSpec(
+    'send a report',
+    { ...CTX, defaultPipelineId: 'pipeline-only-choice' },
+    stubDeps([], null),
+  );
+
+  assert.equal(spec.pipelineId, 'pipeline-only-choice');
+});
+
 // ─── HONESTY (risk #5) — undeclared data surfaces a GAP, never a fabricated connector ────────────
 test('undeclared data phrase surfaces a gap and drops the step — NO fabricated connector', async () => {
   const plan: ModelPlan = {

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   extractAppCapabilitySelections,
   selectableAppCapabilityRefs,
+  soleSelectableAppPipelineId,
   validateAppCapabilitySelections,
 } from '../src/lib/app-capability-selection.ts';
 import type {
@@ -131,6 +132,17 @@ test('projects only selectable refs for generated App bindings', () => {
   assert.deepEqual([...selectableAppCapabilityRefs(resolution, 'pipeline')], [
     'pipeline:published',
   ]);
+  assert.equal(soleSelectableAppPipelineId(resolution), 'published');
+});
+
+test('generated Apps stay unbound when zero or multiple pipelines are selectable', () => {
+  assert.equal(soleSelectableAppPipelineId(context({})), null);
+  assert.equal(
+    soleSelectableAppPipelineId(
+      context({ 'pipeline:first': 'ready', 'pipeline:second': 'approval-required' }),
+    ),
+    null,
+  );
 });
 
 test('rejects absent, denied, unavailable and failed-slice selections with bounded safe errors', () => {
