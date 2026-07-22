@@ -44,6 +44,7 @@ export interface KafkaEnterpriseSourcePort {
 }
 
 export interface KafkaSourceRecordEvidence {
+  topic: string;
   partition: number;
   offset: string;
   key: string | null;
@@ -424,6 +425,7 @@ function decodeSchemaBoundRecord(
     }
   }
   return {
+    topic: binding.topic,
     partition: raw.partition,
     offset: raw.offset,
     key: raw.key?.toString('base64') ?? null,

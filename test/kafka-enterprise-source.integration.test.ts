@@ -152,7 +152,8 @@ test('reads a complete schema-bound tenant window through real Schema Registry H
   assert.equal((portCalls[1] as { groupId: string }).groupId, kafkaConsumerGroup(resolved));
   assert.deepEqual(
     result.records.map(
-      ({ partition, offset, key, keyEncoding, schema, correlationId, actorId, value }) => ({
+      ({ topic, partition, offset, key, keyEncoding, schema, correlationId, actorId, value }) => ({
+        topic,
         partition,
         offset,
         key,
@@ -165,6 +166,7 @@ test('reads a complete schema-bound tenant window through real Schema Registry H
     ),
     [
       {
+        topic: 'factory.machine-risk',
         partition: 0,
         offset: '41',
         key: Buffer.from('machine:41').toString('base64'),
@@ -175,6 +177,7 @@ test('reads a complete schema-bound tenant window through real Schema Registry H
         value: sourceValue('evt-0041'),
       },
       {
+        topic: 'factory.machine-risk',
         partition: 0,
         offset: '42',
         key: Buffer.from('machine:42').toString('base64'),
