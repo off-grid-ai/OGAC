@@ -33,9 +33,11 @@ export const INPUT_BLOCKS: Block[] = [
 export const OUTPUT_BLOCKS: Block[] = [
   { id: 'output:console', group: 'Output', label: 'Console', sub: 'in-app result' },
   { id: 'output:human', group: 'Human', label: 'Human review', sub: 'approve / edit' },
-  { id: 'output:report', group: 'Output', label: 'Report', sub: 'signed PDF export', comingSoon: true },
-  { id: 'output:email', group: 'Output', label: 'Email', sub: 'send result', comingSoon: true },
-  { id: 'output:whatsapp', group: 'Output', label: 'WhatsApp', sub: 'message', comingSoon: true },
+  { id: 'output:report', group: 'Output', label: 'Report', sub: 'signed PDF export' },
+  { id: 'output:email', group: 'Output', label: 'Email', sub: 'send result' },
+  { id: 'output:webhook', group: 'Output', label: 'Webhook', sub: 'signed JSON POST to a URL' },
+  { id: 'output:slack', group: 'Output', label: 'Slack', sub: 'post to a channel' },
+  { id: 'output:whatsapp', group: 'Output', label: 'WhatsApp', sub: 'on-prem gateway message' },
 ];
 
 export interface Block {

@@ -273,6 +273,24 @@ export function setOutputSink(spec: AppSpec, stepId: string, sink: OutputStep['s
   return mapStep(spec, stepId, (s) => (s.kind === 'output' ? ({ ...s, sink } as OutputStep) : s));
 }
 
+// ─── setOutputConfigField — set/clear ONE config field on an output step (pure) ──────────────────
+// The sink-specific destination (webhook url, Slack channel, email to/subject, whatsapp to). A blank
+// value CLEARS the key so an unconfigured sink degrades honestly rather than carrying an empty string.
+export function setOutputConfigField(
+  spec: AppSpec,
+  stepId: string,
+  key: string,
+  value: string,
+): AppSpec {
+  return mapStep(spec, stepId, (s) => {
+    if (s.kind !== 'output') return s;
+    const config = { ...(s.config ?? {}) };
+    if (value.trim()) config[key] = value;
+    else delete config[key];
+    return { ...s, config } as OutputStep;
+  });
+}
+
 // ─── setTrigger — pick how the app is invoked ─────────────────────────────────────────────────────
 export function setTrigger(spec: AppSpec, kind: TriggerKind, config?: Record<string, unknown>): AppSpec {
   const trigger: TriggerSpec = { kind, ...(config ? { config } : {}) };

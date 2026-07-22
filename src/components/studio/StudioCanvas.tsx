@@ -45,6 +45,7 @@ import {
   removeStep,
   removeStepAndEdges,
   setAgentPrompt,
+  setOutputConfigField,
   setOutputSink,
   toggleGrounding,
 } from '@/lib/app-builder';
@@ -505,6 +506,8 @@ export function StudioCanvas({
       onSetPrompt: (p) => edit((s) => setAgentPrompt(s, stepId, p)),
       onToggleGrounding: (g) => edit((s) => toggleGrounding(s, stepId, g)),
       onSetSink: (sink: OutputStep['sink']) => edit((s) => setOutputSink(s, stepId, sink)),
+      onSetSinkConfig: (key: string, value: string) =>
+        edit((s) => setOutputConfigField(s, stepId, key, value)),
     };
   }
 
