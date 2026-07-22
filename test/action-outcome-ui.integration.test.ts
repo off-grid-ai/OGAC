@@ -119,3 +119,27 @@ test('direct create and correction journeys have a clear read-only state', () =>
   assert.match(html, /cannot add, correct or withdraw/);
   assert.match(html, /\/solutions\/apps\/app_1\/runs\/run_1/);
 });
+
+test('timeline names a withdrawn original honestly', () => {
+  const withdrawal: ActionOutcomeRecord = {
+    ...accepted,
+    id: 'aout_withdrawal',
+    kind: 'withdrawn',
+    outcomeCode: null,
+    source: { kind: 'human', eventId: 'event_withdrawal', idempotencyKey: 'source_withdrawal' },
+    note: 'The CRM response was reversed.',
+    supersedesId: accepted.id,
+    recordedAt: '2026-07-22T11:01:00.000Z',
+  };
+  const html = renderToStaticMarkup(
+    createElement(OutcomeTimeline, {
+      appId: 'app_1',
+      runId: 'run_1',
+      stepId: 'act_1',
+      records: [accepted, withdrawal],
+      canManage: true,
+    }),
+  );
+  assert.equal((html.match(/>Withdrawn</g) ?? []).length, 2);
+  assert.doesNotMatch(html, />Corrected</);
+});

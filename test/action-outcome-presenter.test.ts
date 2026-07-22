@@ -104,9 +104,28 @@ test('correction and withdrawal retain history but remove superseded facts from 
     result.history.map((item) => [item.record.id, item.stateLabel, item.canCorrect]),
     [
       ['original', 'Corrected', false],
-      ['correction', 'Corrected', false],
+      ['correction', 'Withdrawn', false],
       ['withdrawal', 'Withdrawn', false],
     ],
   );
   assert.deepEqual(result.nextAction, { kind: 'record-result', label: 'Record customer result' });
+});
+
+test('a withdrawal labels the original fact withdrawn rather than corrected', () => {
+  const original = record('converted', 'converted');
+  const withdrawal = record('withdrawal', null, {
+    kind: 'withdrawn',
+    supersedesId: original.id,
+    note: 'The CRM conversion was reversed.',
+    recordedAt: '2026-07-22T12:00:00.000Z',
+  });
+
+  const result = presentActionOutcomes([original, withdrawal]);
+  assert.deepEqual(
+    result.history.map((item) => [item.record.id, item.stateLabel]),
+    [
+      ['converted', 'Withdrawn'],
+      ['withdrawal', 'Withdrawn'],
+    ],
+  );
 });

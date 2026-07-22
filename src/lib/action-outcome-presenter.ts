@@ -67,21 +67,31 @@ function newest(records: ActionOutcomeRecord[]): ActionOutcomeRecord | null {
 export function presentActionOutcomes(records: ActionOutcomeRecord[]): ActionOutcomePresentation {
   const effective = effectiveActionOutcomes(records);
   const current = newest(effective);
-  const supersededIds = new Set(
-    records.map((record) => record.supersedesId).filter((id): id is string => Boolean(id)),
+  const successorKindById = new Map(
+    records
+      .filter(
+        (record): record is ActionOutcomeRecord & { supersedesId: string } =>
+          Boolean(record.supersedesId),
+      )
+      .map((record) => [record.supersedesId, record.kind]),
   );
   const history = [...records]
     .sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt))
     .map((record): PresentedActionOutcome => {
       const withdrawn = record.kind === 'withdrawn';
-      const superseded = supersededIds.has(record.id);
-      const active = !withdrawn && !superseded;
+      const successorKind = successorKindById.get(record.id);
+      const active = !withdrawn && !successorKind;
       const copy = record.outcomeCode ? actionOutcomeCopy(record.outcomeCode) : null;
       return {
         record,
         label: withdrawn ? 'Record withdrawn' : (copy?.label ?? 'Business result'),
         detail: withdrawn ? record.note : (copy?.detail ?? record.note),
-        stateLabel: withdrawn ? 'Withdrawn' : superseded ? 'Corrected' : 'Current',
+        stateLabel:
+          withdrawn || successorKind === 'withdrawn'
+            ? 'Withdrawn'
+            : successorKind === 'corrected'
+              ? 'Corrected'
+              : 'Current',
         canCorrect: active,
         canWithdraw: active,
       };
