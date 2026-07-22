@@ -1157,8 +1157,8 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   accepted id with `replayed:true` and left the final append-only history at four rows with no
   duplicate source keys. Its effective truth is rejected plus a terminally withdrawn conversion;
   cross-tenant detail failed closed with 404 and App deletion returned the deliberate retained-evidence 409.
-  The exact candidate's create/detail/Back journey passed 1600×1000, 768×1024, and 390×844 visual
-  checks without horizontal overflow.
+  The exact candidate's create/detail/Back journey passed at 1600×1000 and 768×1024 without
+  horizontal overflow; 390×844 showed the intended larger-screen handoff without overflow.
 
 - **[G-OUTCOME-AUTOMATION] OPEN — observation capture and portfolio learning remain manual.** The
   first slice accepts human, system, and import source identities but exposes only the authenticated
