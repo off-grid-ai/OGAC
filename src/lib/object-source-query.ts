@@ -1,9 +1,5 @@
 import { createHash } from 'node:crypto';
-import type {
-  ObjectAccessScope,
-  ObjectDetail,
-  ObjectListing,
-} from '@/lib/object-store';
+import type { ObjectAccessScope, ObjectDetail, ObjectListing } from '@/lib/object-store';
 import { scopedObjectKey, scopedObjectPrefix } from '@/lib/object-store';
 
 export const MAX_OBJECT_SOURCE_OBJECTS = 20;
@@ -57,8 +53,7 @@ export interface ObjectSourceQueryFailure {
 }
 
 export type ObjectSourceValidation<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: ObjectSourceQueryFailure };
+  { ok: true; value: T } | { ok: false; error: ObjectSourceQueryFailure };
 
 function failure(
   code: ObjectSourceQueryFailureCode,
@@ -86,13 +81,18 @@ export function normalizeObjectSourceQuery(input: {
     return failure('invalid-query', 'Object query limit must be a positive integer.');
   }
   const key = stringParam(input.params, 'key');
-  const prefix = stringParam(input.params, 'prefix') ?? '';
   if (input.params?.key !== undefined && key === null) {
     return failure('invalid-query', 'Object key must be a string.');
   }
-  if (input.params?.prefix !== undefined && prefix === '' && input.params.prefix !== '') {
+  const rawPrefix = input.params?.prefix;
+  if (
+    rawPrefix !== undefined &&
+    rawPrefix !== null &&
+    (typeof rawPrefix !== 'string' || (rawPrefix !== '' && rawPrefix.trim() === ''))
+  ) {
     return failure('invalid-query', 'Object prefix must be a string.');
   }
+  const prefix = typeof rawPrefix === 'string' ? rawPrefix.trim() : '';
   if (key && prefix) return failure('invalid-query', 'Choose an object key or a prefix, not both.');
   if (op === 'count' && key) {
     return failure('invalid-query', 'Count queries accept a prefix, not an object key.');
@@ -144,8 +144,7 @@ export function selectListedObjectKeys(
     if (!scoped.ok || scoped.value !== object.key) {
       return failure('scope-denied', 'Object listing contained an invalid scoped key.');
     }
-    keys.push(object.key);
-    if (keys.length === limit) break;
+    if (keys.length < limit) keys.push(object.key);
   }
   return { ok: true, value: keys };
 }
@@ -164,6 +163,19 @@ export function validateObjectSourceDetail(
     );
   }
   return { ok: true, value: { contentType, size: detail.size } };
+}
+
+/** Exact before/after HEAD comparison used to catch a same-size object replacement during GET. */
+export function sameObjectSourceDetail(before: ObjectDetail, after: ObjectDetail): boolean {
+  const contentType = (value: string) => value.split(';', 1)[0].trim().toLowerCase();
+  return (
+    before.bucket === after.bucket &&
+    before.key === after.key &&
+    before.size === after.size &&
+    contentType(before.contentType) === contentType(after.contentType) &&
+    before.etag === after.etag &&
+    before.lastModified === after.lastModified
+  );
 }
 
 function decodeUtf8(bytes: Uint8Array): ObjectSourceValidation<string> {
@@ -196,6 +208,9 @@ export function materializeObjectSourceRow(input: {
 }): ObjectSourceValidation<ObjectSourceRow> {
   const approved = validateObjectSourceDetail(input.detail);
   if (!approved.ok) return approved;
+  if (input.detail.bucket !== input.scope.bucket) {
+    return failure('scope-denied', 'Object metadata escaped the approved bucket.');
+  }
   const getContentType = input.getContentType.split(';', 1)[0].trim().toLowerCase();
   if (
     input.bytes.byteLength !== approved.value.size ||
@@ -249,4 +264,3 @@ export function validateObjectSourceAggregate(
         `Object retrieval is limited to ${MAX_OBJECT_SOURCE_AGGREGATE_BYTES} bytes in total.`,
       );
 }
-
