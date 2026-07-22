@@ -82,6 +82,19 @@ Use the right owner for each fact:
   the current UI score system of record and must not overwrite newer live evidence without a
   re-audit.
 
+## First-party capability planes
+
+The 48-entry denominator measures audited upstream services and enterprise sources. First-party
+product planes such as Governed Action, Outcome Observation, and Enterprise Context are recorded as
+cross-cutting deltas in `docs/SERVICE_CAPABILITY_STATUS.md`; they do not create synthetic services or
+inflate an upstream denominator.
+
+An Enterprise Context delta passes only when one tenant-safe resolver projection drives the Builder
+API, guided editor, conversational Forge, data/tool/pipeline/action pickers, and server-side App
+write validation. A capability shown as unavailable must remain visible with a plain-language reason
+and remedy, but it must not be selectable or persistable. Local code, route, browser, and deployment
+evidence are recorded independently.
+
 ## Updating the map
 
 For each changed capability, read the upstream contract, trace the real adapter and API route,

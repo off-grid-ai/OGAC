@@ -54,6 +54,24 @@ changed; the business result records what happened afterward.
 6. **Choose who can use it** — just me / my org / a shareable link.
 7. **Save.** The spec is re-validated server-side. You land on the **Input** screen.
 
+## What “Available to you” means
+
+The Builder resolves your organization, role, team access, connected systems, published pipelines,
+and approval rules before it lets you build. Guided mode and conversational Forge use the same
+catalogue and the server checks the same decisions again when you save.
+
+- **Ready to add** can be selected and used now.
+- **Needs approval** can be added, but the named approval must happen before the App can run it.
+- **Setup needed** stays visible so you know the capability exists, but it cannot be selected until
+  you follow **Fix setup**.
+- A saved choice that later becomes unavailable stays visible and removable; it is never silently
+  replaced with something else.
+- If one governed pipeline is eligible, a newly compiled App binds it explicitly. If no pipeline is
+  bound, the Builder says **No pipeline (unbound)** instead of claiming a default that does not exist.
+
+If the catalogue cannot be checked, create, edit, and save controls fail closed with a readable
+explanation. Reload or use the supplied setup link; do not work around the state by typing an ID.
+
 ## Running & the human-in-the-loop caveat (read this)
 
 - From the **Input** screen (and the canvas "Run"), a test-run executes **inline** and to

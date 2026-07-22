@@ -100,6 +100,26 @@ This live Outcome slice does not inflate the broader capability denominator. The
 mutable, while automatic CRM/system ingestion, portfolio reporting, pagination, incremental sync,
 rate-limit handling, webhooks, and broader CRM CRUD remain partial or absent.
 
+### Enterprise Context and Catalogue-driven Builder source-verified delta — `3313c502`
+
+The Builder now consumes one tenant-safe Enterprise Context and Permission Resolver contract across
+guided creation, saved-App editing, conversational Forge, data/tool/pipeline/action pickers, compile
+preview, and POST/PATCH/publish validation. Hidden cross-tenant resources are omitted; unavailable or
+denied resources remain non-selectable; approval-required resources stay visible with the approval
+step; saved choices that later become unavailable remain visible and removable instead of trapping
+the operator.
+
+| Evidence slice | State | Retained proof | Remaining boundary |
+| --- | --- | --- | --- |
+| Resolver contract and tenant envelope | source-verified | Pure projection tests, real Postgres route tests, failed-slice fail-closed tests, strict `private,no-store` API response | Exact Console deployment and live tenant probe |
+| Nontechnical catalogue experience | browser-verified locally | 1600×1000 and 768×1024 had zero horizontal overflow; 390×844 showed the intentional larger-screen handoff; ready, approval-required, and setup-needed options carried plain-language remedies | Conversational Forge needs an explicit pipeline picker when an org has zero or multiple eligible pipelines |
+| Compile and persistence enforcement | source-verified | Resolver-filtered data preview; server rejection of unavailable/cross-tenant data, tools, pipelines, and actions; the sole eligible governed pipeline was selected and retained on the saved App detail | Re-run the exact workflow after Console-only deployment |
+
+The browser adversarial pass caught and closed a misleading default before release: an unbound App
+was previously labelled as using the org default. New Apps now bind the sole eligible pipeline
+explicitly; a genuinely unbound choice is labelled **No pipeline (unbound)**. This first-party plane
+does not alter the 171 upstream capability denominator.
+
 ### LLM Guard 0.3.16 audit delta
 
 `llm-guard` now has a seven-item, version-matched denominator pinned to upstream tag

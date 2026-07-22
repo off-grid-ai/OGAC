@@ -789,7 +789,7 @@ The `org_suraksha` (Suraksha Life) tenant + 3 connectors + 12 data-domains are l
 Individual surfaces PASS vision + full-width + no-OSS-leak: ROI (`/insights/roi`), App Reports ROI card, Trust Center (`/governance/trust`), builder entry, review inbox + decision screen. The happy path breaks twice for a non-tech approver:
 
 - **[G-HITL-1] LOOP-KILLER: HITL Approve dead-ends + leaks infra internals.** On a run that executed inline (no durable worker), `POST /api/v1/admin/apps/runs/[id]/review` returns a 409 whose message leaks `OFFGRID_QUEUE_ENABLED=1` + "durable runtime"/"resumable workflow" to the approver, and the run stays stuck. A tax/claims approver cannot complete. FIX: make Approve *just work* — resume the paused run INLINE (continue remaining steps in-process) when there's no durable workflow; never surface env-var/engine internals in a user-facing message. (`src/lib/app-run.ts`, `src/app/api/v1/admin/apps/runs/[id]/review/route.ts`)
-- **[G-BUILD-1] Builder Save dead-ends when the org has 0 data domains.** NL build surfaces an honest "No data source for X" gap, but "Wire a data source" leads nowhere and Save is blocked → the very first app can't be finished in-UI. FIX: let a non-tech user proceed (create/pick a source inline, or allow save-with-gap). (`src/app/build/studio/new/*`)
+- **[G-BUILD-1] ✅ RESOLVED — Builder Save no longer dead-ends when the org has 0 data domains.** The compiler omits an unavailable read instead of fabricating it, the gap is optional, and the operator can save the remaining runnable App or create a data-domain mapping inline. Resolver availability now constrains compile preview and persistence as well as the picker. (`src/components/build/AppBuilder.tsx`, `src/app/api/v1/admin/apps/compile/route.ts`)
 - **[G-WIDTH-1] Input/run form wastes width.** `/build/apps/[id]/input` form sits in a ~760px left column on 1440px with a large empty right gutter — violates the non-negotiable full-width rule. FIX: form + preview/help side-by-side on lg+.
 - **[G-DEV-1] (low) `next dev`-mode build prerender crash on `/invite/accept`** (`useContext` null) and dev-login compiled out under a genuine prod build — only affects the non-standard `NODE_ENV=development next build`; real prod build is fine. Document the `next dev` path for local dev-login.
 - **[G-DATA-1] (demo quality) Grounding pulls unrelated KB docs** (FNOL/KYC into a reimbursement app, "Unverified · 2%") and the local gateway model reasons poorly. Scope grounding to the app's bound domain; point demo apps at a sensible default model.
@@ -1285,3 +1285,22 @@ NOTE (pre-existing, NOT introduced by this branch): the full `npm test` suite sh
 `data/lake` / service-capability-map / humanize / masked-detail). Confirmed present at branch point
 8e1c8eab with this branch's changes reverted — they belong to the data/lake + capability-map work,
 outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass ≥85%.
+
+## Enterprise Context and Catalogue-driven Builder (2026-07-23)
+
+- **[G-CONTEXT-BUILDER] RESOLVED IN SOURCE — one governed catalogue now controls what an App can
+  preview, select, and persist.** The tenant-safe resolver drives Guided, Forge, every real picker,
+  compile preview, and POST/PATCH/publish validation. Loading, failed, denied, unavailable, and
+  approval-required states fail closed without hiding the remedy. The browser journey exposed a
+  false “org default” pipeline claim; `3313c502` fixed it, automatically bound the sole eligible
+  governed pipeline, retained that binding after Save, and labelled a truly missing binding as
+  **No pipeline (unbound)**. Local evidence: coverage gate exit 0; 320/321 integration tests with
+  zero failures; clean typecheck and production build; real create → compile → save → detail →
+  cleanup at 1600/768/390 widths with no horizontal overflow. Live deployment evidence is still
+  required before this item becomes RESOLVED + LIVE.
+
+- **[G-CONTEXT-FORGE-PIPELINE] OPEN — Forge has no explicit pipeline chooser for zero/multiple
+  eligible pipelines.** When exactly one pipeline is eligible, the compiler binds it explicitly.
+  With zero or multiple eligible pipelines, Forge now reports “no pipeline yet” rather than
+  inventing an org default, but an operator must use Guided mode to make the binding choice. Add the
+  shared catalogue-driven pipeline picker to Forge; do not create a second selection model.
