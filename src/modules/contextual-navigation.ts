@@ -86,6 +86,7 @@ export type ContextualDestinationId =
   | 'reports'
   | 'graph'
   | 'datasets'
+  | 'drift-monitoring'
   | 'routing'
   | 'traffic'
   | 'logs'
@@ -215,6 +216,12 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
         label: 'Drift',
         description: 'Compare deployed behavior with the active quality baseline.',
         route: '/solutions/quality/drift',
+      },
+      {
+        id: 'drift-monitoring',
+        label: 'Drift monitoring',
+        description: 'Group drift reports into projects and track drift-share trends over time.',
+        route: '/solutions/quality/drift-monitoring',
       },
       {
         id: 'performance',
