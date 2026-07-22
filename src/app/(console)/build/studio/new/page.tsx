@@ -34,7 +34,12 @@ export default async function StudioNewPage() {
     .map((d) => ({ id: d.id, label: d.label }));
   const agentOptions = agents.map((a) => ({ id: a.id, name: a.name }));
   // Connectors power the inline "Wire a data source" fix-it (create a data-domain without leaving).
-  const connectorOptions = ctx.connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
+  const connectorOptions = ctx.connectors.map((c) => ({
+    id: c.id,
+    name: c.name,
+    type: c.type,
+    endpoint: c.endpoint,
+  }));
 
   return (
     <PageFrame>

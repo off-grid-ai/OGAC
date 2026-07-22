@@ -30,7 +30,12 @@ export default async function AppBuildTab({ params }: Readonly<{ params: Promise
     .filter((d) => d.connectorId && d.resource)
     .map((d) => ({ id: d.id, label: d.label }));
   const agentOptions = agents.map((a) => ({ id: a.id, name: a.name }));
-  const connectorOptions = ctx.connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
+  const connectorOptions = ctx.connectors.map((c) => ({
+    id: c.id,
+    name: c.name,
+    type: c.type,
+    endpoint: c.endpoint,
+  }));
   const pipelineOptions = pipelines.map((p) => ({ id: p.id, name: p.name }));
 
   return (

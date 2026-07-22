@@ -15,6 +15,8 @@ export interface ConnectorOption {
   id: string;
   name: string;
   type: string;
+  /** Optional server-owned endpoint metadata used by bounded internal-action pickers. */
+  endpoint?: string;
 }
 
 export interface DomainDraft {
