@@ -5,6 +5,7 @@ import { IdpList } from '@/components/access/IdpList';
 import { InvitesList } from '@/components/access/InvitesList';
 import { MachineClientsList } from '@/components/access/MachineClientsList';
 import { MfaPanel } from '@/components/access/MfaPanel';
+import { OtpPolicyPanel } from '@/components/access/OtpPolicyPanel';
 import { RealmLifetimes } from '@/components/access/RealmLifetimes';
 import { RolesList } from '@/components/access/RolesList';
 import { SessionsPanel } from '@/components/access/SessionsPanel';
@@ -67,7 +68,12 @@ function AccessDestinationContent({ destination }: Readonly<{ destination: Acces
     clients: <MachineClientsList />,
     roles: <RolesList />,
     sessions: <SessionsPanel />,
-    mfa: <MfaPanel />,
+    mfa: (
+      <>
+        <OtpPolicyPanel />
+        <MfaPanel />
+      </>
+    ),
     federation: <IdpList />,
     realm: <RealmLifetimes />,
   };

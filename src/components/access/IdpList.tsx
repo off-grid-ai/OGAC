@@ -1,13 +1,15 @@
 'use client';
 
 import { LinkSimple, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { providerTypeLabel, summarizeFederation } from '@/lib/keycloak-federation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { LoadingBlock, Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -27,29 +29,54 @@ interface Idp {
   clientId?: string;
 }
 
-function AddOidcIdpForm({ onDone, onCancel }: Readonly<{ onDone: () => void; onCancel: () => void }>) {
+const tabClass = (active: boolean) =>
+  `rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+    active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'
+  }`;
+
+// Add an identity provider — OIDC (authorization-code) OR SAML v2. Both post to the same route; the
+// server validates + builds the rep via the pure builders (buildOidcIdpRep / buildSamlIdpRep).
+function AddIdpForm({ onDone, onCancel }: Readonly<{ onDone: () => void; onCancel: () => void }>) {
+  const [type, setType] = useState<'oidc' | 'saml'>('oidc');
   const [alias, setAlias] = useState('');
   const [displayName, setDisplayName] = useState('');
+  // OIDC
   const [authorizationUrl, setAuthorizationUrl] = useState('');
   const [tokenUrl, setTokenUrl] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  // SAML
+  const [singleSignOnServiceUrl, setSingleSignOnServiceUrl] = useState('');
+  const [entityId, setEntityId] = useState('');
+  const [singleLogoutServiceUrl, setSingleLogoutServiceUrl] = useState('');
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
     setSaving(true);
     try {
+      const body =
+        type === 'saml'
+          ? {
+              type: 'saml',
+              alias,
+              displayName: displayName || undefined,
+              singleSignOnServiceUrl,
+              entityId: entityId || undefined,
+              singleLogoutServiceUrl: singleLogoutServiceUrl || undefined,
+            }
+          : {
+              type: 'oidc',
+              alias,
+              displayName: displayName || undefined,
+              authorizationUrl,
+              tokenUrl,
+              clientId,
+              clientSecret,
+            };
       const res = await fetch('/api/v1/admin/access/idp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          alias,
-          displayName: displayName || undefined,
-          authorizationUrl,
-          tokenUrl,
-          clientId,
-          clientSecret,
-        }),
+        body: JSON.stringify(body),
       });
       const d = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(d.error ?? 'Failed to add identity provider.');
@@ -64,29 +91,62 @@ function AddOidcIdpForm({ onDone, onCancel }: Readonly<{ onDone: () => void; onC
 
   return (
     <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        New OIDC identity provider
-      </p>
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          New identity provider
+        </p>
+        <div className="ml-auto flex gap-1">
+          <button type="button" className={tabClass(type === 'oidc')} onClick={() => setType('oidc')}>
+            OIDC
+          </button>
+          <button type="button" className={tabClass(type === 'saml')} onClick={() => setType('saml')}>
+            SAML 2.0
+          </button>
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Input placeholder="Alias (required)" value={alias} onChange={(e) => setAlias(e.target.value)} autoFocus />
         <Input placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-        <Input
-          placeholder="Authorization URL"
-          value={authorizationUrl}
-          onChange={(e) => setAuthorizationUrl(e.target.value)}
-        />
-        <Input placeholder="Token URL" value={tokenUrl} onChange={(e) => setTokenUrl(e.target.value)} />
-        <Input placeholder="Client ID" value={clientId} onChange={(e) => setClientId(e.target.value)} />
-        <Input
-          placeholder="Client secret"
-          type="password"
-          value={clientSecret}
-          onChange={(e) => setClientSecret(e.target.value)}
-        />
+        {type === 'oidc' ? (
+          <>
+            <Input
+              placeholder="Authorization URL"
+              value={authorizationUrl}
+              onChange={(e) => setAuthorizationUrl(e.target.value)}
+            />
+            <Input placeholder="Token URL" value={tokenUrl} onChange={(e) => setTokenUrl(e.target.value)} />
+            <Input placeholder="Client ID" value={clientId} onChange={(e) => setClientId(e.target.value)} />
+            <Input
+              placeholder="Client secret"
+              type="password"
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+            />
+          </>
+        ) : (
+          <>
+            <Input
+              placeholder="Single sign-on URL (required)"
+              value={singleSignOnServiceUrl}
+              onChange={(e) => setSingleSignOnServiceUrl(e.target.value)}
+            />
+            <Input
+              placeholder="SP entity ID (optional)"
+              value={entityId}
+              onChange={(e) => setEntityId(e.target.value)}
+            />
+            <Input
+              placeholder="Single logout URL (optional)"
+              value={singleLogoutServiceUrl}
+              onChange={(e) => setSingleLogoutServiceUrl(e.target.value)}
+            />
+          </>
+        )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Covers the common OIDC authorization-code case. SAML and advanced mapper config stay in your
-        identity provider's admin console.
+        {type === 'oidc'
+          ? 'Covers the common OIDC authorization-code case (persistent import, JWKS discovery).'
+          : 'SAML v2 POST-binding with a persistent NameID. Signing certificates and attribute mappers stay in your IdP console.'}
       </p>
       <div className="flex gap-2">
         <Button size="sm" className="gap-1.5" onClick={submit} disabled={saving}>
@@ -175,6 +235,25 @@ export function IdpList() {
     }
   };
 
+  const toggleEnabled = async (idp: Idp, enabled: boolean) => {
+    try {
+      const res = await fetch(`/api/v1/admin/access/idp/${encodeURIComponent(idp.alias)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      const d = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(d.error ?? 'Failed to update provider.');
+      toast.success(`"${idp.alias}" ${enabled ? 'enabled' : 'disabled'}.`);
+      void fetchIdps();
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  // Federation posture at a glance — pure rollup over the normalized list.
+  const summary = useMemo(() => summarizeFederation(providers), [providers]);
+
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -184,12 +263,33 @@ export function IdpList() {
         </CardTitle>
         <Button size="sm" onClick={() => setShowAdd((v) => !v)}>
           <Plus className="size-3.5 mr-1" />
-          Add OIDC provider
+          Add provider
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
+        {!loading && !error && providers.length > 0 && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-md border border-border px-2.5 py-1 text-muted-foreground">
+              <span className="font-mono text-foreground">{summary.total}</span> configured
+            </span>
+            <span className="rounded-md border border-border px-2.5 py-1 text-muted-foreground">
+              <span className="font-mono text-foreground">{summary.enabled}</span> enabled
+            </span>
+            {summary.disabled > 0 && (
+              <span className="rounded-md border border-border px-2.5 py-1 text-muted-foreground">
+                <span className="font-mono text-foreground">{summary.disabled}</span> disabled
+              </span>
+            )}
+            {summary.byType.map((t) => (
+              <span key={t.providerId} className="rounded-md border border-border px-2.5 py-1 text-muted-foreground">
+                {t.label}: <span className="font-mono text-foreground">{t.count}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
         {showAdd && (
-          <AddOidcIdpForm
+          <AddIdpForm
             onDone={() => {
               setShowAdd(false);
               void fetchIdps();
@@ -250,14 +350,21 @@ export function IdpList() {
                       <TableCell className="font-mono text-xs">{p.alias}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{p.displayName}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="font-mono text-xs">
-                          {p.providerId}
+                        <Badge variant="secondary" className="text-xs">
+                          {providerTypeLabel(p.providerId)}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={p.enabled ? 'default' : 'destructive'} className="text-xs">
-                          {p.enabled ? 'enabled' : 'disabled'}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={p.enabled}
+                            onCheckedChange={(v) => void toggleEnabled(p, v)}
+                            aria-label={`${p.enabled ? 'Disable' : 'Enable'} ${p.alias}`}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {p.enabled ? 'enabled' : 'disabled'}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
