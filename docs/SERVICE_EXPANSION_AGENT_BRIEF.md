@@ -1,5 +1,22 @@
 # Service expansion agent brief
 
+## Product-first deployment boundary
+
+The on-prem fleet is a demo/integration fixture that avoids cloud cost; fleet topology is not the
+deliverable. Agents must verify the assigned capability through its complete user journey and only
+the dependencies that journey actually exercises. Do not redeploy or re-certify all composable
+services after an App/Console capability change.
+
+- Console/App code: deploy the exact Console artifact and affected Console workers only.
+- Schema changes: use the explicit backup + migration gate, and only when schema changed.
+- Service code/config/image/contract changes: narrowly deploy that service and preserve its state.
+- Broad recovery: reserved for explicit fleet/recovery work or a proven fleet-wide blocker, never a
+  routine capability-release step.
+
+Live evidence must lead with the product outcome (UI/API journey, persisted effect, controls,
+receipt/audit, replay/idempotency). Infrastructure health is supporting evidence, scoped to the
+dependency required for that outcome.
+
 This is the shared execution brief for every agent that audits, integrates, exposes, or verifies an
 Off Grid service. Read it before discovery. Do not create a competing inventory, capability scale,
 route taxonomy, or definition of "integrated".

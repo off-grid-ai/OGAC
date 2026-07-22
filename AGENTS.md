@@ -66,6 +66,30 @@ Other essentials:
 - `drizzle-kit push` hangs over SSH; apply schema changes with the `pg` client directly (see DEPLOY.md § Database migrations).
 - Runtime config is `.env.local` / `.env.production` **on the server** — not in git, never overwritten by deploy.
 
+### Deployment scope: ship the product change, not the demo fleet
+
+The eight-node on-prem estate is a cost-controlled demo/integration fixture. Its topology is **not**
+the product deliverable. For capability work, deep verification means proving the complete user
+journey and its required boundaries on the live fixture; it does not mean re-certifying or
+redeploying every composable service.
+
+- **App/Console-only change:** deploy the Console artifact and only its affected Console workers via
+  the private repo's `deploy/push.sh`. Verify the changed UI/API/workflow plus the specific dependency
+  it uses.
+- **Database schema change:** take the required backup, apply the checked-in migration, deploy the
+  matching Console release, and verify the migration invariants. Do not run a migration when the
+  schema did not change.
+- **Composable service change:** deploy/recreate that service only when its own implementation,
+  configuration, image, or contract changed, or when targeted product verification proves the
+  required dependency is absent/broken. Preserve volumes and use the narrow service runbook.
+- **Broad fleet recovery:** never the default follow-up to a capability release. Run it only for an
+  explicit fleet/recovery task or when targeted verification identifies a fleet-wide dependency
+  problem. A broad topology sweep is not evidence that the product capability works.
+
+Prioritize evidence in this order: non-technical user journey → product state/effects → governance,
+receipt, audit, and replay guarantees → targeted dependency health. Stop when those gates are proven;
+do not expand verification into unrelated infrastructure.
+
 ## Production hardening
 
 **Local hardening/verify script:** `deploy/prod.sh`
