@@ -33,6 +33,21 @@ test('parseTemplatePatch: only present keys are written', () => {
   assert.deepEqual(patch, { summary: 'hi' });
 });
 
+test('parseTemplatePatch: a visibility edit is coerced through the allowed set', () => {
+  assert.deepEqual(parseTemplatePatch({ visibility: 'org' }, { slug: null, title: 'T' }), {
+    visibility: 'org',
+  });
+  assert.deepEqual(parseTemplatePatch({ visibility: 'nonsense' }, { slug: null, title: 'T' }), {
+    visibility: 'private',
+  });
+});
+
+test('parseTemplatePatch: a non-string summary edit is normalized to empty', () => {
+  assert.deepEqual(parseTemplatePatch({ summary: 42 }, { slug: null, title: 'T' }), {
+    summary: '',
+  });
+});
+
 test('parseTemplatePatch: blank title → null', () => {
   assert.equal(parseTemplatePatch({ title: '   ' }, { slug: null, title: 'T' }), null);
 });
