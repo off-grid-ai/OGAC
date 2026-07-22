@@ -205,20 +205,20 @@ export const CONNECTOR_TYPES: ConnectorType[] = [
     liveQuery: false,
   },
 
-  // ── Object store (metadata-only today) ────────────────────────────────────────────────────────────
+  // ── Object store ──────────────────────────────────────────────────────────────────────────────────
   {
     id: 's3',
     name: 'Amazon S3',
     category: 'Object store',
     connectorType: 's3',
     description:
-      'Register an Amazon S3 bucket as a data source (files, exports, parquet). Catalogued in the directory; direct object reads are not wired through the console yet.',
+      'Browse and manage approved S3 objects through a governed bucket and folder binding.',
     authKind: 's3-keys',
-    endpointHint: 's3://bucket-name/prefix/',
+    endpointHint: 'https://s3.amazonaws.com',
     fields: [
-      endpointField('Bucket URI', 's3://bucket-name/prefix/'),
-      { key: 'accessKey', label: 'Access key ID', required: false, secret: true },
-      { key: 'secretKey', label: 'Secret access key', required: false, secret: true },
+      endpointField('Service endpoint', 'https://s3.amazonaws.com'),
+      { key: 'accessKey', label: 'Access key ID', required: true, secret: true },
+      { key: 'secretKey', label: 'Secret access key', required: true, secret: true },
     ],
     liveQuery: false,
   },
@@ -228,13 +228,13 @@ export const CONNECTOR_TYPES: ConnectorType[] = [
     category: 'Object store',
     connectorType: 's3',
     description:
-      'Register a self-hosted MinIO bucket (S3-compatible) — the on-prem object store used as a warehouse stand-in. Catalogued as a data source.',
+      'Browse and manage approved MinIO objects through the same governed S3-compatible path.',
     authKind: 's3-keys',
-    endpointHint: 'http://minio.internal:9000/bucket',
+    endpointHint: 'http://minio.internal:9000',
     fields: [
-      endpointField('Endpoint + bucket', 'http://minio.internal:9000/bucket'),
-      { key: 'accessKey', label: 'Access key', required: false, secret: true },
-      { key: 'secretKey', label: 'Secret key', required: false, secret: true },
+      endpointField('Service endpoint', 'http://minio.internal:9000'),
+      { key: 'accessKey', label: 'Access key', required: true, secret: true },
+      { key: 'secretKey', label: 'Secret key', required: true, secret: true },
     ],
     liveQuery: false,
   },

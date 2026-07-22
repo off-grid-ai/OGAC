@@ -22,8 +22,8 @@ import { panelHref, withPanelParams } from '@/lib/url-panel';
 // and it's deep-linkable — never in local useState.
 //
 // This is the ONE real create form (the drop-in promise): the user picks a source type and fills the
-// fields that type actually needs (SQL: host / port / database / user / password; REST: base URL +
-// api key). The password/api key is sent to the server, which writes it to the vault and stores a
+// fields that type actually needs (SQL, REST, or S3-compatible object store). Credentials are sent
+// to the server, which writes them to the vault and stores a
 // credential-free connector — the secret never lands in the DB or the endpoint string. Types we
 // can't query yet are shown but disabled with a "coming soon" note, so no dead connector gets made.
 export function AddConnectorButton() {
@@ -43,6 +43,9 @@ export function AddConnectorButton() {
   // REST fields
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
+  // S3-compatible object-store fields
+  const [accessKey, setAccessKey] = useState('');
+  const [secretKey, setSecretKey] = useState('');
   const [busy, setBusy] = useState(false);
 
   const def = useMemo(() => connectorTypeDef(type), [type]);
@@ -67,6 +70,8 @@ export function AddConnectorButton() {
       setPassword('');
       setBaseUrl('');
       setApiKey('');
+      setAccessKey('');
+      setSecretKey('');
     }
   }, [open]);
 
@@ -76,9 +81,10 @@ export function AddConnectorButton() {
     if (disabled || !def) return;
     setBusy(true);
     try {
-      const payload =
-        family === 'sql'
-          ? { name, type, host, port, database, user, password }
+      const payload = family === 'sql'
+        ? { name, type, host, port, database, user, password }
+        : family === 's3'
+          ? { name, type, baseUrl, accessKey, secretKey }
           : { name, type, baseUrl, apiKey };
       const res = await fetch('/api/v1/admin/connectors', {
         method: 'POST',
@@ -111,7 +117,7 @@ export function AddConnectorButton() {
         open={open}
         onOpenChange={(o) => !o && setPanel(null)}
         title="Add a connector"
-        description="Connect a database or an API. Your password stays in the vault — never in plain text."
+        description="Connect a database, API, or object store. Credentials stay in the vault and never in the connector record."
         footer={
           <Button onClick={create} disabled={disabled} className="w-full">
             {busy ? 'Connecting…' : 'Add connector'}
@@ -220,6 +226,47 @@ export function AddConnectorButton() {
               <p className="text-xs text-muted-foreground">
                 The password is written to the secrets vault and referenced by the connector — it is
                 never stored in plain text.
+              </p>
+            </div>
+          ) : family === 's3' ? (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="con-s3-url">Object-store endpoint</Label>
+                <Input
+                  id="con-s3-url"
+                  value={baseUrl}
+                  placeholder="http://minio.internal:9000"
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the service endpoint only. Approve each bucket and folder separately in a
+                  data domain.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="con-s3-access">Access key ID</Label>
+                  <Input
+                    id="con-s3-access"
+                    value={accessKey}
+                    autoComplete="off"
+                    onChange={(e) => setAccessKey(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="con-s3-secret">Secret access key</Label>
+                  <Input
+                    id="con-s3-secret"
+                    type="password"
+                    value={secretKey}
+                    autoComplete="new-password"
+                    onChange={(e) => setSecretKey(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Both keys are stored together in the existing connector vault record. They are
+                never written to the database or endpoint.
               </p>
             </div>
           ) : (

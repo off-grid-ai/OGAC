@@ -58,6 +58,8 @@ export function ConnectorRowActions({ connector }: Readonly<{ connector: Connect
   const [auth, setAuth] = useState(connector.auth);
   const [endpoint, setEndpoint] = useState(connector.endpoint);
   const [description, setDescription] = useState(connector.description);
+  const [accessKey, setAccessKey] = useState('');
+  const [secretKey, setSecretKey] = useState('');
 
   const setEditPanel = useCallback(
     (targetId: string | null) => {
@@ -77,6 +79,8 @@ export function ConnectorRowActions({ connector }: Readonly<{ connector: Connect
       setAuth(connector.auth);
       setEndpoint(connector.endpoint);
       setDescription(connector.description);
+      setAccessKey('');
+      setSecretKey('');
     }
   }, [editOpen, connector.name, connector.auth, connector.endpoint, connector.description]);
 
@@ -104,7 +108,14 @@ export function ConnectorRowActions({ connector }: Readonly<{ connector: Connect
     const res = await fetch(`/api/v1/admin/connectors/${connector.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, auth, endpoint, description }),
+      body: JSON.stringify({
+        name,
+        type: connector.type,
+        auth,
+        endpoint,
+        description,
+        ...(connector.type === 's3' ? { accessKey, secretKey } : {}),
+      }),
     });
     setBusy(false);
     if (res.ok) {
@@ -201,6 +212,37 @@ export function ConnectorRowActions({ connector }: Readonly<{ connector: Connect
                 onChange={(e) => setEndpoint(e.target.value)}
               />
             </div>
+            {connector.type === 's3' ? (
+              <div className="space-y-3 rounded-md border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Rotate access keys</p>
+                  <p className="text-xs text-muted-foreground">
+                    Leave both fields blank to keep the keys already stored in the vault.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-s3-access">Access key ID</Label>
+                    <Input
+                      id="edit-s3-access"
+                      value={accessKey}
+                      autoComplete="off"
+                      onChange={(e) => setAccessKey(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-s3-secret">Secret access key</Label>
+                    <Input
+                      id="edit-s3-secret"
+                      type="password"
+                      value={secretKey}
+                      autoComplete="new-password"
+                      onChange={(e) => setSecretKey(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-1.5">
               <Label htmlFor="edit-desc">Description (when to use)</Label>
               <Textarea
