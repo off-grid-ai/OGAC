@@ -13,10 +13,7 @@ import {
 import { resolveDomain, type DataDomain } from '@/lib/data-domains';
 import { listDomains } from '@/lib/data-domains-store';
 import { validateEnterpriseAppSelections } from '@/lib/enterprise-context';
-import {
-  createSolutionDeployment,
-  getSolutionBlueprint,
-} from '@/lib/solution-blueprints-store';
+import { createSolutionDeployment, getSolutionBlueprint } from '@/lib/solution-blueprints-store';
 import type { SolutionDeployment } from '@/lib/solution-blueprints';
 import { listConnectors } from '@/lib/store';
 
@@ -255,10 +252,7 @@ export async function deployRegisteredSolutionTemplate(
     }
     const published = await publishApp(bound.id, orgId);
     if (!published) {
-      throw new SolutionTemplateDeploymentError(
-        'The new App could not be published',
-        'not-found',
-      );
+      throw new SolutionTemplateDeploymentError('The new App could not be published', 'not-found');
     }
     const deployment = await createSolutionDeployment(orgId, {
       blueprintId: blueprint.id,

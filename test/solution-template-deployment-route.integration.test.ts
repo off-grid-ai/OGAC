@@ -36,9 +36,7 @@ test(
     const { createApp, getApp, getLineage, publishAppAsTemplate } =
       await import('@/lib/apps-store');
     const { createSolutionBlueprint } = await import('@/lib/solution-blueprints-store');
-    const route = await import(
-      '../src/app/api/v1/solution-blueprints/[id]/deploy/route.ts'
-    );
+    const route = await import('../src/app/api/v1/solution-blueprints/[id]/deploy/route.ts');
 
     t.after(async () => {
       await db.execute(sql`DELETE FROM solution_observations WHERE org_id = ${orgId}`);
@@ -46,7 +44,9 @@ test(
       await db.execute(sql`DELETE FROM solution_blueprint_versions WHERE org_id = ${orgId}`);
       await db.execute(sql`DELETE FROM solution_blueprints WHERE org_id = ${orgId}`);
       await db.execute(sql`DELETE FROM solution_blueprint_seed_state WHERE org_id = ${orgId}`);
-      await db.execute(sql`DELETE FROM audit_events_v2 WHERE org = ${orgId}`).catch(() => undefined);
+      await db
+        .execute(sql`DELETE FROM audit_events_v2 WHERE org = ${orgId}`)
+        .catch(() => undefined);
       await db.execute(sql`DELETE FROM app_runs WHERE org_id = ${orgId}`);
       await db.execute(sql`DELETE FROM apps WHERE org_id = ${orgId}`);
       await db.execute(sql`DELETE FROM data_domains WHERE org_id = ${orgId}`);
@@ -281,7 +281,9 @@ async function countApps(
   sql: typeof import('drizzle-orm').sql,
   orgId: string,
 ): Promise<number> {
-  const result = await db.execute(sql`SELECT count(*)::int AS count FROM apps WHERE org_id = ${orgId}`);
+  const result = await db.execute(
+    sql`SELECT count(*)::int AS count FROM apps WHERE org_id = ${orgId}`,
+  );
   return Number(result.rows[0]?.count ?? 0);
 }
 
