@@ -160,6 +160,49 @@ class SuiteLifecycleTest(unittest.TestCase):
         with self.assertRaisesRegex(LifecycleError, "batch kind"):
             self.lifecycle.validate("org_a", "kyc", {"kind": "path", "path": "/etc/passwd"})
 
+    def test_history_is_derived_from_gx_results_and_survives_service_restart(self) -> None:
+        self.lifecycle.create_suite("org_a", "kyc", "PAN required", [NOT_NULL])
+        pass_run = self.lifecycle.validate(
+            "org_a", "kyc", {"kind": "inline", "rows": [{"pan": "ABCDE1234F"}]}, "pass_1"
+        )
+        fail_run = self.lifecycle.validate(
+            "org_a", "kyc", {"kind": "inline", "rows": [{"pan": None}]}, "fail_1"
+        )
+
+        restarted = GxLifecycle(self.root)
+        history = restarted.history("org_a", limit=1, suite_name="kyc")
+        self.assertEqual(len(history["runs"]), 1)
+        self.assertIn(history["runs"][0]["id"], {pass_run["id"], fail_run["id"]})
+        self.assertIsNotNone(history["nextCursor"])
+        second = restarted.history(
+            "org_a", limit=1, suite_name="kyc", cursor=history["nextCursor"]
+        )
+        self.assertEqual(len(second["runs"]), 1)
+        self.assertNotEqual(second["runs"][0]["id"], history["runs"][0]["id"])
+        self.assertIsNone(second["nextCursor"])
+
+        # Replaying after restart returns the durable receipt without adding another GX result.
+        replay = restarted.validate(
+            "org_a", "kyc", {"kind": "inline", "rows": [{"pan": "ABCDE1234F"}]}, "pass_1"
+        )
+        self.assertEqual(replay, pass_run)
+        self.assertEqual(
+            len(restarted.context("org_a").stores["validation_results_store"].list_keys()), 2
+        )
+
+    def test_history_is_tenant_scoped_and_fails_closed_on_bad_filters_or_cursors(self) -> None:
+        self.lifecycle.create_suite("org_a", "kyc", "PAN required", [NOT_NULL])
+        self.lifecycle.validate("org_a", "kyc", {"kind": "inline", "rows": []})
+        self.assertEqual(len(self.lifecycle.history("org_a", limit=50)["runs"]), 1)
+        self.assertEqual(self.lifecycle.history("org_b", limit=50)["runs"], [])
+        self.assertEqual(
+            self.lifecycle.history("org_a", limit=50, data_source_id="warehouse")["runs"], []
+        )
+        with self.assertRaisesRegex(LifecycleError, "cursor"):
+            self.lifecycle.history("org_a", limit=50, cursor="unknown")
+        with self.assertRaisesRegex(LifecycleError, "limit"):
+            self.lifecycle.history("org_a", limit=201)
+
 
 if __name__ == "__main__":
     unittest.main()

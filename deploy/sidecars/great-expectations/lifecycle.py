@@ -281,7 +281,7 @@ class GxLifecycle:
     @staticmethod
     def _validation_view(
         result: Any,
-        suite_version: int,
+        suite_version: Optional[int],
         started_at: str,
         completed_at: str,
         data_source_id: Optional[str],
@@ -307,8 +307,13 @@ class GxLifecycle:
             )
         statistics = result.statistics if isinstance(result.statistics, dict) else {}
         meta = result.meta if isinstance(result.meta, dict) else {}
+        run_meta = meta.get("run_id")
+        if isinstance(run_meta, dict):
+            run_name = run_meta.get("run_name")
+        else:
+            run_name = getattr(run_meta, "run_name", None)
         return {
-            "id": str(meta.get("validation_id") or result.id or ""),
+            "id": str(run_name or meta.get("validation_id") or result.id or ""),
             "suiteName": result.suite_name,
             "suiteVersion": suite_version,
             "success": bool(result.success),
@@ -322,6 +327,48 @@ class GxLifecycle:
             "dataSourceId": data_source_id,
             "assetName": asset_name,
         }
+
+    def _history_directory(self, org_id: str) -> Path:
+        directory = self._tenant_root(org_id) / "offgrid" / "history"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def _result_id(retained: Any) -> str:
+        meta = retained.meta if isinstance(retained.meta, dict) else {}
+        run_meta = meta.get("run_id")
+        if isinstance(run_meta, dict):
+            run_name = run_meta.get("run_name")
+        else:
+            run_name = getattr(run_meta, "run_name", None)
+        return str(run_name or meta.get("validation_id") or retained.id or "")
+
+    def _gx_result_key(self, context: Any, result_id: str) -> Any:
+        store = context.stores["validation_results_store"]
+        for key in reversed(store.list_keys()):
+            retained = store.get(key)
+            if self._result_id(retained) == result_id:
+                return key
+        raise LifecycleError("GX validation result was not retained.", 500)
+
+    def _retain_history_view(
+        self, org_id: str, context: Any, response: Dict[str, Any]
+    ) -> None:
+        validation_id = str(response.get("id") or "")
+        if not validation_id:
+            raise LifecycleError("GX validation result has no retained identifier.", 500)
+        key = self._gx_result_key(context, validation_id)
+        destination = self._history_directory(org_id) / f"{validation_id}.json"
+        temporary = destination.with_suffix(f".{uuid.uuid4().hex}.tmp")
+        temporary.write_text(
+            json.dumps(
+                {
+                    "gxStoreKey": list(key.to_tuple()),
+                    "response": response,
+                }
+            )
+        )
+        temporary.replace(destination)
 
     def validate(
         self,
@@ -378,11 +425,79 @@ class GxLifecycle:
                 data_source_id=data_source_id,
                 asset_name=asset_name,
             )
+            self._retain_history_view(org_id, context, response)
             if receipt:
                 temporary = receipt.with_suffix(f".{uuid.uuid4().hex}.tmp")
                 temporary.write_text(json.dumps({"requestHash": request_hash, "response": response}))
                 temporary.replace(receipt)
             return response
+
+    def history(
+        self,
+        org_id: str,
+        limit: int,
+        suite_name: Optional[str] = None,
+        data_source_id: Optional[str] = None,
+        cursor: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(limit, int) or not 1 <= limit <= 200:
+            raise LifecycleError("history limit must be between 1 and 200.")
+        safe_suite = _identifier(suite_name, "suite name") if suite_name else None
+        safe_source = _identifier(data_source_id, "data source id") if data_source_id else None
+        with self._lock(org_id):
+            context = self.context(org_id)
+            store = context.stores["validation_results_store"]
+            gx_results: Dict[str, Any] = {}
+            for key in store.list_keys():
+                retained = store.get(key)
+                result_id = self._result_id(retained)
+                if result_id:
+                    gx_results[result_id] = retained
+
+            projections: Dict[str, Dict[str, Any]] = {}
+            for path in self._history_directory(org_id).glob("*.json"):
+                try:
+                    stored = json.loads(path.read_text())
+                    response = stored.get("response")
+                    validation_id = response.get("id") if isinstance(response, dict) else None
+                    if isinstance(validation_id, str) and validation_id in gx_results:
+                        projections[validation_id] = response
+                except (OSError, UnicodeError, json.JSONDecodeError):
+                    continue
+
+            runs: List[Dict[str, Any]] = []
+            for validation_id, retained in gx_results.items():
+                projected = projections.get(validation_id)
+                if projected is None:
+                    meta = retained.meta if isinstance(retained.meta, dict) else {}
+                    validation_time = str(meta.get("validation_time") or "")
+                    projected = self._validation_view(
+                        retained,
+                        suite_version=None,
+                        started_at=validation_time,
+                        completed_at=validation_time,
+                        data_source_id=None,
+                        asset_name=None,
+                    )
+                if safe_suite and projected.get("suiteName") != safe_suite:
+                    continue
+                if safe_source and projected.get("dataSourceId") != safe_source:
+                    continue
+                runs.append(projected)
+            runs.sort(key=lambda run: str(run.get("completedAt") or ""), reverse=True)
+
+            start = 0
+            if cursor:
+                matching = next((index for index, run in enumerate(runs) if run.get("id") == cursor), None)
+                if matching is None:
+                    raise LifecycleError("history cursor is invalid.")
+                start = matching + 1
+            page = runs[start : start + limit]
+            has_more = start + limit < len(runs)
+            return {
+                "runs": page,
+                "nextCursor": str(page[-1]["id"]) if has_more and page else None,
+            }
 
     def list_suites(self, org_id: str) -> List[Dict[str, Any]]:
         with self._lock(org_id):
