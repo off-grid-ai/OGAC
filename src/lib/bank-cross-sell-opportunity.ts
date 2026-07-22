@@ -8,6 +8,8 @@ export interface BankCrossSellSourceSnapshot {
   eligibilityDomain: string;
   customerResource: string;
   eligibilityResource: string;
+  customerConnectorId?: string;
+  eligibilityConnectorId?: string;
   readAt: string;
   customerRows: Record<string, unknown>[];
   eligibilityRows: Record<string, unknown>[];

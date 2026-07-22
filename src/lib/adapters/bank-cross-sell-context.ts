@@ -86,6 +86,8 @@ export async function loadBankCrossSellContext(
     eligibilityDomain: eligibility.domain.label,
     customerResource: customer.domain.resource,
     eligibilityResource: eligibility.domain.resource,
+    customerConnectorId: customer.connector.id,
+    eligibilityConnectorId: eligibility.connector.id,
     readAt: sources.now().toISOString(),
     customerRows,
     eligibilityRows,
