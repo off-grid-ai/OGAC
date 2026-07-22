@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from lifecycle import GX_CORE_VERSION, GxLifecycle, LifecycleError
@@ -68,6 +69,38 @@ class SuiteLifecycleTest(unittest.TestCase):
             self.lifecycle.create_suite(
                 "org_a", "invalid", "", [{"type": "expect_sql_to_pass", "kwargs": {"column": "x"}}]
             )
+
+    def test_profile_reads_only_a_server_owned_tenant_asset_and_returns_bounded_stats(self) -> None:
+        asset = self.root / "tenants" / "org_a" / "assets" / "warehouse" / "customers.jsonl"
+        asset.parent.mkdir(parents=True)
+        rows = [
+            {"customer_id": 1, "pan": "ABCDE1234F", "amount": 100},
+            {"customer_id": 2, "pan": "", "amount": 250},
+            {"customer_id": 3, "pan": None, "amount": 50},
+        ]
+        asset.write_text("\n".join(json.dumps(row) for row in rows))
+
+        profile = self.lifecycle.profile("org_a", "warehouse", "customers", sample_limit=2)
+        self.assertEqual(profile["sampledRows"], 2)
+        pan = next(column for column in profile["columns"] if column["name"] == "pan")
+        self.assertEqual(pan["rowCount"], 2)
+        self.assertEqual(pan["nullCount"], 1)
+        amount = next(column for column in profile["columns"] if column["name"] == "amount")
+        self.assertEqual((amount["min"], amount["max"]), (100, 250))
+
+        with self.assertRaisesRegex(LifecycleError, "not found") as other_tenant:
+            self.lifecycle.profile("org_b", "warehouse", "customers", sample_limit=2)
+        self.assertEqual(other_tenant.exception.status, 404)
+
+    def test_profile_rejects_malformed_assets_and_unbounded_reads(self) -> None:
+        asset = self.root / "tenants" / "org_a" / "assets" / "warehouse" / "bad.json"
+        asset.parent.mkdir(parents=True)
+        asset.write_text('{"not": "rows"}')
+        with self.assertRaisesRegex(LifecycleError, "JSON objects") as malformed:
+            self.lifecycle.profile("org_a", "warehouse", "bad", sample_limit=10)
+        self.assertEqual(malformed.exception.status, 422)
+        with self.assertRaisesRegex(LifecycleError, "limit"):
+            self.lifecycle.profile("org_a", "warehouse", "bad", sample_limit=100_001)
 
 
 if __name__ == "__main__":

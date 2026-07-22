@@ -7,18 +7,15 @@ Validation Results stores are physically separated on disk instead of relying on
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import threading
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 import great_expectations as gx
 import pandas as pd
-from great_expectations.core import RunIdentifier
 
 
 GX_CORE_VERSION = gx.__version__
@@ -123,6 +120,98 @@ class GxLifecycle:
     def context(self, org_id: str) -> Any:
         # GX creates ``<project_root>/gx/great_expectations.yml`` and filesystem-backed Stores.
         return gx.get_context(mode="file", project_root_dir=str(self._tenant_root(org_id)))
+
+    def _asset_path(self, org_id: str, data_source_id: str, asset_name: str) -> Path:
+        safe_source = _identifier(data_source_id, "data source id")
+        safe_asset = _identifier(asset_name, "asset name")
+        asset_root = (self._tenant_root(org_id) / "assets").resolve()
+        candidates = [
+            asset_root / safe_source / f"{safe_asset}.jsonl",
+            asset_root / safe_source / f"{safe_asset}.json",
+        ]
+        for candidate in candidates:
+            if not candidate.exists():
+                continue
+            resolved = candidate.resolve(strict=True)
+            try:
+                resolved.relative_to(asset_root)
+            except ValueError as error:
+                raise LifecycleError("governed data asset resolves outside its tenant root.", 403) from error
+            if not resolved.is_file():
+                raise LifecycleError("governed data asset is not a regular file.", 400)
+            if resolved.stat().st_size > MAX_ASSET_BYTES:
+                raise LifecycleError("governed data asset exceeds the 32 MiB profiling limit.", 413)
+            return resolved
+        raise LifecycleError("governed data asset not found.", 404)
+
+    def load_asset_rows(
+        self, org_id: str, data_source_id: str, asset_name: str, limit: int
+    ) -> List[Dict[str, Any]]:
+        if not isinstance(limit, int) or not 1 <= limit <= MAX_ASSET_ROWS:
+            raise LifecycleError(f"limit must be between 1 and {MAX_ASSET_ROWS}.")
+        path = self._asset_path(org_id, data_source_id, asset_name)
+        try:
+            if path.suffix == ".jsonl":
+                rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+            else:
+                rows = json.loads(path.read_text())
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise LifecycleError("governed data asset is not valid UTF-8 JSON.", 422) from error
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise LifecycleError("governed data asset must contain JSON objects.", 422)
+        return rows[:limit]
+
+    def profile(
+        self, org_id: str, data_source_id: str, asset_name: str, sample_limit: int
+    ) -> Dict[str, Any]:
+        rows = self.load_asset_rows(org_id, data_source_id, asset_name, sample_limit)
+        frame = pd.DataFrame(rows)
+        columns: List[Dict[str, Any]] = []
+        for name in frame.columns:
+            series = frame[name]
+            missing = series.isna() | series.map(lambda value: value == "" if isinstance(value, str) else False)
+            present = series[~missing]
+            try:
+                distinct_count: Optional[int] = int(present.nunique(dropna=True))
+            except TypeError:
+                distinct_count = None
+            minimum, maximum = self._column_bounds(present)
+            columns.append(
+                {
+                    "name": str(name),
+                    "inferredType": str(series.dtype),
+                    "rowCount": len(series),
+                    "nullCount": int(missing.sum()),
+                    "distinctCount": distinct_count,
+                    "min": minimum,
+                    "max": maximum,
+                }
+            )
+        return {
+            "dataSourceId": _identifier(data_source_id, "data source id"),
+            "assetName": _identifier(asset_name, "asset name"),
+            "profiledAt": _now(),
+            "sampledRows": len(rows),
+            "columns": columns,
+        }
+
+    @staticmethod
+    def _column_bounds(series: Any) -> tuple[Any, Any]:
+        if series.empty:
+            return None, None
+        try:
+            minimum, maximum = series.min(), series.max()
+        except (TypeError, ValueError):
+            return None, None
+
+        def scalar(value: Any) -> Any:
+            if hasattr(value, "isoformat"):
+                return value.isoformat()
+            if hasattr(value, "item"):
+                return value.item()
+            return value if isinstance(value, (str, int, float, bool)) else None
+
+        return scalar(minimum), scalar(maximum)
 
     def _suite(self, context: Any, name: str) -> Any:
         safe_name = _identifier(name, "suite name")
