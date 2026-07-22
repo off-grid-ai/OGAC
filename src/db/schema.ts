@@ -1121,6 +1121,72 @@ export const appRuns = pgTable('app_runs', {
   finishedAt: timestamp('finished_at', { withTimezone: true }),
 }, (t) => [index('app_runs_app_idx').on(t.appId), index('app_runs_org_idx').on(t.orgId)]);
 
+// Atomic post-action business facts. App Runs remain the execution owner and retain the canonical
+// ActionReceipt; this table copies that signed receipt and records only what happened afterwards.
+// It deliberately has no solution_deployment dependency: every governed App action can be observed.
+export const actionOutcomeObservations = pgTable(
+  'action_outcome_observations',
+  {
+    id: text('id').primaryKey(),
+    observationKey: text('observation_key').notNull(),
+    orgId: text('org_id').notNull(),
+    appId: text('app_id').notNull(),
+    runId: text('run_id').notNull(),
+    stepId: text('step_id').notNull(),
+    receiptIdempotencyKey: text('receipt_idempotency_key').notNull(),
+    actionId: text('action_id')
+      .$type<import('@/lib/action-contract').ActionId>()
+      .notNull(),
+    actionTarget: text('action_target').notNull(),
+    actionExecutedAt: timestamp('action_executed_at', { withTimezone: true }).notNull(),
+    actionReceipt: jsonb('action_receipt')
+      .$type<import('@/lib/action-contract').ActionReceipt>()
+      .notNull(),
+    kind: text('kind')
+      .$type<import('@/lib/action-outcome-contract').ActionOutcomeRecordKind>()
+      .notNull(),
+    outcomeCode: text('outcome_code').$type<
+      import('@/lib/action-outcome-contract').ActionOutcomeCode | null
+    >(),
+    observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+    sourceKind: text('source_kind')
+      .$type<import('@/lib/action-outcome-contract').ActionOutcomeSourceKind>()
+      .notNull(),
+    sourceEventId: text('source_event_id').notNull(),
+    sourceIdempotencyKey: text('source_idempotency_key').notNull(),
+    note: text('note').notNull(),
+    evidenceLinks: jsonb('evidence_links').$type<string[]>().notNull(),
+    measurement: jsonb('measurement').$type<
+      import('@/lib/action-outcome-contract').ActionOutcomeMeasurement | null
+    >(),
+    supersedesId: text('supersedes_id'),
+    recordedBy: text('recorded_by').notNull(),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('action_outcome_observations_key_idx').on(t.observationKey),
+    uniqueIndex('action_outcome_observations_source_event_idx').on(
+      t.orgId,
+      t.receiptIdempotencyKey,
+      t.sourceKind,
+      t.sourceEventId,
+    ),
+    uniqueIndex('action_outcome_observations_supersedes_idx').on(t.supersedesId),
+    index('action_outcome_observations_run_step_idx').on(t.orgId, t.runId, t.stepId),
+    index('action_outcome_observations_app_time_idx').on(t.orgId, t.appId, t.observedAt),
+    index('action_outcome_observations_receipt_time_idx').on(
+      t.orgId,
+      t.receiptIdempotencyKey,
+      t.observedAt,
+    ),
+    foreignKey({ columns: [t.runId], foreignColumns: [appRuns.id] }).onDelete('restrict'),
+    foreignKey({ columns: [t.appId], foreignColumns: [apps.id] }).onDelete('restrict'),
+  ],
+);
+
+export type ActionOutcomeObservationRow = typeof actionOutcomeObservations.$inferSelect;
+export type NewActionOutcomeObservationRow = typeof actionOutcomeObservations.$inferInsert;
+
 // ─── Data domains (Builder Epic #107) — the connector rule-engine binding ──────
 // A semantic map: a human phrase (e.g. "reimbursement quota") → a specific connector + resource
 // (table / path / object). This is what turns the inert connector canvas nodes into a deterministic
