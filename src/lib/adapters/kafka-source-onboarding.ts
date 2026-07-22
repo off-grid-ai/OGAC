@@ -176,7 +176,7 @@ export async function createKafkaSource(
       orgId,
     });
     connectorId = connector.id;
-    await persistConnectorSecret(connector.id, normalized.vaultValue);
+    await persistConnectorSecret(connector.id, orgId, normalized.vaultValue);
     const domain = await createDomain(
       {
         label: normalized.domainLabel,
@@ -230,7 +230,7 @@ export async function updateKafkaSource(
       'The current binding cannot be read safely, so it was not changed.',
     );
   });
-  const oldSecret = await resolveConnectorSecret(connectorId);
+  const oldSecret = await resolveConnectorSecret(connectorId, orgId);
   if (!oldSecret) {
     throw new KafkaSourceOnboardingError(
       'source-unavailable',
@@ -261,7 +261,7 @@ export async function updateKafkaSource(
       orgId,
     );
     if (!updatedDomain) throw new Error('domain disappeared during update');
-    await persistConnectorSecret(connectorId, normalized.vaultValue);
+    await persistConnectorSecret(connectorId, orgId, normalized.vaultValue);
     return await assembleView(connectorId, orgId);
   } catch {
     const rollback = await Promise.allSettled([
@@ -286,7 +286,7 @@ export async function updateKafkaSource(
         },
         orgId,
       ),
-      persistConnectorSecret(connectorId, oldSecret),
+      persistConnectorSecret(connectorId, orgId, oldSecret),
     ]);
     if (
       rollback.some(
@@ -309,8 +309,8 @@ export async function updateKafkaSource(
 /** Delete the three owners as one lifecycle operation; restore the vault value on DB failure. */
 export async function deleteKafkaSource(connectorId: string, orgId: string): Promise<void> {
   const { domain } = await loadKafkaSource(connectorId, orgId);
-  const secretRef = await getConnectorSecretRef(connectorId);
-  const oldSecret = await resolveConnectorSecret(connectorId);
+  const secretRef = await getConnectorSecretRef(connectorId, orgId);
+  const oldSecret = await resolveConnectorSecret(connectorId, orgId);
   if (!secretRef || !oldSecret) {
     throw new KafkaSourceOnboardingError(
       'source-unavailable',

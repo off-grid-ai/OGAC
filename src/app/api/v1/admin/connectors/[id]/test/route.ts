@@ -17,7 +17,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const conn = await getConnector(id, orgId);
   if (!conn) return NextResponse.json({ error: 'unknown connector' }, { status: 404 });
 
-  const result = await testConnection({ id: conn.id, type: conn.type, endpoint: conn.endpoint });
+  const result = await testConnection({
+    id: conn.id,
+    orgId,
+    type: conn.type,
+    endpoint: conn.endpoint,
+  });
   auditFromSession(gate, orgId, {
     action: 'connector.test',
     resource: `connector:${id}`,

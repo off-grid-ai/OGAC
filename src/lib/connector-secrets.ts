@@ -17,7 +17,6 @@ export {
   isCreatableType,
   buildSqlEndpoint,
   validateConnectorCreate,
-  connectorSecretKey,
   spliceCredential,
   parseObjectStoreCredential,
   serializeObjectStoreCredential,
@@ -31,31 +30,51 @@ export {
   type S3ConnectorInput,
 } from './connector-policy';
 
+export { connectorSecretKey } from './connector-secret-policy';
+
 // Re-export the inverse (URL → {sanitized endpoint, secret}) pure helper so the update route has ONE
 // import site for the connector-credential seam (mirrors the connector-policy re-export above).
 export { splitEndpointSecret, endpointHasEmbeddedSecret, type SplitEndpoint } from './connector-endpoint';
 
-import { connectorSecretKey } from './connector-policy';
+import { connectorSecretKey } from './connector-secret-policy';
+
+export const LEGACY_CONNECTOR_SECRET_REMEDIATION =
+  'This source uses a legacy unscoped credential. An operator must migrate it into the tenant vault namespace before the source can be used.';
+
+export class ConnectorSecretScopeError extends Error {
+  constructor() {
+    super(LEGACY_CONNECTOR_SECRET_REMEDIATION);
+    this.name = 'ConnectorSecretScopeError';
+  }
+}
 
 // ─── Write / read / remove the connector's secret via OpenBao ──────────────────
 // Write the secret value to the vault under the connector's key and stamp `secret_ref` on the row.
 // Returns the secretRef stored. No-op (returns null) when there's no secret to store.
-export async function persistConnectorSecret(id: string, secret: string | null): Promise<string | null> {
+export async function persistConnectorSecret(
+  id: string,
+  orgId: string,
+  secret: string | null,
+): Promise<string | null> {
   await ensureConnectorSecretRefColumn();
   if (!secret) return null;
-  const key = connectorSecretKey(id);
+  const key = connectorSecretKey(id, orgId);
   const { openBaoSecrets } = await import('@/lib/adapters/secrets');
   if (!openBaoSecrets.set) throw new Error('secrets backend is not writable');
   await openBaoSecrets.set(key, secret);
-  await setConnectorSecretRef(id, key);
+  if (!(await setConnectorSecretRef(id, orgId, key))) {
+    if (openBaoSecrets.remove) await openBaoSecrets.remove(key).catch(() => undefined);
+    throw new Error('connector was not found in this tenant');
+  }
   return key;
 }
 
 // Resolve a connector's stored secret from the vault by its secret_ref. Returns null when the
 // connector has no secretRef or the vault is unreachable (caller falls back to inline creds).
-export async function resolveConnectorSecret(id: string): Promise<string | null> {
-  const ref = await getConnectorSecretRef(id);
+export async function resolveConnectorSecret(id: string, orgId: string): Promise<string | null> {
+  const ref = await getConnectorSecretRef(id, orgId);
   if (!ref) return null;
+  if (ref !== connectorSecretKey(id, orgId)) throw new ConnectorSecretScopeError();
   try {
     const { openBaoSecrets } = await import('@/lib/adapters/secrets');
     return (await openBaoSecrets.get(ref)) ?? null;
@@ -65,9 +84,10 @@ export async function resolveConnectorSecret(id: string): Promise<string | null>
 }
 
 // Best-effort delete of a connector's vault secret (called on connector delete). Never throws.
-export async function removeConnectorSecret(id: string): Promise<void> {
-  const ref = await getConnectorSecretRef(id).catch(() => null);
+export async function removeConnectorSecret(id: string, orgId: string): Promise<void> {
+  const ref = await getConnectorSecretRef(id, orgId).catch(() => null);
   if (!ref) return;
+  if (ref !== connectorSecretKey(id, orgId)) throw new ConnectorSecretScopeError();
   try {
     const { openBaoSecrets } = await import('@/lib/adapters/secrets');
     if (openBaoSecrets.remove) await openBaoSecrets.remove(ref);
@@ -94,23 +114,28 @@ export async function ensureConnectorSecretRefColumn(): Promise<void> {
   return colEnsure;
 }
 
-async function setConnectorSecretRef(id: string, ref: string): Promise<void> {
+async function setConnectorSecretRef(id: string, orgId: string, ref: string): Promise<boolean> {
   await ensureConnectorSecretRefColumn();
   const { db } = await import('@/db');
   const { connectors } = await import('@/db/schema');
-  const { eq } = await import('drizzle-orm');
-  await db.update(connectors).set({ secretRef: ref }).where(eq(connectors.id, id));
+  const { and, eq } = await import('drizzle-orm');
+  const rows = await db
+    .update(connectors)
+    .set({ secretRef: ref })
+    .where(and(eq(connectors.id, id), eq(connectors.orgId, orgId)))
+    .returning({ id: connectors.id });
+  return rows.length === 1;
 }
 
-export async function getConnectorSecretRef(id: string): Promise<string | null> {
+export async function getConnectorSecretRef(id: string, orgId: string): Promise<string | null> {
   await ensureConnectorSecretRefColumn();
   const { db } = await import('@/db');
   const { connectors } = await import('@/db/schema');
-  const { eq } = await import('drizzle-orm');
+  const { and, eq } = await import('drizzle-orm');
   const rows = await db
     .select({ secretRef: connectors.secretRef })
     .from(connectors)
-    .where(eq(connectors.id, id))
+    .where(and(eq(connectors.id, id), eq(connectors.orgId, orgId)))
     .limit(1);
   return rows[0]?.secretRef ?? null;
 }

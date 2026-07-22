@@ -17,6 +17,8 @@ import {
   isPublicHost,
 } from '@/lib/connector-endpoint';
 
+export { connectorSecretKey } from '@/lib/connector-secret-policy';
+
 // ─── The connector-type catalog ───────────────────────────────────────────────
 // `ready` means a complete usable path exists. SQL/REST use connector-exec; S3 uses the bounded
 // connector object route and the existing S3 object-store port.
@@ -377,13 +379,6 @@ export function validateConnectorUpdate(patch: ConnectorUpdateInput): UpdateVali
     }
   }
   return { ok: errors.length === 0, errors };
-}
-
-// ─── The vault key path for a connector's secret ───────────────────────────────
-// A per-connector KV key: `connectors/<id>/credential`. Same conservative charset as exporter
-// secretRefs so it can only ever NAME a vault key, never smuggle a value.
-export function connectorSecretKey(id: string): string {
-  return `connectors/${id}/credential`;
 }
 
 // ─── Splice a resolved secret into a credential-free endpoint ───────────────────

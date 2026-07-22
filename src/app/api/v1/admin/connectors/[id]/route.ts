@@ -87,7 +87,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const replacementSecret = existing.type === 's3' ? credentialResult.secret : peeledSecret;
   if (replacementSecret) {
     try {
-      await persistConnectorSecret(id, replacementSecret);
+      await persistConnectorSecret(id, orgId, replacementSecret);
     } catch (e) {
       console.error('vault write failed on connector update:', e);
       return NextResponse.json(

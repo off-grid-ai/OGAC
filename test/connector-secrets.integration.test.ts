@@ -37,14 +37,14 @@ test('connector secret_ref column self-migrates + round-trips', { skip: dbUp ? f
     orgId: ORG,
   });
   // Freshly created connector has no secretRef yet.
-  assert.equal(await getConnectorSecretRef(created.id), null);
+  assert.equal(await getConnectorSecretRef(created.id, ORG), null);
 
   // Stamp a secretRef directly (mirrors what persistConnectorSecret does after the vault write).
-  const ref = connectorSecretKey(created.id);
+  const ref = connectorSecretKey(created.id, ORG);
   await db.update(connectors).set({ secretRef: ref }).where(eq(connectors.id, created.id));
 
   // Read it back through the module's resolver.
-  assert.equal(await getConnectorSecretRef(created.id), ref);
+  assert.equal(await getConnectorSecretRef(created.id, ORG), ref);
 
   // The stored endpoint is still credential-free — the password never touched the row.
   const listed = (await listConnectors(ORG)).find((c) => c.id === created.id);

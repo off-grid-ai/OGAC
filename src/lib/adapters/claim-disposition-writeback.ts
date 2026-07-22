@@ -236,7 +236,7 @@ export async function writeClaimDisposition(
     };
   }
 
-  const mutation = await mutateClaimSource(connector, command);
+  const mutation = await mutateClaimSource({ ...connector, orgId }, command);
   if (!mutation.ok) {
     await failClaimDisposition(ledgerInput, reservation.token, mutation.message).catch(() => undefined);
     return mutation;

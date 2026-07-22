@@ -183,10 +183,12 @@ test(
     );
     await persistConnectorSecret(
       connector.id,
+      ORG,
       serializeObjectStoreCredential({ accessKey: 'access', secretKey: 'secret' }),
     );
     await persistConnectorSecret(
       foreignConnector.id,
+      FOREIGN_ORG,
       serializeObjectStoreCredential({ accessKey: 'foreign', secretKey: 'foreign-secret' }),
     );
     t.after(async () => {
@@ -337,10 +339,12 @@ test(
     });
     await persistConnectorSecret(
       ownedS3.id,
+      ORG,
       serializeObjectStoreCredential({ accessKey: 'old-access', secretKey: 'old-secret' }),
     );
     await persistConnectorSecret(
       foreignS3.id,
+      FOREIGN_ORG,
       serializeObjectStoreCredential({ accessKey: 'foreign-access', secretKey: 'foreign-secret' }),
     );
     t.after(async () => {
@@ -362,7 +366,7 @@ test(
       { params: Promise.resolve({ id: ownedS3.id }) },
     );
     assert.equal(rotated.status, 200, 'an S3 rotation does not require browser-supplied type');
-    const ownedRef = await getConnectorSecretRef(ownedS3.id);
+    const ownedRef = await getConnectorSecretRef(ownedS3.id, ORG);
     assert.deepEqual(parseObjectStoreCredential(vault.get(ownedRef ?? '') ?? null), {
       accessKey: 'new-access',
       secretKey: 'new-secret',

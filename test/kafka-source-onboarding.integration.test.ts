@@ -179,7 +179,7 @@ test(
     assert.equal(domains.length, 1);
     assert.equal(domains[0].connectorId, created.connectorId);
     assert.equal(domains[0].resource, 'enterprise.risk-signals');
-    const key = connectorSecretKey(created.connectorId);
+    const key = connectorSecretKey(created.connectorId, ORG);
     assert.deepEqual(JSON.parse(vault.get(key)!), {
       version: 1,
       tls: false,

@@ -131,7 +131,7 @@ test(
       ORG,
     );
     const secret = securityBinding();
-    await persistConnectorSecret(connector.id, secret);
+    await persistConnectorSecret(connector.id, ORG, secret);
 
     const resolved = await resolveKafkaConnectorBinding({
       orgId: ORG,
@@ -161,8 +161,8 @@ test(
         schemaRegistryAuthorization: 'Bearer vault-only-registry-token',
       },
     });
-    assert.equal(vault.get(connectorSecretKey(connector.id)), secret);
-    assert.deepEqual(vaultGets, [connectorSecretKey(connector.id)]);
+    assert.equal(vault.get(connectorSecretKey(connector.id, ORG)), secret);
+    assert.deepEqual(vaultGets, [connectorSecretKey(connector.id, ORG)]);
 
     const beforeOwnershipDenials = vaultGets.length;
     await assert.rejects(
@@ -270,7 +270,7 @@ test(
       },
       ORG,
     );
-    await persistConnectorSecret(tlsConnector.id, securityBinding({ tls: false }));
+    await persistConnectorSecret(tlsConnector.id, ORG, securityBinding({ tls: false }));
     await assert.rejects(
       resolveKafkaConnectorBinding({
         orgId: ORG,
@@ -299,6 +299,7 @@ test(
     const secretCanary = 'must-never-appear-in-binding-errors';
     await persistConnectorSecret(
       badSecretConnector.id,
+      ORG,
       securityBinding({ unsupportedSecretField: secretCanary }),
     );
     await assert.rejects(
@@ -315,7 +316,7 @@ test(
       },
     );
 
-    await persistConnectorSecret(badSecretConnector.id, `{${secretCanary}`);
+    await persistConnectorSecret(badSecretConnector.id, ORG, `{${secretCanary}`);
     await assert.rejects(
       resolveKafkaConnectorBinding({
         orgId: ORG,

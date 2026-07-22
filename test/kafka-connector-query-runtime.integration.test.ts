@@ -155,6 +155,7 @@ test(
     );
     await persistConnectorSecret(
       connector.id,
+      ORG,
       JSON.stringify({
         version: 1,
         tls: false,

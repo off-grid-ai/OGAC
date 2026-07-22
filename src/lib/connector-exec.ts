@@ -25,6 +25,7 @@ export interface ConnectorTarget {
   type: string;
   endpoint: string;
   id?: string;
+  orgId?: string;
 }
 
 // A connector target with its credential already resolved from the vault: the endpoint has any SQL
@@ -34,6 +35,7 @@ export interface ResolvedExecTarget {
   type: string;
   endpoint: string;
   authHeader: Record<string, string>;
+  credentialError: string | null;
 }
 
 export interface RestConnectorRequest {
@@ -55,19 +57,33 @@ export interface RestConnectorResponse {
 // to the raw endpoint + no header when there's no id / no vaulted secret / the vault is unreachable,
 // so seeded connectors with inline creds keep working. Dynamic import breaks the exec↔secrets cycle.
 export async function resolveConnectorTarget(conn: ConnectorTarget): Promise<ResolvedExecTarget> {
-  const base: ResolvedExecTarget = { type: conn.type, endpoint: conn.endpoint, authHeader: {} };
+  const base: ResolvedExecTarget = {
+    type: conn.type,
+    endpoint: conn.endpoint,
+    authHeader: {},
+    credentialError: null,
+  };
   if (!conn.id) return base;
+  if (!conn.orgId) {
+    return { ...base, credentialError: 'Connector credential resolution requires tenant context.' };
+  }
   try {
     const { resolveConnectorSecret } = await import('./connector-secrets');
     const { spliceCredential } = await import('./connector-policy');
-    const secret = await resolveConnectorSecret(conn.id);
+    const secret = await resolveConnectorSecret(conn.id, conn.orgId);
     if (!secret) return base;
     const dialect = detectDialect(conn.type, conn.endpoint);
-    if (dialect === 'rest') return { ...base, authHeader: { authorization: `Bearer ${secret}` } };
+    if (dialect === 'rest') {
+      return { ...base, authHeader: { authorization: `Bearer ${secret}` } };
+    }
     // SQL dialects: splice the password into the connection URL (no-op if it already has one).
     return { ...base, endpoint: spliceCredential(conn.type, conn.endpoint, secret) };
-  } catch {
-    return base;
+  } catch (error) {
+    return {
+      ...base,
+      credentialError:
+        error instanceof Error ? error.message : 'Connector credential could not be resolved.',
+    };
   }
 }
 
@@ -284,7 +300,11 @@ export async function execConnectorQuery(
   const limit = Math.max(1, Math.min(query.limit ?? 100, 1000));
   // Inject the vaulted credential (SQL password / REST bearer) at query time. Endpoint stays
   // credential-free on the row; the resolved copy is used only here and never persisted.
-  const resolved = await resolveConnectorTarget(conn);
+  const resolved = await resolveConnectorTarget({
+    ...conn,
+    orgId: conn.orgId ?? query.binding?.orgId,
+  });
+  if (resolved.credentialError) return null;
   const endpoint = resolved.endpoint;
 
   if (dialect === 'postgres') {
@@ -403,6 +423,7 @@ export async function execRestConnectorRequest(
   }
   try {
     const resolved = await resolveConnectorTarget(conn);
+    if (resolved.credentialError) return null;
     const base = resolved.endpoint.replace(/\/$/, '');
     const url = new URL(`${base}/${request.path.map(encodeURIComponent).join('/')}`);
     for (const [key, value] of Object.entries(request.query ?? {})) {
@@ -450,6 +471,9 @@ export async function testConnection(conn: ConnectorTarget): Promise<ConnectionT
     return { ok: false, dialect: null, message: 'This connector type cannot be queried live yet.' };
   }
   const resolved = await resolveConnectorTarget(conn);
+  if (resolved.credentialError) {
+    return { ok: false, dialect, message: resolved.credentialError };
+  }
   const endpoint = resolved.endpoint;
 
   try {
@@ -510,6 +534,7 @@ export async function listResources(conn: ConnectorTarget): Promise<string[] | n
   const dialect = detectDialect(conn.type, conn.endpoint);
   if (!dialect) return null;
   const resolved = await resolveConnectorTarget(conn);
+  if (resolved.credentialError) return null;
   const endpoint = resolved.endpoint;
 
   try {

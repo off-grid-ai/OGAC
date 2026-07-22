@@ -189,7 +189,7 @@ test('validateConnectorCreate: requires a name', () => {
 });
 
 test('connectorSecretKey is a stable, per-connector vault path', () => {
-  assert.equal(connectorSecretKey('con_abc123'), 'connectors/con_abc123/credential');
+  assert.equal(connectorSecretKey('con_abc123', 'default'), 'connectors/con_abc123/credential');
 });
 
 test('spliceCredential injects the password into a SQL URL at query time (not persisted)', () => {

@@ -207,7 +207,10 @@ export async function isGovernedKafkaConnector(input: {
 }): Promise<boolean> {
   const connector = await getConnector(input.connectorId, input.orgId);
   if (!connector || connector.type.toLowerCase() !== 'kafka') return false;
-  return (await getConnectorSecretRef(connector.id)) === connectorSecretKey(connector.id);
+  return (
+    (await getConnectorSecretRef(connector.id, input.orgId)) ===
+    connectorSecretKey(connector.id, input.orgId)
+  );
 }
 
 export async function isGovernedKafkaBinding(input: {
@@ -261,7 +264,7 @@ export async function resolveKafkaConnectorBinding(input: {
 
   const endpoint = parseBootstrapBroker(connector.endpoint);
   const scope = parseDomainBinding(domain.opHints);
-  const secret = await resolveConnectorSecret(connector.id);
+  const secret = await resolveConnectorSecret(connector.id, input.orgId);
   if (!secret) {
     throw new KafkaConnectorBindingError(
       'missing-credential',

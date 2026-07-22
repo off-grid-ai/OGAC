@@ -186,7 +186,7 @@ test('validate: missing name prepends a name error onto the type-specific ones (
 // ─── connectorSecretKey ────────────────────────────────────────────────────────────────────────────
 
 test('connectorSecretKey: canonical per-connector key path', () => {
-  assert.equal(connectorSecretKey('c_42'), 'connectors/c_42/credential');
+  assert.equal(connectorSecretKey('c_42', 'default'), 'connectors/c_42/credential');
 });
 
 // ─── spliceCredential — sql splice, already-has-creds, non-sql skip, unknown type, catch arm ───────

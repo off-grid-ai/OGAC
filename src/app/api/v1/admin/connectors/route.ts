@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   // Push the credential to the vault and reference it on the row. If the vault write fails we roll
   // the connector back so a user never ends up with a credential-less, non-connecting connector.
   try {
-    await persistConnectorSecret(created.id, v.secret);
+    await persistConnectorSecret(created.id, orgId, v.secret);
   } catch (e) {
     const { deleteConnector } = await import('@/lib/store');
     await deleteConnector(created.id, orgId).catch(() => undefined);

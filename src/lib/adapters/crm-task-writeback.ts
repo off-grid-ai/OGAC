@@ -53,7 +53,7 @@ export async function writeCrmTask(
   if (!validated.ok) return { ok: false, code: 'invalid-command', message: validated.errors.join(' ') };
   if (!connector.id) return { ok: false, code: 'unsupported-connector', message: 'connector id is required' };
   const request = buildCrmTaskSourceRequest(validated.value);
-  const response = await execRestConnectorRequest(connector, {
+  const response = await execRestConnectorRequest({ ...connector, orgId }, {
     ...request,
     headers: { 'x-offgrid-org-id': orgId },
   });

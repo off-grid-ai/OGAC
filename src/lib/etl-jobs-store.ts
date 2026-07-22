@@ -338,7 +338,7 @@ export async function runJob(job: EtlJobSpec, orgId: string = DEFAULT_ORG): Prom
     // 2. Pull rows from the bound resource.
     const limit = clampRowLimit(job.rowLimit);
     const result = await execConnectorQuery(
-      { type: conn.type, endpoint: conn.endpoint, id: conn.id },
+      { type: conn.type, endpoint: conn.endpoint, id: conn.id, orgId },
       { resource: job.sourceResource, op: 'read', limit },
     );
     if (!result) throw new Error('could not read from the source (unreachable or unsupported)');

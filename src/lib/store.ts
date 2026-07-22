@@ -918,7 +918,7 @@ export async function deleteConnector(id: string, orgId: string = DEFAULT_ORG): 
   // the secretRef FROM the row, so the row must still exist. Best-effort (the row delete is what
   // matters); dynamic import avoids pulling the secrets/vault graph into every store consumer.
   const { removeConnectorSecret } = await import('@/lib/connector-secrets');
-  await removeConnectorSecret(id).catch(() => undefined);
+  await removeConnectorSecret(id, orgId).catch(() => undefined);
   await db
     .delete(ingestJobs)
     .where(and(eq(ingestJobs.connectorId, id), eq(ingestJobs.orgId, orgId)));

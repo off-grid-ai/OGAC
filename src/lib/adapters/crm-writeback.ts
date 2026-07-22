@@ -87,7 +87,8 @@ export async function writeCrmOpportunityFollowUp(
   }
 
   const input = validated.value;
-  const current = await execRestConnectorRequest(connector, {
+  const scopedConnector = { ...connector, orgId };
+  const current = await execRestConnectorRequest(scopedConnector, {
     method: 'GET',
     path: ['opportunities', input.opportunityId],
   });
@@ -125,7 +126,7 @@ export async function writeCrmOpportunityFollowUp(
   }
 
   const patch = buildCrmOpportunityPatch(input, { orgId, writtenAt: signedAt });
-  const updated = await execRestConnectorRequest(connector, {
+  const updated = await execRestConnectorRequest(scopedConnector, {
     method: 'PATCH',
     path: ['opportunities', input.opportunityId],
     body: patch,

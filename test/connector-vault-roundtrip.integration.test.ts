@@ -119,27 +119,27 @@ test('connector credential round-trips through the vault; endpoint stays clean; 
 
   // 2. Push the secret to the vault + stamp the row (what the route does after createConnector).
   const password = 'Sup3rSecret!';
-  const ref = await persistConnectorSecret(created.id, password);
-  assert.equal(ref, connectorSecretKey(created.id));
+  const ref = await persistConnectorSecret(created.id, ORG, password);
+  assert.equal(ref, connectorSecretKey(created.id, ORG));
 
   // 3. The DB row's endpoint carries NO password; the row references the vault key.
   const listed = (await listConnectors(ORG)).find((c) => c.id === created.id)!;
   assert.ok(listed);
   assert.ok(!listed.endpoint.includes(password), 'the password is NOT in the DB endpoint');
   assert.equal(listed.endpoint, 'postgres://reader@db.internal:5432/corebank');
-  assert.equal(await getConnectorSecretRef(created.id), ref);
+  assert.equal(await getConnectorSecretRef(created.id, ORG), ref);
 
   // 4. The secret really lives in the vault (our stub KV), keyed by the ref.
   assert.equal(kv.get(ref!), password, 'the password is stored in the vault, not the DB');
 
   // 5. resolveConnectorSecret reads it back from the vault by id.
-  assert.equal(await resolveConnectorSecret(created.id), password);
+  assert.equal(await resolveConnectorSecret(created.id, ORG), password);
 
   // 6. connector-exec re-injects it into the runtime URL (endpoint on the row stays clean).
   const { detectDialect } = await import('@/lib/connector-exec');
   const { spliceCredential } = await import('@/lib/connector-policy');
   assert.equal(detectDialect('postgres', listed.endpoint), 'postgres');
-  const runtimeUrl = spliceCredential('postgres', listed.endpoint, await resolveConnectorSecret(created.id) ?? '');
+  const runtimeUrl = spliceCredential('postgres', listed.endpoint, await resolveConnectorSecret(created.id, ORG) ?? '');
   const u = new URL(runtimeUrl);
   assert.equal(decodeURIComponent(u.password), password, 'exec splices the vaulted secret back in');
   assert.equal(u.username, 'reader');
@@ -147,5 +147,5 @@ test('connector credential round-trips through the vault; endpoint stays clean; 
   // 7. Delete purges the vault secret — no orphan left behind.
   await deleteConnector(created.id, ORG);
   assert.equal(kv.has(ref!), false, 'the vault secret is removed on connector delete');
-  assert.equal(await resolveConnectorSecret(created.id), null);
+  assert.equal(await resolveConnectorSecret(created.id, ORG), null);
 });

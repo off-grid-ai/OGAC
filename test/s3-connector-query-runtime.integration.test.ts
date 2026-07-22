@@ -127,6 +127,7 @@ test(
     );
     await persistConnectorSecret(
       connector.id,
+      ORG,
       serializeObjectStoreCredential({ accessKey: 'access', secretKey: 'secret' }),
     );
     t.after(async () => {

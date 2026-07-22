@@ -52,7 +52,9 @@ export async function resolveConnectorObjectBinding(input: {
   if (!scope.ok) {
     throw new ConnectorObjectBindingError('unapproved-scope', scope.error);
   }
-  const credential = parseObjectStoreCredential(await resolveConnectorSecret(connector.id));
+  const credential = parseObjectStoreCredential(
+    await resolveConnectorSecret(connector.id, input.orgId),
+  );
   if (!credential) {
     throw new ConnectorObjectBindingError(
       'missing-credential',
