@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { KeycloakError, keycloakAdmin } from '@/lib/keycloak-admin';
-import { buildOidcIdpRep, forbiddenGrantMessage, normalizeIdps, type KcRawIdp } from '@/lib/keycloak-realm';
+import {
+  buildOidcIdpRep,
+  buildSamlIdpRep,
+  forbiddenGrantMessage,
+  normalizeIdps,
+  type KcRawIdp,
+} from '@/lib/keycloak-realm';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -25,8 +31,9 @@ export async function GET(req: Request) {
   }
 }
 
-// POST → add an OIDC identity provider. We support the common OIDC authorization-code case; SAML and
-// advanced mapper config stay in the Keycloak admin console (validated/built by buildOidcIdpRep).
+// POST → add an identity provider. `type: "saml"` builds a SAML v2 provider; anything else (default)
+// builds the common OIDC authorization-code provider. Both are validated/built by the pure builders;
+// advanced mapper/signing-cert config stays in the identity provider's own admin console.
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
@@ -37,14 +44,25 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
 
-  const built = buildOidcIdpRep({
-    alias: String(body.alias ?? ''),
-    displayName: body.displayName ? String(body.displayName) : undefined,
-    authorizationUrl: String(body.authorizationUrl ?? ''),
-    tokenUrl: String(body.tokenUrl ?? ''),
-    clientId: String(body.clientId ?? ''),
-    clientSecret: String(body.clientSecret ?? ''),
-  });
+  const built =
+    String(body.type ?? 'oidc') === 'saml'
+      ? buildSamlIdpRep({
+          alias: String(body.alias ?? ''),
+          displayName: body.displayName ? String(body.displayName) : undefined,
+          singleSignOnServiceUrl: String(body.singleSignOnServiceUrl ?? ''),
+          entityId: body.entityId ? String(body.entityId) : undefined,
+          singleLogoutServiceUrl: body.singleLogoutServiceUrl
+            ? String(body.singleLogoutServiceUrl)
+            : undefined,
+        })
+      : buildOidcIdpRep({
+          alias: String(body.alias ?? ''),
+          displayName: body.displayName ? String(body.displayName) : undefined,
+          authorizationUrl: String(body.authorizationUrl ?? ''),
+          tokenUrl: String(body.tokenUrl ?? ''),
+          clientId: String(body.clientId ?? ''),
+          clientSecret: String(body.clientSecret ?? ''),
+        });
   if ('error' in built) return NextResponse.json({ error: built.error }, { status: 400 });
 
   try {
