@@ -1,7 +1,7 @@
 # Flagship capability closure
 
 This is the smallest evidence-backed closure plan for three flagship BFSI journeys: insurance
-indemnity/FNOL, lender delinquency intervention, and bank cross-sell. It is derived from the 151
+indemnity/FNOL, lender delinquency intervention, and bank cross-sell. It is derived from the 171
 audited capability items and the product outcome in `docs/founder-freehand.md`: use the enterprise's
 existing data and systems to make material work faster, better, or cheaper in a reliable, governed,
 auditable environment.
@@ -10,7 +10,7 @@ This is not a live-deployment report. Gate states are the retained canonical aud
 means Available / Integrated / UI exposed / Used in a workflow. For a stale audit, `A=N` means the
 selected immutable deployment identity is not current—not that the capability is necessarily absent.
 
-## Product-contract status (2026-07-20)
+## Product-contract status (2026-07-22)
 
 The catalog contract gap is closed in code without inflating proof:
 
@@ -30,6 +30,13 @@ Release application is isolated in `scripts/apply-flagship-solution-contracts.mt
 does not reconcile contract rows. `--apply` requires the exact deployed Console SHA and reconciles
 only the three contract-owned Apps/pipelines, missing required domain declarations, and catalog
 seed rows; it preserves unrelated rows and refuses operator-owned naming/binding collisions.
+
+The Outcome Observation Plane is now code-wired against the frozen governed `ActionReceipt` without
+creating another service family or capability denominator. It gives the three journeys one
+tenant-scoped, append-only result lifecycle and plain-language run UI. It is not live evidence until
+the checked-in migration and exact Console SHA are deployed and a real flagship receipt is correlated
+to a retained result. The existing `enterprise-source-crm/write-sync-webhooks` row therefore remains
+`N/P/P/P`.
 
 ## Minimum closure set
 
@@ -64,7 +71,7 @@ governed step execution, human pause/resume, failure recovery, and output persis
 | Indemnity/FNOL             | `enterprise-source-minio/object-read-write` | Y/N/P/N  | The pinned service provides S3 APIs; only source ontology is visible.                        | Implement governed bucket/key-scoped claim-document read/write with limits, provenance, and workflow proof.            |
 | Delinquency and cross-sell | `enterprise-source-corebank/sql-read`       | N/Y/Y/Y  | Bounded PostgreSQL reads, Data Sources UI, and retained lender/claims lookup evidence exist. | Pin the mutable source and repeat schema/count/read evidence.                                                          |
 | Delinquency and cross-sell | `enterprise-source-crm/rest-read`           | N/Y/Y/Y  | Bounded CRM reads, UI journeys, and retained customer/cross-sell lookup evidence exist.      | Pin the mutable source and repeat discovery/read evidence.                                                             |
-| Delinquency and cross-sell | `enterprise-source-crm/write-sync-webhooks` | N/P/P/P  | Console `16fa96443c79` proves a governed bank task write, approval evidence, signed receipt, duplicate-safe replay, and zero-mutation shadow run. | Add typed pagination, incremental state, rate-limit handling, webhooks, and broader audited CRM CRUD. |
+| Delinquency and cross-sell | `enterprise-source-crm/write-sync-webhooks` | N/P/P/P  | Console `16fa96443c79` proves a governed bank task write, approval evidence, signed receipt, duplicate-safe replay, and zero-mutation shadow run. Receipt-correlated business results are code-wired and test-proven, not deployed. | Deploy migration + Console, retain one real receipt → result → correction/withdrawal journey, then add typed pagination, incremental state, rate-limit handling, webhooks, and broader audited CRM CRUD. |
 
 ## Insurance indemnity / FNOL
 
@@ -111,13 +118,13 @@ governed step execution, human pause/resume, failure recovery, and output persis
 ### Ordered implementation
 
 1. Pin Core Banking and CRM source identities.
-2. Deploy the code-wired bounded CRM task/action path and prove approval, one mutation, retained
-   receipt, and idempotent replay so intervention becomes verified work, not merely advice.
+2. Retain the already-live bounded CRM approval, one mutation, signed receipt, and idempotent replay
+   evidence; deploy the Outcome Observation migration and correlate a cured result to that receipt.
 3. Bind the adoptable blueprint to loan-account and repayment-history domains and its exact pipeline.
 4. Audit/stamp `app-worker`; reverify Gateway, OPA, and Temporal.
 5. Add attributed collections-playbook retrieval and complete lineage delivery evidence.
 6. Prove cohort selection → prioritization → compliant recommendation → human approval → CRM
-   task/write-back → outcome observation.
+   task/write-back → cured/rejected outcome observation, including correction/withdrawal history.
 7. Measure 30+ DPD roll rate, cure rate, promise-to-pay performance, collector capacity, and avoided
    loss.
 
@@ -142,12 +149,13 @@ governed step execution, human pause/resume, failure recovery, and output persis
 
 1. Define the exact data domains, eligibility constraints, RM decision, write-back, and outcome
    contract.
-2. Pin Core Banking and CRM; deploy and prove the code-wired CRM opportunity/task write-back.
+2. Pin Core Banking and CRM; retain the live CRM opportunity/task write-back proof, deploy the Outcome
+   Observation migration, and correlate accepted then converted results to the signed receipt.
 3. Add the RM review step and audit/stamp `app-worker`.
 4. Reverify Gateway, OPA, and Temporal; retain Qdrant product-rule attribution.
 5. Retain lineage from holdings/product rules through recommendation, RM decision, and CRM outcome.
 6. Prove customer context → eligible next-best action → cited rationale → RM acceptance/rejection →
-   CRM update.
+   CRM update → customer result, keeping the RM decision separate from customer acceptance.
 7. Measure conversion, incremental revenue, RM book coverage, recommendation time, and prevented
    compliance exceptions.
 
@@ -161,12 +169,12 @@ governed step execution, human pause/resume, failure recovery, and output persis
 
 1. **Product contracts (code complete):** apply the catalog/runtime seed and retain tenant-scoped
    adoptability evidence for indemnity, delinquency, and cross-sell.
-2. **Action seams:** implement S3 claim documents and claims write-back; deploy and prove the
-   code-wired CRM write-back.
+2. **Action seams:** bounded CRM write-back is live; implement S3 claim documents and claims write-back.
 3. **Runtime proof:** audit `app-worker`; pin/reverify Gateway, OPA, Temporal, and source identities.
 4. **Evidence spine:** Qdrant provider/filter attribution and Marquez delivery receipts.
 5. **Three tenant journeys:** real human decisions and system write-back, not seeded counters.
-6. **ROI proof:** canonical run observations with baseline, outcome, cost, and capacity evidence.
+6. **Outcome and ROI proof:** deploy the shared receipt-correlated observation lifecycle, then add
+   canonical baseline-versus-result, cost, and capacity evidence over executed-receipt denominators.
 
 This order makes each journey usable first, consumable through its business decision, and sellable
 through justified ROI. Later breadth must not delay the minimum action-and-proof loop.

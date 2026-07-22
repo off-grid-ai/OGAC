@@ -1147,6 +1147,25 @@ LINKS between them are broken/missing. Priority = demo golden path (Studio → g
   CRM mutations; pagination, incremental sync, webhooks, generic CRM CRUD, and other enterprise action
   families remain future audited slices.
 
+- **[G-OUTCOME-LIVE] CODE + WIRED; LIVE EVIDENCE PENDING — system completion is now distinct from
+  business success.** Commits `5f488c3a..e2884441` freeze one `ActionReceipt`-consuming contract and
+  implement tenant-scoped append-only PostgreSQL evidence, source-event idempotency, accepted /
+  rejected / converted / cured / settled results, retained correction/withdrawal history, thin
+  authenticated routes, and URL-driven nontechnical create/detail/correct journeys. The 32-test
+  focused suite proves the real migration, route → store → PostgreSQL path, replay conflicts,
+  tenancy, audit retention, role states, and rendered user copy. This is not live proof. Release
+  acceptance is: backup; apply `drizzle/0012_action_outcome_observations.sql`; deploy one exact
+  Console SHA; retain a real bank `ActionReceipt` → accepted → converted journey; prove exact
+  replay adds no row; correct and withdraw retained facts; confirm App deletion returns a deliberate
+  evidence-retention conflict; and visually inspect wide and narrow states.
+
+- **[G-OUTCOME-AUTOMATION] OPEN — observation capture and portfolio learning remain manual.** The
+  first slice accepts human, system, and import source identities but exposes only the authenticated
+  manual Console journey. Add governed CRM webhook/import adapters with checkpoint and failure
+  visibility, then expose portfolio-level baseline-versus-result windows using canonical executed
+  receipt denominators. Until those paths are live, do not describe one recorded result as an
+  automated learning loop or ROI proof.
+
 ## Insurance claim disposition source ownership (2026-07-20)
 
 - **[G-CLAIM-SOURCE] RESOLVED IN CODE — do not write claims through the Advisor/HR MySQL fixture.**

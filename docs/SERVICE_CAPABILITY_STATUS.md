@@ -79,6 +79,26 @@ receipt and no CRM mutation. `enterprise-source-crm/write-sync-webhooks` is ther
 the stale mutable source identity keeps Available at `no`, while the broad pagination/sync/webhook
 denominator remains only partially integrated, exposed, and used.
 
+### Outcome Observation Plane code-wired delta
+
+The frozen `ActionReceipt` now has one Console-owned post-action evidence path in source commits
+`5f488c3a..e2884441`. The server resolves the canonical receipt from the active tenant's App run;
+browser input cannot supply or replace receipt identity. It appends accepted, rejected, converted,
+cured, or settled facts, derives retry idempotency from tenant + receipt + source event, and retains
+corrections and withdrawals instead of rewriting history.
+
+| Evidence slice                        | Source state | Retained source proof                                                            | Still required before live verification                                                                 |
+| ------------------------------------- | ------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Contract and evidence lifecycle       | code-wired   | Outcome-focused suite 32/32; real PostgreSQL constraints, store, and routes pass | Back up the live database, apply `drizzle/0012_action_outcome_observations.sql`, and verify invariants.  |
+| Nontechnical run-to-result journey    | code-wired   | URL-driven create/detail/correct pages and rendered role/error states pass       | Deploy the exact Console SHA; visually verify wide/narrow; retain one real bank receipt → result path. |
+| Audit retention and replay guarantees | code-wired   | Duplicate-safe source replay; App deletion returns an explicit evidence conflict | Retain deployed observation, correction, withdrawal, audit actor, and unchanged conflicting replay.     |
+
+No four-gate state is promoted by this source checkpoint. The canonical
+`enterprise-source-crm/write-sync-webhooks` item stays `N/P/P/P`: its live proof still ends at the
+governed CRM action receipt. A deployed business-result record, automatic CRM/system ingestion,
+portfolio baseline-versus-result reporting, and the broader pagination/sync/webhook denominator are
+not yet retained.
+
 ### LLM Guard 0.3.16 audit delta
 
 `llm-guard` now has a seven-item, version-matched denominator pinned to upstream tag

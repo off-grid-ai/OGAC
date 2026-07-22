@@ -30,6 +30,10 @@ gate: approvals, triage, drafting-with-review, scheduled digests.
 4. **Review** (inline on the Running screen) — a run paused at a human step; approve or reject.
 5. **Reports** (`/apps/reports`) — rollups across runs (volume, outcomes, human-review rate).
 
+For Apps with a governed **Action** step, the Running screen also carries the post-action business
+result. It deliberately keeps two facts separate: the signed execution receipt proves what the system
+changed; the business result records what happened afterward.
+
 ## How to build one
 
 1. **Describe.** Write the outcome and the steps in plain language. Example:
@@ -68,6 +72,31 @@ gate: approvals, triage, drafting-with-review, scheduled digests.
 - **No fake connector rows.** A read that fails returns "no rows", never invented data.
 - **Every step is governed.** An agent step runs the full policy/guardrail/grounding/signing
   pipeline. A guardrail step can halt the run. Every save/edit/run/review is written to the audit log.
+
+## Record what happened after an action
+
+Use this after a governed Action step has completed and its signed receipt is visible on the App run.
+For example, creating a CRM follow-up task is system completion; a customer accepting or converting
+is the later business result.
+
+1. Open **Solutions → Apps**, choose the App, open **Runs**, then choose the completed run.
+2. In **Action and result**, check the signed system receipt on the left. On the right, choose
+   **Record customer result**.
+3. Select what happened: customer accepted, customer declined, customer converted, account cured,
+   or claim settled. Add when it happened, a plain-language confirmation, and an evidence link.
+   Revenue is optional.
+4. Save. The result has its own shareable URL and stays correlated to the exact action step and
+   receipt. Retrying the same source event does not add a duplicate.
+5. If evidence changes, open the result and choose **Correct this record** or **Withdraw record**.
+   The original remains in the result history for audit. It is never silently overwritten.
+
+Only admins can record, correct, or withdraw business results. Other roles see a clear read-only
+state. Deleting an App with retained result evidence is intentionally blocked so audit history cannot
+be erased accidentally.
+
+Current boundary: results are recorded from the run journey. Automatic CRM webhook/import capture
+and portfolio baseline-versus-result reporting are not yet available, so one recorded result must not
+be treated as automated learning or ROI proof.
 
 ## Known limitation — inline agent steps
 

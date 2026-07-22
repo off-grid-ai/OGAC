@@ -23,6 +23,11 @@ artifact of a specific run (a reimbursement decision, a triage outcome).
 - **Cost** — total tokens and total USD, pulled from run provenance and per-step detail.
 - **Per-run summary** — steps, steps done/errored, human decisions, duration, tokens, cost.
 
+These rollups describe **system run outcomes**. They do not yet aggregate the post-action business
+results recorded on an Action step (customer accepted/converted, account cured, claim settled). Open
+the individual App run's **Action and result** section to inspect those receipt-correlated facts. A
+portfolio baseline-versus-result view is still a tracked capability gap.
+
 ## The signed per-run PDF
 
 `GET /api/v1/admin/app-runs/[id]/report` renders one run to a PDF (pure-JS, no headless browser) and
