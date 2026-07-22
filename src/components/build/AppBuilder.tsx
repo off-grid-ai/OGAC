@@ -36,6 +36,7 @@ import {
   relabelStep,
   removeStep,
   setAgentPrompt,
+  setOutputConfigField,
   setOutputSink,
   setPipeline,
   setSummary,
@@ -291,6 +292,8 @@ export function AppBuilder({
       onSetPrompt: (p) => setSpec((s) => (s ? setAgentPrompt(s, stepId, p) : s)),
       onToggleGrounding: (g) => setSpec((s) => (s ? toggleGrounding(s, stepId, g) : s)),
       onSetSink: (sink) => setSpec((s) => (s ? setOutputSink(s, stepId, sink) : s)),
+      onSetSinkConfig: (key, value) =>
+        setSpec((s) => (s ? setOutputConfigField(s, stepId, key, value) : s)),
       onSetTools: (refs) => setSpec((s) => (s ? setStepTools(s, stepId, refs) : s)),
     };
   }

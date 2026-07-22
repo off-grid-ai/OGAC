@@ -50,6 +50,10 @@ export interface StepEditorHandlers {
   onSetPrompt: (prompt: string) => void;
   onToggleGrounding: (grounded: boolean) => void;
   onSetSink: (sink: OutputStep['sink']) => void;
+  /** Set/clear ONE config field on an output step (the sink's destination: url / channel / to /
+   *  subject). Optional: when absent the per-sink config inputs are hidden (a host that hasn't wired
+   *  config-setting yet), so the picker still works read-only. */
+  onSetSinkConfig?: (key: string, value: string) => void;
   /** Set the tool refs an inline agent step may call (#117 composable tools). Optional: when absent
    *  the tool picker is hidden (a host that hasn't wired tool-setting yet). */
   onSetTools?: (toolRefs: string[]) => void;
@@ -63,14 +67,20 @@ const KIND_META: Record<AppStepKind, { icon: React.ReactNode; noun: string }> = 
   output: { icon: <FileText className="size-4" />, noun: 'Output result' },
 };
 
-// Delivery sinks the operator can pick. report + email DELIVER for real (signed PDF report; SMTP or
-// Resend email — honest "not configured" when the channel isn't set up). WhatsApp is not wired yet, so
-// it is shown but marked "coming soon" + disabled — we never fake a send we can't make.
+// Delivery sinks the operator can pick. ALL of these DELIVER for real (each honest-degrades to "not
+// configured" when its channel/secret isn't set up — we never fake a send we can't make):
+//   • report   — a signed PDF export.
+//   • email    — on-prem SMTP or Resend.
+//   • webhook  — a signed JSON POST (HMAC) to any URL (ServiceNow / Jira / anything).
+//   • slack    — post to a channel via a vaulted incoming-webhook.
+//   • whatsapp — a message via your on-prem WhatsApp gateway.
 const SINKS: { sink: OutputStep['sink']; label: string; comingSoon?: boolean }[] = [
   { sink: 'console', label: 'Console (record the result)' },
   { sink: 'report', label: 'Report (signed PDF)' },
   { sink: 'email', label: 'Email' },
-  { sink: 'whatsapp', label: 'WhatsApp — coming soon', comingSoon: true },
+  { sink: 'webhook', label: 'Webhook (signed JSON POST)' },
+  { sink: 'slack', label: 'Slack (post to a channel)' },
+  { sink: 'whatsapp', label: 'WhatsApp (on-prem gateway)' },
 ];
 
 export function AppStepEditor({
@@ -164,25 +174,7 @@ export function AppStepEditor({
           <ConnectorBinding step={step} names={names} handlers={handlers} />
         ) : null}
         {step.kind === 'output' ? (
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Where does the result go?</Label>
-            <select
-              value={step.sink}
-              onChange={(e) => handlers.onSetSink(e.target.value as OutputStep['sink'])}
-              className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
-            >
-              {SINKS.map((s) => (
-                <option key={s.sink} value={s.sink} disabled={s.comingSoon}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-muted-foreground">
-              Report renders a signed PDF; Email delivers via your on-prem SMTP or Resend (it reports
-              &ldquo;not configured&rdquo; honestly if neither is set up). WhatsApp is coming soon. The
-              outcome is always recorded to the console.
-            </p>
-          </div>
+          <OutputBinding step={step} handlers={handlers} />
         ) : null}
         {step.kind === 'guardrail' ? (
           <p className="text-[11px] text-muted-foreground">
@@ -197,6 +189,154 @@ export function AppStepEditor({
           </p>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+// ─── OutputBinding — pick the sink + configure its destination ────────────────────────────────────
+// Each deliver-sink needs its own destination field (webhook url / Slack channel / email to+subject /
+// WhatsApp number). The config editor is full-width: the sink picker + its help sit side-by-side on
+// lg, and the destination inputs render below in a responsive grid. Every field maps to the pure
+// setOutputConfigField reducer; a blank value clears it so an unconfigured sink degrades honestly.
+function OutputBinding({
+  step,
+  handlers,
+}: Readonly<{
+  step: Extract<AppStep, { kind: 'output' }>;
+  handlers: StepEditorHandlers;
+}>) {
+  const cfg = step.config ?? {};
+  const cfgStr = (k: string): string => (typeof cfg[k] === 'string' ? (cfg[k] as string) : '');
+  const setCfg = handlers.onSetSinkConfig;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Where does the result go?</Label>
+          <select
+            value={step.sink}
+            onChange={(e) => handlers.onSetSink(e.target.value as OutputStep['sink'])}
+            className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+            aria-label="Output sink"
+          >
+            {SINKS.map((s) => (
+              <option key={s.sink} value={s.sink} disabled={s.comingSoon}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="self-end pb-1 text-[11px] text-muted-foreground">
+          Every channel delivers for real and reports &ldquo;not configured&rdquo; honestly if its
+          credentials aren&apos;t set up — it never fakes a send. Cloud channels (email via Resend,
+          webhook, Slack) only leave the box when your pipeline&apos;s egress policy allows it, and PII
+          is masked before it crosses the wire. The outcome is always recorded to the console.
+        </p>
+      </div>
+
+      {setCfg ? <SinkConfigFields sink={step.sink} cfgStr={cfgStr} setCfg={setCfg} /> : null}
+    </div>
+  );
+}
+
+// Per-sink destination inputs. Only the fields the selected sink uses are shown.
+function SinkConfigFields({
+  sink,
+  cfgStr,
+  setCfg,
+}: Readonly<{
+  sink: OutputStep['sink'];
+  cfgStr: (k: string) => string;
+  setCfg: (key: string, value: string) => void;
+}>) {
+  if (sink === 'email') {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ConfigField
+          label="Send to (email address)"
+          value={cfgStr('to')}
+          placeholder="ops@corp.example"
+          onChange={(v) => setCfg('to', v)}
+        />
+        <ConfigField
+          label="Subject (optional)"
+          value={cfgStr('subject')}
+          placeholder="Your weekly digest"
+          onChange={(v) => setCfg('subject', v)}
+        />
+      </div>
+    );
+  }
+  if (sink === 'webhook') {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ConfigField
+          label="Destination URL"
+          value={cfgStr('url')}
+          placeholder="https://hooks.your-service.com/in"
+          onChange={(v) => setCfg('url', v)}
+          hint="We POST a signed JSON payload (HMAC-SHA256). The signing secret lives in your vault."
+        />
+        <ConfigField
+          label="Event name (optional)"
+          value={cfgStr('event')}
+          placeholder="offgrid.app_run"
+          onChange={(v) => setCfg('event', v)}
+        />
+      </div>
+    );
+  }
+  if (sink === 'slack') {
+    return (
+      <ConfigField
+        label="Channel override (optional)"
+        value={cfgStr('channel')}
+        placeholder="#ops-alerts"
+        onChange={(v) => setCfg('channel', v)}
+        hint="Leave blank to use your Slack incoming-webhook's default channel. The webhook URL lives in your vault."
+      />
+    );
+  }
+  if (sink === 'whatsapp') {
+    return (
+      <ConfigField
+        label="Send to (WhatsApp number)"
+        value={cfgStr('to')}
+        placeholder="+91 98765 43210"
+        onChange={(v) => setCfg('to', v)}
+        hint="Delivered via your on-prem WhatsApp gateway (OFFGRID_WHATSAPP_URL). Air-gapped — nothing reaches a cloud API."
+      />
+    );
+  }
+  // console / report have no destination to configure.
+  return null;
+}
+
+function ConfigField({
+  label,
+  value,
+  placeholder,
+  onChange,
+  hint,
+}: Readonly<{
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+  hint?: string;
+}>) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 text-sm"
+        aria-label={label}
+      />
+      {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }

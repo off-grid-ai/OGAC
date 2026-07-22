@@ -13,6 +13,7 @@ import {
   relabelStep,
   removeStep,
   setAgentPrompt,
+  setOutputConfigField,
   setOutputSink,
   setTitle,
   setTrigger,
@@ -161,6 +162,17 @@ test('setOutputSink + setTrigger + metadata edits', () => {
   assert.equal(t.trigger.kind, 'webhook');
   assert.equal(setTitle(threeStepApp(), 'New title').title, 'New title');
   assert.equal(setVisibility(threeStepApp(), 'org').visibility, 'org');
+});
+
+test('setOutputConfigField sets a sink config field and clears it on blank', () => {
+  const withUrl = setOutputConfigField(threeStepApp(), 's3', 'url', 'https://hooks.corp/in');
+  assert.equal((withUrl.steps[2] as { config?: Record<string, unknown> }).config?.url, 'https://hooks.corp/in');
+  // A blank value CLEARS the key (honest degrade — no empty-string destination left behind).
+  const cleared = setOutputConfigField(withUrl, 's3', 'url', '  ');
+  assert.equal((cleared.steps[2] as { config?: Record<string, unknown> }).config?.url, undefined);
+  // Non-output steps are untouched.
+  const noop = setOutputConfigField(threeStepApp(), 's1', 'url', 'x');
+  assert.equal((noop.steps[0] as { config?: Record<string, unknown> }).config, undefined);
 });
 
 test('describeStepBinding is honest about unbound steps', () => {
