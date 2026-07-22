@@ -149,6 +149,7 @@ test('keeps read-only choices visible with the resolver explanation and remedy',
     label: 'Option pipeline:draft',
     description: 'Description pipeline:draft',
     selectable: false,
+    removable: false,
     selected: false,
     savedOnly: false,
     requiresApproval: false,
@@ -159,34 +160,47 @@ test('keeps read-only choices visible with the resolver explanation and remedy',
 });
 
 test('preserves every saved ref omitted by the resolver but never makes it selectable', () => {
-  const result = buildBuilderCatalogueOptions(context([slice('capabilities', [])], { select: 'enabled' }), {
-    sliceId: 'capabilities',
-    controlId: 'select',
-    selected: [
-      { ref: 'tool:retired', label: 'Retired screening tool' },
-      { ref: 'app:removed' },
-    ],
-  });
+  const result = buildBuilderCatalogueOptions(
+    context([slice('capabilities', [])], { select: 'enabled' }),
+    {
+      sliceId: 'capabilities',
+      controlId: 'select',
+      selected: [{ ref: 'tool:retired', label: 'Retired screening tool' }, { ref: 'app:removed' }],
+    },
+  );
 
   assert.deepEqual(
-    result.options.map((option) => [option.ref, option.label, option.selected, option.selectable]),
+    result.options.map((option) => [
+      option.ref,
+      option.label,
+      option.selected,
+      option.selectable,
+      option.removable,
+    ]),
     [
-      ['tool:retired', 'Retired screening tool', true, false],
-      ['app:removed', 'Saved option (no longer available)', true, false],
+      ['tool:retired', 'Retired screening tool', true, false, true],
+      ['app:removed', 'Saved option (no longer available)', true, false, true],
     ],
   );
+  assert.equal(result.selectionDisabled, false, 'saved blocked choices can be removed');
 });
 
 test('loading, errors, missing and failed slices fail closed without dropping saved state', () => {
   const requests = [
-    buildBuilderCatalogueOptions({ status: 'loading' }, {
-      sliceId: 'data',
-      selected: [{ ref: 'data:saved', label: 'Saved data' }],
-    }),
-    buildBuilderCatalogueOptions({ status: 'error', message: 'Options could not be loaded.' }, {
-      sliceId: 'data',
-      selected: [{ ref: 'data:saved', label: 'Saved data' }],
-    }),
+    buildBuilderCatalogueOptions(
+      { status: 'loading' },
+      {
+        sliceId: 'data',
+        selected: [{ ref: 'data:saved', label: 'Saved data' }],
+      },
+    ),
+    buildBuilderCatalogueOptions(
+      { status: 'error', message: 'Options could not be loaded.' },
+      {
+        sliceId: 'data',
+        selected: [{ ref: 'data:saved', label: 'Saved data' }],
+      },
+    ),
     buildBuilderCatalogueOptions(context([]), {
       sliceId: 'data',
       selected: [{ ref: 'data:saved', label: 'Saved data' }],
@@ -201,6 +215,7 @@ test('loading, errors, missing and failed slices fail closed without dropping sa
     assert.equal(result.selectionDisabled, true);
     assert.equal(result.options[0]?.selected, true);
     assert.equal(result.options[0]?.selectable, false);
+    assert.equal(result.options[0]?.removable, false);
   }
   assert.match(requests[0].guidance, /Checking/);
   assert.match(requests[1].guidance, /could not be loaded/);
@@ -218,17 +233,15 @@ test('non-enabled or missing controls override item readiness while partial slic
     { sliceId: 'capabilities', controlId: 'select' },
   );
   const partial = buildBuilderCatalogueOptions(
-    context([
-      slice(
-        'capabilities',
-        [item('tool:ready'), item('tool:blocked', 'read-only')],
-        'partial',
-      ),
-    ], { select: 'enabled' }),
+    context(
+      [slice('capabilities', [item('tool:ready'), item('tool:blocked', 'read-only')], 'partial')],
+      { select: 'enabled' },
+    ),
     { sliceId: 'capabilities', controlId: 'select' },
   );
 
   assert.equal(denied.options[0]?.selectable, false);
+  assert.equal(denied.options[0]?.removable, false);
   assert.equal(denied.options[0]?.remedyHref, '/governance/access');
   assert.match(denied.options[0]?.explanation ?? '', /Control select/);
   assert.equal(missing.options[0]?.selectable, false);
@@ -241,6 +254,25 @@ test('non-enabled or missing controls override item readiness while partial slic
   );
 });
 
+test('a selected unavailable item can be removed, while the same unselected item stays inert', () => {
+  const state = context([
+    slice('data', [item('data:retired', 'read-only'), item('data:other', 'read-only')]),
+  ]);
+  const result = buildBuilderCatalogueOptions(state, {
+    sliceId: 'data',
+    selected: [{ ref: 'data:retired', label: 'Retired data' }],
+  });
+
+  assert.deepEqual(
+    result.options.map((option) => [option.ref, option.selectable, option.removable]),
+    [
+      ['data:retired', false, true],
+      ['data:other', false, false],
+    ],
+  );
+  assert.equal(result.selectionDisabled, false);
+});
+
 test('prefix filtering cannot reintroduce resources from another picker family', () => {
   const result = buildBuilderCatalogueOptions(
     context(
@@ -249,5 +281,8 @@ test('prefix filtering cannot reintroduce resources from another picker family',
     ),
     { sliceId: 'capabilities', controlId: 'select', refPrefixes: ['tool:', 'app:'] },
   );
-  assert.deepEqual(result.options.map((option) => option.ref), ['tool:a', 'app:c']);
+  assert.deepEqual(
+    result.options.map((option) => option.ref),
+    ['tool:a', 'app:c'],
+  );
 });
