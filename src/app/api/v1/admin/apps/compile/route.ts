@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { selectableAppCapabilityRefs } from '@/lib/app-capability-selection';
 import { compileAppSpec } from '@/lib/app-compile';
 import { requireAdmin } from '@/lib/authz';
+import { getEnterpriseContext } from '@/lib/enterprise-context';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +27,18 @@ export async function POST(req: Request) {
 
   const orgId = await currentOrgId();
   const ownerId = gate.user.email ?? 'service@offgrid.local';
+  const context = await getEnterpriseContext({
+    orgId,
+    actor: { userId: ownerId, role: gate.user.role },
+  });
+  const allowedDataDomainIds = new Set(
+    [...selectableAppCapabilityRefs(context, 'data')].map((ref) => ref.slice('data:'.length)),
+  );
 
-  const { spec, gaps } = await compileAppSpec(description, { orgId, ownerId });
+  const { spec, gaps } = await compileAppSpec(description, {
+    orgId,
+    ownerId,
+    allowedDataDomainIds,
+  });
   return NextResponse.json({ object: 'app_compile', spec, gaps });
 }

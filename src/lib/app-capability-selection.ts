@@ -95,6 +95,29 @@ function resourceIsSelectable(
   return resource.disposition === 'ready' || resource.disposition === 'approval-required';
 }
 
+/** Return the safe refs a downstream producer may place into a newly generated App. */
+export function selectableAppCapabilityRefs(
+  context: EnterpriseContextResolution,
+  kind: AppCapabilitySelectionKind,
+): Set<string> {
+  const prefixes: Readonly<Record<AppCapabilitySelectionKind, readonly string[]>> = {
+    pipeline: ['pipeline:'],
+    data: ['data:'],
+    tool: ['app:', 'prim:', 'tool:'],
+    action: ['action:'],
+  };
+  const slices = new Map(context.slices.map((catalogSlice) => [catalogSlice.id, catalogSlice]));
+  return new Set(
+    context.resources
+      .filter(
+        (resource) =>
+          prefixes[kind].some((prefix) => resource.ref.startsWith(prefix)) &&
+          resourceIsSelectable(resource, slices),
+      )
+      .map((resource) => resource.ref),
+  );
+}
+
 /**
  * Validate submitted App selections against the tenant-safe resolver projection. Error messages are
  * bounded to one per capability kind and never echo a hidden or attacker-supplied identifier.

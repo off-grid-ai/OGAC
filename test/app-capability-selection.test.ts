@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   extractAppCapabilitySelections,
+  selectableAppCapabilityRefs,
   validateAppCapabilitySelections,
 } from '../src/lib/app-capability-selection.ts';
 import type {
@@ -113,6 +114,23 @@ test('accepts only ready or approval-required selections', () => {
     }),
   );
   assert.deepEqual(result, { ok: true, errors: [] });
+});
+
+test('projects only selectable refs for generated App bindings', () => {
+  const resolution = context({
+    'data:customers': 'ready',
+    'data:approval-ledger': 'approval-required',
+    'data:missing-connector': 'unavailable',
+    'pipeline:published': 'ready',
+  });
+
+  assert.deepEqual(
+    [...selectableAppCapabilityRefs(resolution, 'data')],
+    ['data:customers', 'data:approval-ledger'],
+  );
+  assert.deepEqual([...selectableAppCapabilityRefs(resolution, 'pipeline')], [
+    'pipeline:published',
+  ]);
 });
 
 test('rejects absent, denied, unavailable and failed-slice selections with bounded safe errors', () => {

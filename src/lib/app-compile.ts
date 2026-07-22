@@ -48,6 +48,8 @@ export interface CompileResult {
 export interface CompileCtx {
   orgId: string;
   ownerId: string;
+  /** Resolver-approved data refs for generated bindings. Omitted only by pure/unit callers. */
+  allowedDataDomainIds?: ReadonlySet<string>;
 }
 
 // ─── Dependency seams (injected in tests; real defaults in prod) ─────────────────────────────────
@@ -87,7 +89,11 @@ export async function compileAppSpec(
   deps: CompileDeps = defaultDeps,
 ): Promise<CompileResult> {
   const desc = (description ?? '').trim();
-  const domains = await deps.loadDomains(ctx.orgId).catch(() => [] as DataDomain[]);
+  const loadedDomains = await deps.loadDomains(ctx.orgId).catch(() => [] as DataDomain[]);
+  const allowedDataDomainIds = ctx.allowedDataDomainIds;
+  const domains = allowedDataDomainIds
+    ? loadedDomains.filter((domain) => allowedDataDomainIds.has(domain.id))
+    : loadedDomains;
 
   // 1. LLM path — decompose, then re-bind + gap-check EVERY step ourselves (untrusted output).
   let assembled: { steps: AppStep[]; gaps: string[]; title: string; summary: string } | null = null;

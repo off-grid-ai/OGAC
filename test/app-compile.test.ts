@@ -113,6 +113,29 @@ test('a description with NO declared domains at all binds nothing and gaps every
   assert.equal(validateAppSpec(spec).ok, true);
 });
 
+test('resolver-approved domain ids constrain generated bindings before preview', async () => {
+  const allowedDataDomainIds = new Set([SEEDED[0]!.id]);
+  const plan: ModelPlan = {
+    steps: [
+      { kind: 'connector-query', dataPhrase: 'invoice' },
+      { kind: 'connector-query', dataPhrase: 'employee quota' },
+      { kind: 'agent', instruction: 'decide' },
+      { kind: 'output', sink: 'console' },
+    ],
+  };
+  const { spec, gaps } = await compileAppSpec(
+    'read the invoice and check the employee quota, then decide',
+    { ...CTX, allowedDataDomainIds },
+    stubDeps(SEEDED, plan),
+  );
+
+  const domains = spec.steps
+    .filter((step) => step.kind === 'connector-query')
+    .map((step) => step.domain);
+  assert.deepEqual(domains, [SEEDED[0]!.id]);
+  assert.equal(gaps.some((gap) => /quota/i.test(gap)), true);
+});
+
 // ─── Deterministic heuristic fallback (no gateway) ───────────────────────────────────────────────
 test('heuristic fallback (modelDecompose null): reimbursement still yields a governed multi-step spec', async () => {
   const { spec, gaps } = await compileAppSpec(REIMBURSEMENT, CTX, stubDeps(SEEDED, null));
