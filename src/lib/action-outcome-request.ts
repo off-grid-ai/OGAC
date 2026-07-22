@@ -16,8 +16,21 @@ interface RequestContext {
 }
 
 export type ParsedActionOutcomeRequest =
-  | { ok: true; value: ActionOutcomeMutationInput }
-  | { ok: false; errors: string[] };
+  { ok: true; value: ActionOutcomeMutationInput } | { ok: false; errors: string[] };
+
+export type ParsedObservedAt =
+  { ok: true; value: string } | { ok: false; error: 'Enter a valid date and time.' };
+
+/** Browser datetime-local input -> canonical ISO without allowing Invalid Date to throw. */
+export function isoObservedAtFromForm(value: unknown): ParsedObservedAt {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { ok: false, error: 'Enter a valid date and time.' };
+  }
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp)
+    ? { ok: true, value: new Date(timestamp).toISOString() }
+    : { ok: false, error: 'Enter a valid date and time.' };
+}
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -68,7 +81,7 @@ export function parseActionOutcomeRequest(
 ): ParsedActionOutcomeRequest {
   const raw = objectValue(body);
   const fallback =
-    context.defaultEvidenceLink ?? `/operations/runs/${encodeURIComponent(context.runId)}`;
+    context.defaultEvidenceLink ?? `/operations/runs/${encodeURIComponent(`app:${context.runId}`)}`;
   const outcomeCode = isActionOutcomeCode(raw.outcomeCode)
     ? (raw.outcomeCode as ActionOutcomeCode)
     : undefined;

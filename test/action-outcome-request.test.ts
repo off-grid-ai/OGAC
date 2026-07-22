@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseActionOutcomeRequest } from '../src/lib/action-outcome-request.ts';
+import {
+  isoObservedAtFromForm,
+  parseActionOutcomeRequest,
+} from '../src/lib/action-outcome-request.ts';
+
+test('datetime form parsing returns an inline-safe error instead of throwing', () => {
+  assert.deepEqual(isoObservedAtFromForm('not-a-date'), {
+    ok: false,
+    error: 'Enter a valid date and time.',
+  });
+  const valid = isoObservedAtFromForm('2026-07-22T10:30');
+  assert.equal(valid.ok, true);
+  if (valid.ok) assert.match(valid.value, /^2026-07-22T/);
+});
 
 test('request parser takes locators and kind from trusted route context and defaults evidence', () => {
   const result = parseActionOutcomeRequest(
@@ -21,7 +34,7 @@ test('request parser takes locators and kind from trusted route context and defa
   assert.equal(result.value.runId, 'run_1');
   assert.equal(result.value.stepId, 'act_1');
   assert.equal(result.value.kind, 'observed');
-  assert.deepEqual(result.value.evidenceLinks, ['/operations/runs/run_1']);
+  assert.deepEqual(result.value.evidenceLinks, ['/operations/runs/app%3Arun_1']);
   assert.deepEqual(result.value.source, { kind: 'human', eventId: 'mutation:accepted:1' });
   assert.equal('actionReceipt' in result.value, false);
 });
@@ -108,4 +121,3 @@ test('request parser returns contract errors for invalid browser input', () => {
     ]);
   }
 });
-
