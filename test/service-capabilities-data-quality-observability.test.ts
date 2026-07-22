@@ -231,3 +231,18 @@ test('enterprise sources preserve exact fixture versions and connector reality',
     'no',
   );
 });
+
+test('the code-wired outcome plane does not inflate the live CRM capability gates', () => {
+  const crm = audit('enterprise-source-crm');
+  const item = crm.items.find((entry) => entry.id === 'write-sync-webhooks');
+
+  assert.deepEqual(
+    CAPABILITY_GATES.map((gate) => item?.gates[gate].status),
+    ['no', 'partial', 'partial', 'partial'],
+  );
+  assert.match(item?.gates.adapter.evidence ?? '', /canonical receipt server-side/);
+  assert.match(item?.gates.adapter.evidence ?? '', /migration is not deployed/i);
+  assert.match(item?.gates.ui.evidence ?? '', /URL-driven run, result, correction, and withdrawal/);
+  assert.match(item?.gates.workflow.evidence ?? '', /no deployed business-result observation/i);
+  assert.match(item?.gap ?? '', /receipt → observed result → correction\/withdrawal journey/);
+});
