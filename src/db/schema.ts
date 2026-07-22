@@ -1485,6 +1485,34 @@ export const erasureRequests = pgTable('erasure_requests', {
   index('erasure_requests_subject_idx').on(t.subject),
 ]);
 
+// ─── Drift monitoring system-of-record (drift-report history + trend) ─────────────────────────────
+// The drift adapter produces stateless per-run verdicts; `drift_runs` retains each run with engine
+// attribution. This table is the console-owned MONITORING LAYER on top of those runs: a named PROJECT
+// that groups drift reports for a dataset/pipeline and carries the breach THRESHOLD used to flag
+// drift over time. Report history + trend are DERIVED from the org's retained `drift_runs` (see
+// evidently-projects-store.ts) — this table holds only the project config. Org-scoped like everything
+// else. Pure rules live in evidently-monitoring.ts; the store + self-migrate in
+// evidently-projects-store.ts. ADDITIVE — needs a db:push (orchestrator).
+export const driftProjects = pgTable('drift_projects', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id').notNull().default('default'),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  // Free-text label of the dataset/pipeline this project monitors (drift_runs carries no dataset fk,
+  // so association is org-level + descriptive — see the store's honesty note).
+  dataset: text('dataset').notNull().default(''),
+  // Breach line in [0,1]; a bucket whose mean drift share ≥ this is flagged. Defaults to the PSI
+  // "drift" threshold (0.25) so a project with no explicit line matches the engine's own verdict.
+  driftThreshold: doublePrecision('drift_threshold').notNull().default(0.25),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('drift_projects_org_idx').on(t.orgId),
+]);
+
+export type DriftProjectRow = typeof driftProjects.$inferSelect;
+export type NewDriftProjectRow = typeof driftProjects.$inferInsert;
+
 export type DataAsset = typeof dataAssets.$inferSelect;
 export type NewDataAsset = typeof dataAssets.$inferInsert;
 export type DataClassificationRow = typeof dataClassifications.$inferSelect;
