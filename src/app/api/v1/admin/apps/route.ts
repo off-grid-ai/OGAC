@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { APP_CAPABILITY_SELECTION_ERROR } from '@/lib/app-capability-selection';
 import {
   AppValidationError,
   createApp,
@@ -7,6 +8,7 @@ import {
 } from '@/lib/apps-store';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
+import { validateEnterpriseAppSelections } from '@/lib/enterprise-context';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -50,6 +52,23 @@ export async function POST(req: Request) {
     slug: body.slug,
     pipelineId: body.pipelineId ?? null,
   };
+
+  const selection = await validateEnterpriseAppSelections(
+    {
+      orgId,
+      actor: { userId: ownerId, role: gate.user.role },
+    },
+    input,
+  );
+  if (!selection.ok) {
+    return NextResponse.json(
+      {
+        error: APP_CAPABILITY_SELECTION_ERROR,
+        errors: selection.errors,
+      },
+      { status: 422 },
+    );
+  }
 
   try {
     const app = await createApp(orgId, ownerId, input);

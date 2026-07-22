@@ -21,6 +21,9 @@ export interface AppCapabilitySelectionValidation {
   errors: string[];
 }
 
+export const APP_CAPABILITY_SELECTION_ERROR =
+  'One or more selected capabilities are not available to your account';
+
 const ERROR_BY_KIND: Readonly<Record<AppCapabilitySelectionKind, string>> = {
   pipeline:
     'The selected governed pipeline is not available to your account. Choose one marked Ready or Approval required.',

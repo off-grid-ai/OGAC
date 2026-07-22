@@ -6,6 +6,12 @@
 
 import { ACTION_DESCRIPTORS, type ActionId } from '@/lib/action-contract';
 import { isCompatibleCrmActionConnector } from '@/lib/action-connector-compatibility';
+import {
+  extractAppCapabilitySelections,
+  validateAppCapabilitySelections,
+  type AppCapabilitySelectionInput,
+  type AppCapabilitySelectionValidation,
+} from '@/lib/app-capability-selection';
 import { enforceAppAccessWithSharing } from '@/lib/app-sharing';
 import { callerFromSession } from '@/lib/app-access-caller';
 import type { AppAccessCaller } from '@/lib/app-access-policy';
@@ -854,4 +860,14 @@ export async function getEnterpriseContext(
     intentDecisions,
     slices,
   });
+}
+
+/** Resolve the authoritative catalog once, only when a write actually submits capability refs. */
+export async function validateEnterpriseAppSelections(
+  request: EnterpriseContextRequest,
+  input: AppCapabilitySelectionInput,
+  sources: EnterpriseContextSources = defaultSources,
+): Promise<AppCapabilitySelectionValidation> {
+  if (extractAppCapabilitySelections(input).length === 0) return { ok: true, errors: [] };
+  return validateAppCapabilitySelections(input, await getEnterpriseContext(request, sources));
 }

@@ -4,6 +4,7 @@ import { isCompatibleCrmActionConnector } from '../src/lib/action-connector-comp
 import type { AppSpec } from '../src/lib/app-model.ts';
 import {
   getEnterpriseContext,
+  validateEnterpriseAppSelections,
   type EnterpriseContextSources,
 } from '../src/lib/enterprise-context.ts';
 import type { PipelineView } from '../src/lib/pipelines.ts';
@@ -263,6 +264,32 @@ test('custom roles never project Builder writes that the raw requireAdmin gate r
     result.resources.every((resource) => resource.canSelect === false),
     true,
   );
+});
+
+test('server selection enforcement resolves context exactly once only when a patch selects a capability', async () => {
+  let pipelineLoads = 0;
+  const countedSources = sources({
+    async listPipelines() {
+      pipelineLoads += 1;
+      return [pipeline];
+    },
+  });
+
+  assert.deepEqual(
+    await validateEnterpriseAppSelections(request('admin'), { steps: [] }, countedSources),
+    { ok: true, errors: [] },
+  );
+  assert.equal(pipelineLoads, 0);
+
+  assert.deepEqual(
+    await validateEnterpriseAppSelections(
+      request('admin'),
+      { pipelineId: pipeline.id },
+      countedSources,
+    ),
+    { ok: true, errors: [] },
+  );
+  assert.equal(pipelineLoads, 1);
 });
 
 test('one failed source degrades only its slices and never exposes static actions without resolved availability', async () => {

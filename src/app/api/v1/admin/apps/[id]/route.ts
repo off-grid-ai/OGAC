@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { syncAppSchedule, unscheduleApp } from '@/lib/app-schedules';
 import {
+  APP_CAPABILITY_SELECTION_ERROR,
+  extractAppCapabilitySelections,
+} from '@/lib/app-capability-selection';
+import {
   AppAgentOwnershipError,
   AppValidationError,
   deleteApp,
@@ -12,6 +16,7 @@ import {
 import { auditFromSession } from '@/lib/audit-actor';
 import { hasActionOutcomesForApp } from '@/lib/action-outcome-observation-store';
 import { requireAdmin } from '@/lib/authz';
+import { validateEnterpriseAppSelections } from '@/lib/enterprise-context';
 import { currentOrgId } from '@/lib/tenancy';
 import { hasSolutionDeploymentsForApp } from '@/lib/solution-blueprints-store';
 
@@ -48,7 +53,28 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   try {
     if (body.publish) {
+      const existing = await getApp(id, orgId);
+      if (!existing) return NextResponse.json({ error: 'not found' }, { status: 404 });
+      const selection = await validateEnterpriseAppSelections(
+        {
+          orgId,
+          actor: {
+            userId: gate.user.email ?? 'service@offgrid.local',
+            role: gate.user.role,
+          },
+          appId: id,
+        },
+        existing,
+      );
+      if (!selection.ok) {
+        return NextResponse.json(
+          { error: APP_CAPABILITY_SELECTION_ERROR, errors: selection.errors },
+          { status: 422 },
+        );
+      }
       const published = await publishApp(id, orgId);
+      // The tenant-scoped row was resolved immediately before validation. A concurrent deletion is
+      // still reported with the route's established not-found response.
       if (!published) return NextResponse.json({ error: 'not found' }, { status: 404 });
       // Wire the schedule trigger: a published schedule-trigger app registers its cron on Temporal;
       // anything else tears any prior schedule down. Graceful — a Temporal outage never fails publish.
@@ -63,6 +89,29 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
     // A plain field patch. Strip the publish flag; pass the rest through as an AppPatch.
     const { publish: _publish, ...patch } = body;
+    if (extractAppCapabilitySelections(patch).length > 0 && !(await getApp(id, orgId))) {
+      return NextResponse.json({ error: 'not found' }, { status: 404 });
+    }
+    const selection = await validateEnterpriseAppSelections(
+      {
+        orgId,
+        actor: {
+          userId: gate.user.email ?? 'service@offgrid.local',
+          role: gate.user.role,
+        },
+        appId: id,
+      },
+      patch,
+    );
+    if (!selection.ok) {
+      return NextResponse.json(
+        {
+          error: APP_CAPABILITY_SELECTION_ERROR,
+          errors: selection.errors,
+        },
+        { status: 422 },
+      );
+    }
     const updated = await updateApp(id, orgId, patch);
     if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 });
     // Reconcile the schedule after every update so editing the cron / trigger / published flag takes
