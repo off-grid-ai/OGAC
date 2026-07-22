@@ -30,7 +30,7 @@ export default async function SolutionLibraryPage() {
             <BlueprintForm />
           </div>
         </details>
-        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {blueprints.map((blueprint) => {
             const summary = summarizeOutcome(blueprint.outcome);
             return (

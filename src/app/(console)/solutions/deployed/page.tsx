@@ -1,4 +1,4 @@
-import { ArrowRight } from '@phosphor-icons/react/dist/ssr';
+import { ArrowRight, Plus } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { PageFrame } from '@/components/PageFrame';
 import { DeploymentForm } from '@/components/solutions/DeploymentForm';
@@ -37,8 +37,8 @@ export default async function DeployedSolutionsPage({
           </p>
         </header>
         <details className="rounded-lg border">
-          <summary className="cursor-pointer px-5 py-4 text-sm font-medium">
-            Bind a blueprint to an existing App
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 text-sm font-medium">
+            <Plus /> Bind a blueprint to an existing App
           </summary>
           <div className="border-t p-4">
             {apps.length ? (
