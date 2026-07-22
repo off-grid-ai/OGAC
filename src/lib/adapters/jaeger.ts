@@ -7,10 +7,12 @@
 //   OFFGRID_JAEGER_URL     — Jaeger query API base, e.g. http://127.0.0.1:16686
 //   OFFGRID_JAEGER_WEB_URL — optional UI base for deep links (defaults to OFFGRID_JAEGER_URL)
 import { jaegerTraceUrl } from '@/lib/jaeger';
+import type {
+  JaegerServicesResponse,
+  JaegerTracesResponse,
+} from '@/lib/jaeger-shape';
 import {
   type JaegerOperationsResponse,
-  type JaegerServicesResponse,
-  type JaegerTracesResponse,
   type TaggedTrace,
   type TraceHeadline,
   type TraceListRow,
