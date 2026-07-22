@@ -43,6 +43,10 @@ import type { CheckResult } from '@/lib/checks';
 import { forwardToCloud } from '@/lib/cloud-client';
 import { egressAuditEvent, egressBlockedAuditEvent } from '@/lib/cloud-egress-audit';
 import { resolveCloudPlan } from '@/lib/cloud-route-plan';
+import { DEFAULT_EGRESS_DLP_POLICY, enforceEgressDlp } from '@/lib/egress-dlp';
+import { egressDlpAuditEvent, egressDlpAuditable } from '@/lib/egress-dlp-audit';
+import { type EgressMessage, sanitizeOutboundMessages } from '@/lib/egress-dlp-run';
+import { getEgressPolicy } from '@/lib/egress-policy-store';
 import { correlationIds } from '@/lib/correlation';
 import { costForTokens } from '@/lib/finops';
 import { retrieve as retrieveOrgKnowledge } from '@/lib/org-knowledge';
@@ -536,6 +540,39 @@ export async function POST(req: Request) {
   // Cloud unavailable → we fell back to local; record it so the honest degradation is provable.
   if (plan?.kind === 'local' && plan.cloudUnavailable) {
     recordAudit(egressBlockedAuditEvent(egressCtx, plan));
+  }
+
+  // ── MANDATORY egress DLP (privacy-first on egress) ─────────────────────────────────────────────
+  // Before ANY request leaves the box to a CLOUD provider, PII/secrets are stripped from the outbound
+  // payload — or the call is BLOCKED — enforced by DEFAULT and governed per-org. This is the enabler
+  // for "use the best OUTSIDE models on the enterprise's INSIDE moat, SAFELY". On-prem routes never
+  // reach this branch, so their behaviour is byte-identical. It REUSES the same guardrail engine as
+  // the checks spine (no re-implemented redaction). FAIL CLOSED: if the guardrail cannot sanitize the
+  // content, the cloud call is refused — a guardrail must never be bypassable by killing the engine.
+  if (plan?.kind === 'cloud' && plan.selection != null) {
+    const egressModel = `${plan.selection.provider.id}:${plan.selection.model}`;
+    const dlpCtx = {
+      actor: egressCtx.actor,
+      org: DEFAULT_ORG,
+      project: egressCtx.project,
+      runId: chatRunId,
+      model: egressModel,
+    };
+    const egressPolicy = await getEgressPolicy(orgId).catch(() => DEFAULT_EGRESS_DLP_POLICY);
+    const dlp = await sanitizeOutboundMessages(
+      payload.messages as EgressMessage[],
+      egressPolicy,
+      orgId,
+    ).catch(() => null);
+    if (!dlp || dlp.blocked) {
+      // A thrown pass is itself fail-closed: we cannot prove PII was stripped ⇒ refuse the cloud call.
+      const decision = dlp?.decision ?? enforceEgressDlp('cloud', '', egressPolicy, null);
+      recordAudit(egressDlpAuditEvent(dlpCtx, decision));
+      return deny(`request blocked by cloud egress protection: ${decision.reason}`);
+    }
+    // Replace the outbound payload with the sanitized copy (masked) or the original (passthrough).
+    payload.messages = dlp.messages;
+    if (egressDlpAuditable(dlp.decision)) recordAudit(egressDlpAuditEvent(dlpCtx, dlp.decision));
   }
 
   // Observability: mark when the upstream request begins so the Langfuse generation observation
