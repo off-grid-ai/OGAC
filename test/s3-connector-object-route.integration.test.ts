@@ -247,6 +247,26 @@ test(
     assert.equal(uploaded.status, 201);
     assert.equal(objects.get('approved/evidence.txt')?.body.toString(), 'retained');
 
+    const deniedReplace = await route.POST(
+      request(
+        `/api/v1/admin/connectors/${connector.id}/objects?domain=${domain.id}&key=evidence.txt`,
+        { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'accidental' },
+      ),
+      { params: Promise.resolve({ id: connector.id }) },
+    );
+    assert.equal(deniedReplace.status, 409);
+    assert.equal(objects.get('approved/evidence.txt')?.body.toString(), 'retained');
+
+    const replaced = await route.POST(
+      request(
+        `/api/v1/admin/connectors/${connector.id}/objects?domain=${domain.id}&key=evidence.txt&replace=1`,
+        { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'replaced' },
+      ),
+      { params: Promise.resolve({ id: connector.id }) },
+    );
+    assert.equal(replaced.status, 201);
+    assert.equal(objects.get('approved/evidence.txt')?.body.toString(), 'replaced');
+
     const listed = await route.GET(
       request(`/api/v1/admin/connectors/${connector.id}/objects?domain=${domain.id}`),
       { params: Promise.resolve({ id: connector.id }) },
@@ -267,7 +287,7 @@ test(
     assert.equal(downloaded.status, 200);
     assert.equal(downloaded.headers.get('x-content-type-options'), 'nosniff');
     assert.match(downloaded.headers.get('content-disposition') ?? '', /^attachment;/);
-    assert.equal(await downloaded.text(), 'retained');
+    assert.equal(await downloaded.text(), 'replaced');
 
     const beforeLarge = s3Requests.length;
     const tooLarge = await route.GET(

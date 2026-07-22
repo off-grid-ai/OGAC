@@ -177,9 +177,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params;
     const resolved = await binding(req, id);
-    const relativeKey = new URL(req.url).searchParams.get('key') ?? '';
+    const url = new URL(req.url);
+    const relativeKey = url.searchParams.get('key') ?? '';
     const scoped = scopedObjectKey(resolved.scope, relativeKey);
     if (!scoped.ok) return privateJson({ error: scoped.error }, { status: 400 });
+    const existing = await resolved.store.headObject(resolved.scope.bucket, scoped.key);
+    if (existing && !url.searchParams.has('replace')) {
+      return privateJson(
+        {
+          error: 'An object with this name already exists. Confirm replacement to continue.',
+          code: 'object-exists',
+        },
+        { status: 409 },
+      );
+    }
     const body = await readBodyBounded(req);
     if (!body) return privateJson({ error: 'File exceeds the upload limit.' }, { status: 413 });
     const contentType = req.headers.get('content-type') ?? 'application/octet-stream';
