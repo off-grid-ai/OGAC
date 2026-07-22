@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { GuardrailCatalog } from '@/components/guardrails/GuardrailCatalog';
 import { GuardrailRules } from '@/components/guardrails/GuardrailRules';
+import { PresidioAnonymizers } from '@/components/guardrails/PresidioAnonymizers';
 import { PresidioRecognizers } from '@/components/guardrails/PresidioRecognizers';
 import { PresidioThresholds } from '@/components/guardrails/PresidioThresholds';
 import { PageFrame } from '@/components/PageFrame';
@@ -15,6 +16,8 @@ import { listGuardrailRules } from '@/lib/guardrails-rules';
 import { readGuardrailsView, type GuardrailsView } from '@/lib/guardrails-view';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelines } from '@/lib/pipelines';
+import { getAnonymizerPolicy } from '@/lib/presidio-anonymizer-policy-store';
+import { DEFAULT_ANONYMIZER_POLICY } from '@/lib/presidio-anonymizers';
 import { getThresholds, listRecognizers } from '@/lib/presidio-recognizers';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -57,11 +60,19 @@ async function destinationContent(
 
   const orgId = await currentOrgId();
   if (destination.id === 'masking') {
-    const rules = await listGuardrailRules(orgId).catch(() => []);
+    const [rules, anonymizerPolicy] = await Promise.all([
+      listGuardrailRules(orgId).catch(() => []),
+      getAnonymizerPolicy(orgId).catch(() => DEFAULT_ANONYMIZER_POLICY),
+    ]);
     return (
-      <ManagementCard title="Masking rules">
-        <GuardrailRules rules={rules} />
-      </ManagementCard>
+      <div className="space-y-6">
+        <ManagementCard title="Masking rules">
+          <GuardrailRules rules={rules} />
+        </ManagementCard>
+        <ManagementCard title="Anonymizer operators — how each entity is masked">
+          <PresidioAnonymizers policy={anonymizerPolicy} imageRedactionAvailable={false} />
+        </ManagementCard>
+      </div>
     );
   }
 
