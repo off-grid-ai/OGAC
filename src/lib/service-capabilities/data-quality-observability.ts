@@ -415,6 +415,45 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
       ]),
     ],
   }),
+  {
+    serviceId: 'organizational-brain',
+    serviceLabel: 'Organizational Brain (Onyx)',
+    upstreamVersion: 'Onyx CE v4.4.1',
+    versionSource:
+      '../onprem-fleet-orchestration/deploy/onprem/onyx-g4.yml (pinned image); live /health verified 2026-07-23',
+    denominatorSource: 'https://docs.onyx.app/ (document ingest, semantic search, connectors, document sets)',
+    auditedAt: '2026-07-23',
+    auditState: 'current',
+    auditStateEvidence: null,
+    summary:
+      'The organizational brain is a governed retrieval-augmented memory over enterprise documents (Onyx CE on g4, fronted by the S1 tunnel). Ingest and tenant-isolated semantic search are wired behind the knowledge adapter and exposed as a governed agent tool (prim:org_brain_search); a cross-tenant RBAC deny and a cited retrieval are proven live. Document delete is unsupported on the CE build (404) and there is no dedicated memory-management UI yet.',
+    items: [
+      capability('governed-memory-search', 'Governed organizational-memory search', 'Retrieve grounded passages from enterprise memory with citations, inside a governed run.', '/operations/services/organizational-brain', 'Inspect the organizational brain', 'Retrieval is API/tool-first; there is no operator-facing memory-search console page yet — add a governed search surface so operators can query memory directly, not only via an agent.', [
+        'yes', 'Onyx CE v4.4.1 provides semantic document search over indexed connectors and document sets (live /health + query verified 2026-07-23).',
+        'yes', 'The OnyxOrganizationalBrain adapter and prim:org_brain_search tool bind search to the console (reachesInternet:false, defaultEnabled:true), with an env-tunable 300s timeout matching Onyx CE search latency.',
+        'partial', 'Exposed via the service detail + as a governed agent tool; no dedicated operator memory-search page exists.',
+        'yes', 'Fleet-proven live 2026-07-23: a governed app run (org_bharat) invoked the org-brain tool and returned an answer citing offgrid://organizational-brain/org_bharat/documents/* resources.',
+      ]),
+      capability('document-ingest', 'Document ingest and provenance', 'Write enterprise documents into tenant memory and record their provenance.', '/operations/services/organizational-brain', 'Inspect the organizational brain', 'Ingest is proven via the admin route; a batch/connector-sync management surface is not yet exposed.', [
+        'yes', 'Onyx CE ingests documents and indexes them for semantic retrieval.',
+        'yes', 'The console ingest route upserts documents through the brain adapter and returns an offgrid:// provenance URI.',
+        'partial', 'Ingest is API-first (admin route); no operator ingest/connector-management UI exists yet.',
+        'yes', 'Fleet-proven live 2026-07-23: a console ingest returned 201 with a stable offgrid://organizational-brain/org_bharat/documents/* provenance identity, retrievable in the same tenant.',
+      ]),
+      capability('tenant-isolation-rbac', 'Tenant isolation and capability RBAC', 'Enforce per-tenant memory boundaries and role-gated brain capabilities.', '/operations/services/organizational-brain', 'Inspect brain authorization', 'Authorization is enforced in the run path; a per-role brain-capability admin view is not yet surfaced.', [
+        'yes', 'Onyx supports multi-tenant document isolation; the console layers per-org scoping on top.',
+        'yes', 'resolveBrainAuthorization + requireBrainCapability gate every brain call by {tenantId, subjectId, role} before the adapter is reached.',
+        'partial', 'Enforcement is proven in the run path; there is no dedicated brain-RBAC management page.',
+        'yes', 'Fleet-proven live 2026-07-23: an out-of-tenant subject was denied brain access while the in-tenant governed run succeeded — the isolation boundary held under a real run.',
+      ]),
+      capability('document-lifecycle', 'Document update and delete', 'Update or remove documents from organizational memory.', '/operations/services/organizational-brain', 'Inspect the organizational brain', 'Document delete returns 404 on the Onyx CE build — memory removal is NOT available on this edition; treat memory as append/re-ingest only until an edition or endpoint supports delete. This is a real, open gap.', [
+        'partial', 'Onyx CE indexes documents but the CE build does not honor the document-delete endpoint (returns 404).',
+        'partial', 'The adapter exposes delete, but it fails against the deployed CE build.',
+        'no', 'No document-lifecycle management UI exists.',
+        'partial', 'Re-ingest overwrites a document by stable id; hard delete is unverified because the CE endpoint 404s.',
+      ]),
+    ],
+  },
 ];
 
 const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [

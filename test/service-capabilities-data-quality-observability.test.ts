@@ -17,6 +17,7 @@ const DATA_IDS = [
   'streaming',
   'data-quality',
   'kestra',
+  'organizational-brain',
 ] as const;
 
 const OBSERVABILITY_IDS = [
@@ -47,9 +48,9 @@ function audit(serviceId: string) {
   return found;
 }
 
-test('the family registry owns exactly its 24 canonical logical inventory ids', () => {
+test('the family registry owns exactly its 25 canonical logical inventory ids', () => {
   const actualIds = DATA_QUALITY_OBSERVABILITY_AUDITS.map((entry) => entry.serviceId);
-  assert.equal(actualIds.length, 24);
+  assert.equal(actualIds.length, 25);
   assert.equal(new Set(actualIds).size, actualIds.length);
   assert.deepEqual(actualIds, EXPECTED_IDS);
   assert.equal(actualIds.includes('presidio'), false, 'Presidio belongs to the governance lane');
@@ -57,7 +58,12 @@ test('the family registry owns exactly its 24 canonical logical inventory ids', 
 
 test('every capability record has exact version provenance and honest four-gate evidence', () => {
   for (const record of DATA_QUALITY_OBSERVABILITY_AUDITS) {
-    assert.equal(record.auditedAt, '2026-07-20');
+    // Most of the family shares the batch audit date; org-brain was re-verified live on its own date.
+    assert.match(record.auditedAt, /^2026-\d{2}-\d{2}$/, `${record.serviceId} must carry an ISO audit date`);
+    assert.ok(
+      record.auditedAt === '2026-07-20' || record.serviceId === 'organizational-brain',
+      `${record.serviceId} must be audited on the family batch date`,
+    );
     assert.ok(record.upstreamVersion.trim(), `${record.serviceId} must name the audited version`);
     assert.ok(record.versionSource.trim(), `${record.serviceId} must name its version source`);
     assert.ok(
