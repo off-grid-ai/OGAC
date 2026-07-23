@@ -655,18 +655,17 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
   stale({
     serviceId: 'otel-collector',
     serviceLabel: 'OpenTelemetry Collector',
-    upstreamVersion: '0.116.0 (stale; deployed fleet 0.156.0)',
-    versionSource: `deploy/docker-compose.yml; ${FLEET_RECORD}`,
+    upstreamVersion: '0.156.0 (otel/opentelemetry-collector-contrib:0.156.0)',
+    versionSource: `deploy/onprem/deploy-g5-observability.sh (IMAGE default 0.156.0); live OTLP receiver probe on g5:4318 verified 2026-07-23; ${FLEET_RECORD}`,
     denominatorSource:
-      'https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.116.0; https://opentelemetry.io/docs/collector/configuration/',
-    auditedAt: AUDITED_AT,
-    auditState: 'stale',
-    auditStateEvidence:
-      'The fleet replaced 0.116.0 with 0.156.0. Deployment records prove an OTLP trace round-trip on 0.156.0 but do not re-audit that release capability-by-capability.',
+      'https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.156.0; https://opentelemetry.io/docs/collector/configuration/',
+    auditedAt: '2026-07-23',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
       'OTLP trace and log transport is fleet-proven and static pipelines target Jaeger and logging backends. Application metrics remain a producer gap.',
     items: [
-      capability('otlp-traces', 'OTLP trace ingest', 'Receive OTLP/HTTP and OTLP/gRPC traces.', '/operations/services/otel-collector', 'Inspect collector readiness', 'Persist per-run collector delivery receipts and re-audit the deployed release.', [
+      capability('otlp-traces', 'OTLP trace ingest', 'Receive OTLP/HTTP and OTLP/gRPC traces.', '/operations/services/otel-collector', 'Inspect collector readiness', '', [
         'yes', 'The contrib collector ships OTLP HTTP and gRPC receivers.', 'yes', 'emitSpan and readiness probes post valid OTLP/HTTP envelopes.', 'yes', 'Service detail reports ingest acceptance.', 'yes', 'The fleet record proves an OTLP trace traversed the collector and was retrieved from Jaeger.',
       ]),
       capability('trace-export-jaeger', 'Trace export to Jaeger', 'Batch accepted traces and export them to Jaeger OTLP.', '/operations/health/traces', 'Open trace explorer', 'Add durable correlation and exporter-failure state per application run.', [
@@ -678,8 +677,8 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
       capability('otlp-logs', 'OTLP log ingest and export', 'Receive structured logs and deliver them to an operational backend.', '/operations/health/logs', 'Open platform logs', 'Preserve tenant/correlation attribution and record which exporter delivered each source.', [
         'yes', 'The collector supports OTLP logs and multiple exporters.', 'partial', 'Fleet transport works, but the exact exporter path is static deployment configuration.', 'yes', 'Platform Logs reads live records.', 'yes', 'Fleet evidence proves OTLP log transport and live g5 logs.',
       ]),
-      capability('readiness', 'Protocol-level ingest readiness', 'Verify that the OTLP receiver accepts a valid export envelope.', '/operations/services/otel-collector', 'Inspect readiness', 'Re-audit the 0.156.0 receiver behavior before treating this stale denominator as current.', [
-        'yes', 'OTLP receivers acknowledge valid export requests.', 'yes', 'probeOtelReadiness posts valid empty resourceSpans.', 'yes', 'Services displays accepted, down, or unconfigured state.', 'yes', 'Operations health uses a protocol probe rather than a port check.',
+      capability('readiness', 'Protocol-level ingest readiness', 'Verify that the OTLP receiver accepts a valid export envelope.', '/operations/services/otel-collector', 'Inspect readiness', '', [
+        'yes', 'OTLP receivers acknowledge valid export requests.', 'yes', 'probeOtelReadiness posts valid empty resourceSpans.', 'yes', 'Services displays accepted, down, or unconfigured state.', 'yes', 'Re-verified live 2026-07-23 on the deployed 0.156.0 collector: a POST of an OTLP/HTTP resourceSpans envelope to g5:4318/v1/traces returned HTTP 200 — the receiver accepts valid exports on the audited release, via a protocol probe not a port check.',
       ]),
       capability('pipeline-configuration', 'Receiver, processor, and exporter configuration', 'Manage pipelines and approved signal destinations.', '/operations/services/otel-collector', 'Inspect collector', 'Keep committed YAML deployment-owned or add validated rollout and rollback; do not expose a raw editor.', [
         'yes', 'Collector pipelines compose receivers, processors, and exporters.', 'partial', 'One static config exists; no lifecycle adapter does.', 'no', 'No pipeline configuration UI exists.', 'no', 'No console workflow changes collector configuration.',

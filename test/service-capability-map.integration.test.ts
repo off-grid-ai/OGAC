@@ -171,7 +171,7 @@ test('inventory filtering is URL-backed and preserves selection plus every facet
     query: 'telemetry',
     family: 'observability',
     owner: 'operations-services',
-    audit: 'stale',
+    audit: 'current',
     readiness: 'unverified',
   });
 
@@ -187,7 +187,7 @@ test('inventory filtering is URL-backed and preserves selection plus every facet
   assert.match(html, /1\/49 services shown/);
   assert.match(
     html,
-    /href="\/operations\/services\/capability-map\?q=telemetry&amp;family=runtime&amp;owner=operations-services&amp;audit=stale&amp;readiness=unverified"/,
+    /href="\/operations\/services\/capability-map\?q=telemetry&amp;family=runtime&amp;owner=operations-services&amp;audit=current&amp;readiness=unverified"/,
   );
 });
 

@@ -121,8 +121,11 @@ test('migrated detailed denominators are preserved and use current canonical rou
     audit('streaming').items.find((item) => item.id === 'bfsi-stream-proof')?.gates.workflow.evidence ?? '',
     /authenticated lender and insurance Console round-trips/,
   );
-  assert.equal(audit('otel-collector').auditState, 'stale');
-  assert.match(audit('otel-collector').upstreamVersion, /fleet 0\.156\.0/);
+  // otel-collector was re-verified live 2026-07-23 (OTLP receiver 200 on the deployed release):
+  // pinned to 0.156.0 and promoted stale→current.
+  assert.equal(audit('otel-collector').auditState, 'current');
+  assert.equal(audit('otel-collector').auditStateEvidence, null);
+  assert.match(audit('otel-collector').upstreamVersion, /0\.156\.0/);
 });
 
 test('fleet evidence distinguishes deployed health from production capability use', () => {
