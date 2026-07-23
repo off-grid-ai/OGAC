@@ -144,6 +144,7 @@ const PLATFORM_SERVICE_IDS_BY_FAMILY: Readonly<
     'airbyte',
     'streaming',
     'data-quality',
+    'organizational-brain',
     'kestra',
   ],
   runtime: [

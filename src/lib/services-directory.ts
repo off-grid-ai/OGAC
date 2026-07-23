@@ -326,9 +326,19 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     id: 'data-quality',
     label: 'Data Quality',
     description:
-      'Data-quality checkpoint engine — validates warehouse tables against expectations on the sync path.',
+      'Data-quality engine (Great Expectations Core 1.19) — persistent expectation suites, validation runs and history that gate warehouse tables on the sync path.',
     url: process.env.OFFGRID_DATAQUALITY_URL ?? 'http://127.0.0.1:8944',
-    healthPath: '/', // sidecar root → {"status":"ok"}
+    healthPath: '/', // GX root → {"status":"ok"}
+    auth: 'api-key',
+    kind: 'api',
+  },
+  {
+    id: 'organizational-brain',
+    label: 'Organizational Brain',
+    description:
+      'Private organizational memory — governed, tenant-scoped document ingestion and retrieval (citations + provenance) for people, Apps and agents.',
+    url: process.env.ONYX_API_URL ?? 'http://127.0.0.1:8950',
+    healthPath: '/health', // Onyx API health → 200
     auth: 'api-key',
     kind: 'api',
   },

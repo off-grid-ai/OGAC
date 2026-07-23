@@ -87,7 +87,7 @@ test('capability map is a canonical, module-gated full-width operations route', 
   assert.doesNotMatch(component, /mx-auto/);
 });
 
-test('the explorer renders the exact 48-entry audit contract without inventing pending coverage', () => {
+test('the explorer renders the exact 49-entry audit contract without inventing pending coverage', () => {
   const reconciled = inventory();
   const html = renderExplorer(null);
   const auditCounts = reconciled.entries.reduce(
@@ -98,7 +98,7 @@ test('the explorer renders the exact 48-entry audit contract without inventing p
     { current: 0, stale: 0, pending: 0 },
   );
 
-  assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 48);
+  assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 49);
   assert.equal(
     auditCounts.current,
     SERVICE_CAPABILITY_AUDITS.filter((audit) => audit.auditState === 'current').length,
@@ -116,7 +116,7 @@ test('the explorer renders the exact 48-entry audit contract without inventing p
     SERVICE_CAPABILITY_AUDITS.map((audit) => audit.serviceId).sort(),
   );
   assert.equal((html.match(/data-inventory-stat=/g) ?? []).length, 4);
-  assert.match(html, /Inventory<\/p><p[^>]*>48<\/p>/);
+  assert.match(html, /Inventory<\/p><p[^>]*>49<\/p>/);
   assert.match(html, new RegExp(`Current audits<\\/p><p[^>]*>${auditCounts.current}<\\/p>`));
   assert.match(html, new RegExp(`Stale audits<\\/p><p[^>]*>${auditCounts.stale}<\\/p>`));
   assert.match(html, new RegExp(`Pending audits<\\/p><p[^>]*>${auditCounts.pending}<\\/p>`));
@@ -184,7 +184,7 @@ test('inventory filtering is URL-backed and preserves selection plus every facet
   assert.match(html, /name="audit"/);
   assert.match(html, /name="readiness"/);
   assert.doesNotMatch(html, /name="service" value="otel-collector"/);
-  assert.match(html, /1\/48 services shown/);
+  assert.match(html, /1\/49 services shown/);
   assert.match(
     html,
     /href="\/operations\/services\/capability-map\?q=telemetry&amp;family=runtime&amp;owner=operations-services&amp;audit=stale&amp;readiness=unverified"/,
