@@ -17,8 +17,8 @@ test('service capability tracker names every canonical inventory entry exactly o
     ...ENTERPRISE_SOURCE_DEFINITIONS.map((source) => source.id),
   ];
 
-  assert.equal(canonicalIds.length, 48);
-  assert.equal(new Set(canonicalIds).size, 48);
+  assert.equal(canonicalIds.length, 49);
+  assert.equal(new Set(canonicalIds).size, 49);
   assert.ok(perServiceLedger, 'per-service ledger section must exist');
 
   for (const id of canonicalIds) {
