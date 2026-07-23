@@ -159,8 +159,8 @@ export class OnyxOrganizationalBrain implements OrganizationalBrainPort {
     this.config = config;
     this.fetchImpl = config.fetchImpl ?? fetch;
     this.timeoutMs = config.timeoutMs ?? 10_000;
-    if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 1 || this.timeoutMs > 60_000) {
-      throw new OnyxOrganizationalBrainError('Onyx timeout must be an integer between 1 and 60000 milliseconds');
+    if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 1 || this.timeoutMs > 300_000) {
+      throw new OnyxOrganizationalBrainError('Onyx timeout must be an integer between 1 and 300000 milliseconds');
     }
   }
 

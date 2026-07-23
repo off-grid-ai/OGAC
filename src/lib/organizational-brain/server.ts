@@ -37,7 +37,12 @@ function brainFromEnvironment(): OrganizationalBrainPort {
   const apiBaseUrl = process.env[ONYX_URL_ENV]?.trim();
   const apiToken = process.env[ONYX_TOKEN_ENV]?.trim();
   if (!apiBaseUrl || !apiToken) throw new BrainPolicyError(`${ONYX_URL_ENV} and ${ONYX_TOKEN_ENV} are required`);
-  return new OnyxOrganizationalBrain({ apiBaseUrl, apiToken });
+  // Onyx retrieval is embedding + rerank; on constrained on-prem hardware a cold search can take
+  // well over a minute. Allow a generous, env-tunable request timeout (default 180s) so a governed
+  // retrieval completes instead of aborting — bounded by the adapter's 300s ceiling.
+  const configured = Number(process.env.ONYX_API_TIMEOUT_MS);
+  const timeoutMs = Number.isSafeInteger(configured) && configured > 0 ? configured : 180_000;
+  return new OnyxOrganizationalBrain({ apiBaseUrl, apiToken, timeoutMs });
 }
 
 /**

@@ -587,7 +587,7 @@ test('foreign source mutation returns not found after a scoped read and performs
 
 test('constructor and delete boundary reject unsafe timeout and document ids before network', async () => {
   const fake = boundary(() => json({ detail: 'must not be reached' }, 500));
-  for (const timeoutMs of [0, -1, 60_001, Number.POSITIVE_INFINITY, 1.5]) {
+  for (const timeoutMs of [0, -1, 300_001, Number.POSITIVE_INFINITY, 1.5]) {
     assert.throws(
       () =>
         new OnyxOrganizationalBrain({
