@@ -55,13 +55,41 @@ export function isSideEffectingStep(step: StepShape): boolean {
   return SIDE_EFFECTING_SINKS.has(sink);
 }
 
+// ─── GLOBAL live-action opt-in (OFF by default) ────────────────────────────────────────────────────
+// The air-gap posture for the ACT half of the loop: the platform may THINK and PREVIEW freely, but it
+// only ACTS on the outside world (delivers a sink / mutates via an action) after a DELIBERATE,
+// auditable opt-in. Modeled on the internet tool-primitive gate (isEnvTruthy): unless
+// OFFGRID_ALLOW_LIVE_ACTIONS is truthy, EVERY side-effecting step is intercepted as a shadow
+// would-perform on EVERY path (manual, trigger, public-slug, inbound-email) — even when the run mode
+// resolves to 'live' and a connector/key is configured. This is the demo-safe default that closes the
+// "automated paths silently act live" hazard. PURE (env passed in).
+export const LIVE_ACTIONS_ENV = 'OFFGRID_ALLOW_LIVE_ACTIONS';
+
+// Local truthy check (keeps this pure module zero-import). Mirrors tool-primitives' air-gap rule.
+function envTruthy(v: string | undefined): boolean {
+  if (!v) return false;
+  const s = v.trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+}
+
+export function liveActionsEnabled(env: Record<string, string | undefined> = {}): boolean {
+  return envTruthy(env[LIVE_ACTIONS_ENV]);
+}
+
 /**
- * Should this step be INTERCEPTED for the given run mode? PURE. Intercept iff the run is in shadow AND
- * the step is side-effecting. A live run never intercepts; a shadow run intercepts only the effecting
- * steps (so reads/reasoning still run and produce a real, reviewable outcome).
+ * Should this step be INTERCEPTED (recorded as a shadow would-perform, never reaching the wire)? PURE.
+ * A non-side-effecting step (read/reason/guardrail/human) NEVER intercepts. A side-effecting step
+ * (action, or a delivering/rendering sink) intercepts when the run is in shadow mode OR when live
+ * actions are globally disabled (OFF by default) — so a real outbound effect requires BOTH a live run
+ * AND the explicit global opt-in. `env` defaults to {} ⇒ live actions OFF ⇒ fail-safe.
  */
-export function shouldIntercept(mode: RunMode, step: StepShape): boolean {
-  return mode === 'shadow' && isSideEffectingStep(step);
+export function shouldIntercept(
+  mode: RunMode,
+  step: StepShape,
+  env: Record<string, string | undefined> = {},
+): boolean {
+  if (!isSideEffectingStep(step)) return false;
+  return mode === 'shadow' || !liveActionsEnabled(env);
 }
 
 // ─── the "would perform" record — what a shadowed side-effecting step WOULD have done ──────────────

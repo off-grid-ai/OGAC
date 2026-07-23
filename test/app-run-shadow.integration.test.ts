@@ -48,6 +48,11 @@ function stubDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
 const emailStep = () =>
   ({ id: 'out', label: 'Notify ops', kind: 'output' as const, sink: 'email' as const, config: { to: 'ops@bank.in', subject: 'KYC HIGH' } });
 
+// Default the global live-action gate ON for the LIVE assertions in this file (a real send happens
+// only with the opt-in). Shadow assertions intercept regardless. The OFF-by-default gate is proven
+// by the dedicated test at the end of this file + app-run-controls.test.ts.
+process.env.OFFGRID_ALLOW_LIVE_ACTIONS = '1';
+
 test('SHADOW: an email sink NO-OPs and records wouldPerform (never calls sendEmail)', async () => {
   let sent = false;
   const deps = stubDeps({ async sendEmail() { sent = true; return { ok: true, configured: true, reason: 'sent' }; } });
@@ -115,4 +120,33 @@ test('SHADOW: runApp over a full spec threads mode + persists wouldPerform on th
   const last = persisted[persisted.length - 1] as { steps: { id: string; wouldPerform?: unknown }[] };
   const step = last.steps.find((s) => s.id === 'out');
   assert.ok(step?.wouldPerform, 'persisted step state carries wouldPerform');
+});
+
+// ─── GLOBAL live-action gate at the integration layer ──────────────────────────────────────────────
+// Even a LIVE run must NOT act on the world unless the operator explicitly opted in. With the global
+// flag OFF, a live-mode side-effecting step is intercepted (records wouldPerform, never calls the wire).
+test('GLOBAL GATE: a LIVE run is intercepted when OFFGRID_ALLOW_LIVE_ACTIONS is OFF (no side effect)', async () => {
+  const prev = process.env.OFFGRID_ALLOW_LIVE_ACTIONS;
+  process.env.OFFGRID_ALLOW_LIVE_ACTIONS = '';
+  try {
+    let sent = false;
+    const deps = stubDeps({
+      async sendEmail() {
+        sent = true;
+        return { ok: true, configured: true, reason: 'sent' };
+      },
+    });
+    const res = await executeStep(
+      spec(),
+      emailStep(),
+      PRIOR,
+      { orgId: 'default', runId: 'rgate', mode: 'live' },
+      deps,
+    );
+    assert.equal(sent, false, 'a live run must NOT act when live-actions are globally disabled');
+    assert.ok(res.wouldPerform, 'records wouldPerform instead of sending');
+  } finally {
+    if (prev === undefined) delete process.env.OFFGRID_ALLOW_LIVE_ACTIONS;
+    else process.env.OFFGRID_ALLOW_LIVE_ACTIONS = prev;
+  }
 });

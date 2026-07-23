@@ -507,7 +507,7 @@ export async function executeStep(
       case 'action': {
         const approved = hasApprovedMakerChecker(step, priorResults);
         const impact = planActionImpact(step, approved);
-        if (shouldIntercept(ctx.mode ?? 'live', step)) {
+        if (shouldIntercept(ctx.mode ?? 'live', step, process.env)) {
           const would = {
             sink: `action:${step.actionId}`,
             recipient: `${impact.system}:${impact.target}`,
@@ -532,7 +532,7 @@ export async function executeStep(
         // records what it WOULD have sent (recipient/subject/payload preview) instead of delivering.
         // The console sink is pure record-keeping (never intercepted) and read/reason steps run
         // normally, so the operator sees the REAL decision the app would make — just no actions fire.
-        if (shouldIntercept(ctx.mode ?? 'live', step)) {
+        if (shouldIntercept(ctx.mode ?? 'live', step, process.env)) {
           const outcome = aggregateOutcome(priorResults);
           const would = buildWouldPerform(step.sink, step.config, outcome);
           return {

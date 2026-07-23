@@ -73,6 +73,10 @@ function outStep(
   return { id: 'out', label: 'Deliver', kind: 'output' as const, sink, config };
 }
 
+// These tests validate the LIVE execution path of sinks/actions, so opt in to the global
+// live-action gate (OFF-by-default). The OFF/intercept behaviour is covered by app-run-controls.test.ts.
+process.env.OFFGRID_ALLOW_LIVE_ACTIONS = '1';
+
 test('buildInRunView projects prior StepResults into an AppRunView the report renderer consumes', () => {
   const view = buildInRunView(spec(), PRIOR, CTX, { q: 'hi' });
   assert.equal(view.id, 'apprun_test1');

@@ -70,6 +70,10 @@ function json(res: ServerResponse, status: number, body: unknown, replay = false
   res.end(JSON.stringify(body));
 }
 
+// Validates the LIVE action path; opt in to the global live-action gate (OFF-by-default,
+// covered by app-run-controls.test.ts). Shadow assertions below intercept regardless of the flag.
+process.env.OFFGRID_ALLOW_LIVE_ACTIONS = '1';
+
 test('shadow action returns a bounded impact preview and makes zero CRM requests', async (t) => {
   let requests = 0;
   const server = createServer((_req, res) => {

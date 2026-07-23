@@ -6,6 +6,7 @@ import {
   buildWouldPerform,
   evaluateBlastRadius,
   isSideEffectingStep,
+  liveActionsEnabled,
   normalizeControls,
   previewPayload,
   resolveRunMode,
@@ -30,12 +31,30 @@ test('isSideEffectingStep: console sink + non-output kinds are NOT side-effectin
   assert.equal(isSideEffectingStep({ kind: 'human' }), false);
 });
 
-// ─── shouldIntercept — shadow AND side-effecting ───────────────────────────────────────────────────
-test('shouldIntercept: only a shadow run intercepts a side-effecting step', () => {
-  assert.equal(shouldIntercept('shadow', { kind: 'output', sink: 'email' }), true);
-  assert.equal(shouldIntercept('shadow', { kind: 'output', sink: 'console' }), false);
-  assert.equal(shouldIntercept('shadow', { kind: 'agent' }), false);
-  assert.equal(shouldIntercept('live', { kind: 'output', sink: 'email' }), false);
+// ─── liveActionsEnabled — global OFF-by-default opt-in ─────────────────────────────────────────────
+test('liveActionsEnabled: OFF unless explicitly opted in', () => {
+  assert.equal(liveActionsEnabled({}), false); // unset ⇒ OFF (fail-safe default)
+  assert.equal(liveActionsEnabled({ OFFGRID_ALLOW_LIVE_ACTIONS: 'false' }), false);
+  assert.equal(liveActionsEnabled({ OFFGRID_ALLOW_LIVE_ACTIONS: '0' }), false);
+  assert.equal(liveActionsEnabled({ OFFGRID_ALLOW_LIVE_ACTIONS: '1' }), true);
+  assert.equal(liveActionsEnabled({ OFFGRID_ALLOW_LIVE_ACTIONS: 'true' }), true);
+});
+
+// ─── shouldIntercept — shadow OR global live-actions OFF intercepts a side-effecting step ──────────
+const ON = { OFFGRID_ALLOW_LIVE_ACTIONS: '1' };
+test('shouldIntercept: side-effecting requires BOTH a live run AND the global opt-in to execute', () => {
+  // shadow always intercepts a side-effecting step, regardless of the global flag
+  assert.equal(shouldIntercept('shadow', { kind: 'output', sink: 'email' }, ON), true);
+  assert.equal(shouldIntercept('shadow', { kind: 'output', sink: 'console' }, ON), false);
+  assert.equal(shouldIntercept('shadow', { kind: 'agent' }, ON), false);
+  // live + global flag OFF (default) ⇒ still intercepted (the demo-safe default)
+  assert.equal(shouldIntercept('live', { kind: 'output', sink: 'email' }), true);
+  assert.equal(shouldIntercept('live', { kind: 'action' }), true);
+  // live + global flag ON ⇒ executes (not intercepted)
+  assert.equal(shouldIntercept('live', { kind: 'output', sink: 'email' }, ON), false);
+  assert.equal(shouldIntercept('live', { kind: 'action' }, ON), false);
+  // console sink + non-effecting steps are never intercepted by the global flag
+  assert.equal(shouldIntercept('live', { kind: 'output', sink: 'console' }), false);
   assert.equal(shouldIntercept('live', { kind: 'agent' }), false);
 });
 

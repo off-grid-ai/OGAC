@@ -57,6 +57,10 @@ function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
   });
 }
 
+// Validates the LIVE approved-action path; opt in to the global live-action gate (OFF-by-default,
+// covered by app-run-controls.test.ts).
+process.env.OFFGRID_ALLOW_LIVE_ACTIONS = '1';
+
 test('approved inline action persists impact and signed receipt through the existing run trace', async (t) => {
   const server = createServer(async (req, res) => {
     const body = await readJson(req);
