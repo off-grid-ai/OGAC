@@ -31,6 +31,9 @@ import {
   type EgressDecision,
   type ToolPrimitive,
 } from '@/lib/tool-primitives';
+import { BrainAuthorizationError } from '@/lib/organizational-brain/contracts';
+import { formatBrainCitations } from '@/lib/organizational-brain/search-format';
+import type { OrganizationalBrainRuntime } from '@/lib/organizational-brain/server';
 
 // ─── env-var reconciliation (web_search endpoint) ─────────────────────────────────────────────────
 // Two names for the SAME on-prem search endpoint existed: this adapter's legacy OFFGRID_WEB_SEARCH_URL
@@ -324,6 +327,9 @@ export type Mark = (kind: string, label: string, detail: string, refs: string[],
 export interface ComposableToolCtx {
   orgId: string;
   actor?: string;
+  /** The acting principal's role, threaded from the run's identity so the org-brain RBAC gate (which
+   *  matches a policy entry by tenant + subject OR role) can fire on the role too. */
+  actorRole?: string;
   /** The id of the app whose agent step is calling — enables the app→app cycle guard. */
   callerAppId?: string;
   /**
@@ -332,6 +338,78 @@ export interface ComposableToolCtx {
    * Default 'cloud' — the additive "no bound pipeline" rule (unchanged behaviour when unset).
    */
   egress?: EgressDecision;
+}
+
+// ─── org_brain_search — the OPT-IN, RBAC-gated, air-gap-safe retrieval primitive ─────────────────
+//
+// Unlike the internet primitives, this reaches only the private on-prem organizational brain, so it
+// carries no egress leash and no 'approval' action-policy gate — RBAC IS the control. It:
+//   1. resolves the run's acting principal (tenant = orgId, subject = actor, role = actorRole) against
+//      the server-owned access policy via organizationalBrainForActor (the SAME pure RBAC used by the
+//      request path), then requires the 'retrieve' capability;
+//   2. on any authorization denial (unauthorized actor / missing capability / foreign tenant) returns
+//      an HONEST 'blocked' result and NEVER reaches the brain;
+//   3. otherwise searches the brain and formats the cited passages.
+// The brain resolver is injectable ONLY so a test can place a fake OrganizationalBrainPort at the Onyx
+// HTTP boundary while exercising the REAL RBAC decision; production passes nothing (lazy import).
+export const ORG_BRAIN_SEARCH_ID = 'org_brain_search';
+
+export type BrainRuntimeResolver = (actor: {
+  tenantId: string;
+  subjectId: string;
+  role?: string;
+}) => OrganizationalBrainRuntime;
+
+export async function runOrgBrainSearch(
+  ctx: ComposableToolCtx,
+  query: string,
+  resolve?: BrainRuntimeResolver,
+): Promise<PrimitiveResult> {
+  const q = query.trim();
+  if (!q) {
+    return { ok: false, status: 'error', primitiveId: ORG_BRAIN_SEARCH_ID, detail: 'organizational memory search needs a query' };
+  }
+  const { requireBrainCapability } = await import('@/lib/organizational-brain/contracts');
+  let runtime: OrganizationalBrainRuntime;
+  try {
+    const resolver = resolve ?? (await import('@/lib/organizational-brain/server')).organizationalBrainForActor;
+    runtime = resolver({ tenantId: ctx.orgId, subjectId: ctx.actor ?? '', role: ctx.actorRole });
+    // RBAC: unauthorized principals (no matching policy entry) throw at resolution; principals without
+    // the retrieve capability throw here. Both are honest DENIALS — refuse without reaching the brain.
+    requireBrainCapability(runtime.authorization, 'retrieve');
+  } catch (error) {
+    if (error instanceof BrainAuthorizationError) {
+      return {
+        ok: false,
+        status: 'blocked',
+        primitiveId: ORG_BRAIN_SEARCH_ID,
+        detail: 'not authorized to retrieve from the organizational brain (RBAC)',
+      };
+    }
+    return {
+      ok: false,
+      status: 'error',
+      primitiveId: ORG_BRAIN_SEARCH_ID,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+  try {
+    const result = await runtime.brain.search(runtime.authorization, { query: q, limit: 5 });
+    return {
+      ok: true,
+      status: 'ran',
+      primitiveId: ORG_BRAIN_SEARCH_ID,
+      output: formatBrainCitations(result.citations),
+      detail: `retrieved ${result.citations.length} cited passage(s) from the organizational brain`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 'error',
+      primitiveId: ORG_BRAIN_SEARCH_ID,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export async function maybeRunComposableTool(
@@ -344,6 +422,12 @@ export async function maybeRunComposableTool(
   // Primitive?
   if (isPrimitiveRef(ref)) {
     const id = parsePrimitiveRef(ref)!;
+    // org_brain_search is RBAC-gated + air-gap-safe — dispatched directly (no approval/egress gate).
+    if (id === ORG_BRAIN_SEARCH_ID) {
+      const result = await runOrgBrainSearch(ctx, query);
+      mark?.('tool', `prim:${id}`, result.detail, [ref], t);
+      return result;
+    }
     const policy = await resolvePrimitivePolicy(id, ctx.orgId);
     const result = await runPrimitive(id, { policy, egress: ctx.egress ?? 'cloud' });
     mark?.('tool', `prim:${id}`, result.detail, [ref], t);

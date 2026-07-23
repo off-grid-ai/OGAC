@@ -285,6 +285,9 @@ function makeGovernedToolExecutor(
   // seam so an autonomous agent's web_search tool call is leashed identically to a cloud model call:
   // under a local-only/blocked pipeline it is refused (egress_blocked). Default 'cloud' (additive).
   egress: EgressDecision = 'cloud',
+  // The acting principal's role, threaded so the RBAC-gated org_brain_search primitive can match the
+  // access policy on role as well as subject. Undefined when the run has no resolved role.
+  actorRole?: string,
 ) {
   return async (ref: string, args: Record<string, unknown>): Promise<ToolObservation> => {
     try {
@@ -293,7 +296,7 @@ function makeGovernedToolExecutor(
       await maybeRunSandboxTool(ref, mark);
       const result = await maybeRunComposableTool(
         ref,
-        { orgId, actor: caller, callerAppId: agentId, egress },
+        { orgId, actor: caller, actorRole, callerAppId: agentId, egress },
         mark,
         typeof args.query === 'string' ? args.query : JSON.stringify(args),
       );
@@ -502,6 +505,10 @@ export async function runAgent(
     orgId,
     machineFallback: { type: 'machine', id: 'system', label: 'system' },
   });
+  // The acting principal's role for this run — the first role resolved on the request's document-ACL
+  // identity (asker), threaded into the composable tool seam so the RBAC-gated org_brain_search
+  // primitive can match the access policy on role as well as subject (caller email).
+  const actorRole = context?.asker?.roles?.[0];
   // Canonical attributed audit (Phase 4.11): who ran which agent, its outcome/model, correlated by
   // runId. Emitted on EVERY terminal path (denied / blocked / done), best-effort. Actor/org/project
   // come from the resolved attribution so inline and durable emit an identical event.
@@ -791,7 +798,7 @@ export async function runAgent(
     // egress leashes web_search exactly like the model call above.
     await maybeRunComposableTool(
       toolHit.ref,
-      { orgId, actor: caller, callerAppId: agent.id, egress: runEgress },
+      { orgId, actor: caller, actorRole, callerAppId: agent.id, egress: runEgress },
       mark,
       query,
     );
@@ -953,7 +960,7 @@ export async function runAgent(
       goal: `${modelQuery}${context}`,
       tools: toolCatalog,
       planNext: makeGovernedPlanner(loopModel, loopSystem, caller),
-      callTool: makeGovernedToolExecutor(orgId, agent.id, caller, mark, runEgress),
+      callTool: makeGovernedToolExecutor(orgId, agent.id, caller, mark, runEgress, actorRole),
       maxIterations: budget,
     });
     recordTrajectory(loop.trajectory, mark);

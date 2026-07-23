@@ -57,6 +57,25 @@ export const HTTP_FETCH_ENV = 'OFFGRID_TOOL_HTTP_FETCH';   // per-tool opt-in fo
 // always-safe on-prem primitive (none reach out) would carry defaultEnabled:true and no enableEnv.
 export const TOOL_PRIMITIVES: ToolPrimitive[] = [
   {
+    id: 'org_brain_search',
+    name: 'Organizational memory search',
+    description:
+      "Search the organization's private, governed memory (the organizational brain) and get back cited passages, scoped to your organization and your access.",
+    params: [
+      {
+        key: 'query',
+        label: 'What to look up',
+        type: 'text',
+        required: true,
+        description: 'The question or topic to look up in the organizational brain.',
+      },
+    ],
+    reachesInternet: false,
+    defaultEnabled: true,
+    airgapNote:
+      'Stays on-prem — queries the private organizational brain over the governed on-prem tunnel; nothing leaves the network.',
+  },
+  {
     id: 'web_search',
     name: 'Web search',
     description:
