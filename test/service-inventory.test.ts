@@ -28,7 +28,7 @@ function canonicalServices(): ServiceEntry[] {
   }
 }
 
-test('canonical inventory reconciles exactly 42 platform plus 6 enterprise sources to 48', () => {
+test('canonical inventory reconciles exactly 43 platform plus 6 enterprise sources to 49', () => {
   const inventory = reconcileServiceInventory({ platformServices: canonicalServices() });
   assert.deepEqual(
     {
@@ -46,7 +46,7 @@ test('canonical inventory reconciles exactly 42 platform plus 6 enterprise sourc
       issues: [],
     },
   );
-  assert.equal(new Set(inventory.entries.map((entry) => entry.id)).size, 48);
+  assert.equal(new Set(inventory.entries.map((entry) => entry.id)).size, 49);
 });
 
 test('inventory keeps platform services and enterprise sources under different IA owners', () => {
@@ -54,7 +54,7 @@ test('inventory keeps platform services and enterprise sources under different I
   const platform = inventory.entries.filter((entry) => entry.owner === 'operations-services');
   const sources = inventory.entries.filter((entry) => entry.owner === 'data-sources');
 
-  assert.equal(platform.length, 42);
+  assert.equal(platform.length, 43);
   assert.equal(sources.length, 6);
   assert.ok(platform.every((entry) => entry.routes.list === '/operations/services'));
   assert.ok(sources.every((entry) => entry.routes.list === '/data/sources'));
@@ -98,7 +98,7 @@ test('capability coverage is projected from the canonical audit registry without
   assert.ok((corebank?.seededWorkflowEvidence.length ?? 0) > 0);
 });
 
-test('all canonical audits project consistently across the exact 48-entry inventory', () => {
+test('all canonical audits project consistently across the exact 49-entry inventory', () => {
   const inventory = reconcileServiceInventory({ platformServices: canonicalServices() });
   const auditStates = inventory.entries.reduce(
     (counts, entry) => {
@@ -145,7 +145,7 @@ test('reconciliation fails honestly for drift, duplicate ids, and unknown platfo
   assert.ok(inventory.issues.some((issue) => issue.code === 'unclassified-platform'));
 });
 
-test('all 48 records carry routes, system-of-record provenance, and an honest next action', () => {
+test('all 49 records carry routes, system-of-record provenance, and an honest next action', () => {
   const inventory = reconcileServiceInventory({ platformServices: canonicalServices() });
   for (const entry of inventory.entries) {
     assert.match(entry.routes.list, /^\//);
@@ -165,7 +165,7 @@ test('URL-style inventory filters search identity, IA facets, audit recency, and
   );
   assert.equal(filterServiceInventory(entries, { family: 'observability' }).length, 8);
   assert.equal(filterServiceInventory(entries, { owner: 'data-sources' }).length, 6);
-  assert.equal(filterServiceInventory(entries, { readiness: 'unverified' }).length, 48);
+  assert.equal(filterServiceInventory(entries, { readiness: 'unverified' }).length, 49);
   assert.deepEqual(
     filterServiceInventory(entries, {
       query: 'claims',

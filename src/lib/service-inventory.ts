@@ -17,9 +17,9 @@ import {
   type ReadinessSummary,
 } from './service-topology';
 
-export const EXPECTED_PLATFORM_SERVICE_COUNT = 42;
+export const EXPECTED_PLATFORM_SERVICE_COUNT = 43;
 export const EXPECTED_ENTERPRISE_SOURCE_COUNT = 6;
-export const EXPECTED_LOGICAL_INVENTORY_COUNT = 48;
+export const EXPECTED_LOGICAL_INVENTORY_COUNT = 49;
 
 export const SERVICE_INVENTORY_FAMILIES = [
   'data',

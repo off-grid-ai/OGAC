@@ -41,16 +41,16 @@ function renderExplorer(
   );
 }
 
-test('capability explorer keeps the 48-entry inventory in an independently scrolling master pane', () => {
+test('capability explorer keeps the 49-entry inventory in an independently scrolling master pane', () => {
   const html = renderExplorer();
 
-  assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 48);
+  assert.equal((html.match(/data-service-inventory-row=/g) ?? []).length, 49);
   assert.match(html, /aria-label="Service families"/);
   assert.match(html, /aria-label="Service capability inventory"/);
   assert.match(html, /aria-label="Selected service detail"/);
   assert.match(html, /lg:overflow-hidden/);
   assert.match(html, /lg:overflow-y-auto/);
-  assert.match(html, /48-entry contract matched/);
+  assert.match(html, /49-entry contract matched/);
   assert.match(html, /Choose a service to inspect its evidence/);
   assert.doesNotMatch(html, /mx-auto|max-w-2xl|max-w-3xl/);
 });
@@ -139,7 +139,7 @@ test('filter controls keep search actions and facet widths in independent respon
   assert.match(html, />Any readiness</);
 });
 
-test('audit and readiness facets narrow all 48 services and survive every explorer link', () => {
+test('audit and readiness facets narrow all 49 services and survive every explorer link', () => {
   const expectedEntries = inventory().entries.filter(
     (entry) =>
       serviceInventoryAuditState(entry) === 'stale' &&
