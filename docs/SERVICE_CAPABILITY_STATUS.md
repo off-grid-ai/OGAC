@@ -203,6 +203,7 @@ The lane is the work owner. `current` and `stale` reflect the existing versioned
 | Data              | `airbyte`                       | current              | data/quality                  |
 | Data              | `streaming`                     | current              | data/quality                  |
 | Data              | `data-quality`                  | current              | data/quality                  |
+| Data              | `organizational-brain`          | pending              | data/quality                  |
 | Data              | `kestra`                        | stale                | data/quality                  |
 | Runtime           | `gateway`                       | stale                | runtime/governance/operations |
 | Runtime           | `litellm`                       | current, mutable tag | runtime/governance/operations |
