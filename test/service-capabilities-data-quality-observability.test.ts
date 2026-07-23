@@ -58,11 +58,11 @@ test('the family registry owns exactly its 25 canonical logical inventory ids', 
 
 test('every capability record has exact version provenance and honest four-gate evidence', () => {
   for (const record of DATA_QUALITY_OBSERVABILITY_AUDITS) {
-    // Most of the family shares the batch audit date; org-brain was re-verified live on its own date.
+    // The family shares a batch audit date; services re-verified live carry their own later date.
     assert.match(record.auditedAt, /^2026-\d{2}-\d{2}$/, `${record.serviceId} must carry an ISO audit date`);
     assert.ok(
-      record.auditedAt === '2026-07-20' || record.serviceId === 'organizational-brain',
-      `${record.serviceId} must be audited on the family batch date`,
+      record.auditedAt >= '2026-07-20',
+      `${record.serviceId} audit date must not predate the family batch audit`,
     );
     assert.ok(record.upstreamVersion.trim(), `${record.serviceId} must name the audited version`);
     assert.ok(record.versionSource.trim(), `${record.serviceId} must name its version source`);
@@ -144,7 +144,7 @@ test('fleet evidence distinguishes deployed health from production capability us
   );
   assert.match(
     audit('warehouse').items.find((item) => item.id === 'sql-query')?.gates.workflow.evidence ?? '',
-    /723,633 BFSI rows/,
+    /801,821 BFSI rows/,
   );
   assert.equal(
     audit('victoriametrics').items.find((item) => item.id === 'metrics-query')?.gates.workflow.status,
@@ -189,10 +189,13 @@ test('version identities are exact or explicitly stale and bounded', () => {
   assert.match(postgres.denominatorSource, /postgresql\.org\/docs\/16/);
   assert.match(postgres.denominatorSource, /pgvector\/pgvector\/blob\/v0\.8\.0/);
 
+  // Warehouse was re-verified live 2026-07-23: the mutable minor tag is now pinned to the exact
+  // deployed patch queried from the running ClickHouse, so the identity is current, not stale.
   const warehouse = audit('warehouse');
-  assert.equal(warehouse.auditState, 'stale');
-  assert.match(warehouse.auditStateEvidence ?? '', /mutable minor-series tag/);
-  assert.ok(warehouse.items.every((item) => item.gates.upstream.status === 'no'));
+  assert.equal(warehouse.auditState, 'current');
+  assert.equal(warehouse.auditStateEvidence, null);
+  assert.match(warehouse.upstreamVersion, /24\.8\.14\.39/);
+  assert.match(warehouse.versionSource, /live SELECT version\(\) on g6/);
 
   for (const id of ENTERPRISE_SOURCE_IDS) {
     assert.match(audit(id).denominatorSource, /enterprise-source-registry\.ts/);

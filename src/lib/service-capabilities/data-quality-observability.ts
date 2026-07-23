@@ -231,21 +231,21 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
   stale({
     serviceId: 'warehouse',
     serviceLabel: 'ClickHouse Warehouse',
-    upstreamVersion: '24.8-alpine',
-    versionSource: 'deploy/docker-compose.yml',
+    upstreamVersion: '24.8.14.39 (clickhouse/clickhouse-server:24.8-alpine)',
+    versionSource:
+      'deploy/docker-compose.yml (mutable minor tag); live SELECT version() on g6:8124 verified 2026-07-23 → 24.8.14.39',
     denominatorSource: 'https://clickhouse.com/docs/en/operations/system-tables',
-    auditedAt: AUDITED_AT,
-    auditState: 'stale',
-    auditStateEvidence:
-      'The clickhouse/clickhouse-server:24.8-alpine image is a mutable minor-series tag, so source does not establish the exact deployed patch-level capability denominator.',
+    auditedAt: '2026-07-23',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
       'ClickHouse is the analytics warehouse. SQL exploration and Airbyte-loaded BFSI datasets are live; privileged schema and cluster administration are not console-managed.',
     items: [
       capability('sql-query', 'SQL query and exploration', 'Run bounded analytical SQL and inspect results and schema.', '/data/warehouse', 'Open warehouse', '', [
-        'yes', 'ClickHouse 24.8 provides HTTP/native SQL query APIs and system metadata.',
-        'yes', 'The warehouse adapter executes bounded reads and metadata queries.',
+        'yes', 'ClickHouse 24.8.14.39 provides HTTP/native SQL query APIs and system metadata (live version() verified on g6 2026-07-23).',
+        'yes', 'The warehouse adapter executes bounded reads and metadata queries via X-ClickHouse-User/Key.',
         'yes', 'Data Warehouse exposes schema browsing and SQL results.',
-        'yes', 'The fleet record verifies 723,633 BFSI rows across eight ClickHouse tables.',
+        'yes', 'Live-verified 2026-07-23: a bounded system.tables query against the deployed ClickHouse returned 801,821 BFSI rows across 21 user tables.',
       ]),
       capability('ingest-sync', 'Batch and ELT ingestion', 'Land replicated source records and inspect loaded tables and counts.', '/data/flows/replication', 'Manage replication', '', [
         'yes', 'ClickHouse supports high-throughput inserts and Airbyte destinations.',
