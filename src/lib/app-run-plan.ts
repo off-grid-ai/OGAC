@@ -161,6 +161,66 @@ export function nextRunnableSteps(spec: AppSpec, completedIds: Iterable<string>)
   return topoOrder(spec).filter((s) => !done.has(s.id) && isStepReady(spec, s.id, done));
 }
 
+// ─── evaluateGuard — a conditional edge's `when` guard (PURE) ──────────────────────────────────────
+// The grammar is deliberately minimal — a binding check, NOT an expression language (mirrors the
+// template-var engine's honesty rule):
+//     <stepId> <op> <literal>      op ∈ contains | == | !=      literal = "quoted" | 'quoted' | bare
+// `<stepId>` names the step whose produced output the guard tests; its value is looked up in
+// `outputs`. Comparison is trimmed + case-insensitive so it survives LLM-output whitespace/casing.
+//   • an ABSENT/empty `when` is an UNCONDITIONAL edge → true (backward-compatible: every existing
+//     edge has no guard, so nothing branches until a guard is authored).
+//   • an UNPARSEABLE guard fails OPEN → true: we never SILENTLY drop a path (that would hide work);
+//     a malformed guard is instead surfaced by author-time validation (validateAppSpec, Slice B).
+const GUARD_RE = /^\s*([A-Za-z0-9_.-]+)\s+(contains|==|!=)\s+(.+?)\s*$/;
+export function evaluateGuard(when: string | undefined, outputs: Record<string, string>): boolean {
+  if (!when || !when.trim()) return true;
+  const m = when.match(GUARD_RE);
+  if (!m) return true; // fail-open to run; flagged at author time, never a silent skip
+  const [, ref, op, rawLit] = m;
+  const lit = rawLit.replace(/^["']|["']$/g, '').trim().toLowerCase();
+  const val = (outputs[ref] ?? '').trim().toLowerCase();
+  if (op === 'contains') return val.includes(lit);
+  if (op === '==') return val === lit;
+  return val !== lit; // '!='
+}
+
+// ─── planAdvance — the guard-aware scheduler step: what to RUN and what to SKIP next (PURE) ─────────
+// Supersedes the bare `nextRunnableSteps(spec, completedStepIds(state))` call the drivers used: it
+// also decides which queued steps must now be SKIPPED because every path that could reach them is
+// dead (a conditional edge whose guard is false, or a predecessor that was itself skipped). Both the
+// inline orchestrator and the durable workflow call this each pass, so branching behaves identically
+// on both. Only classifies `queued` steps whose predecessors are ALL settled (done|skipped):
+//   • entry step (no predecessors)                         → runnable.
+//   • at least one incoming edge is ACTIVE (its source is
+//     done AND its guard evaluates true against outputs)   → runnable.
+//   • predecessors all settled but NO incoming edge active → skip (no live path reaches it).
+// A step with an unsettled predecessor is left for a later pass (returned in neither list).
+export function planAdvance(spec: AppSpec, state: AppRunState): { runnable: AppStep[]; skip: AppStep[] } {
+  const statusById = new Map(state.steps.map((s) => [s.id, s.status] as const));
+  const outputs: Record<string, string> = {};
+  for (const s of state.steps) if (typeof s.output === 'string') outputs[s.id] = s.output;
+  const done = new Set(state.steps.filter((s) => s.status === 'done').map((s) => s.id));
+  const settled = new Set(
+    state.steps.filter((s) => s.status === 'done' || s.status === 'skipped').map((s) => s.id),
+  );
+  const edges = spec.edges ?? [];
+
+  const runnable: AppStep[] = [];
+  const skip: AppStep[] = [];
+  for (const step of topoOrder(spec)) {
+    if (statusById.get(step.id) !== 'queued') continue; // only classify not-yet-started steps
+    const incoming = edges.filter((e) => e.to === step.id);
+    if (incoming.length === 0) {
+      runnable.push(step); // entry step — always live
+      continue;
+    }
+    if (!incoming.every((e) => settled.has(e.from))) continue; // a predecessor hasn't settled yet
+    const anyActive = incoming.some((e) => done.has(e.from) && evaluateGuard(e.when, outputs));
+    (anyActive ? runnable : skip).push(step);
+  }
+  return { runnable, skip };
+}
+
 // ─── initState — the initial AppRunState: every step queued, run queued ───────────────────────────
 export function initState(spec: AppSpec, runId: string): AppRunState {
   const steps: StepState[] = topoOrder(spec).map((s) => ({
@@ -174,7 +234,7 @@ export function initState(spec: AppSpec, runId: string): AppRunState {
 
 // ─── The reducer's step-result input (a subset of StepState the orchestrator produces) ──────────
 export interface StepResultInput {
-  status: 'running' | 'done' | 'error' | 'awaiting_human';
+  status: 'running' | 'done' | 'error' | 'awaiting_human' | 'skipped';
   output?: string;
   refs?: { name: string; position?: number }[];
   detail?: string;
@@ -227,7 +287,7 @@ export function applyStepResult(
       ...(result.deliveryReceipt !== undefined ? { deliveryReceipt: result.deliveryReceipt } : {}),
     };
     if (result.status === 'running' && !s.startedAt) next.startedAt = now;
-    if (result.status === 'done' || result.status === 'error') {
+    if (result.status === 'done' || result.status === 'error' || result.status === 'skipped') {
       if (!next.startedAt) next.startedAt = now;
       next.finishedAt = now;
     }
