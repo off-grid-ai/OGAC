@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { PostHog } from '@/components/PostHog';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { LANDING } from '@/lib/landing-copy';
 import './globals.css';
 
-// Brand voice matches the landing site + README (the single ethos): "AWS for AI." Keep the console's
-// social/link unfurl (OG/Twitter) in lockstep with console-landing-page/src/app/layout.tsx.
-const OG_TITLE = 'Off Grid AI Console — AWS for AI';
-const OG_DESCRIPTION =
-  'Make your enterprise intelligent, on one interface that just works. Source available, on your own servers. Set your rules once. Everyone builds governed AI on top.';
+// Social/link unfurl (title + OG + Twitter) is DERIVED from the one landing-copy source of truth, so
+// the brand rules the copy is tested against (no em dash, no buzzwords, product named "Off Grid AI")
+// carry through to the metadata automatically — no second place to drift.
+const OG_TITLE = `${LANDING.brand} · ${LANDING.footer.companyDescription}`;
+const OG_DESCRIPTION = `${LANDING.hero.headline} ${LANDING.hero.offer}`;
 
 export const metadata: Metadata = {
   title: OG_TITLE,
