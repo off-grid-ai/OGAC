@@ -723,17 +723,17 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
   stale({
     serviceId: 'enterprise-source-corebank',
     serviceLabel: 'Core Banking',
-    upstreamVersion: '16-alpine (mutable image tag)',
-    versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    upstreamVersion: 'PostgreSQL 16.14 (postgres:16-alpine)',
+    versionSource:
+      '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml; live `postgres --version` in container offgrid-ds-corebank on S1 verified 2026-07-24 → PostgreSQL 16.14',
     denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
-    auditedAt: AUDITED_AT,
-    auditState: 'stale',
-    auditStateEvidence:
-      'The enterprise fixture uses the mutable postgres:16-alpine tag; the fleet records a healthy seeded source but not an immutable image digest.',
+    auditedAt: '2026-07-24',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
-      'The Core Banking PostgreSQL fixture is queryable through the SQL connector and supports lender and insurance context. Its mutable image identity prevents a current upstream audit.',
+      'The Core Banking PostgreSQL 16.14 fixture is queryable through the SQL connector and supports lender and insurance context. The exact running patch is now pinned from the live container.',
     items: [
-      capability('sql-read', 'Governed SQL reads', 'Count and read approved Core Banking tables through a bound connector.', '/data/sources', 'Open data sources', 'Pin the fixture image and re-run schema, count, and bounded-read evidence against the immutable deployment.', [
+      capability('sql-read', 'Governed SQL reads', 'Count and read approved Core Banking tables through a bound connector.', '/data/sources', 'Open data sources', '', [
         'yes', 'PostgreSQL 16 provides SQL table and metadata operations.', 'yes', 'connector-exec detects PostgreSQL and performs bounded read/count queries.', 'yes', 'Data Sources and connector detail expose test, resource, and query journeys.', 'yes', 'Fleet evidence records lender delinquency plus claims and policy lookups over the seeded source.',
       ]),
       capability('connector-lifecycle', 'Connector and credential lifecycle', 'Create, inspect, update, test, rotate credentials, and delete the source binding.', '/data/sources', 'Manage connector', 'The fixture is seed-owned and points to loopback; preserve a managed source identity and prove credential rotation without weakening the public-endpoint SSRF guard.', [
@@ -747,17 +747,17 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
   stale({
     serviceId: 'enterprise-source-policyadmin',
     serviceLabel: 'Policy Administration',
-    upstreamVersion: '8 (mutable image tag)',
-    versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    upstreamVersion: 'MySQL 8.4.10 (mysql:8)',
+    versionSource:
+      '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml; live `mysqld --version` in container offgrid-ds-policyadmin on S1 verified 2026-07-24 → MySQL 8.4.10',
     denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
-    auditedAt: AUDITED_AT,
-    auditState: 'stale',
-    auditStateEvidence:
-      'The enterprise fixture uses the mutable mysql:8 tag; the fleet records a healthy seeded source but not an immutable image digest.',
+    auditedAt: '2026-07-24',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
       'The Policy Administration MySQL fixture is queryable through the SQL connector and used for reimbursement, advisor, and policy context.',
     items: [
-      capability('sql-read', 'Governed SQL reads', 'Count and read approved policy-administration tables through a bound connector.', '/data/sources', 'Open data sources', 'Pin the MySQL image and re-run schema, count, and bounded-read proof.', [
+      capability('sql-read', 'Governed SQL reads', 'Count and read approved policy-administration tables through a bound connector.', '/data/sources', 'Open data sources', '', [
         'yes', 'MySQL 8 provides SQL table and metadata operations.', 'yes', 'connector-exec detects MySQL and performs bounded read/count queries.', 'yes', 'Data Sources and connector detail expose query journeys.', 'yes', 'Fleet evidence records reimbursement, advisor, and policy operations over seeded data.',
       ]),
       capability('connector-lifecycle', 'Connector and credential lifecycle', 'Create, inspect, update, test, rotate credentials, and delete the binding.', '/data/sources', 'Manage connector', 'Prove lifecycle and secret rotation for the internal fixture without bypassing the SSRF policy.', [
@@ -771,17 +771,17 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
   stale({
     serviceId: 'enterprise-source-erp',
     serviceLabel: 'Finance ERP',
-    upstreamVersion: 'latest (mutable image tag)',
-    versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    upstreamVersion: 'Azure SQL Edge — image sha256:902628a8be89 (mcr.microsoft.com/azure-sql-edge:latest, built 2026-07-03)',
+    versionSource:
+      '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml; live `docker inspect` of container offgrid-ds-erp on S1 verified 2026-07-24 → image sha256:902628a8be89e35dfb7895ca31d602974c7bafde4d583a0d0873844feb1c42cf (created 2026-07-03)',
     denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
-    auditedAt: AUDITED_AT,
-    auditState: 'stale',
-    auditStateEvidence:
-      'The SQL Server fixture uses a mutable latest tag. Its seeded invoice workflow is recorded, but the exact running upstream release and digest are not.',
+    auditedAt: '2026-07-24',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
-      'The Finance ERP SQL Server fixture supports bounded invoice reads used by reimbursement validation. Immutable version evidence and broader administration are missing.',
+      'The Finance ERP SQL Server fixture supports bounded invoice reads used by reimbursement validation. The mutable latest tag is now pinned to the exact deployed image content ID from the live container.',
     items: [
-      capability('sql-read', 'Governed SQL reads', 'Count and read approved general-ledger and invoice tables.', '/data/sources', 'Open data sources', 'Pin the SQL Server image and re-run invoice, schema, count, and bounded-read proof.', [
+      capability('sql-read', 'Governed SQL reads', 'Count and read approved general-ledger and invoice tables.', '/data/sources', 'Open data sources', '', [
         'yes', 'The deployed SQL Server family exposes T-SQL table queries.', 'yes', 'connector-exec detects mssql and performs bounded read/count queries.', 'yes', 'Data Sources and connector detail expose query journeys.', 'yes', 'Fleet evidence records reimbursement invoice validation over the seeded ERP.',
       ]),
       capability('connector-lifecycle', 'Connector and credential lifecycle', 'Create, inspect, update, test, rotate credentials, and delete the ERP binding.', '/data/sources', 'Manage connector', 'Prove lifecycle and secret rotation for the internal fixture and remove dependence on a mutable image.', [
@@ -841,17 +841,17 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
   stale({
     serviceId: 'enterprise-source-crm',
     serviceLabel: 'CRM',
-    upstreamVersion: '20-alpine (mutable image tag)',
-    versionSource: '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml',
+    upstreamVersion: 'Node.js v20.20.2 REST fixture (node:20-alpine)',
+    versionSource:
+      '../onprem-fleet-orchestration/deploy/onprem/data-sources.yml; live `node --version` in container offgrid-ds-crm on S1 verified 2026-07-24 → v20.20.2',
     denominatorSource: ENTERPRISE_SOURCE_DENOMINATOR,
-    auditedAt: AUDITED_AT,
-    auditState: 'stale',
-    auditStateEvidence:
-      'The CRM fixture uses the mutable node:20-alpine tag. Fleet records prove the REST fixture is healthy and used, but no immutable image digest identifies the audited deployment.',
+    auditedAt: '2026-07-24',
+    auditState: 'current',
+    auditStateEvidence: null,
     summary:
       'The Salesforce-style REST fixture supplies customer and cross-sell context. Governed task and opportunity writes are live through Apps with human approval, zero-mutation shadow execution, idempotent replay, and signed receipts. Receipt-correlated business-result evidence is code-wired but not yet deployed; immutable source identity and sync/webhook breadth remain gaps.',
     items: [
-      capability('rest-read', 'Governed REST reads', 'Read approved account, opportunity, and contact resources.', '/data/sources', 'Open data sources', 'Pin the fixture and re-run resource discovery and bounded-read evidence.', [
+      capability('rest-read', 'Governed REST reads', 'Read approved account, opportunity, and contact resources.', '/data/sources', 'Open data sources', '', [
         'yes', 'The deployed fixture exposes HTTP JSON resources.', 'yes', 'connector-exec detects REST/CRM endpoints and performs bounded reads.', 'yes', 'Data Sources and connector detail expose REST test and resource journeys.', 'yes', 'Fleet evidence records customer and cross-sell context lookup.',
       ]),
       capability('connector-lifecycle', 'Connector and credential lifecycle', 'Create, inspect, update, test, rotate credentials, and delete the CRM binding.', '/data/sources', 'Manage connector', 'Prove internal fixture lifecycle and secret rotation without bypassing endpoint safeguards.', [

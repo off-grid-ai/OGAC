@@ -128,9 +128,10 @@ test('the explorer renders the exact 49-entry audit contract without inventing p
 test('enterprise-source master state and selected audit detail use the same canonical evidence', () => {
   const html = renderExplorer('enterprise-source-corebank');
 
+  // corebank was live-pinned to PostgreSQL 16.14 on 2026-07-24 → now current, not stale.
   assert.match(
     html,
-    /data-service-inventory-row="enterprise-source-corebank"[\s\S]*?data-audit-state="stale"/,
+    /data-service-inventory-row="enterprise-source-corebank"[\s\S]*?data-audit-state="current"/,
   );
   assert.match(html, /Core Banking/);
   assert.match(html, /Audited capabilities/);

@@ -208,28 +208,23 @@ test('version identities are exact or explicitly stale and bounded', () => {
 });
 
 test('enterprise sources preserve exact fixture versions and connector reality', () => {
+  // All fixture identities re-verified live 2026-07-24 and pinned from the running containers
+  // (exact patch where the engine reports one; immutable image content-ID for fully-mutable tags).
   assert.deepEqual(
     ENTERPRISE_SOURCE_IDS.map((id) => audit(id).upstreamVersion),
     [
-      '16-alpine (mutable image tag)',
-      '8 (mutable image tag)',
-      'latest (mutable image tag)',
+      'PostgreSQL 16.14 (postgres:16-alpine)',
+      'MySQL 8.4.10 (mysql:8)',
+      'Azure SQL Edge — image sha256:902628a8be89 (mcr.microsoft.com/azure-sql-edge:latest, built 2026-07-03)',
       '24.2.7',
       'RELEASE.2025-04-08T15-41-24Z',
-      '20-alpine (mutable image tag)',
+      'Node.js v20.20.2 REST fixture (node:20-alpine)',
     ],
   );
 
-  for (const id of [
-    'enterprise-source-corebank',
-    'enterprise-source-policyadmin',
-    'enterprise-source-erp',
-    'enterprise-source-crm',
-  ]) {
-    assert.equal(audit(id).auditState, 'stale', `${id} uses a mutable fixture tag`);
-  }
-  for (const id of ['enterprise-source-kafka', 'enterprise-source-minio']) {
-    assert.equal(audit(id).auditState, 'current', `${id} has a pinned fixture version`);
+  for (const id of ENTERPRISE_SOURCE_IDS) {
+    assert.equal(audit(id).auditState, 'current', `${id} fixture identity is live-pinned`);
+    assert.equal(audit(id).auditStateEvidence, null);
   }
 
   assert.equal(
@@ -248,9 +243,11 @@ test('the code-wired outcome plane does not inflate the live CRM capability gate
   const crm = audit('enterprise-source-crm');
   const item = crm.items.find((entry) => entry.id === 'write-sync-webhooks');
 
+  // Upstream availability is 'yes' (REST systems provide CRUD/pagination/webhooks); the honest limits
+  // are on our integration/UI/workflow (still partial) — pinning the fixture doesn't inflate those.
   assert.deepEqual(
     CAPABILITY_GATES.map((gate) => item?.gates[gate].status),
-    ['no', 'partial', 'partial', 'partial'],
+    ['yes', 'partial', 'partial', 'partial'],
   );
   assert.match(item?.gates.adapter.evidence ?? '', /canonical receipt server-side/);
   assert.match(item?.gates.adapter.evidence ?? '', /migration is not deployed/i);

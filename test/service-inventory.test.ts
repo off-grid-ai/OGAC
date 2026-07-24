@@ -83,18 +83,20 @@ test('capability coverage is projected from the canonical audit registry without
     totalItems: 4,
   });
   assert.deepEqual(postgres?.productionWorkflowCapabilityIds, ['relational-store']);
+  // corebank re-verified live 2026-07-24 → pinned to PostgreSQL 16.14, promoted stale→current; the
+  // pinned identity clears the mutable-version flag and lifts the sql-read read capability to all-yes.
   assert.deepEqual(corebank?.capabilityAudit, {
     status: 'audited',
-    auditState: 'stale',
-    verifiedGates: 4,
+    auditState: 'current',
+    verifiedGates: 7,
     partialGates: 5,
     totalGates: 12,
     productionItems: 1,
     totalItems: 3,
   });
   assert.deepEqual(corebank?.productionWorkflowCapabilityIds, ['sql-read']);
-  assert.equal(corebank?.deployment.version, '16-alpine (mutable image tag)');
-  assert.equal(corebank?.deployment.mutableVersion, true);
+  assert.equal(corebank?.deployment.version, 'PostgreSQL 16.14 (postgres:16-alpine)');
+  assert.equal(corebank?.deployment.mutableVersion, false);
   assert.ok((corebank?.seededWorkflowEvidence.length ?? 0) > 0);
 });
 

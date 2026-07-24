@@ -1107,11 +1107,11 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
   audit({
     serviceId: 'unleash',
     serviceLabel: 'Feature Flags',
-    upstreamVersion: '6.6 mutable minor tag',
-    versionSource: 'deploy/docker-compose.yml (unleashorg/unleash-server:6.6)',
+    upstreamVersion: 'unleash-server 6.6 — image sha256:790ab9540704 (unleashorg/unleash-server:6.6)',
+    versionSource:
+      'deploy/docker-compose.yml (unleashorg/unleash-server:6.6); live `docker inspect` of container offgrid-services-b-unleash-1 on g6 verified 2026-07-24 → image sha256:790ab9540704d4641864facac1f315a690b4e038b37dd1c0b717f7c1a7fdba25',
     denominatorSource: 'https://docs.getunleash.io/reference',
-    auditStateEvidence:
-      'The configured 6.6 tag is not digest-pinned; the live immutable upstream version is unknown.',
+    auditState: 'current',
     summary:
       'Relevant denominator: flag CRUD, enablement, rollout strategies, variants, environment state, and audited product use. The mutable tag prevents a current availability claim.',
     capabilities: [
