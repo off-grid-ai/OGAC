@@ -249,3 +249,30 @@ test('normalizeCacheLogs: objects only, non-array → []', () => {
   const rows = normalizeCacheLogs([{ cache_hit: true }, null, 3, { cache_hit: false }]);
   assert.equal(rows.length, 2);
 });
+
+test('normalizeCachePolicy: parses litellm_cache_params echoed as a JSON string (live redis shape)', () => {
+  // LiteLLM's redis backend returned /cache/ping with litellm_cache_params as a JSON STRING, not an
+  // object — the console showed dashes until this was parsed. This pins the real 2026-07-24 shape.
+  const raw = {
+    status: 'healthy',
+    cache_type: 'redis',
+    ping_response: true,
+    litellm_cache_params: JSON.stringify({
+      supported_call_types: ['completion', 'acompletion'],
+      type: 'redis',
+      namespace: 'offgrid',
+      ttl: 3600,
+    }),
+  };
+  const policy = normalizeCachePolicy(raw);
+  assert.equal(policy.ttlSeconds, 3600);
+  assert.equal(policy.namespace, 'offgrid');
+  assert.deepEqual(policy.supportedCallTypes, ['completion', 'acompletion']);
+});
+
+test('normalizeCachePolicy: malformed JSON-string params degrade to empty (never throws)', () => {
+  const policy = normalizeCachePolicy({ litellm_cache_params: '{not valid json' });
+  assert.equal(policy.ttlSeconds, null);
+  assert.equal(policy.namespace, null);
+  assert.deepEqual(policy.supportedCallTypes, []);
+});

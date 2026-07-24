@@ -41,14 +41,18 @@ export interface RawCachePing {
   ping_response?: boolean | null;
   /** Whether LiteLLM could set+get a probe key (a deeper liveness check on some versions). */
   set_cache_response?: string | null;
-  /** Echoed cache policy (read-only — set at deploy). Names mirror litellm_settings.cache. */
-  litellm_cache_params?: {
-    supported_call_types?: string[] | null;
-    ttl?: number | null;
-    mode?: string | null;
-    type?: string | null;
-    namespace?: string | null;
-  } | null;
+  /** Echoed cache policy (read-only — set at deploy). Names mirror litellm_settings.cache. LiteLLM
+   *  returns this either as an object OR as a JSON-encoded string (observed live on redis). */
+  litellm_cache_params?:
+    | {
+        supported_call_types?: string[] | null;
+        ttl?: number | null;
+        mode?: string | null;
+        type?: string | null;
+        namespace?: string | null;
+      }
+    | string
+    | null;
   [k: string]: unknown;
 }
 
@@ -96,9 +100,27 @@ function posIntOrNull(v: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
 }
 
+/** Resolve the echoed cache params, which LiteLLM may return either as an object OR as a
+ *  JSON-encoded string (observed live on the redis backend). Bad JSON ⇒ null. PURE. */
+function resolveCacheParams(
+  raw: RawCachePing | null | undefined,
+): Record<string, unknown> | null {
+  const p = raw?.litellm_cache_params ?? null;
+  if (!p) return null;
+  if (typeof p === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(p);
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  }
+  return typeof p === 'object' ? (p as Record<string, unknown>) : null;
+}
+
 /** Extract the read-only policy from a ping's echoed params. PURE. */
 export function normalizeCachePolicy(raw: RawCachePing | null | undefined): CachePolicy {
-  const p = raw?.litellm_cache_params ?? null;
+  const p = resolveCacheParams(raw);
   if (!p) return { ...EMPTY_POLICY };
   const types = Array.isArray(p.supported_call_types)
     ? p.supported_call_types.filter((s): s is string => typeof s === 'string' && s.trim() !== '')
