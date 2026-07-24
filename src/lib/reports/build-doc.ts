@@ -304,7 +304,7 @@ export function buildRegulatorDoc(input: RegulatorDocInput, meta: DocMetaInput):
       blocks: [
         {
           type: 'paragraph',
-          text: `${count(input.deviceCount)} device(s) are enrolled under this tenant's policy, each with a per-device kill switch available to the administrator. This document reflects the live control-plane state for the reporting period and is exported directly from the Off Grid AI Console.`,
+          text: `${count(input.deviceCount)} device(s) are enrolled under this tenant's policy, each with a per-device kill switch available to the administrator. This document reflects the live control-plane state for the reporting period and is exported directly from OGAC (Off Grid AI Console).`,
         },
         {
           type: 'callout',
@@ -314,7 +314,7 @@ export function buildRegulatorDoc(input: RegulatorDocInput, meta: DocMetaInput):
         {
           type: 'signature',
           name: signerName(meta.provenance),
-          title: 'Accountable owner — submitted via Off Grid AI Console',
+          title: 'Accountable owner, submitted via OGAC',
         },
       ],
     },

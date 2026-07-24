@@ -1355,3 +1355,20 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
     the string without a migration orphans the existing resource. Decide per-identifier whether the
     external name should change at all.
   Landing metadata is now DERIVED from `src/lib/landing-copy.ts`, so that surface won't drift again.
+
+## Docs prose positioning + naming pass (2026-07-24)
+
+- **[G-DOCS-POSITIONING-OGAC] OPEN — the in-product docs (`src/lib/docs/introduction.ts` and
+  peers) still lead with the retired "AWS for AI" positioning and the "Off Grid AI Console" name.**
+  This is a content pass, NOT a find-replace: align the docs intro to the approved landing
+  positioning ("the one interface that makes your enterprise intelligent" / outcomes-first) and
+  rename to OGAC (expand "OGAC (Off Grid AI Console)" on first mention per page). A blind name swap
+  would leave "Think of it as AWS for AI" next to a renamed heading — half-done and incoherent.
+  Also fix the ` - ` pseudo-em-dashes to plain punctuation while rewriting (brand rule).
+- **CLOSED in the same session (display-copy naming, deployed):** SigninHeader "Console" tag,
+  handbook layout wordmark, report PDF cover wordmark + author + two report body sentences → OGAC.
+- **Still deferred (functional identifiers — renaming orphans live/embedded resources):**
+  `superset-provision.ts` DB name, `openapi.ts` + `docs/api/route.ts` API title, `c2pa.ts` author,
+  `service-specs.ts` label, `reports/render.tsx` `creator="offgrid-console"` machine id. The
+  capability-audit evidence quote in `runtime-governance-operations.ts:948` intentionally records the
+  OLD live title of a DIFFERENT host (status.getoffgridai.co) at verification time — do not edit.

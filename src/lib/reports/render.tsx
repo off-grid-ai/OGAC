@@ -319,7 +319,7 @@ function Cover({ doc }: { doc: ReportDoc }): JSX.Element {
     <Page size="A4" style={cover.page}>
       <View style={cover.wordmarkRow}>
         <Image style={cover.logo} src={logoDataUri()} />
-        <Text style={cover.wordmark}>Off Grid AI Console</Text>
+        <Text style={cover.wordmark}>OGAC</Text>
       </View>
       <Text style={cover.classification}>{m.classification.toUpperCase()}</Text>
 
@@ -354,7 +354,7 @@ function ReportDocument({ doc }: { doc: ReportDoc }): JSX.Element {
   return (
     <Document
       title={`${m.title} — ${m.tenantName}`}
-      author="Off Grid AI Console"
+      author="OGAC (Off Grid AI Console)"
       subject={m.framework ?? m.title}
       creator="offgrid-console"
       producer="offgrid-console"
