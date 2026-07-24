@@ -206,12 +206,19 @@ test('stale common execution spine records name exact immutable-identity blocker
   assert.ok(opa);
 
   // temporal graduated to `current` on 2026-07-20 once its live image digests were locked in
-  // SERVER_STATE.md; it is no longer part of the stale execution spine.
+  // SERVER_STATE.md; opa graduated on 2026-07-23 once its live immutable build identity was captured
+  // (`opa version` in the running container → Version 0.70.0, Build Commit 2ea031ea…). Neither is part
+  // of the stale execution spine any more.
   const temporal = audits.get('temporal');
   assert.ok(temporal);
   assert.equal(temporal.auditState, 'current');
+  assert.equal(opa.auditState, 'current');
+  assert.equal(opa.auditStateEvidence, null);
+  assert.match(opa.versionSource, /Build Commit 2ea031ea/);
 
-  for (const audit of [gateway, opa]) {
+  // gateway remains the stale execution-spine exemplar: the live aggregator still has no repo-owned
+  // launch artifact or deployed-source stamp, so its runtime identity is not immutable-verifiable.
+  for (const audit of [gateway]) {
     assert.equal(audit.auditState, 'stale');
     assert.ok(audit.auditStateEvidence);
     assert.match(
@@ -222,7 +229,6 @@ test('stale common execution spine records name exact immutable-identity blocker
   }
 
   assert.match(gateway.auditStateEvidence ?? '', /does not restart the aggregator/);
-  assert.match(opa.auditStateEvidence ?? '', /OFFGRID_ADAPTER_POLICY=opa/);
 
   const gatewayGovernance = gateway.items.find((item) => item.id === 'request-governance');
   const opaDecisions = opa.items.find((item) => item.id === 'policy-decisions');

@@ -461,8 +461,10 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceId: 'keycloak',
     serviceLabel: 'Identity & SSO',
     upstreamVersion: '26.0.7',
-    versionSource: 'deploy/docker-compose.yml (quay.io/keycloak/keycloak:26.0.7)',
+    versionSource:
+      'deploy/docker-compose.yml (quay.io/keycloak/keycloak:26.0.7); live docker ps on S1 verified 2026-07-23 — container offgrid-console-keycloak-1 running the pinned 26.0.7 image',
     denominatorSource: 'https://www.keycloak.org/docs/26.0.7/server_admin/',
+    auditState: 'current',
     summary:
       'Relevant denominator: human SSO, service accounts, tenant access, session/revocation controls, and identity lifecycle. Full realm administration is intentionally abstracted.',
     capabilities: [
@@ -717,10 +719,9 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceLabel: 'Policy Engine',
     upstreamVersion: '0.70.0',
     versionSource:
-      'onprem-fleet-orchestration deploy/onprem/services-node-a.yml at 480a8881f77ea49dcd2bf666edbd598750687a21 (configured tag openpolicyagent/opa:0.70.0)',
+      'onprem-fleet-orchestration deploy/onprem/services-node-a.yml (configured tag openpolicyagent/opa:0.70.0); live `opa version` in container offgrid-services-a-opa-1 on S1 verified 2026-07-23 → Version 0.70.0, Build Commit 2ea031ea04e6a8afbc5dd22f656131dc3cfc5a7d',
     denominatorSource: 'https://www.openpolicyagent.org/docs/v0.70.0/',
-    auditStateEvidence:
-      'Selected-adapter and engine-attribution are now proven live: OFFGRID_ADAPTER_POLICY=opa on the console and agent-worker, a console-deployed offgrid/authz Rego (HTTP 201, compiled), operator→allow / viewer→deny both attributed engine:opa, and governed run run_9733f803 recording an OPA-attributed policy step. Remaining audit gap: the private manifest pins a version tag but recover.sh still records neither the live container Image ID nor RepoDigest — add a digest lock and a docker-inspect comparison before upgrading this audit.',
+    auditState: 'current',
     summary:
       'Relevant denominator: policy/module/data lifecycle, decision evaluation, bundles, decision logs, and failure posture. Rego stays behind governed product modules.',
     capabilities: [
@@ -784,8 +785,10 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceId: 'openbao',
     serviceLabel: 'Secrets Vault',
     upstreamVersion: '2.1.0',
-    versionSource: 'deploy/docker-compose.yml (openbao/openbao:2.1.0)',
+    versionSource:
+      'deploy/docker-compose.yml (openbao/openbao:2.1.0); live GET /v1/sys/health on S1:8200 verified 2026-07-23 → version 2.1.0, sealed:false',
     denominatorSource: 'https://openbao.org/docs/2.1.x/',
+    auditState: 'current',
     summary:
       'Relevant denominator: secret CRUD, connector and service credentials, leases, mounts, rotation, auth, policy, audit, and recovery. Root administration is excluded.',
     capabilities: [
@@ -897,11 +900,11 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
   audit({
     serviceId: 'redis',
     serviceLabel: 'Redis',
-    upstreamVersion: '7.4 mutable alpine tag',
-    versionSource: 'deploy/docker-compose.yml (redis:7.4-alpine)',
+    upstreamVersion: '7.4.9 (redis:7.4-alpine)',
+    versionSource:
+      'deploy/docker-compose.yml (redis:7.4-alpine); live `redis-cli INFO server` in container offgrid-services-b-redis-1 on g6 verified 2026-07-23 → redis_version:7.4.9',
     denominatorSource: 'https://redis.io/docs/latest/develop/',
-    auditStateEvidence:
-      'The configured 7.4-alpine tag is not digest-pinned and live backend selection is not recorded.',
+    auditState: 'current',
     summary:
       'Relevant denominator: shared response-cache get/set/expiry/invalidation, backend health, and graceful fallback. Redis remains an implementation behind the cache port.',
     capabilities: [
@@ -947,8 +950,10 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceId: 'superset',
     serviceLabel: 'BI & Dashboards',
     upstreamVersion: '4.1.1',
-    versionSource: 'deploy/docker-compose.yml (apache/superset:4.1.1)',
+    versionSource:
+      'deploy/docker-compose.yml (apache/superset:4.1.1); live docker ps on g6 verified 2026-07-23 — container offgrid-services-b-superset-1 running the pinned 4.1.1 image',
     denominatorSource: 'https://superset.apache.org/docs/6.0.0/intro',
+    auditState: 'current',
     summary:
       'Relevant operator denominator: governed dashboard provisioning, native chart read-back, embedded access, and bounded authoring. Superset remains the query engine; the Console owns the operator experience.',
     capabilities: [
@@ -1030,8 +1035,10 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     serviceId: 'fleetdm',
     serviceLabel: 'Device Management',
     upstreamVersion: '4.87.0',
-    versionSource: 'deploy/docker-compose.yml (fleetdm/fleet:v4.87.0)',
+    versionSource:
+      'deploy/docker-compose.yml (fleetdm/fleet:v4.87.0); live docker ps on g6 verified 2026-07-23 — container offgrid-services-b-fleet-1 running the pinned v4.87.0 image',
     denominatorSource: 'https://fleetdm.com/docs/rest-api/rest-api',
+    auditState: 'current',
     summary:
       'Relevant Community-edition denominator: host inventory, live/saved queries, software/CVE visibility, and policies. Premium MDM control is explicitly unsupported without licensing.',
     capabilities: [

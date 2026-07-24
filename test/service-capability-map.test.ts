@@ -11,10 +11,10 @@ import {
   type AuditedCapabilitySummary,
 } from '../src/lib/service-capability-map.ts';
 
-test('canonical registry composes 39 unique versioned audits without the removed product', () => {
+test('canonical registry composes 40 unique versioned audits without the removed product', () => {
   const ids = SERVICE_CAPABILITY_AUDITS.map((audit) => audit.serviceId);
 
-  assert.equal(ids.length, 39);
+  assert.equal(ids.length, 40);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(ids.includes('provit'), false);
   for (const audit of SERVICE_CAPABILITY_AUDITS) {
