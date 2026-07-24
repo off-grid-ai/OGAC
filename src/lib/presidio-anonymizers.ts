@@ -134,8 +134,12 @@ export function validateOperatorSpec(draft: unknown): OperatorValidation {
     }
 
     case 'encrypt': {
+      // A KEYLESS encrypt spec is legal and is the PRODUCTION shape: it means "use the org's
+      // vault-held key", bound at call time by bindEncryptKey. Key material is therefore never
+      // persisted in the policy row. An INLINE key is still accepted (bootstrap/tests) but must be a
+      // real AES length; a wrong-length key is rejected rather than silently downgraded.
       const key = typeof d.key === 'string' ? d.key : '';
-      if (!key) return { ok: false, error: 'encrypt requires a key' };
+      if (!key) return { ok: true, value: { type: 'encrypt' } };
       const bytes = byteLength(key);
       if (!(VALID_ENCRYPT_KEY_BYTES as readonly number[]).includes(bytes)) {
         return {
@@ -359,4 +363,58 @@ export function describeOperator(spec: OperatorSpec): string {
     default:
       return 'replace';
   }
+}
+
+// ─── Vault-backed encryption keys (the secret-backed half of advanced anonymizers) ────────────────
+// The rule: an AES key is SECRET MATERIAL and must never sit in the policy row. So the persisted
+// policy carries the encrypt INTENT only (a keyless encrypt spec) and the key is resolved from the
+// secrets store at call time. These are PURE so the whole rule is unit-testable with zero I/O.
+
+/** Where the org's Presidio AES key lives in the secrets store (mirrors the Slack webhook pattern). */
+export const PRESIDIO_ENCRYPT_KEY_SECRET = 'org/presidio_encrypt_key';
+
+/** Does this policy encrypt anywhere (⇒ a key must be resolved before it can run)? PURE. */
+export function policyUsesEncrypt(policy: AnonymizerPolicy): boolean {
+  if (policy.default.type === 'encrypt') return true;
+  return Object.values(policy.perEntity).some((spec) => spec.type === 'encrypt');
+}
+
+/**
+ * Drop inline AES key material from every encrypt spec — the shape we PERSIST. PURE. The encrypt
+ * intent survives (a keyless encrypt spec is valid and means "use the vaulted key"), so stripping the
+ * key can never silently disable encryption.
+ */
+export function stripInlineEncryptKeys(policy: AnonymizerPolicy): AnonymizerPolicy {
+  const strip = (spec: OperatorSpec): OperatorSpec =>
+    spec.type === 'encrypt' && spec.key !== undefined ? { type: 'encrypt' } : spec;
+  const perEntity: Record<string, OperatorSpec> = {};
+  for (const [entity, spec] of Object.entries(policy.perEntity)) perEntity[entity] = strip(spec);
+  return { default: strip(policy.default), perEntity };
+}
+
+/**
+ * Bind the vaulted key into every encrypt spec, ready to send to Presidio. PURE.
+ *
+ * FAIL SAFE, never fail open: when no key can be resolved, an encrypt spec is DOWNGRADED to `replace`
+ * (the value is still masked — it is never emitted in plaintext) and the affected entity is reported
+ * in `downgraded` so the caller can surface the degradation honestly instead of hiding it. A spec that
+ * already carries an inline key keeps it (bootstrap/tests).
+ */
+export function bindEncryptKey(
+  policy: AnonymizerPolicy,
+  key: string | null,
+): { policy: AnonymizerPolicy; downgraded: string[] } {
+  const downgraded: string[] = [];
+  const bind = (spec: OperatorSpec, label: string): OperatorSpec => {
+    if (spec.type !== 'encrypt') return spec;
+    if (spec.key) return spec;
+    if (key) return { type: 'encrypt', key };
+    downgraded.push(label);
+    return { type: 'replace' };
+  };
+  const perEntity: Record<string, OperatorSpec> = {};
+  for (const [entity, spec] of Object.entries(policy.perEntity)) {
+    perEntity[entity] = bind(spec, entity);
+  }
+  return { policy: { default: bind(policy.default, 'DEFAULT'), perEntity }, downgraded };
 }

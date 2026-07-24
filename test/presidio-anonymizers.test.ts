@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  bindEncryptKey,
+  policyUsesEncrypt,
+  stripInlineEncryptKeys,
   ANONYMIZE_OPERATORS,
   buildAnonymizeRequest,
   byteLength,
@@ -118,9 +121,11 @@ test('validateOperatorSpec rejects bad operator + bad encrypt keys', () => {
   assert.equal(validateOperatorSpec(null).ok, false);
   assert.equal(validateOperatorSpec('string').ok, false);
 
+  // A KEYLESS encrypt spec is now the PRODUCTION shape — it means "use the org's vaulted key", so the
+  // policy row never carries key material. It validates, carrying the intent with no key.
   const noKey = validateOperatorSpec({ type: 'encrypt' });
-  assert.equal(noKey.ok, false);
-  assert.match((noKey as { error: string }).error, /requires a key/);
+  assert.equal(noKey.ok, true);
+  assert.deepEqual((noKey as { value: unknown }).value, { type: 'encrypt' });
 
   const shortKey = validateOperatorSpec({ type: 'encrypt', key: 'short' });
   assert.equal(shortKey.ok, false);
@@ -161,7 +166,8 @@ test('validateAnonymizerPolicy: missing default uses safe fallback; empty is val
 });
 
 test('validateAnonymizerPolicy: bad default operator is a hard error', () => {
-  const res = validateAnonymizerPolicy({ default: { type: 'encrypt' } });
+  // A wrong-LENGTH inline key is still a hard error (a keyless encrypt is legal — vault-backed).
+  const res = validateAnonymizerPolicy({ default: { type: 'encrypt', key: 'too-short' } });
   assert.equal(res.ok, false);
   assert.match((res as { error: string }).error, /default operator/);
 });
@@ -324,4 +330,74 @@ test('operator + hash catalogs match the verified live engine contract', () => {
   assert.ok(!(ANONYMIZE_OPERATORS as readonly string[]).includes('custom'));
   // The shipped BFSI default policy is itself valid.
   assert.equal(validateAnonymizerPolicy(DEFAULT_ANONYMIZER_POLICY).ok, true);
+});
+
+// ─── Vault-backed encryption keys ─────────────────────────────────────────────────────────────────
+// The rule: key material never lives in the policy row. The persisted policy carries the encrypt
+// INTENT (keyless spec); the key is bound from the secrets store at call time; an unresolvable key
+// DOWNGRADES to replace (still masked — never plaintext) and is reported, never hidden.
+
+test('policyUsesEncrypt detects encryption in the default or any per-entity spec', () => {
+  assert.equal(policyUsesEncrypt({ default: { type: 'replace' }, perEntity: {} }), false);
+  assert.equal(policyUsesEncrypt({ default: { type: 'encrypt' }, perEntity: {} }), true);
+  assert.equal(
+    policyUsesEncrypt({ default: { type: 'replace' }, perEntity: { IN_PAN: { type: 'encrypt' } } }),
+    true,
+  );
+});
+
+test('stripInlineEncryptKeys removes key material but PRESERVES the encrypt intent', () => {
+  const key = 'k'.repeat(32);
+  const stripped = stripInlineEncryptKeys({
+    default: { type: 'encrypt', key },
+    perEntity: { IN_PAN: { type: 'encrypt', key }, EMAIL_ADDRESS: { type: 'mask', charsToMask: 4 } },
+  });
+  assert.deepEqual(stripped.default, { type: 'encrypt' }, 'default keeps encrypt, loses the key');
+  assert.deepEqual(stripped.perEntity.IN_PAN, { type: 'encrypt' });
+  assert.equal(stripped.perEntity.EMAIL_ADDRESS.charsToMask, 4, 'other operators untouched');
+  // The stripped shape must survive a persist→read round-trip as ENCRYPT (not silently downgraded).
+  assert.equal(normalizeAnonymizerPolicy(stripped).perEntity.IN_PAN.type, 'encrypt');
+});
+
+test('bindEncryptKey injects the vaulted key into every keyless encrypt spec', () => {
+  const key = 'v'.repeat(24);
+  const { policy, downgraded } = bindEncryptKey(
+    { default: { type: 'encrypt' }, perEntity: { IN_PAN: { type: 'encrypt' }, X: { type: 'redact' } } },
+    key,
+  );
+  assert.deepEqual(policy.default, { type: 'encrypt', key });
+  assert.deepEqual(policy.perEntity.IN_PAN, { type: 'encrypt', key });
+  assert.deepEqual(policy.perEntity.X, { type: 'redact' }, 'non-encrypt specs pass through');
+  assert.deepEqual(downgraded, [], 'nothing degraded when the key resolves');
+});
+
+test('bindEncryptKey FAILS SAFE: no key ⇒ downgrade to replace (masked, never plaintext) + report', () => {
+  const { policy, downgraded } = bindEncryptKey(
+    { default: { type: 'replace' }, perEntity: { IN_PAN: { type: 'encrypt' }, AADHAAR: { type: 'encrypt' } } },
+    null,
+  );
+  assert.deepEqual(policy.perEntity.IN_PAN, { type: 'replace' }, 'still masked, not passed through');
+  assert.deepEqual(policy.perEntity.AADHAAR, { type: 'replace' });
+  assert.deepEqual(downgraded.sort(), ['AADHAAR', 'IN_PAN'], 'the degradation is reported honestly');
+  // and the produced Presidio operator config is a real masking operator, never an empty-key encrypt
+  assert.deepEqual(specToOperatorConfig(policy.perEntity.IN_PAN), { type: 'replace' });
+});
+
+test('bindEncryptKey keeps an inline key (bootstrap) in preference to the vaulted one', () => {
+  const inline = 'i'.repeat(16);
+  const { policy, downgraded } = bindEncryptKey(
+    { default: { type: 'encrypt', key: inline }, perEntity: {} },
+    'v'.repeat(32),
+  );
+  assert.deepEqual(policy.default, { type: 'encrypt', key: inline });
+  assert.deepEqual(downgraded, []);
+});
+
+test('a keyless encrypt policy never reaches Presidio with an empty key', () => {
+  // The regression this guards: specToOperatorConfig({type:'encrypt'}) yields key:'' which Presidio
+  // rejects; bindEncryptKey must resolve or downgrade FIRST, so an empty key can never be sent.
+  const { policy } = bindEncryptKey({ default: { type: 'encrypt' }, perEntity: {} }, null);
+  const built = buildAnonymizeRequest('x', [{ entity_type: 'IN_PAN', start: 0, end: 1, score: 1 }], policy);
+  assert.notDeepEqual(built.anonymizers.DEFAULT, { type: 'encrypt', key: '' });
+  assert.deepEqual(built.anonymizers.DEFAULT, { type: 'replace' });
 });
