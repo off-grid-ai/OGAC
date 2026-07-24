@@ -109,6 +109,31 @@ export function egressMaskingRequired(routeTarget: EgressRouteTarget, policy: Eg
 }
 
 /**
+ * What egress DLP demands of a GOVERNED (app/agent) run's outbound content, given the egress the
+ * bound pipeline PERMITS for the run ('local' | 'cloud' | 'block') and the org egress-DLP policy.
+ * PURE, zero-import — so the run path enforces the SAME per-org policy the interactive chat seam does
+ * (one authority; no second definition of "when does a run mask/block on cloud egress").
+ *
+ *   • maskFloor  — masking is REQUIRED before this run's content egresses: a cloud-permitted run under
+ *                  an ENABLED policy. Fed as the floor bit into effectivePiiMasking(), so egress DLP
+ *                  can only ESCALATE a run's masking on, never lower a pipeline overlay that's already
+ *                  on. A local run contributes nothing (data never leaves the box).
+ *   • blockOnPii — any PII detected in the outbound content must BLOCK the run (refuse), not merely
+ *                  mask it: a cloud-permitted run whose policy strictness is 'block'. Mirrors the chat
+ *                  seam's `strictness:'block' + hits ⇒ blocked` verdict.
+ *
+ * A 'block' or 'local' run egress demands nothing here: 'block' is already refused upstream by the
+ * routing leash, and 'local' never egresses.
+ */
+export function egressDlpRunDemand(
+  runEgress: string,
+  policy: EgressDlpPolicy,
+): { maskFloor: boolean; blockOnPii: boolean } {
+  const cloud = runEgress === 'cloud' && policy.enabled === true;
+  return { maskFloor: cloud, blockOnPii: cloud && policy.strictness === 'block' };
+}
+
+/**
  * Decide — and HOW — a request may egress. PURE, total (every branch returns a decision, none throws).
  *
  * @param routeTarget where the request will run ('on-prem' | 'cloud').

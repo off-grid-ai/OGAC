@@ -4,6 +4,7 @@ import {
   DEFAULT_EGRESS_DLP_POLICY,
   type EgressDlpPolicy,
   type EgressScan,
+  egressDlpRunDemand,
   egressMaskingRequired,
   enforceEgressDlp,
   normalizeEgressPolicy,
@@ -157,6 +158,39 @@ test('egressMaskingRequired: only a cloud route with DLP on requires masking', (
   assert.equal(egressMaskingRequired('cloud', ENABLED_MASK), true);
   assert.equal(egressMaskingRequired('cloud', DISABLED), false);
   assert.equal(egressMaskingRequired('on-prem', ENABLED_MASK), false);
+});
+
+// ── egressDlpRunDemand: the governed-run (app/agent) demand from the per-org policy ──────────────
+
+test('egressDlpRunDemand: a cloud-permitted run under mask policy demands masking, not block', () => {
+  const d = egressDlpRunDemand('cloud', ENABLED_MASK);
+  assert.equal(d.maskFloor, true);
+  assert.equal(d.blockOnPii, false);
+});
+
+test('egressDlpRunDemand: a cloud-permitted run under BLOCK policy demands mask floor AND block', () => {
+  const d = egressDlpRunDemand('cloud', ENABLED_BLOCK);
+  assert.equal(d.maskFloor, true);
+  assert.equal(d.blockOnPii, true);
+});
+
+test('egressDlpRunDemand: a cloud-permitted run with DLP DISABLED demands nothing', () => {
+  const d = egressDlpRunDemand('cloud', DISABLED);
+  assert.deepEqual(d, { maskFloor: false, blockOnPii: false });
+});
+
+test('egressDlpRunDemand: a LOCAL run never egresses ⇒ demands nothing, even under block policy', () => {
+  assert.deepEqual(egressDlpRunDemand('local', ENABLED_BLOCK), {
+    maskFloor: false,
+    blockOnPii: false,
+  });
+});
+
+test('egressDlpRunDemand: a BLOCKED-egress run (refused upstream) demands nothing here', () => {
+  assert.deepEqual(egressDlpRunDemand('block', ENABLED_BLOCK), {
+    maskFloor: false,
+    blockOnPii: false,
+  });
 });
 
 // ── audit builders ─────────────────────────────────────────────────────────────────────────────
