@@ -172,6 +172,42 @@ test('heuristicDecompose binds the invoice + quota phrases to seeded domains dir
   assert.deepEqual(built.gaps, []);
 });
 
+// ─── Branching: a plain-language conditional compiles to a real guarded BRANCH ────────────────────
+
+test('compileAppSpec: an "if X, A, else B" description compiles to a guarded branch (heuristic path)', async () => {
+  const desc = 'if the claim is over 1 lakh, route to a surveyor, otherwise auto-approve it';
+  const { spec } = await compileAppSpec(desc, CTX, stubDeps(SEEDED, null));
+
+  // A decision agent fans out to two guarded edges (yes/no), and every path ends at an output.
+  const decision = spec.steps.find((s) => s.kind === 'agent');
+  assert.ok(decision, 'a decision agent was emitted');
+  const guarded = spec.edges.filter((e) => e.when);
+  assert.equal(guarded.length, 2, 'two guarded edges (then/else)');
+  assert.ok(guarded.every((e) => e.from === decision!.id), 'both branch edges leave the decision');
+  assert.ok(guarded.some((e) => /contains "yes"/.test(e.when!)));
+  assert.ok(guarded.some((e) => /contains "no"/.test(e.when!)));
+  assert.ok(spec.steps.some((s) => s.kind === 'output'), 'the branches merge into an output');
+  // The whole branched graph is a valid one-entry DAG.
+  assert.equal(validateAppSpec(spec).ok, true, validateAppSpec(spec).errors.join('; '));
+});
+
+test('compileAppSpec: a data lead-in before the conditional binds, then the branch follows', async () => {
+  const desc = 'read the invoice, if the amount is over budget then flag for review else approve it';
+  const { spec } = await compileAppSpec(desc, CTX, stubDeps(SEEDED, null));
+  // The invoice read binds and feeds the decision; the decision guards two branches.
+  const cq = spec.steps.find((s) => s.kind === 'connector-query') as { id: string; domain: string } | undefined;
+  assert.ok(cq && cq.domain === 'dom_inv', 'the lead-in invoice read bound to the seeded domain');
+  const decision = spec.steps.find((s) => s.kind === 'agent')!;
+  assert.ok(spec.edges.some((e) => e.from === cq!.id && e.to === decision.id), 'lead-in feeds the decision');
+  assert.equal(spec.edges.filter((e) => e.when).length, 2, 'two guarded branch edges');
+  assert.equal(validateAppSpec(spec).ok, true, validateAppSpec(spec).errors.join('; '));
+});
+
+test('compileAppSpec: a NON-conditional description stays LINEAR (no guarded edges) — no regression', async () => {
+  const { spec } = await compileAppSpec(REIMBURSEMENT, CTX, stubDeps(SEEDED, null));
+  assert.equal(spec.edges.filter((e) => e.when).length, 0, 'no branch is invented for a linear process');
+});
+
 test('heuristic: approval intent inserts a human review before output even without an explicit approve clause', () => {
   const built = heuristicDecompose('expense approval — check the employee quota then decide eligibility', SEEDED);
   const k = built.steps.map((s) => s.kind);

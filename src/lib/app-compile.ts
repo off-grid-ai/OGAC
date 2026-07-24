@@ -45,6 +45,17 @@ export interface CompileResult {
   gaps: string[];
 }
 
+// The intermediate a decompose pass produces, before finalizeSpec turns it into an AppSpec. `edges`
+// is OPTIONAL: a linear decompose leaves it undefined (finalizeSpec chains the steps in order); a
+// BRANCHING decompose provides explicit guarded edges (finalizeSpec uses them verbatim).
+export interface Assembled {
+  steps: AppStep[];
+  gaps: string[];
+  title: string;
+  summary: string;
+  edges?: AppEdge[];
+}
+
 export interface CompileCtx {
   orgId: string;
   ownerId: string;
@@ -98,7 +109,7 @@ export async function compileAppSpec(
     : loadedDomains;
 
   // 1. LLM path — decompose, then re-bind + gap-check EVERY step ourselves (untrusted output).
-  let assembled: { steps: AppStep[]; gaps: string[]; title: string; summary: string } | null = null;
+  let assembled: Assembled | null = null;
   const plan = await deps.modelDecompose(desc, domains).catch(() => null);
   if (plan && Array.isArray(plan.steps) && plan.steps.length > 0) {
     const built = assembleFromPlan(plan, desc, domains);
@@ -130,7 +141,7 @@ export function assembleFromPlan(
   plan: ModelPlan,
   description: string,
   domains: DataDomain[],
-): { steps: AppStep[]; gaps: string[]; title: string; summary: string } {
+): Assembled {
   const steps: AppStep[] = [];
   const gaps: string[] = [];
   let n = 0;
@@ -199,7 +210,13 @@ export function assembleFromPlan(
 export function heuristicDecompose(
   description: string,
   domains: DataDomain[],
-): { steps: AppStep[]; gaps: string[]; title: string; summary: string } {
+): Assembled {
+  // Branching: a plain-language conditional ("if X, A, else B") compiles to a real BRANCH (decision
+  // agent + guarded edges), not a linear chain. Detected first; a non-conditional description takes
+  // the linear path below unchanged.
+  const cond = detectConditional(description);
+  if (cond) return heuristicBranchDecompose(description, cond, domains);
+
   const clauses = segment(description);
   const steps: AppStep[] = [];
   const gaps: string[] = [];
@@ -284,13 +301,63 @@ function finishAssembly(
   title: string | undefined,
   summary: string | undefined,
   description: string,
-): { steps: AppStep[]; gaps: string[]; title: string; summary: string } {
+): Assembled {
   return {
     steps,
     gaps,
     title: (title ?? '').trim() || deriveTitle(description),
     summary: (summary ?? '').trim() || description.trim(),
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// PURE — decompose a CONDITIONAL description into a BRANCHED graph (the no-gateway heuristic path):
+//   [data lead-in]  →  decision agent  →  { then-branch (YES), else-branch (NO) }  →  merge → output
+// The lead-in is the data reads named BEFORE the "if"; the branch comes from buildConditionalBranch;
+// every non-output branch leaf merges into ONE terminal output so each path ends at an emit.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+function heuristicBranchDecompose(
+  description: string,
+  cond: ConditionalClause,
+  domains: DataDomain[],
+): Assembled {
+  const gaps: string[] = [];
+  const steps: AppStep[] = [];
+  const edges: AppEdge[] = [];
+  let n = 0;
+
+  // Lead-in: data reads mentioned before the conditional ("read the claim, if amount > 1L …").
+  const ifAt = description.search(/\bif\b/i);
+  for (const clause of segment(ifAt > 0 ? description.slice(0, ifAt) : '')) {
+    if (classifyClause(clause) !== 'data') continue;
+    const phrase = extractDataPhrase(clause);
+    const bound = bindDataPhrase(phrase, domains, `s${n + 1}`, titleCase(phrase), gaps);
+    if (bound) {
+      steps.push(bound);
+      n += 1;
+    }
+  }
+  const leadLast = steps.at(-1)?.id;
+
+  // The branch (decision + guarded branches); ids continue after the lead-in.
+  const br = buildConditionalBranch(cond, n + 1);
+  const decisionId = br.steps[0].id;
+  steps.push(...br.steps);
+  n += br.steps.length;
+  if (leadLast) edges.push({ from: leadLast, to: decisionId });
+  edges.push(...br.edges);
+
+  // Merge every non-output branch leaf into one terminal output (a leaf already an output is itself
+  // terminal). Guarantees ≥1 output + that every path ends at an emit.
+  const kindOf = (id: string): string | undefined => steps.find((s) => s.id === id)?.kind;
+  const danglers = br.leaves.filter((id) => kindOf(id) !== 'output');
+  if (danglers.length > 0) {
+    const outId = `s${n + 1}`;
+    steps.push({ id: outId, label: 'Output result', kind: 'output', sink: 'console' });
+    for (const id of danglers) edges.push({ from: id, to: outId });
+  }
+
+  return { steps, gaps, edges, title: deriveTitle(description), summary: description.trim() };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -323,14 +390,31 @@ function bindDataPhrase(
 // PURE — finalize: linear-chain the ordered steps into a valid one-entry graph
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 export function finalizeSpec(
-  assembled: { steps: AppStep[]; gaps: string[]; title: string; summary: string },
+  assembled: Assembled,
   ctx: CompileCtx,
   description: string,
 ): AppSpec {
-  // Guarantee a terminal output sink for EVERY compile path (LLM plan + heuristic): a governed app
-  // always ends by emitting its result. The heuristic already appends one; the model-plan path may
-  // not — so centralize the guarantee here. Also guarantees ≥1 step so an empty description still
-  // yields a valid (output-only) spec.
+  const base = {
+    id: '',
+    orgId: ctx.orgId,
+    ownerId: ctx.ownerId,
+    title: assembled.title || deriveTitle(description),
+    summary: assembled.summary || description.trim(),
+    visibility: 'private' as const,
+    published: false,
+    ...(ctx.defaultPipelineId ? { pipelineId: ctx.defaultPipelineId } : {}),
+    trigger: { kind: 'on-demand' as const },
+  };
+
+  // BRANCH path: a decompose that authored explicit (guarded) edges — use them VERBATIM. The branch
+  // decompose already guarantees a terminal output on every path, so we do not re-chain or append.
+  if (assembled.edges && assembled.edges.length > 0) {
+    return { ...base, steps: assembled.steps, edges: assembled.edges };
+  }
+
+  // LINEAR path (unchanged): guarantee a terminal output sink for EVERY compile path (a governed app
+  // always ends by emitting its result), then chain the ordered steps into a one-entry graph. Also
+  // guarantees ≥1 step so an empty description still yields a valid (output-only) spec.
   const steps = [...assembled.steps];
   const last = steps.at(-1);
   if (last?.kind !== 'output') {
@@ -342,19 +426,7 @@ export function finalizeSpec(
   const edges: AppEdge[] =
     steps.length > 1 ? steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id })) : [];
 
-  return {
-    id: '',
-    orgId: ctx.orgId,
-    ownerId: ctx.ownerId,
-    title: assembled.title || deriveTitle(description),
-    summary: assembled.summary || description.trim(),
-    visibility: 'private',
-    published: false,
-    ...(ctx.defaultPipelineId ? { pipelineId: ctx.defaultPipelineId } : {}),
-    trigger: { kind: 'on-demand' },
-    steps,
-    edges,
-  };
+  return { ...base, steps, edges };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -425,20 +497,24 @@ export interface ConditionalClause {
   elseText: string | null;
 }
 
-// Parse "if <condition>[,] [then] <then> [,] [else|otherwise <else>]". Robust, multi-step (not one
+// Parse "if <condition>[,] [then] <then>, (else|otherwise) <else>". Robust, multi-step (not one
 // brittle regex): peel off if → else → then/comma, so real phrasings survive
-// ("if the claim is over 1 lakh, route to a surveyor, otherwise auto-approve"). Returns null when
-// there is no `if`, or the condition and action can't be separated (then it's not a real branch).
+// ("if the claim is over 1 lakh, route to a surveyor, otherwise auto-approve").
+//
+// HONESTY / no over-interpretation: a genuine two-way branch REQUIRES an explicit else/otherwise.
+// An "if-only" phrase like "check if they are eligible, then approve" is linguistically ambiguous
+// with a plain decision-then-action ("decide eligibility, then approve") — so we do NOT invent a
+// branch from it (that returns null, and the linear decompose handles it as a decision + action).
+// Returns null when there is no `if`, no `else`, or the condition and then-action can't be split.
 export function detectConditional(text: string): ConditionalClause | null {
   const ifm = /\bif\b\s+(.+)/is.exec((text ?? '').trim());
   if (!ifm) return null;
-  let rest = ifm[1];
-  let elseText: string | null = null;
-  const em = /\b(?:else|otherwise)\b\s+(.+)$/is.exec(rest);
-  if (em) {
-    elseText = em[1].trim().replace(/[.,;\s]+$/, '') || null;
-    rest = rest.slice(0, em.index).trim();
-  }
+  const em = /\b(?:else|otherwise)\b\s+(.+)$/is.exec(ifm[1]);
+  if (!em) return null; // no else ⇒ not a two-way branch (don't over-interpret a decision phrase)
+  const elseText = em[1].trim().replace(/[.,;\s]+$/, '');
+  const rest = ifm[1].slice(0, em.index).trim();
+  if (!elseText) return null;
+
   let condition: string;
   let thenText: string;
   const tm = /^(.+?)[,;]?\s+then\s+(.+)$/is.exec(rest);

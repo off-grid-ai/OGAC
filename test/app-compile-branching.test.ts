@@ -26,17 +26,16 @@ test('detectConditional: explicit "then", "else"', () => {
   assert.match(c!.elseText ?? '', /flag for review/);
 });
 
-test('detectConditional: if-only (no else) still parses a single guarded branch', () => {
-  const c = detectConditional('if the document is a duplicate, reject it');
-  assert.ok(c);
-  assert.match(c!.condition, /document is a duplicate/);
-  assert.match(c!.thenText, /reject it/);
-  assert.equal(c!.elseText, null);
+test('detectConditional: an if-only conditional (no else) is NOT a branch — a decision phrase, not routing', () => {
+  // "check if X then Y" is ambiguous with "decide X then Y"; without an explicit else we do NOT
+  // invent a two-way branch (the linear decompose handles it as a decision + action).
+  assert.equal(detectConditional('if the document is a duplicate, reject it'), null);
+  assert.equal(detectConditional('check if they have exceeded and are eligible, then approve or reject'), null);
 });
 
 test('detectConditional: no "if" ⇒ null; an "if" that cannot split condition/action ⇒ null', () => {
   assert.equal(detectConditional('read the invoice and notify the team'), null);
-  assert.equal(detectConditional('if eligible'), null); // no then / no comma to split an action
+  assert.equal(detectConditional('if eligible'), null); // no else, no then / no comma
 });
 
 test('buildConditionalBranch: emits a decision agent + a yes/no guarded edge per branch', () => {
@@ -68,8 +67,10 @@ test('buildConditionalBranch: the emitted guards actually route with the runner 
   assert.equal(evaluateGuard(elseEdge.when, { s1: 'the answer is NO' }), true);
 });
 
-test('buildConditionalBranch: an if-only conditional emits a single guarded branch', () => {
-  const cond = detectConditional('if the document is a duplicate, reject it')!;
+test('buildConditionalBranch: a single-branch conditional (elseText null) emits one guarded branch', () => {
+  // The builder supports an else-less clause (constructed directly); the pipeline itself only
+  // branches on an explicit else, but the builder capability is independent + tested here.
+  const cond = { condition: 'the document is a duplicate', thenText: 'reject it', elseText: null };
   const { steps, edges, leaves } = buildConditionalBranch(cond, 1);
   assert.equal(steps.length, 2, 'decision + one branch');
   assert.equal(edges.length, 1);
