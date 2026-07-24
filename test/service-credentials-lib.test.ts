@@ -64,8 +64,17 @@ test('credentialPlan: seaweedfs/s3 are s3 (SigV4 access/secret keys)', () => {
   assert.deepEqual(credentialPlan('s3'), { mode: 's3', baoPath: 's3/s3-access-key' });
 });
 
-test('credentialPlan: no-auth images (opensearch/marquez/opa/presidio) are none', () => {
-  for (const svc of ['opensearch', 'marquez', 'opa', 'presidio']) {
+test('credentialPlan: opensearch is oidc-jwt (Phase-D cutover — its security plugin validates KC JWTs)', () => {
+  assert.deepEqual(credentialPlan('opensearch'), {
+    mode: 'oidc-jwt',
+    baoPath: 'opensearch/client-secret',
+  });
+});
+
+test('credentialPlan: the remaining no-auth images (marquez/opa/presidio) stay none', () => {
+  // These are edge-gated (Caddy forward_auth) / proxied — none validate a KC JWT, so sending one
+  // would be a credential they cannot verify.
+  for (const svc of ['marquez', 'opa', 'presidio']) {
     assert.deepEqual(credentialPlan(svc), { mode: 'none' }, svc);
   }
 });

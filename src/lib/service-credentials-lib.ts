@@ -86,11 +86,14 @@ const PLAN_MODES: Record<string, CredentialMode> = {
   // SeaweedFS S3 IAM is access/secret keys (SigV4) — no OIDC.
   seaweedfs: 's3',
   s3: 's3',
-  // No-auth images on the trusted LAN today. TODO(Phase-D): OpenSearch can enable its security plugin
-  // with native OIDC/JWT → flip to 'oidc-jwt' + a KC client; Marquez/OPA/Presidio stay edge-gated
-  // (Caddy forward_auth) or move behind a console proxy — none of them validate a KC JWT today, so
-  // they MUST remain 'none' until that lands or we'd send a credential they can't verify.
-  opensearch: 'none',
+  // Phase-D DONE for OpenSearch (2026-07-25): its security plugin is ENABLED on the fleet and it
+  // validates Keycloak JWTs natively (jwt auth domain, required_audience offgrid-opensearch, the
+  // service account mapped to all_access). The REST layer deliberately stays plain HTTP on this
+  // deployment, so the console sends a Bearer over loopback — no demo-cert trust problem. Every
+  // OpenSearch call routes through lib/opensearch-http.ts, which reads this plan.
+  opensearch: 'oidc-jwt',
+  // Marquez/OPA/Presidio stay edge-gated (Caddy forward_auth) or behind a console proxy — none of them
+  // validate a KC JWT today, so they MUST remain 'none' or we'd send a credential they can't verify.
   marquez: 'none',
   opa: 'none',
   presidio: 'none',
