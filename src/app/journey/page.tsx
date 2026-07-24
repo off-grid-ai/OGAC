@@ -112,7 +112,7 @@ function StageRow({ stage, last }: Readonly<{ stage: (typeof STAGES)[number]; la
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{stage.reality}</p>
           <div className="mt-3 max-w-2xl rounded-md border border-border bg-card/60 p-3">
             <span className="text-[10px] uppercase tracking-wide text-primary">
-              With Off Grid AI Console
+              With OGAC
             </span>
             <p className="mt-1 text-sm text-foreground">{stage.console}</p>
           </div>
@@ -161,7 +161,7 @@ export default function JourneyPage() {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Off Grid AI Console
+            OGAC
           </Link>
           <Button asChild size="sm">
             <Link href="/operations/devices">Open console</Link>
@@ -179,9 +179,9 @@ export default function JourneyPage() {
             From Shadow AI to a self-serve platform
           </h1>
           <p className="mt-3 max-w-2xl text-base text-muted-foreground">
-            Every enterprise is somewhere on this path. Off Grid AI Console is the platform that
-            carries you from sanctioned access to an org-wide, auditable AI estate — one stage at a
-            time.
+            Every enterprise is somewhere on this path. OGAC (Off Grid AI Console) is the platform
+            that carries you from sanctioned access to an org-wide, auditable AI estate, one stage
+            at a time.
           </p>
           <p className="mt-2 text-sm font-medium text-primary">
             Each stage earns the next. You can&apos;t skip.

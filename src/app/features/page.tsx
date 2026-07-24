@@ -376,7 +376,7 @@ export default function FeaturesPage() {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Off Grid AI Console
+            OGAC
           </Link>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
@@ -403,8 +403,8 @@ export default function FeaturesPage() {
               your enterprise.
             </h1>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground">
-              Off Grid AI Console is the all-in-one control plane for agentic AI — every layer of
-              the stack on one source-available console, on your own infrastructure, with
+              OGAC (Off Grid AI Console) is the all-in-one control plane for agentic AI. Every layer
+              of the stack on one source-available console, on your own infrastructure, with
               open-source engines behind stable ports. No per-token markup, no required cloud API
               keys, no lock-in.
             </p>

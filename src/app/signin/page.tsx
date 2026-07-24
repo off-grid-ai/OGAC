@@ -138,7 +138,7 @@ export default async function SignInPage({
               className="mb-2"
               priority
             />
-            <CardTitle className="text-base">Off Grid AI Console</CardTitle>
+            <CardTitle className="text-base">OGAC</CardTitle>
             <CardDescription>
               Sign in to your control plane: gateways, models, data, agents, and governance.
             </CardDescription>

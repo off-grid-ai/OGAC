@@ -157,7 +157,7 @@ export default function FleetControlPage() {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Off Grid AI Console
+            OGAC
           </Link>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">

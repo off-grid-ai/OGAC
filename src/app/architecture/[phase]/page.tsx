@@ -29,7 +29,7 @@ export default async function PhasePage({ params }: Readonly<{ params: Promise<{
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            Off Grid AI Console
+            OGAC
           </Link>
           <Button asChild size="sm">
             <Link href="/operations/devices">Open console</Link>

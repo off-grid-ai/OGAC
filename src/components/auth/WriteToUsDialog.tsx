@@ -58,7 +58,7 @@ export function WriteToUsDialog() {
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-sm">Request access to Off Grid AI Console</DialogTitle>
+          <DialogTitle className="text-sm">Request access to OGAC</DialogTitle>
         </DialogHeader>
         {status === 'done' ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
