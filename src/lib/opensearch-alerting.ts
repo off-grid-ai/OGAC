@@ -24,6 +24,8 @@ import {
 
 const DEFAULT_URL = 'http://127.0.0.1:9200';
 
+import { opensearchFetch } from '@/lib/opensearch-http';
+
 function osUrl(): string {
   return process.env.OFFGRID_OPENSEARCH_URL ?? DEFAULT_URL;
 }
@@ -33,11 +35,12 @@ export function alertingConfigured(): boolean {
 }
 
 async function osFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${osUrl()}${path}`, {
+  // Brokered auth (no-op while the cluster runs security-off) so alerting survives the OIDC cutover.
+  return opensearchFetch(path, {
     ...init,
-    headers: { 'content-type': 'application/json', ...init?.headers },
+    headers: { 'content-type': 'application/json', ...(init?.headers as Record<string, string>) },
     cache: 'no-store',
-    signal: AbortSignal.timeout(6000),
+    timeoutMs: 6000,
   });
 }
 

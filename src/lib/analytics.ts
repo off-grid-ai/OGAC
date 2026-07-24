@@ -22,6 +22,8 @@ import { currentOrgId } from '@/lib/tenancy';
 // scalar rollups derive from `tokens`/`ms` (always numeric) so the cards looked fine; only the
 // histogram silently died. Bucketing days by `ts.slice(0,10)` in JS — exactly as FinOps' `daily`
 // does — makes the charts bind to the same populated docs the cards do, mapping-independent.
+import { opensearchFetch } from '@/lib/opensearch-http';
+
 const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
@@ -34,12 +36,12 @@ export async function gatewayEvents(pipelineTag?: string | null): Promise<AuditE
   // cost model would count another tenant's traffic.
   const query = scopedQuery(analyticsScopeFilters(await currentOrgId(), pipelineTag));
   try {
-    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
+    const r = await opensearchFetch(`/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ size: 5000, sort: [{ '@timestamp': 'desc' }], query }),
       cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
     if (!r.ok) return [];
     const data = await r.json();

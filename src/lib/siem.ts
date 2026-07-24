@@ -7,6 +7,8 @@ import { randomUUID } from 'node:crypto';
 import { type AuditEvent, type AuditEventInput, buildAuditEvent } from '@/lib/audit-event';
 import { correlationIds } from '@/lib/correlation';
 
+import { opensearchFetch } from '@/lib/opensearch-http';
+
 const OPENSEARCH_URL = process.env.OFFGRID_OPENSEARCH_URL;
 const INDEX = process.env.OFFGRID_OPENSEARCH_INDEX ?? 'offgrid-audit';
 
@@ -126,11 +128,12 @@ export function shipAudit(events: Shippable[]): void {
         (e) => `${JSON.stringify({ index: { _index: INDEX, _id: e.id } })}\n${JSON.stringify(e)}`,
       )
       .join('\n') + '\n';
-  fetch(`${OPENSEARCH_URL}/_bulk`, {
+  // Brokered auth (no-op while the cluster runs security-off) so the ship survives the OIDC cutover.
+  opensearchFetch('/_bulk', {
     method: 'POST',
     headers: { 'content-type': 'application/x-ndjson' },
     body,
-    signal: AbortSignal.timeout(4000),
+    timeoutMs: 4000,
   }).catch(() => {});
 }
 
@@ -212,11 +215,11 @@ function buildQuery(p: AuditSearchParams): Record<string, unknown> {
 export async function searchAudit(p: AuditSearchParams): Promise<AuditSearchResult> {
   if (!OPENSEARCH_URL) return { total: 0, hits: [], configured: false };
   try {
-    const res = await fetch(`${OPENSEARCH_URL}/${INDEX}/_search`, {
+    const res = await opensearchFetch(`/${INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(buildQuery(p)),
-      signal: AbortSignal.timeout(5000),
+      timeoutMs: 5000,
     });
     if (!res.ok) {
       return { total: 0, hits: [], configured: true, error: `OpenSearch ${res.status}` };

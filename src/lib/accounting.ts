@@ -15,6 +15,8 @@ import { currentOrgId } from '@/lib/tenancy';
 // Unreachable/empty → real zeros, never synthetic. The pure query builder + response parser live in
 // accounting-aggs.ts (zero-IO, unit-tested). This is a thin I/O adapter that injects the clock + env
 // and prices via finops.
+import { opensearchFetch } from '@/lib/opensearch-http';
+
 const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';
 
@@ -35,14 +37,14 @@ export async function computeAccounting(
   const range = resolveRange(preset, Date.now());
   try {
     const org = await currentOrgId();
-    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
+    const r = await opensearchFetch(`/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(
         buildAccountingQuery(range.from ?? undefined, range.to ?? undefined, pipelineTag, org),
       ),
       cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
     if (!r.ok) return emptyAccounting(range);
     const data = await r.json();
