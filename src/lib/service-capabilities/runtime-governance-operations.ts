@@ -231,13 +231,12 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
   audit({
     serviceId: 'gateway',
     serviceLabel: 'AI Gateway',
-    upstreamVersion: 'Live aggregator gateway-aggregator.mjs (script sha256 afc7410e5583262c) against deployed Console SHA 4919b54e',
+    upstreamVersion: 'Aggregator gateway-aggregator.mjs (script sha256 afc7410e5583262c) under repo-owned LaunchDaemon co.getoffgridai.gateway-aggregator',
     versionSource:
-      'live probe on S1 verified 2026-07-24: PID 315 running /Users/admin/offgrid/console/scripts/gateway-aggregator.mjs (script sha256 afc7410e5583262c, started 2026-07-15 19:54:13, PORT=8800, API-key-owned), :8800/v1/models → HTTP 401 (live + enforcing); expected Console SHA = deployed 4919b54e',
+      'Repo-owned launch artifact deploy/onprem/{gateway-aggregator.sh, co.getoffgridai.gateway-aggregator.plist, install-gateway-aggregator.sh}, installed to /Library/LaunchDaemons on S1 2026-07-24 (root:wheel). Verified live: launchd-managed (ppid 1), RunAtLoad+KeepAlive, :8800/v1/models → HTTP 401 (live + API-key enforced). Auto-restart PROVEN 2026-07-24 — killing the aggregator (pid 37325) had launchd relaunch it (pid 37871) with :8800 answering again. Script identity sha256 afc7410e5583262c; token sourced from /Users/admin/offgrid/secrets/gateway-aggregator.token (never in-repo).',
     denominatorSource:
       'packages/gateway/src/index.ts; packages/gateway/src/cluster/types.ts; packages/gateway/src/queue/types.ts; Console cloud-egress contract at c0d3e793: src/lib/egress-dlp.ts, src/lib/egress-dlp-run.ts, src/lib/egress-policy-store.ts, and src/app/api/v1/chat/stream/route.ts',
-    auditStateEvidence:
-      'The live identity is now recorded (script sha256 afc7410e5583262c, PID start 2026-07-15 19:54:13, expected Console SHA 4919b54e, :8800 live+401), but deploy/push.sh still does not restart the aggregator and the live process is a legacy ROOT process with no repo-owned launchd artifact. Closing this requires installing a root /Library/LaunchDaemons artifact (co.getoffgridai.gateway-aggregator, mirroring the guard-aggregator recover path) — an operator step needing sudo on S1. Until that is installed and a kill→auto-restart is proven, the digest/launch-manifest identity is incomplete and the aggregator will not self-recover.',
+    auditState: 'current',
     summary:
       'Bounded first-party denominator: authenticated inference, model discovery, fleet routing, and request governance. Direct backend access is not part of the operator contract.',
     capabilities: [

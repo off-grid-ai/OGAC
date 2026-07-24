@@ -196,7 +196,7 @@ test('app-worker has a pinned six-item denominator without inflating live proof'
   );
 });
 
-test('stale common execution spine records name exact immutable-identity blockers', () => {
+test('execution-spine immutable-identity blockers are all closed (gateway/opa/temporal current)', () => {
   const audits = new Map(
     RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.map((record) => [record.serviceId, record]),
   );
@@ -205,10 +205,11 @@ test('stale common execution spine records name exact immutable-identity blocker
   assert.ok(gateway);
   assert.ok(opa);
 
-  // temporal graduated to `current` on 2026-07-20 once its live image digests were locked in
-  // SERVER_STATE.md; opa graduated on 2026-07-23 once its live immutable build identity was captured
-  // (`opa version` in the running container → Version 0.70.0, Build Commit 2ea031ea…). Neither is part
-  // of the stale execution spine any more.
+  // The execution spine's immutable-identity blockers are all now CLOSED:
+  // - temporal graduated 2026-07-20 (live image digests locked in SERVER_STATE.md);
+  // - opa graduated 2026-07-23 (`opa version` → Build Commit 2ea031ea…);
+  // - gateway graduated 2026-07-24 once its aggregator became a repo-owned root LaunchDaemon
+  //   (co.getoffgridai.gateway-aggregator, launchd-managed, KeepAlive) with a PROVEN kill→auto-restart.
   const temporal = audits.get('temporal');
   assert.ok(temporal);
   assert.equal(temporal.auditState, 'current');
@@ -216,19 +217,10 @@ test('stale common execution spine records name exact immutable-identity blocker
   assert.equal(opa.auditStateEvidence, null);
   assert.match(opa.versionSource, /Build Commit 2ea031ea/);
 
-  // gateway remains the stale execution-spine exemplar: the live aggregator still has no repo-owned
-  // launch artifact or deployed-source stamp, so its runtime identity is not immutable-verifiable.
-  for (const audit of [gateway]) {
-    assert.equal(audit.auditState, 'stale');
-    assert.ok(audit.auditStateEvidence);
-    assert.match(
-      audit.auditStateEvidence,
-      /(checksum|digest|Image ID|RepoDigest)/i,
-      `${audit.serviceId} identifies the missing immutable runtime evidence`,
-    );
-  }
-
-  assert.match(gateway.auditStateEvidence ?? '', /does not restart the aggregator/);
+  assert.equal(gateway.auditState, 'current');
+  assert.equal(gateway.auditStateEvidence, null);
+  assert.match(gateway.versionSource, /LaunchDaemon/);
+  assert.match(gateway.versionSource, /Auto-restart PROVEN/);
 
   const gatewayGovernance = gateway.items.find((item) => item.id === 'request-governance');
   const opaDecisions = opa.items.find((item) => item.id === 'policy-decisions');

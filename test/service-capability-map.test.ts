@@ -37,9 +37,15 @@ test('composition rejects duplicate family ownership instead of silently choosin
   );
 });
 
-test('stale audits cannot verify upstream availability', () => {
+test('the whole map is live-current, and any stale audit could not verify upstream availability', () => {
+  // As of 2026-07-24 every service was live-verified to current (0 stale / 0 pending) — the achieved
+  // all-current state. Assert that, AND keep the stale invariant as a guard so a future re-introduced
+  // stale audit still cannot fake upstream availability.
   const stale = SERVICE_CAPABILITY_AUDITS.filter((audit) => audit.auditState === 'stale');
-  assert.ok(stale.length > 0);
+  assert.equal(stale.length, 0, 'the map is all-current — no stale audits remain');
+  for (const audit of SERVICE_CAPABILITY_AUDITS) {
+    assert.equal(audit.auditStateEvidence, null, `${audit.serviceId} current ⇒ no stale evidence`);
+  }
 
   for (const audit of stale) {
     assert.ok(audit.auditStateEvidence, `${audit.serviceId} explains why its audit is stale`);
