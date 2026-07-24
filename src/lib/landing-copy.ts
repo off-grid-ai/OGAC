@@ -115,7 +115,7 @@ export const LANDING = {
     intro: 'First five use cases free, outcomes agreed upfront. See it work, then decide.',
     plans: [
       { name: 'Self-installed', price: 'Free', suffix: '', description: 'The platform for business, free for up to 25 users.', cta: { label: 'View the source', href: 'source' as const }, features: ['Up to 25 users', 'Run it yourself', 'Source available', 'Your infrastructure'] },
-      { name: 'Managed', price: '$150', suffix: '/month', description: 'Installed and managed for teams up to 50.', cta: { label: 'View the product', href: 'liveProduct' as const }, features: ['Up to 50 users included', '$2.99 per user above 50', 'Installation included', 'Platform updates included'] },
+      { name: 'Managed', price: '$149.50', suffix: '/month', description: 'Installed and managed for teams up to 50.', cta: { label: 'View the product', href: 'liveProduct' as const }, features: ['Up to 50 users included', '$2.99 per user above 50', 'Installation included', 'Platform updates included'] },
       { name: 'Enterprise', price: 'Custom', suffix: '', description: 'Five working use cases in 14 days, at no cost.', cta: { label: 'Start with five', href: 'liveProduct' as const }, features: ['Five-use-case proof', 'Outcomes agreed upfront', 'Unlimited-user licensing available', 'Enterprise support available'] },
     ],
     comparison: {

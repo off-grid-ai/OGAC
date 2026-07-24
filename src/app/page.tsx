@@ -19,8 +19,12 @@ import { SeeItLive } from '@/app/_landing/see-it-live';
 import { BookCallDialog } from '@/components/auth/BookCallDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuroraText } from '@/components/ui/aurora-text';
+import { BentoGrid, BentoTile } from '@/components/ui/bento-grid';
 import { BlurFade } from '@/components/ui/blur-fade';
+import { BorderBeam } from '@/components/ui/border-beam';
 import { Button } from '@/components/ui/button';
+import { DotPattern } from '@/components/ui/dot-pattern';
+import { MagicCard } from '@/components/ui/magic-card';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import { Spotlight } from '@/components/ui/spotlight';
 import { LANDING } from '@/lib/landing-copy';
@@ -222,28 +226,29 @@ export default function LandingPage() {
       <section id="capabilities" className="relative border-b border-border bg-card/40">
         <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
           <SectionHead number={c.capabilities.number} kicker={c.capabilities.kicker} heading={c.capabilities.heading} intro={c.capabilities.intro} />
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {c.capabilities.items.map((it, i) => (
-              <BlurFade key={it.number} delay={0.08 * i} inView>
-                <div className="h-full rounded-2xl border border-border bg-background p-5">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-mono text-xs text-primary">{it.number}</span>
-                    <span className="text-base font-semibold text-foreground">{it.name}</span>
-                  </div>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{it.summary}</p>
-                  <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
-                    {it.visual}
-                  </p>
-                </div>
-              </BlurFade>
-            ))}
-          </div>
+          <BlurFade delay={0.1} inView>
+            <BentoGrid className="mt-10">
+              {c.capabilities.items.map((it, i) => (
+                <BentoTile
+                  key={it.number}
+                  icon={PILLAR_ICONS[i] ?? Cpu}
+                  title={`${it.number} · ${it.name}`}
+                  body={it.summary}
+                />
+              ))}
+            </BentoGrid>
+          </BlurFade>
         </div>
       </section>
 
       {/* ── 03 Numbers ─────────────────────────────────────────────────────── */}
-      <section id="numbers" className="relative border-b border-border">
-        <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
+      <section id="numbers" className="relative overflow-hidden border-b border-border">
+        <DotPattern
+          width={22}
+          height={22}
+          className="[mask-image:radial-gradient(60rem_circle_at_center,white,transparent)] opacity-60"
+        />
+        <div className="relative mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
           <SectionHead number={c.numbers.number} kicker={c.numbers.kicker} heading={c.numbers.heading} intro={c.numbers.intro} />
           <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-7">
             {c.numbers.metrics.map((m, i) => (
@@ -322,7 +327,12 @@ export default function LandingPage() {
           <div className="mt-10 grid gap-4 lg:grid-cols-3">
             {c.pricing.plans.map((plan, i) => (
               <BlurFade key={plan.name} delay={0.08 * i} inView>
-                <div className={`flex h-full flex-col rounded-2xl border bg-background p-6 ${i === 2 ? 'border-primary/50 shadow-[0_20px_80px_-30px_rgba(5,150,105,0.25)]' : 'border-border'}`}>
+                <MagicCard
+                  className={`relative flex h-full flex-col overflow-hidden rounded-2xl border bg-background p-6 ${i === 2 ? 'border-primary/50 shadow-[0_20px_80px_-30px_rgba(5,150,105,0.25)]' : 'border-border'}`}
+                >
+                  {i === 2 ? (
+                    <BorderBeam size={90} duration={7} colorFrom="#34d399" colorTo="#059669" />
+                  ) : null}
                   <p className="text-sm font-semibold text-foreground">{plan.name}</p>
                   <p className="mt-2 flex items-baseline gap-1">
                     <span className="font-mono text-3xl font-semibold tracking-tight text-foreground">{plan.price}</span>
@@ -340,7 +350,7 @@ export default function LandingPage() {
                   <Button asChild variant={i === 2 ? 'default' : 'outline'} size="sm" className="mt-6">
                     <Link href={href(plan.cta.href)}>{plan.cta.label}</Link>
                   </Button>
-                </div>
+                </MagicCard>
               </BlurFade>
             ))}
           </div>
