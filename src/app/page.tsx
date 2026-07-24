@@ -140,7 +140,7 @@ export default function LandingPage() {
                       <ArrowRight className="size-4" weight="bold" />
                     </Link>
                   </Button>
-                  <BookCallDialog label="Book a call" variant="outline" size="lg" autoOpenParam="book" />
+                  <BookCallDialog label="Book a call" variant="outline" size="lg" className="" autoOpenParam="book" />
                 </div>
               </BlurFade>
               <BlurFade delay={0.48} inView>
