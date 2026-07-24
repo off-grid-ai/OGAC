@@ -412,6 +412,102 @@ function impliesApproval(description: string): boolean {
   return APPROVAL.test(description) || /\bapproval\b/i.test(description);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// PURE — conditional (branching) recognition + build. "if X, A, (else|otherwise) B" → a decision
+// agent + two guarded branches. The runner (app-run-plan.planAdvance) honors the guards; here we
+// only AUTHOR them from plain language so the non-tech persona gets a real branch, not a linear
+// approximation. The decision agent is instructed to answer YES/NO and the branch edges guard on
+// that token — a deterministic, model-friendly contract (no free-form expression language).
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+export interface ConditionalClause {
+  condition: string;
+  thenText: string;
+  elseText: string | null;
+}
+
+// Parse "if <condition>[,] [then] <then> [,] [else|otherwise <else>]". Robust, multi-step (not one
+// brittle regex): peel off if → else → then/comma, so real phrasings survive
+// ("if the claim is over 1 lakh, route to a surveyor, otherwise auto-approve"). Returns null when
+// there is no `if`, or the condition and action can't be separated (then it's not a real branch).
+export function detectConditional(text: string): ConditionalClause | null {
+  const ifm = /\bif\b\s+(.+)/is.exec((text ?? '').trim());
+  if (!ifm) return null;
+  let rest = ifm[1];
+  let elseText: string | null = null;
+  const em = /\b(?:else|otherwise)\b\s+(.+)$/is.exec(rest);
+  if (em) {
+    elseText = em[1].trim().replace(/[.,;\s]+$/, '') || null;
+    rest = rest.slice(0, em.index).trim();
+  }
+  let condition: string;
+  let thenText: string;
+  const tm = /^(.+?)[,;]?\s+then\s+(.+)$/is.exec(rest);
+  if (tm) {
+    condition = tm[1];
+    thenText = tm[2];
+  } else {
+    const ci = rest.indexOf(',');
+    if (ci < 0) return null; // no "then" and no comma ⇒ can't split condition from action
+    condition = rest.slice(0, ci);
+    thenText = rest.slice(ci + 1);
+  }
+  condition = condition.trim().replace(/[,;.]+$/, '');
+  thenText = thenText.trim().replace(/[,;.]+$/, '');
+  if (!condition || !thenText) return null;
+  return { condition, thenText, elseText };
+}
+
+// Build one branch clause into a step (output/human/agent) — the branch tail the merge wires to.
+function branchStep(clause: string, id: string): AppStep {
+  const cls = classifyClause(clause);
+  if (cls === 'output') {
+    return { id, label: shortLabel(clause) || 'Output', kind: 'output', sink: sinkForClause(clause) };
+  }
+  if (cls === 'approval') return { id, label: shortLabel(clause) || 'Review / approve', kind: 'human' };
+  return {
+    id,
+    label: shortLabel(clause) || 'Action',
+    kind: 'agent',
+    inlineAgent: { systemPrompt: clause.trim(), grounded: true },
+  };
+}
+
+// Assemble the decision agent + guarded branches from a parsed conditional. Step ids start at
+// `s${startN}`. Returns the branch steps, the guarded edges (decision → branch), and the `leaves`
+// (branch tail ids) the caller merges into the terminal output step.
+export function buildConditionalBranch(
+  cond: ConditionalClause,
+  startN: number,
+): { steps: AppStep[]; edges: AppEdge[]; leaves: string[] } {
+  const dId = `s${startN}`;
+  const steps: AppStep[] = [
+    {
+      id: dId,
+      label: shortLabel(cond.condition) || 'Decision',
+      kind: 'agent',
+      inlineAgent: {
+        systemPrompt: `Decide whether: ${cond.condition}. Answer with exactly one word: YES or NO.`,
+        grounded: true,
+      },
+    },
+  ];
+  const edges: AppEdge[] = [];
+  const leaves: string[] = [];
+
+  const thenId = `s${startN + 1}`;
+  steps.push(branchStep(cond.thenText, thenId));
+  edges.push({ from: dId, to: thenId, when: `${dId} contains "yes"` });
+  leaves.push(thenId);
+
+  if (cond.elseText) {
+    const elseId = `s${startN + 2}`;
+    steps.push(branchStep(cond.elseText, elseId));
+    edges.push({ from: dId, to: elseId, when: `${dId} contains "no"` });
+    leaves.push(elseId);
+  }
+  return { steps, edges, leaves };
+}
+
 export type OutputSinkKind = 'console' | 'report' | 'email' | 'whatsapp' | 'webhook' | 'slack';
 
 export interface InferredOutputSink {
