@@ -2,7 +2,7 @@
 
 import { Plus, Trash } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ import {
   HASH_TYPES,
   type HashType,
   type OperatorSpec,
+  policyUsesEncrypt,
 } from '@/lib/presidio-anonymizers';
 
 // Per-entity anonymizer OPERATOR policy editor + a live test box. This is the "how do we mask each
@@ -254,6 +255,7 @@ export function PresidioAnonymizers({
         </div>
 
         {/* Image redaction — the real upload → redact → review surface */}
+        <EncryptionKeyPanel usesEncrypt={policyUsesEncrypt(policy)} />
         <ImageRedactionPanel available={imageRedactionAvailable} />
       </div>
     </div>
@@ -287,7 +289,8 @@ function OperatorEditor({
         onChange({ type, hashType: 'sha256' });
         break;
       case 'encrypt':
-        onChange({ type, key: '' });
+        // No inline key: a keyless encrypt spec means "use the org's vaulted key".
+        onChange({ type });
         break;
       case 'replace':
         onChange({ type, newValue: '' });
@@ -374,15 +377,77 @@ function OperatorEditor({
       ) : null}
 
       {spec.type === 'encrypt' ? (
-        <Input
-          value={spec.key ?? ''}
-          placeholder="AES key (16 / 24 / 32 chars)"
-          className="font-mono"
-          onChange={(e) => onChange({ type: 'encrypt', key: e.target.value })}
-        />
+        // The AES key is NEVER typed or stored here — it is generated into the secrets store and
+        // bound at scan time. Manage it with "Encryption key" below.
+        <p className="rounded border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground">
+          Uses the organization&rsquo;s encryption key from the secrets store. Manage it under
+          <span className="text-foreground"> Encryption key</span> below.
+        </p>
       ) : null}
 
       <p className="text-[11px] text-muted-foreground">{describeOperator(spec)}</p>
+    </div>
+  );
+}
+
+// ─── Encryption key — the vault-backed AES key for the `encrypt` operator ─────────────────────────
+// The key is generated server-side into the secrets store and NEVER returned, so this panel only ever
+// shows whether one is configured. Without a key an encrypt operator degrades to masking (the value is
+// still redacted, never plaintext) — stated plainly rather than failing silently.
+function EncryptionKeyPanel({ usesEncrypt }: Readonly<{ usesEncrypt: boolean }>) {
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    fetch('/api/v1/admin/governance/masking/encrypt-key')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (live) setConfigured(j ? Boolean(j.configured) : null);
+      })
+      .catch(() => {
+        if (live) setConfigured(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function generate(): Promise<void> {
+    setBusy(true);
+    try {
+      const res = await fetch('/api/v1/admin/governance/masking/encrypt-key', { method: 'POST' });
+      const body = (await res.json().catch(() => ({}))) as { configured?: boolean; rotated?: boolean; error?: string };
+      if (!res.ok) {
+        toast.error(body.error ?? 'Could not store the key');
+        return;
+      }
+      setConfigured(Boolean(body.configured));
+      toast.success(body.rotated ? 'Encryption key rotated' : 'Encryption key generated');
+    } catch {
+      toast.error('Could not reach the secrets store');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-border p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium">Encryption key</span>
+        <Badge variant={configured ? 'default' : 'secondary'}>
+          {configured === null ? 'unknown' : configured ? 'configured' : 'not set'}
+        </Badge>
+        <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={generate} disabled={busy}>
+          {busy ? 'Working…' : configured ? 'Rotate key' : 'Generate key'}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Generated on the server and held in the secrets store — it is never displayed or downloadable.
+        {usesEncrypt && configured === false
+          ? ' Your policy encrypts an entity but no key is set, so those values are masked instead until you generate one.'
+          : ' Required only by the encrypt operator; without it, encrypt degrades to masking.'}
+      </p>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   type AnonymizerPolicy,
   DEFAULT_ANONYMIZER_POLICY,
   normalizeAnonymizerPolicy,
+  stripInlineEncryptKeys,
 } from '@/lib/presidio-anonymizers';
 
 let ensurePromise: Promise<void> | null = null;
@@ -64,7 +65,9 @@ export async function setAnonymizerPolicy(
   orgId = 'default',
 ): Promise<AnonymizerPolicy> {
   await ensureAnonymizerPolicySchema();
-  const normalized = normalizeAnonymizerPolicy(value);
+  // NEVER persist AES key material: strip inline keys, keeping the encrypt INTENT (a keyless encrypt
+  // spec resolves the org's vaulted key at call time via bindEncryptKey).
+  const normalized = stripInlineEncryptKeys(normalizeAnonymizerPolicy(value));
   const { db } = await import('@/db');
   const { sql } = await import('drizzle-orm');
   await db.execute(sql`

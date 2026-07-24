@@ -5,6 +5,13 @@ import {
   type NormalizedRecognizer,
   type ThresholdConfig,
 } from '@/lib/presidio-recognizers';
+import {
+  type AnonymizerPolicy,
+  bindEncryptKey,
+  buildAnonymizeRequest,
+  PRESIDIO_ENCRYPT_KEY_SECRET,
+  policyUsesEncrypt,
+} from '@/lib/presidio-anonymizers';
 import { regexScan } from './pii-regex';
 import type { PiiPort, PiiResult } from './types';
 
@@ -21,6 +28,14 @@ export interface PresidioScanPolicy {
   recognizers?: NormalizedRecognizer[];
   thresholds?: ThresholdConfig;
   language?: string;
+  /**
+   * The org's per-entity OPERATOR policy (mask / redact / hash / encrypt / keep). ABSENT ⇒ the legacy
+   * single-`replace` behaviour, so every existing caller is unchanged. PRESENT ⇒ the operator's
+   * configured operators actually govern production redaction (they previously only applied on the
+   * admin test surface, which is the gap this closes). Encrypt keys are already BOUND here (the
+   * caller resolves them from the vault via bindEncryptKey) — this layer never touches secrets.
+   */
+  operators?: AnonymizerPolicy;
 }
 
 interface PresidioEntity {
@@ -152,9 +167,15 @@ export async function scanWithPresidio(
     }
 
     try {
+      // The org's OPERATOR policy governs production redaction when present (reusing the SAME pure
+      // request builder the admin test surface uses — one authority, no second shaping rule); absent,
+      // the legacy single-`replace` body is sent verbatim.
+      const body = policy.operators
+        ? buildAnonymizeRequest(text, entities, policy.operators)
+        : { text, analyzer_results: entities, anonymizers: anonymizers(entities) };
       const anonymized = (await postJson(
         `${config.anonymizerUrl}/anonymize`,
-        { text, analyzer_results: entities, anonymizers: anonymizers(entities) },
+        body,
         config.timeoutMs,
         fetcher,
       )) as { text?: unknown };
@@ -197,18 +218,41 @@ export async function scanWithPresidio(
   }
 }
 
+/**
+ * Resolve the org's AES key for the `encrypt` operator from the SECRETS STORE (OpenBao), with an env
+ * bootstrap fallback. Never throws and never logs the material — an unresolved key makes
+ * bindEncryptKey downgrade encryption to masking rather than fail open.
+ */
+async function resolveEncryptKey(): Promise<string | null> {
+  try {
+    const { openBaoSecrets } = await import('@/lib/adapters/secrets');
+    const vaulted = await openBaoSecrets.get(PRESIDIO_ENCRYPT_KEY_SECRET);
+    if (typeof vaulted === 'string' && vaulted.trim()) return vaulted.trim();
+  } catch {
+    /* vault unreachable — fall through to the env bootstrap */
+  }
+  return process.env.OFFGRID_PRESIDIO_ENCRYPT_KEY?.trim() || null;
+}
+
 async function loadPolicy(orgId?: string): Promise<PresidioScanPolicy> {
   try {
     const { getThresholds, listRecognizers } = await import('@/lib/presidio-recognizers');
+    const { getAnonymizerPolicy } = await import('@/lib/presidio-anonymizer-policy-store');
     const resolvedOrg = orgId?.trim() || 'default';
-    const [recognizers, thresholds] = await Promise.all([
+    const [recognizers, thresholds, stored] = await Promise.all([
       listRecognizers(resolvedOrg),
       getThresholds(resolvedOrg),
+      getAnonymizerPolicy(resolvedOrg),
     ]);
-    return { recognizers, thresholds };
+    // Bind the vaulted key ONLY when the policy actually encrypts, so a non-encrypting org never
+    // touches the secrets store. An unresolvable key downgrades to masking (fail safe, reported).
+    const operators = policyUsesEncrypt(stored)
+      ? bindEncryptKey(stored, await resolveEncryptKey()).policy
+      : stored;
+    return { recognizers, thresholds, operators };
   } catch {
     // The default India recognizers are folded in by buildAnalyzeRequest. A policy-store failure must
-    // not bypass redaction; it only loses the org overrides for this call.
+    // not bypass redaction; it only loses the org overrides for this call (legacy replace applies).
     return {};
   }
 }
