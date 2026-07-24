@@ -1,8 +1,8 @@
 <div align="center">
   <img src="public/logo.png" width="88" alt="Off Grid AI" />
-  <h1>Off Grid AI Console</h1>
-  <h3>AWS for AI. Make your enterprise intelligent, on one interface that just works.</h3>
-  <p>Source available. Set your rules once. Everyone builds governed AI on top.</p>
+  <h1>Off Grid AI</h1>
+  <h3>Enable every person to operate with the intelligence and capabilities of the entire enterprise.</h3>
+  <p>Source available. Five working AI use cases, live in 14 days, at zero cost. Set your rules once. Everyone builds governed AI on top.</p>
   <p>
     <a href="https://github.com/off-grid-ai/console/actions/workflows/ci.yml"><img src="https://github.com/off-grid-ai/console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
     <img src="https://img.shields.io/badge/coverage-97%25-brightgreen" alt="Coverage: 97% statements &amp; lines" />
@@ -225,7 +225,7 @@ a public consumer chatbot or a throwaway prototype.
 
 Off Grid AI's commercial model is simple:
 
-- **Self-installed:** use Off Grid AI Console for business at no charge for up to 25 users.
+- **Self-installed:** use Off Grid AI for business at no charge for up to 25 users.
 - **Installed and managed by Off Grid AI:** $150/month for up to 50 users. Organizations with more
   than 50 users pay $2.99/user/month.
 - **Enterprise:** start with a no-cost proof of concept. Following CIO-sponsored discovery, Off Grid
