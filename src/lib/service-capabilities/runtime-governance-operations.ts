@@ -66,12 +66,11 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
   audit({
     serviceId: 'console',
     serviceLabel: 'Console',
-    upstreamVersion: '61b86a720f725bbd6fdd40d0368e499e22c1bc2e',
-    versionSource: `${FLEET_EVIDENCE} release stamp`,
+    upstreamVersion: 'Deployed release 4919b54ed63267f6c061a617f92024003a6682e6',
+    versionSource: `live deploy/.deployed-sha on S1 verified 2026-07-24 → 4919b54ed63267f6c061a617f92024003a6682e6, signin 200; ${FLEET_EVIDENCE} release stamp`,
     denominatorSource:
       'src/app/(console) route tree; src/lib/tenancy-policy.ts; src/lib/adapters contracts',
-    auditStateEvidence:
-      'The fleet verified this immutable release, but the current working release has moved beyond it and is not deployed.',
+    auditState: 'current',
     summary:
       'Bounded first-party denominator: authenticated operator access, management routes, tenant isolation, and durable run dispatch. Self-restart remains host-owned.',
     capabilities: [
