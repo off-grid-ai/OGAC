@@ -285,3 +285,45 @@ export function summarizeImageRedactionEntities(
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([entityType, evidence]) => ({ entityType, ...evidence }));
 }
+
+// ─── Operator-UI PURE helpers (client-side, zero-IO) ────────────────────────────────────────────
+// The upload panel validates a chosen file BEFORE encoding + posting it, so an over-limit or
+// wrong-type file is rejected instantly with an honest message instead of a wasted round-trip. Same
+// limits the server enforces (IMAGE_REDACTION_LIMITS) — one source of truth, no drift.
+
+/** Map a browser File.type to the supported media type, or null if unsupported. PURE. */
+export function imageRedactionMediaTypeFor(fileType: string): ImageRedactionMediaType | null {
+  if (fileType === 'image/png') return 'image/png';
+  if (fileType === 'image/jpeg' || fileType === 'image/jpg') return 'image/jpeg';
+  return null;
+}
+
+/**
+ * Validate a chosen upload against the server's real limits. Returns an honest error string, or null
+ * when the file is acceptable. PURE — takes the minimal {type,size} shape so it is unit-testable
+ * without a DOM File.
+ */
+export function imageRedactionUploadError(file: { type: string; size: number }): string | null {
+  if (!imageRedactionMediaTypeFor(file.type)) return 'Only PNG and JPEG images are supported.';
+  if (file.size <= 0) return 'The file is empty.';
+  if (file.size > IMAGE_REDACTION_LIMITS.maxBytes) {
+    const mib = Math.round(IMAGE_REDACTION_LIMITS.maxBytes / (1024 * 1024));
+    return `Image exceeds the ${mib} MiB limit.`;
+  }
+  return null;
+}
+
+/**
+ * A short human summary of what a redaction did, for the review panel. PURE.
+ *   • no entities → an honest "screened, nothing detected" (the image is still returned re-encoded).
+ *   • entities    → "PAN ×1, PHONE_NUMBER ×2" style, most-frequent first.
+ */
+export function summarizeRedactionResult(evidence: ImageRedactionEvidence): string {
+  const list = evidence.entities;
+  if (!list.length) return 'Screened — no PII detected in the image.';
+  const parts = [...list]
+    .sort((a, b) => b.count - a.count || a.entityType.localeCompare(b.entityType))
+    .map((e) => `${e.entityType} ×${e.count}`);
+  const total = list.reduce((sum, e) => sum + e.count, 0);
+  return `Redacted ${total} PII region${total === 1 ? '' : 's'}: ${parts.join(', ')}.`;
+}

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getPii } from '@/lib/adapters/registry';
+import { resolvePresidioImageRedactorConfig } from '@/lib/adapters/presidio-image-redaction';
 import { guardrailsDestination, type GuardrailsDestination } from '@/lib/guardrails-destinations';
 import { listGuardrailRules } from '@/lib/guardrails-rules';
 import { readGuardrailsView, type GuardrailsView } from '@/lib/guardrails-view';
@@ -64,13 +65,20 @@ async function destinationContent(
       listGuardrailRules(orgId).catch(() => []),
       getAnonymizerPolicy(orgId).catch(() => DEFAULT_ANONYMIZER_POLICY),
     ]);
+    // Real availability: the image-redactor is usable when its URL + token are configured (the same
+    // config the adapter resolves), not a hardcoded flag.
+    const imgCfg = resolvePresidioImageRedactorConfig();
+    const imageRedactionAvailable = Boolean(imgCfg.url && imgCfg.token);
     return (
       <div className="space-y-6">
         <ManagementCard title="Masking rules">
           <GuardrailRules rules={rules} />
         </ManagementCard>
         <ManagementCard title="Anonymizer operators — how each entity is masked">
-          <PresidioAnonymizers policy={anonymizerPolicy} imageRedactionAvailable={false} />
+          <PresidioAnonymizers
+            policy={anonymizerPolicy}
+            imageRedactionAvailable={imageRedactionAvailable}
+          />
         </ManagementCard>
       </div>
     );

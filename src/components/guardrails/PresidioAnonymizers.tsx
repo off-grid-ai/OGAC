@@ -1,6 +1,6 @@
 'use client';
 
-import { ImageSquare, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
+import { Plus, Trash } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { ImageRedactionPanel } from '@/components/guardrails/ImageRedactionPanel';
 import {
   ANONYMIZE_OPERATORS,
   type AnonymizeOperator,
@@ -252,21 +253,8 @@ export function PresidioAnonymizers({
           ) : null}
         </div>
 
-        {/* Image redaction — honest capability signal */}
-        <div className="space-y-1 rounded-md border border-dashed border-border p-4">
-          <div className="flex items-center gap-2">
-            <ImageSquare className="size-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Document image redaction</span>
-            <Badge variant={imageRedactionAvailable ? 'default' : 'secondary'}>
-              {imageRedactionAvailable ? 'available' : 'engine not deployed'}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {imageRedactionAvailable
-              ? 'Upload a KYC document image to redact PII regions before it moves.'
-              : 'Redacting PII from KYC document IMAGES (OVDs) needs the Presidio image-redactor service, which is not part of this deployment. Text masking above is fully live.'}
-          </p>
-        </div>
+        {/* Image redaction — the real upload → redact → review surface */}
+        <ImageRedactionPanel available={imageRedactionAvailable} />
       </div>
     </div>
   );

@@ -4,8 +4,12 @@ import {
   DEFAULT_IMAGE_REDACTION_ENTITIES,
   IMAGE_REDACTION_LIMITS,
   ImageRedactionError,
+  imageRedactionMediaTypeFor,
+  imageRedactionUploadError,
   parseImageRedactionCommand,
   summarizeImageRedactionEntities,
+  summarizeRedactionResult,
+  type ImageRedactionEvidence,
 } from '@/lib/image-redaction';
 
 const png = Buffer.from('89504e470d0a1a0a00000000', 'hex');
@@ -126,5 +130,69 @@ test('aggregates only sanitized provider evidence and rejects anything outside p
     () =>
       summarizeImageRedactionEntities([{ entityType: 'PERSON', score: 'raw OCR text' }], policy),
     ImageRedactionError,
+  );
+});
+
+// ─── Operator-UI PURE helpers ─────────────────────────────────────────────────────────────────────
+
+test('imageRedactionMediaTypeFor: maps browser file types, rejects the rest', () => {
+  assert.equal(imageRedactionMediaTypeFor('image/png'), 'image/png');
+  assert.equal(imageRedactionMediaTypeFor('image/jpeg'), 'image/jpeg');
+  assert.equal(imageRedactionMediaTypeFor('image/jpg'), 'image/jpeg');
+  assert.equal(imageRedactionMediaTypeFor('application/pdf'), null);
+  assert.equal(imageRedactionMediaTypeFor(''), null);
+});
+
+test('imageRedactionUploadError: accepts a valid image, rejects type/empty/oversize with the real limit', () => {
+  assert.equal(imageRedactionUploadError({ type: 'image/png', size: 1024 }), null);
+  assert.match(imageRedactionUploadError({ type: 'application/pdf', size: 10 }) ?? '', /PNG and JPEG/);
+  assert.match(imageRedactionUploadError({ type: 'image/png', size: 0 }) ?? '', /empty/);
+  assert.match(
+    imageRedactionUploadError({ type: 'image/png', size: IMAGE_REDACTION_LIMITS.maxBytes + 1 }) ?? '',
+    /exceeds the 8 MiB limit/,
+  );
+});
+
+const EVIDENCE = (entities: ImageRedactionEvidence['entities']): ImageRedactionEvidence => ({
+  engine: 'Microsoft Presidio image-redactor',
+  engineVersion: '0.0.59',
+  ocrEngine: 'Tesseract',
+  inputSha256: 'a'.repeat(64),
+  outputSha256: 'b'.repeat(64),
+  inputBytes: 100,
+  outputBytes: 90,
+  width: 400,
+  height: 200,
+  durationMs: 42,
+  entities,
+  policy: {
+    receiptId: 'imgred_x',
+    tenantId: 'default',
+    actorId: 'op@x',
+    purpose: 'KYC',
+    entityTypes: ['IN_PAN'],
+    scoreThreshold: 0.5,
+  },
+});
+
+test('summarizeRedactionResult: honest "nothing detected" when no entities', () => {
+  assert.match(summarizeRedactionResult(EVIDENCE([])), /no PII detected/i);
+});
+
+test('summarizeRedactionResult: totals + most-frequent-first entity breakdown', () => {
+  const s = summarizeRedactionResult(
+    EVIDENCE([
+      { entityType: 'IN_PAN', count: 1, maxScore: 0.9 },
+      { entityType: 'PHONE_NUMBER', count: 2, maxScore: 0.8 },
+    ]),
+  );
+  assert.match(s, /Redacted 3 PII regions/);
+  assert.match(s, /PHONE_NUMBER ×2, IN_PAN ×1/); // most-frequent first
+});
+
+test('summarizeRedactionResult: singular "region" for a single detection', () => {
+  assert.match(
+    summarizeRedactionResult(EVIDENCE([{ entityType: 'IN_PAN', count: 1, maxScore: 0.9 }])),
+    /Redacted 1 PII region: IN_PAN ×1/,
   );
 });
