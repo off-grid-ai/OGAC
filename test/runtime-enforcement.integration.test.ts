@@ -106,6 +106,92 @@ test('PII masking substitutes the raw value BEFORE the model (real PII scan + co
   assert.equal(unchanged, rawQuery, 'no masking required ⇒ the raw query is unchanged');
 });
 
+// ── Egress DLP on the GOVERNED-run path (agentrun) — the per-org policy that only the chat seam used
+// to honor now governs app/agent runs too. These compose the REAL functions agentrun invokes, in the
+// SAME order, and assert the terminal artifacts (the model-bound query; the block verdict + audit).
+// The full runAgent live path is verified on the box (importing runAgent here drags next-auth in).
+
+test('egress DLP ESCALATES masking on a cloud run even when the pipeline overlay is OFF', async () => {
+  const { enforceModelCall } = await import('@/lib/pipeline-enforcement');
+  const { ORG_GUARDRAIL_DEFAULTS, ORG_POLICY_DEFAULTS } = await import('@/lib/pipeline-governance');
+  const { normalizeRouting } = await import('@/lib/pipelines-policy');
+  const { maskTextForModel } = await import('@/lib/guardrail-rules-runtime');
+  const { regexScan } = await import('@/lib/adapters/pii-regex');
+  const { egressDlpRunDemand } = await import('@/lib/egress-dlp');
+  const { effectivePiiMasking } = await import('@/lib/pii-escalation');
+
+  // A pipeline whose masking overlay is OFF — the pre-fix state where a cloud run leaked raw PII.
+  const contract = {
+    pipelineId: 'pl-egress-mask',
+    dataAllowlist: [] as string[],
+    routing: normalizeRouting(undefined),
+    orgPolicyDefaults: ORG_POLICY_DEFAULTS,
+    orgGuardrailDefaults: { ...ORG_GUARDRAIL_DEFAULTS, requirePiiMasking: { mode: 'default' as const, bool: false } },
+    policyOverlay: {},
+    guardrailOverlay: {},
+  };
+  const verdict = enforceModelCall(contract as never, 'general');
+  assert.equal(verdict.requirePiiMasking, false, 'the pipeline overlay does NOT require masking');
+
+  // The org egress-DLP policy (default: enabled, mask) on a CLOUD-permitted run supplies the floor.
+  const demand = egressDlpRunDemand('cloud', { enabled: true, strictness: 'mask' });
+  assert.equal(demand.maskFloor, true);
+  const requireMasking = effectivePiiMasking(demand.maskFloor, verdict);
+  assert.equal(requireMasking, true, 'egress DLP escalated masking ON for the cloud run');
+
+  // The substitution the run path then performs — the raw customer PII must not reach the model.
+  const rawQuery = 'settle the claim for pan ABCPE1234F and email alice@example.com';
+  const modelQuery = requireMasking ? maskTextForModel(rawQuery, regexScan(rawQuery)) : rawQuery;
+  assert.ok(!modelQuery.includes('ABCPE1234F'), 'the raw PAN did NOT reach the model');
+  assert.ok(!modelQuery.includes('alice@example.com'), 'the raw email did NOT reach the model');
+  assert.ok(modelQuery.includes('[PAN]') && modelQuery.includes('[EMAIL]'), 'redacted placeholders sent');
+
+  // Control: the SAME run on a LOCAL route demands nothing — on-prem content is byte-identical.
+  const localDemand = egressDlpRunDemand('local', { enabled: true, strictness: 'mask' });
+  assert.equal(localDemand.maskFloor, false);
+  const localQuery = effectivePiiMasking(localDemand.maskFloor, verdict) ? maskTextForModel(rawQuery, regexScan(rawQuery)) : rawQuery;
+  assert.equal(localQuery, rawQuery, 'a local run is never masked by egress DLP');
+});
+
+test('egress DLP strictness BLOCK refuses a cloud run whose content carries PII (+ auditable)', async () => {
+  const { egressDlpRunDemand, enforceEgressDlp } = await import('@/lib/egress-dlp');
+  const { egressScanFromPii, mergeEgressScans } = await import('@/lib/egress-dlp-run');
+  const { egressDlpAuditEvent, egressDlpAuditable, EGRESS_DLP_ACTION } = await import('@/lib/egress-dlp-audit');
+  const { regexScan } = await import('@/lib/adapters/pii-regex');
+
+  const policy = { enabled: true, strictness: 'block' as const };
+  assert.deepEqual(egressDlpRunDemand('cloud', policy), { maskFloor: true, blockOnPii: true });
+
+  // Build the aggregate scan the run path builds from its query + source scans (here: a PAN hit).
+  const scan = egressScanFromPii(regexScan('customer pan ABCPE1234F'), 'customer pan ABCPE1234F');
+  assert.equal(scan.hits, true, 'the real regex floor detected the PAN');
+  const decision = enforceEgressDlp('cloud', '', policy, mergeEgressScans([scan]));
+
+  assert.equal(decision.action, 'blocked', 'strictness block + PII ⇒ the run is REFUSED');
+  assert.ok(decision.reason.includes('BLOCKED'));
+  assert.equal(egressDlpAuditable(decision), true, 'a blocked egress is audited');
+  const ev = egressDlpAuditEvent(
+    { actor: { type: 'user', id: 'rm@acme.test', label: 'RM' }, org: 'acme', runId: 'run_x', model: 'openai:gpt-4o' },
+    decision,
+  );
+  assert.equal(ev.action, EGRESS_DLP_ACTION);
+  assert.equal(ev.outcome, 'blocked', 'the governance ledger records the blocked egress');
+});
+
+test('egress DLP MASK strictness on a clean cloud run passes through, unaudited (no false noise)', async () => {
+  const { enforceEgressDlp } = await import('@/lib/egress-dlp');
+  const { egressScanFromPii, mergeEgressScans } = await import('@/lib/egress-dlp-run');
+  const { egressDlpAuditable } = await import('@/lib/egress-dlp-audit');
+  const { regexScan } = await import('@/lib/adapters/pii-regex');
+
+  const clean = egressScanFromPii(regexScan('summarize the quarterly policy for the team'), 'x');
+  assert.equal(clean.hits, false);
+  const decision = enforceEgressDlp('cloud', '', { enabled: true, strictness: 'mask' }, mergeEgressScans([clean]));
+  assert.equal(decision.action, 'passthrough');
+  assert.equal(decision.screened, true, 'it WAS screened, just clean');
+  assert.equal(egressDlpAuditable(decision), false, 'a clean screened egress is not audit noise');
+});
+
 test('a simulated DRIFT breach triggers auto-rollback of a published pipeline (real Postgres)', { skip: dbUp ? false : SKIP_MESSAGE }, async (t) => {
   const { createPipeline, updatePipeline, getPipeline, deletePipeline } = await import('@/lib/pipelines');
   const { publishWithGate } = await import('@/lib/pipeline-release');

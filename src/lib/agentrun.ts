@@ -55,6 +55,15 @@ import { route } from '@/lib/retrieval/router';
 import type { RetrievalHit } from '@/lib/retrieval/types';
 import { listTools } from '@/lib/store';
 import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
+import {
+  DEFAULT_EGRESS_DLP_POLICY,
+  egressDlpRunDemand,
+  enforceEgressDlp,
+  type EgressScan,
+} from '@/lib/egress-dlp';
+import { egressScanFromPii, mergeEgressScans } from '@/lib/egress-dlp-run';
+import { egressDlpAuditEvent, egressDlpAuditable } from '@/lib/egress-dlp-audit';
+import { getEgressPolicy } from '@/lib/egress-policy-store';
 
 // The canonical interaction pipeline. Every agent run flows through one ordered chain so that the
 // platform's capabilities actually fire in-path, not just from admin endpoints:
@@ -789,6 +798,16 @@ export async function runAgent(
   // an internet-reaching primitive (web_search) is refused under a local-only/blocked leash.
   const runEgress = modelVerdict.egress;
 
+  // MANDATORY egress DLP for GOVERNED runs (the same per-org policy the interactive chat seam
+  // enforces). A cloud-permitted run under an enabled policy MASKS its outbound content by default;
+  // strictness 'block' REFUSES a run whose content carries PII. This is the app/agent-path half of
+  // "use the best OUTSIDE models on the enterprise's INSIDE moat, SAFELY" — until now only the chat
+  // path honored it, so a governed app could egress raw PII to cloud. `maskFloor` feeds the masking
+  // gate below as an escalate-only floor (never lowers a pipeline overlay already on); a local run
+  // demands nothing (data never leaves the box). Default-secure on any load failure.
+  const egressPolicy = await getEgressPolicy(attribution.org).catch(() => DEFAULT_EGRESS_DLP_POLICY);
+  const egressDemand = egressDlpRunDemand(runEgress, egressPolicy);
+
   const toolHit = routed.hits.find((h) => h.sourceKind === 'tool');
   if (toolHit) {
     mark('handoff', 'tool', toolHit.title, [toolHit.ref], Date.now());
@@ -817,7 +836,10 @@ export async function runAgent(
   // authority: a scan throw ⇒ { block:true }; only a successful scan yields forwardable (redacted)
   // text. The old `catch { /* query unmasked */ }` was a fail-open PII leak.
   let modelQuery = query;
-  const requireMasking = effectivePiiMasking(false, modelVerdict);
+  // Floor now includes egress DLP: a cloud-permitted run under an enabled policy masks even when the
+  // pipeline overlay didn't escalate masking on. effectivePiiMasking takes the MAX, so this only ever
+  // escalates masking on — never lowers a pipeline overlay that's already on.
+  const requireMasking = effectivePiiMasking(egressDemand.maskFloor, modelVerdict);
   if (requireMasking) {
     t = Date.now();
     let scanResult:
@@ -935,6 +957,66 @@ export async function runAgent(
         sourceMasking.maskedRefs,
         t,
       );
+    }
+
+    // Egress-DLP verdict over the run's outbound content (query + governed sources), computed from the
+    // SAME scans above — no re-scan. On a cloud-permitted run this records the canonical egress-DLP
+    // decision to the governance ledger (so /governance/egress shows governed-run egress alongside
+    // interactive chat), and — under strictness 'block' — REFUSES a run whose content carried PII
+    // (the chat seam's exact verdict). Only runs when egress DLP mandated masking (maskFloor).
+    if (egressDemand.maskFloor) {
+      const failClosed: EgressScan = {
+        configured: true,
+        reachable: false,
+        hits: false,
+        entities: [],
+        sanitized: '',
+      };
+      const queryScan: EgressScan = scanResult.ok
+        ? egressScanFromPii(scanResult.scan, query)
+        : failClosed;
+      const sourceScans: EgressScan[] = sourceAttempts.map((a) =>
+        a.ok ? egressScanFromPii(a.scan, '') : failClosed,
+      );
+      const egressDecision = enforceEgressDlp(
+        'cloud',
+        '',
+        egressPolicy,
+        mergeEgressScans([queryScan, ...sourceScans]),
+      );
+      const egressDlpCtx = {
+        actor: attribution.actor,
+        org: attribution.org,
+        project: attribution.project,
+        runId,
+        model: runModel,
+      };
+      if (egressDlpAuditable(egressDecision)) {
+        recordAudit(egressDlpAuditEvent(egressDlpCtx, egressDecision));
+      }
+      // A 'blocked' verdict (strictness-block on PII, or fail-closed) REFUSES the run — its content
+      // must never reach the model. The canonical enforceEgressDlp verdict is the single authority.
+      if (egressDecision.action === 'blocked') {
+        mark('egress', 'block', egressDecision.reason, [], t);
+        auditRun('blocked');
+        return persist(
+          runId,
+          {
+            agentId,
+            query,
+            answer: '',
+            status: 'blocked',
+            steps,
+            citations: [],
+            checks: [
+              ...preChecks,
+              { name: 'egress-dlp', verdict: 'blocked' as const, detail: egressDecision.reason },
+            ],
+            provenance: null,
+          },
+          attribution.org,
+        );
+      }
     }
   }
 
