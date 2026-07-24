@@ -1372,3 +1372,16 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   `service-specs.ts` label, `reports/render.tsx` `creator="offgrid-console"` machine id. The
   capability-audit evidence quote in `runtime-governance-operations.ts:948` intentionally records the
   OLD live title of a DIFFERENT host (status.getoffgridai.co) at verification time — do not edit.
+
+## Presidio deanonymize (recovering an encrypted original) (2026-07-25)
+
+- **[G-PRESIDIO-DEANONYMIZE] OPEN — encryption is one-way in practice.** The `encrypt` anonymizer
+  operator is now live end-to-end (org policy → vault-held AES key → real ciphertext on the production
+  data-redaction path, proven 2026-07-25), but the REVERSAL half is not exposed: Presidio's
+  `/deanonymize` endpoint has no adapter, no route, and no authorized surface. So an operator can
+  encrypt a PAN reversibly in principle yet cannot recover it through the console.
+  What closing it needs (deliberately NOT done blind — recovery of PII is a privileged action):
+  an adapter over `/deanonymize`, an RBAC/ABAC-gated route (recovery is strictly more sensitive than
+  masking — it should require an approval + a purpose, like the image-redaction receipt pattern), a
+  reason-coded audit event per recovery, and a UI that never bulk-reveals. Until then, choose `encrypt`
+  only when a downstream system holds the key, and prefer `hash` when you just need join-ability.
