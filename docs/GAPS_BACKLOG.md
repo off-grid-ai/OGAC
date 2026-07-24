@@ -1337,3 +1337,21 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   Langfuse, Ragas, promptfoo, Evidently, and gateway evidence through Off Grid-owned ports so any
   underlying QA service can be replaced later. Re-rank this entry against the service-capability map
   at the next backlog-prioritization checkpoint; do not interrupt Kafka, Onyx, or GX delivery now.
+
+## In-app "Off Grid AI Console" branding sweep to OGAC (2026-07-24)
+
+- **[G-BRAND-INAPP-OGAC] OPEN — the landing page, its title/OG metadata, base README, and the
+  `website` repo are rebranded (Console → OGAC/umbrella "Off Grid AI"), but ~14 in-app surfaces
+  still say "Off Grid AI Console".** Two classes, handle differently:
+  - **Display copy (safe to rename to OGAC / "Off Grid AI"):** `src/app/signin/page.tsx` card title,
+    `src/app/features/page.tsx`, `src/app/journey/page.tsx`, `src/app/fleet-control/page.tsx`,
+    `src/app/architecture/[phase]/page.tsx`, `src/app/handbook/page.tsx`,
+    `src/components/artifacts/PublicArtifact.tsx` ("Published from …"),
+    `src/components/auth/WriteToUsDialog.tsx`.
+  - **Functional identifiers — DO NOT blind-rename; renaming breaks live integrations/artifacts:**
+    `src/lib/superset-provision.ts` `OFFGRID_DB_NAME = 'Off Grid AI Console'` (registered Superset DB
+    name), `src/lib/c2pa.ts` artifact author, `src/lib/openapi.ts` + `src/app/docs/api/route.ts` API
+    title, `src/lib/service-specs.ts` console label. These name persisted/embedded resources; changing
+    the string without a migration orphans the existing resource. Decide per-identifier whether the
+    external name should change at all.
+  Landing metadata is now DERIVED from `src/lib/landing-copy.ts`, so that surface won't drift again.
