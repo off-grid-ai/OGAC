@@ -1830,7 +1830,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Attribute request cost by key, model, deployment, team, and time window.',
         '/runtime/models/spend',
         'Open gateway spend',
-        'The LiteLLM-native attribution surface at /runtime/models/spend is wired — the spend adapter reads LiteLLM /spend/logs and rolls up by model, virtual-key, and time bucket with a per-request drill-down — but is not yet fleet-verified end-to-end through those new routes. The console-native cost-by-model/user/project/time path (Insights → Cost) remains fleet-proven, so the aggregate workflow gate is partial until the LiteLLM-ledger surface is exercised live.',
+        '',
         [
           'yes',
           'LiteLLM (DB-backed proxy) tracks per-request spend and exposes it over /spend/logs (+ optional /global/spend/keys|models rollups); the console additionally meters the audit/traffic log with per-model pricing (finops.priceFor/costForTokens).',
@@ -1838,8 +1838,8 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'Two adapters cover it: assembleFinOps buckets real per-request token counts × price into cost by model/user/project, and adapters/litellm-spend.ts reads LiteLLM /spend/logs and rolls up by model/virtual-key/time-bucket in the pure litellm-spend.ts (window parsing, normalization, aggregation, summary — unit-tested).',
           'yes',
           'Insights → Cost (Models/Users/Projects/Overview) attributes spend with pipeline + time-window filters, and the new gateway FinOps surface at /runtime/models/spend attributes spend/tokens/requests by model, by virtual-key, and over time (24h/7d/30d) with a per-request drill-down — honestly leading with tokens/volume and labelling $0 on free on-prem models.',
-          'partial',
-          'Fleet-proven live for the console-native path: cost-by-model shows real usage (Qwen 2.5 14B — 53 requests, 74,808 tokens; GPT-4o-mini — 4 requests) priced into spend, filterable by pipeline + window; local models correctly report $0. The LiteLLM-ledger per-virtual-key surface is code+wired but its live read through /api/v1/admin/gateway/spend is not yet fleet-verified.',
+          'yes',
+          'Fleet-proven live on both paths. Console-native: cost-by-model shows real usage (Qwen 2.5 14B — 53 requests, 74,808 tokens; GPT-4o-mini — 4 requests) priced into spend, filterable by pipeline + window; local models correctly report $0. LiteLLM-ledger (verified 2026-07-24): /api/v1/admin/gateway/spend/{by-model,by-key,logs} all returned configured:true live:true with real /spend/logs rows from the DB-backed proxy — honestly leading with request volume/tokens, labelling $0 on free on-prem models, and marking unattributed (master-key) calls as such rather than fabricating a virtual-key.',
         ],
       ),
       defineCapability(
