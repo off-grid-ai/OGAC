@@ -12,6 +12,7 @@ import {
   isServiceInventoryOwner,
   isServiceInventoryReadinessState,
   reconcileServiceInventory,
+  serviceCapabilityFacetOptions,
   serviceCapabilityMapHref,
   serviceInventoryAuditState,
   serviceInventoryReadinessState,
@@ -289,4 +290,63 @@ test('capability map URLs preserve explicit search, facets, and service selectio
     serviceCapabilityMapHref({ serviceId: 'otel-collector', query: '   ' }),
     '/operations/services/capability-map?service=otel-collector',
   );
+});
+
+test('serviceCapabilityFacetOptions builds URL-driven facet options that preserve the rest of the filter', () => {
+  const current = { query: 'kyc', family: 'data', audit: 'stale', readiness: 'unverified' } as const;
+  const options = serviceCapabilityFacetOptions(
+    'audit',
+    current,
+    ['current', 'stale', 'pending'],
+    (v) => `${v} audit`,
+    'Any audit state',
+  );
+
+  // Leading option clears the facet; the rest map each value → label.
+  assert.deepEqual(
+    options.map((o) => o.value),
+    ['', 'current', 'stale', 'pending'],
+  );
+  assert.deepEqual(
+    options.map((o) => o.label),
+    ['Any audit state', 'current audit', 'stale audit', 'pending audit'],
+  );
+
+  // Only the active value is selected (audit=stale here) — never a fake default.
+  assert.deepEqual(
+    options.filter((o) => o.selected).map((o) => o.value),
+    ['stale'],
+  );
+
+  // Each option sets ONLY its own facet while preserving query + the OTHER facets (family, readiness).
+  const byValue = new Map(options.map((o) => [o.value, o.href] as const));
+  assert.equal(
+    byValue.get('current'),
+    '/operations/services/capability-map?q=kyc&family=data&audit=current&readiness=unverified',
+  );
+  // The clear option drops audit entirely but keeps everything else.
+  assert.equal(
+    byValue.get(''),
+    '/operations/services/capability-map?q=kyc&family=data&readiness=unverified',
+  );
+  // No option carries a service id — selecting a facet returns to the list, not a stale detail.
+  for (const o of options) assert.doesNotMatch(o.href, /service=/);
+});
+
+test('serviceCapabilityFacetOptions marks the clear option active when the facet is unset', () => {
+  const options = serviceCapabilityFacetOptions(
+    'readiness',
+    { query: '', family: '', audit: '', readiness: '' },
+    ['verified', 'partial', 'attention', 'unverified'],
+    (v) => v,
+    'Any readiness',
+  );
+  assert.equal(options[0]?.value, '');
+  assert.equal(options[0]?.selected, true);
+  assert.equal(
+    options.filter((o) => o.selected).length,
+    1,
+    'exactly one option is active',
+  );
+  assert.equal(options[0]?.href, '/operations/services/capability-map');
 });

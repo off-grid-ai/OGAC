@@ -154,9 +154,18 @@ test('audit and readiness facets narrow all 49 services and survive every explor
   for (const entry of expectedEntries) {
     assert.match(html, new RegExp(`data-service-inventory-row="${entry.id}"`));
   }
-  assert.match(html, /name="audit"[^>]*><option value="">Any audit state<\/option>/);
-  assert.match(html, /<option value="stale" selected="">stale audit<\/option>/);
-  assert.match(html, /<option value="unverified" selected="">not verified<\/option>/);
+  // The facets are the app's styled dropdown (FacetSelect on dropdown-menu), NOT native <select>:
+  // the SSR trigger carries the aria-label and shows the ACTIVE option's label; the Radix option list
+  // is portal-rendered on open (covered by the e2e screenshot gate, not this static-markup test).
+  assert.match(html, /aria-label="Filter by audit recency"/);
+  assert.match(html, /aria-label="Filter by operational readiness"/);
+  assert.match(html, />stale audit</); // active audit label in the trigger
+  assert.match(html, />not verified</); // active readiness label in the trigger
+  assert.doesNotMatch(html, /<option value="stale"/); // no native <select>/<option> anymore
+  // The active facets survive a text-search GET submit via hidden fields (facet dropdowns navigate on
+  // their own, but the search form must not drop them).
+  assert.match(html, /<input type="hidden" name="audit" value="stale"\/>/);
+  assert.match(html, /<input type="hidden" name="readiness" value="unverified"\/>/);
   assert.match(
     html,
     /href="\/operations\/services\/capability-map\?family=runtime&amp;audit=stale&amp;readiness=unverified"/,

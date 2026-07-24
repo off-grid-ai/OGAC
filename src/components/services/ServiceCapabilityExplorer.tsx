@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { NativeSelect } from '@/components/ui/field';
+import { FacetSelect } from '@/components/ui/facet-select';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -20,6 +20,7 @@ import {
   SERVICE_INVENTORY_FAMILIES,
   SERVICE_INVENTORY_OWNERS,
   SERVICE_INVENTORY_READINESS_STATES,
+  serviceCapabilityFacetOptions,
   serviceCapabilityMapHref,
   serviceInventoryAuditState,
   serviceInventoryReadinessState,
@@ -193,7 +194,12 @@ function InventoryFilters({ filter }: Readonly<{ filter: ServiceInventoryFilter 
       className="grid gap-2"
       role="search"
     >
+      {/* The facet dropdowns navigate on their own (each option is an href), but the text-search GET
+          submit must not drop the active facets — carry them as hidden fields alongside family. */}
       {filter.family ? <input type="hidden" name="family" value={filter.family} /> : null}
+      {filter.owner ? <input type="hidden" name="owner" value={filter.owner} /> : null}
+      {filter.audit ? <input type="hidden" name="audit" value={filter.audit} /> : null}
+      {filter.readiness ? <input type="hidden" name="readiness" value={filter.readiness} /> : null}
       <div
         role="group"
         aria-label="Service search controls"
@@ -224,49 +230,45 @@ function InventoryFilters({ filter }: Readonly<{ filter: ServiceInventoryFilter 
         className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1"
       >
         <div className="min-w-0">
-          <NativeSelect
-            name="owner"
-            defaultValue={filter.owner}
-            aria-label="Filter services by IA owner"
-            className="w-full"
-          >
-            <option value="">Both IA owners</option>
-            {SERVICE_INVENTORY_OWNERS.map((owner) => (
-              <option key={owner} value={owner}>
-                {OWNER_LABELS[owner]}
-              </option>
-            ))}
-          </NativeSelect>
+          <FacetSelect
+            label="IA owner"
+            ariaLabel="Filter services by IA owner"
+            options={serviceCapabilityFacetOptions(
+              'owner',
+              filter,
+              SERVICE_INVENTORY_OWNERS,
+              (owner) => OWNER_LABELS[owner as (typeof SERVICE_INVENTORY_OWNERS)[number]],
+              'Both IA owners',
+            )}
+          />
         </div>
         <div className="min-w-0">
-          <NativeSelect
-            name="audit"
-            defaultValue={filter.audit}
-            aria-label="Filter by audit recency"
-            className="w-full"
-          >
-            <option value="">Any audit state</option>
-            {SERVICE_INVENTORY_AUDIT_STATES.map((audit) => (
-              <option key={audit} value={audit}>
-                {AUDIT_LABELS[audit]} audit
-              </option>
-            ))}
-          </NativeSelect>
+          <FacetSelect
+            label="Audit state"
+            ariaLabel="Filter by audit recency"
+            options={serviceCapabilityFacetOptions(
+              'audit',
+              filter,
+              SERVICE_INVENTORY_AUDIT_STATES,
+              (audit) =>
+                `${AUDIT_LABELS[audit as (typeof SERVICE_INVENTORY_AUDIT_STATES)[number]]} audit`,
+              'Any audit state',
+            )}
+          />
         </div>
         <div className="min-w-0">
-          <NativeSelect
-            name="readiness"
-            defaultValue={filter.readiness}
-            aria-label="Filter by operational readiness"
-            className="w-full"
-          >
-            <option value="">Any readiness</option>
-            {SERVICE_INVENTORY_READINESS_STATES.map((readiness) => (
-              <option key={readiness} value={readiness}>
-                {READINESS_LABELS[readiness]}
-              </option>
-            ))}
-          </NativeSelect>
+          <FacetSelect
+            label="Readiness"
+            ariaLabel="Filter by operational readiness"
+            options={serviceCapabilityFacetOptions(
+              'readiness',
+              filter,
+              SERVICE_INVENTORY_READINESS_STATES,
+              (readiness) =>
+                READINESS_LABELS[readiness as (typeof SERVICE_INVENTORY_READINESS_STATES)[number]],
+              'Any readiness',
+            )}
+          />
         </div>
         <div className="flex min-w-0 items-center justify-end">
           {hasFilter ? (

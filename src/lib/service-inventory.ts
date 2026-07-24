@@ -468,3 +468,39 @@ export function serviceCapabilityMapHref({
   const search = params.toString();
   return `/operations/services/capability-map${search ? `?${search}` : ''}`;
 }
+
+/** One selectable option of a capability-map facet filter: a value, its label, the URL that applies
+ *  it (built from the current filter so every other facet + the query are preserved), and whether it
+ *  is the active selection. Pure — the presentation control only navigates to `href`. */
+export interface ServiceCapabilityFacetOption {
+  value: string;
+  label: string;
+  href: string;
+  selected: boolean;
+}
+
+/**
+ * Build the option list for one capability-map facet (owner/audit/readiness). The leading option
+ * clears the facet (empty value); each value option carries the href that sets ONLY that facet while
+ * preserving the rest of the current filter. Selecting a facet clears any open service detail, matching
+ * the master→list semantics (the map href builder omits `service` since the filter carries none).
+ */
+export function serviceCapabilityFacetOptions(
+  param: 'owner' | 'audit' | 'readiness',
+  current: ServiceInventoryFilter,
+  values: readonly string[],
+  labelFor: (value: string) => string,
+  allLabel: string,
+): ServiceCapabilityFacetOption[] {
+  const selectedValue = (current[param] ?? '') as string;
+  const hrefFor = (value: string) => serviceCapabilityMapHref({ ...current, [param]: value });
+  return [
+    { value: '', label: allLabel, href: hrefFor(''), selected: selectedValue === '' },
+    ...values.map((value) => ({
+      value,
+      label: labelFor(value),
+      href: hrefFor(value),
+      selected: selectedValue === value,
+    })),
+  ];
+}
