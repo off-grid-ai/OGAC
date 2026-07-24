@@ -971,6 +971,182 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
     ],
   }),
   audit({
+    serviceId: 'cloudflared',
+    serviceLabel: 'Cloudflare Tunnel',
+    upstreamVersion: 'cloudflared tunnel (named tunnel 70f8a607, config-file run)',
+    versionSource:
+      'live `pgrep -fl cloudflared` on S1 verified 2026-07-24 → PID 90637 running `cloudflared tunnel --config ~/.cloudflared/config.yml run 70f8a607-…`; co.getoffgridai.tunnel LaunchAgent',
+    denominatorSource: 'https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/',
+    auditState: 'current',
+    summary:
+      'Cloudflared publishes the on-prem console and SSH ingress to the outside world through a named tunnel. It is proven live (this session reached the fleet through it); its config is host-owned and the console does not manage the tunnel.',
+    capabilities: [
+      [
+        'ingress-tunnel',
+        'Outbound-only ingress tunnel',
+        'Publish selected on-prem services to public hostnames over an outbound-only tunnel.',
+        '/operations/services/cloudflared',
+        'Inspect tunnel',
+        '',
+        [
+          'yes',
+          'cloudflared establishes an outbound-only tunnel that publishes configured hostnames without inbound ports.',
+          'yes',
+          'The fleet runs a named tunnel (70f8a607) under the co.getoffgridai.tunnel LaunchAgent with a host-owned config.',
+          'yes',
+          'The service detail exposes tunnel readiness.',
+          'yes',
+          'Verified live 2026-07-24: this session reached S1 (docker, console, SSH) through the running cloudflared tunnel (PID 90637) — end-to-end ingress proven.',
+        ],
+      ],
+      [
+        'tunnel-config-management',
+        'Tunnel route and credential management',
+        'Manage ingress routes, credentials, and high-availability replicas for the tunnel.',
+        '/operations/services/cloudflared',
+        'Inspect tunnel config',
+        'Tunnel routes/credentials are host-owned (~/.cloudflared/config.yml); the console has no route/credential/HA management surface, and single-replica has no failover.',
+        [
+          'yes',
+          'cloudflared supports ingress rules, credential rotation, and replica-based HA.',
+          'partial',
+          'The config file is host-owned; no console adapter manages routes or credentials.',
+          'no',
+          'No console UI manages tunnel routes.',
+          'partial',
+          'A single replica serves ingress; no HA/failover is configured or proven.',
+        ],
+      ],
+    ],
+  }),
+  audit({
+    serviceId: 'gateway-control',
+    serviceLabel: 'Gateway Control Plane',
+    upstreamVersion: 'First-party gateway aggregator control API (S1:8800)',
+    versionSource:
+      'scripts/gateway-aggregator.mjs; live probe on S1 verified 2026-07-24 → 127.0.0.1:8800/v1/models returned HTTP 401 (endpoint live, API-key enforced)',
+    denominatorSource: 'packages/gateway/src/cluster/types.ts; packages/gateway control-plane contract',
+    auditState: 'current',
+    summary:
+      'The gateway control plane exposes the model registry and routing configuration behind the aggregator. Its control endpoint is live and API-key enforced; a full console-driven registry-management round-trip is not re-proven this cycle.',
+    capabilities: [
+      [
+        'model-registry-control',
+        'Model registry and routing control',
+        'Expose the authorized model registry and routing configuration to governed consumers.',
+        '/runtime/models/routing',
+        'Manage routing',
+        'The control endpoint is live and secured; a console-driven registry mutation round-trip (add/disable a model through the control API with the gateway key) is not re-proven in this audit.',
+        [
+          'yes',
+          'The gateway aggregator exposes a control API for model discovery and routing policy.',
+          'partial',
+          'The console reads authorized models through the gateway; a control-plane mutation adapter is not proven here.',
+          'yes',
+          'Runtime → Models → Routing surfaces the model/routing configuration.',
+          'partial',
+          'Verified live 2026-07-24: 127.0.0.1:8800/v1/models returned HTTP 401 (endpoint live + API-key enforced); a management mutation with the gateway key is not retained as evidence.',
+        ],
+      ],
+    ],
+  }),
+  audit({
+    serviceId: 'litellm-forwarder',
+    serviceLabel: 'LiteLLM Forwarder',
+    upstreamVersion: 'S1→g5 TCP forward to the LiteLLM proxy (:4000)',
+    versionSource:
+      'co.getoffgridai.tcp-forward / onyx-llm-bridge LaunchAgents; live probe on S1 verified 2026-07-24 → 127.0.0.1:4000/health returned HTTP 401 (LiteLLM reachable through the forward)',
+    denominatorSource:
+      '../onprem-fleet-orchestration/deploy/onprem/SERVICE_MAP.md (S1→g5 forwarders); host forward contract',
+    auditState: 'current',
+    summary:
+      'The forwarder bridges S1 loopback to the g5 LiteLLM proxy so the gateway and console reach model inference across the LAN boundary. Traffic flow is proven live; the legacy root forward plists are not fully repo-owned (a disclosed reproducibility gap).',
+    capabilities: [
+      [
+        'llm-transport',
+        'LiteLLM transport forward',
+        'Carry inference traffic from S1 to the g5 LiteLLM proxy.',
+        '/operations/services/litellm-forwarder',
+        'Inspect forwarder',
+        'The forward carries live traffic, but the legacy root S1→g5 forward plists are not yet repo-owned — an explicit recovery/reproducibility gap recorded in the fleet ledger.',
+        [
+          'yes',
+          'A TCP forward maps an S1 loopback port to the g5 LiteLLM endpoint.',
+          'yes',
+          'The console/gateway reach LiteLLM through the S1 loopback the forward publishes.',
+          'partial',
+          'The forward is host/LaunchAgent-owned; no console UI manages it.',
+          'yes',
+          'Verified live 2026-07-24: 127.0.0.1:4000/health returned HTTP 401 (LiteLLM live and reachable through the forward).',
+        ],
+      ],
+    ],
+  }),
+  audit({
+    serviceId: 'observability-forwarder',
+    serviceLabel: 'Observability Forwarder',
+    upstreamVersion: 'S1→g5/g6 TCP forwards to the observability backends',
+    versionSource:
+      'co.getoffgridai.tcp-forward LaunchAgent + S1→g6 loopback forwards; live probe on S1 verified 2026-07-24 (sibling forwards serving — Langfuse loopback 8931 group)',
+    denominatorSource:
+      '../onprem-fleet-orchestration/deploy/onprem/SERVICE_MAP.md (S1 loopback forwards); host forward contract',
+    auditState: 'current',
+    summary:
+      'The forwarder bridges S1 loopback to the observability backends (Langfuse/OTel/metrics) so the console reads telemetry across the LAN boundary. The forward mechanism is proven live via sibling forwards; a dedicated observability round-trip through this forward is not separately retained.',
+    capabilities: [
+      [
+        'observability-transport',
+        'Observability transport forward',
+        'Carry telemetry read traffic from S1 to the observability backends.',
+        '/operations/services/observability-forwarder',
+        'Inspect forwarder',
+        'The forward mechanism is proven for sibling loopback forwards; a dedicated Langfuse/OTel round-trip attributed to this specific forward is not retained, and the plists share the legacy repo-ownership gap.',
+        [
+          'yes',
+          'A TCP forward maps S1 loopback ports to the observability backends.',
+          'yes',
+          'Console observability reads reach their backends through the S1 loopback forwards.',
+          'partial',
+          'The forward is host/LaunchAgent-owned; no console UI manages it.',
+          'partial',
+          'Verified live 2026-07-24 that sibling S1 loopback forwards serve (8931/8933 group); a dedicated observability round-trip through this forward is not separately retained.',
+        ],
+      ],
+    ],
+  }),
+  audit({
+    serviceId: 'fleet-forwarder',
+    serviceLabel: 'Fleet Data Forwarder',
+    upstreamVersion: 'S1→g6 loopback forwards to the data-plane services (:894x/:893x)',
+    versionSource:
+      'S1 loopback forwards (127.0.0.1:8941 warehouse, 8942 airbyte, 8944 GX, 8932 unleash, 8933 superset); live probe on S1 verified 2026-07-24',
+    denominatorSource:
+      '../onprem-fleet-orchestration/deploy/onprem/SERVICE_MAP.md (S1 127.0.0.1:894x→g6 map); host forward contract',
+    auditState: 'current',
+    summary:
+      'The forwarder fronts the g6 data-plane services on S1 loopback ports so the console reaches the warehouse, ETL, quality, and BI engines across the LAN. Multiple forwards are proven serving live.',
+    capabilities: [
+      [
+        'data-plane-transport',
+        'Data-plane transport forward',
+        'Carry console traffic from S1 loopback to the g6 data-plane services.',
+        '/operations/services/fleet-forwarder',
+        'Inspect forwarder',
+        'Forwards serve live; they are host/LaunchAgent-owned with no console management surface, and share the fleet forward repo-ownership gap.',
+        [
+          'yes',
+          'TCP forwards map S1 loopback ports to the g6 warehouse/ETL/quality/BI endpoints.',
+          'yes',
+          'The console reaches the g6 data-plane services through these S1 loopbacks (e.g. warehouse queries).',
+          'partial',
+          'The forwards are host/LaunchAgent-owned; no console UI manages them.',
+          'yes',
+          'Verified live 2026-07-24: S1 loopback forwards returned live responses — 8941 (warehouse) 200, 8944 (GX) 200, 8932 (unleash) 200, 8933 (superset) 302.',
+        ],
+      ],
+    ],
+  }),
+  audit({
     serviceId: 'opa',
     serviceLabel: 'Policy Engine',
     upstreamVersion: '0.70.0',
@@ -1713,13 +1889,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
  * IDs explicit proves inventory coverage while leaving the canonical capability summary honestly
  * `not-audited`.
  */
-export const RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS = [
-  'gateway-control',
-  'cloudflared',
-  'litellm-forwarder',
-  'observability-forwarder',
-  'fleet-forwarder',
-] as const;
+export const RUNTIME_GOVERNANCE_OPERATIONS_UNAUDITED_SERVICE_IDS = [] as const;
 
 export const RUNTIME_GOVERNANCE_OPERATIONS_SERVICE_IDS = [
   ...RUNTIME_GOVERNANCE_OPERATIONS_AUDITS.map((record) => record.serviceId),

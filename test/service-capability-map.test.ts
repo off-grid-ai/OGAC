@@ -11,10 +11,10 @@ import {
   type AuditedCapabilitySummary,
 } from '../src/lib/service-capability-map.ts';
 
-test('canonical registry composes 44 unique versioned audits without the removed product', () => {
+test('canonical registry composes 49 unique versioned audits without the removed product', () => {
   const ids = SERVICE_CAPABILITY_AUDITS.map((audit) => audit.serviceId);
 
-  assert.equal(ids.length, 44);
+  assert.equal(ids.length, 49);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(ids.includes('provit'), false);
   for (const audit of SERVICE_CAPABILITY_AUDITS) {
@@ -103,9 +103,11 @@ test('summary counts only verified gates and production workflow evidence', () =
 });
 
 test('unaudited and unknown services stay unscored', () => {
-  assert.equal(getServiceCapabilityAudit('cloudflared'), null);
-  assert.deepEqual(summarizeServiceCapabilityAudit('cloudflared'), { status: 'not-audited' });
+  // Every canonical inventory service is now audited, so only an unknown service id is unscored — a
+  // service without an audit entry must never project fake coverage.
+  assert.equal(getServiceCapabilityAudit('does-not-exist'), null);
   assert.deepEqual(summarizeServiceCapabilityAudit('does-not-exist'), { status: 'not-audited' });
+  assert.deepEqual(summarizeServiceCapabilityAudit('another-unknown'), { status: 'not-audited' });
 });
 
 test('network gateway audit is pinned and keeps independently incomplete UI gates honest', () => {
