@@ -412,17 +412,69 @@ function impliesApproval(description: string): boolean {
   return APPROVAL.test(description) || /\bapproval\b/i.test(description);
 }
 
-function sinkForClause(clause: string): 'console' | 'report' | 'email' | 'whatsapp' {
-  const c = clause.toLowerCase();
-  if (/\bemail\b/.test(c)) return 'email';
-  if (/\bwhatsapp\b/.test(c)) return 'whatsapp';
-  if (/\breport\b/.test(c)) return 'report';
-  return 'console';
+export type OutputSinkKind = 'console' | 'report' | 'email' | 'whatsapp' | 'webhook' | 'slack';
+
+export interface InferredOutputSink {
+  sink: OutputSinkKind;
+  /** Recipient config the phrasing revealed (to / channel / url), when present. */
+  config?: Record<string, unknown>;
+  /** An honest gap when a delivery sink is chosen but the recipient isn't specified. */
+  gap?: string;
 }
 
-function normalizeSink(sink: string | undefined): 'console' | 'report' | 'email' | 'whatsapp' {
+const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
+const URL_RE = /(https?:\/\/[^\s"')]+)/i;
+const SLACK_CHANNEL_RE = /#[\w-]+/;
+
+/**
+ * Map plain-language DELIVERY intent → the right governed output sink (+ recipient + honest gap). PURE.
+ * A non-technical author who says "post to Slack" / "send a webhook" / "email finance" gets the real
+ * channel, not a silent `console` sink. Recipients are extracted only when literally present — never
+ * fabricated; a delivery sink without a recipient reports a gap the author fixes before publishing.
+ * Order = most-specific first (webhook + URL before a generic "send").
+ */
+export function inferOutputSink(text: string): InferredOutputSink {
+  const c = (text ?? '').toLowerCase();
+  const raw = text ?? '';
+  if (/\bwebhook\b/.test(c) || (/\b(post|send|call)\b/.test(c) && URL_RE.test(raw))) {
+    const url = raw.match(URL_RE)?.[1];
+    return url
+      ? { sink: 'webhook', config: { url } }
+      : { sink: 'webhook', gap: 'Webhook delivery: no destination URL found — set the webhook URL before publishing.' };
+  }
+  if (/\bslack\b/.test(c)) {
+    const channel = raw.match(SLACK_CHANNEL_RE)?.[0];
+    return {
+      sink: 'slack',
+      ...(channel ? { config: { channel } } : {}),
+      gap: 'Slack delivery needs the incoming-webhook URL configured in Messaging → Slack before it can post.',
+    };
+  }
+  if (/\bwhatsapp\b/.test(c)) {
+    const to = raw.match(/\+?\d[\d\s-]{7,}\d/)?.[0]?.replace(/[\s-]/g, '');
+    return to
+      ? { sink: 'whatsapp', config: { to } }
+      : { sink: 'whatsapp', gap: 'WhatsApp delivery: no recipient number found — set it before publishing.' };
+  }
+  if (/\b(e-?mail)\b/.test(c)) {
+    const to = raw.match(EMAIL_RE)?.[0];
+    return to
+      ? { sink: 'email', config: { to } }
+      : { sink: 'email', gap: 'Email delivery: no recipient address found — set the "to" address before publishing.' };
+  }
+  if (/\b(report|pdf)\b/.test(c)) return { sink: 'report' };
+  return { sink: 'console' };
+}
+
+function sinkForClause(clause: string): OutputSinkKind {
+  return inferOutputSink(clause).sink;
+}
+
+function normalizeSink(sink: string | undefined): OutputSinkKind {
   const s = String(sink ?? '').toLowerCase();
-  return s === 'report' || s === 'email' || s === 'whatsapp' ? s : 'console';
+  return s === 'report' || s === 'email' || s === 'whatsapp' || s === 'webhook' || s === 'slack'
+    ? (s as OutputSinkKind)
+    : 'console';
 }
 
 function shortLabel(clause: string): string {
