@@ -142,6 +142,8 @@ export interface WebhookSendResult {
   reason: string;
   /** The HTTP status the endpoint returned (for the audit trail), when a request was made. */
   status?: number;
+  /** The HMAC signature header value applied to the delivered payload (for the retained receipt). */
+  signature?: string;
 }
 
 /** Is the webhook sink usable for this step? Needs BOTH a valid URL AND a resolvable signing secret. */
@@ -199,7 +201,13 @@ export async function postWebhook(
     if (!res.ok) {
       return { ok: false, configured: true, status: res.status, reason: `webhook POST failed (${res.status})` };
     }
-    return { ok: true, configured: true, status: res.status, reason: `delivered to webhook (${res.status})` };
+    return {
+      ok: true,
+      configured: true,
+      status: res.status,
+      signature: signatureHeaderValue(signature),
+      reason: `delivered to webhook (${res.status})`,
+    };
   } catch (e) {
     return { ok: false, configured: true, reason: `webhook POST failed: ${(e as Error).message}` };
   }

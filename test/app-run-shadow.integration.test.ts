@@ -41,9 +41,15 @@ function stubDeps(over: Partial<AppRunDeps> = {}): AppRunDeps {
       };
     },
     async sendEmail() { return { ok: true, configured: true, reason: 'sent' }; },
+    async sendWebhook() { return { ok: true, configured: true, status: 200, signature: 'sha256=stubsig', reason: 'delivered to webhook (200)' }; },
+    async sendSlack() { return { ok: true, configured: true, status: 200, reason: 'posted to Slack (200)' }; },
+    async sendWhatsApp() { return { ok: true, configured: true, status: 200, reason: 'sent (200)' }; },
   };
   return { ...base, ...over };
 }
+
+const webhookStep = () =>
+  ({ id: 'out', label: 'Notify ops webhook', kind: 'output' as const, sink: 'webhook' as const, config: { url: 'http://127.0.0.1:9099' } });
 
 const emailStep = () =>
   ({ id: 'out', label: 'Notify ops', kind: 'output' as const, sink: 'email' as const, config: { to: 'ops@bank.in', subject: 'KYC HIGH' } });
@@ -120,6 +126,39 @@ test('SHADOW: runApp over a full spec threads mode + persists wouldPerform on th
   const last = persisted[persisted.length - 1] as { steps: { id: string; wouldPerform?: unknown }[] };
   const step = last.steps.find((s) => s.id === 'out');
   assert.ok(step?.wouldPerform, 'persisted step state carries wouldPerform');
+});
+
+test('LIVE: a webhook sink delivers AND attaches a structured signed delivery receipt', async () => {
+  let sent = false;
+  const deps = stubDeps({
+    async sendWebhook() {
+      sent = true;
+      return { ok: true, configured: true, status: 200, signature: 'sha256=stubsig', reason: 'delivered to webhook (200)' };
+    },
+  });
+  const res = await executeStep(spec(), webhookStep(), PRIOR, { orgId: 'org_bharat', runId: 'rwh', mode: 'live' }, deps);
+  assert.equal(sent, true, 'sendWebhook MUST be called in a live run');
+  assert.equal(res.status, 'done');
+  assert.equal(res.wouldPerform, undefined);
+  // The delivery is RETAINED as a structured, signed receipt — not just a log line.
+  assert.ok(res.deliveryReceipt, 'a delivery receipt is retained');
+  assert.equal(res.deliveryReceipt!.kind, 'sink-delivery');
+  assert.equal(res.deliveryReceipt!.sink, 'webhook');
+  assert.equal(res.deliveryReceipt!.destination, 'http://127.0.0.1:9099');
+  assert.equal(res.deliveryReceipt!.httpStatus, 200);
+  assert.equal(res.deliveryReceipt!.signed, true);
+  assert.ok((res.deliveryReceipt!.signatureDigest ?? '').length === 64, 'sha256 digest of the signature');
+  assert.match(res.detail!, /signed receipt retained/);
+});
+
+test('SHADOW: a webhook sink is intercepted — no delivery, no receipt, records wouldPerform', async () => {
+  let sent = false;
+  const deps = stubDeps({ async sendWebhook() { sent = true; return { ok: true, configured: true, status: 200, reason: 'x' }; } });
+  const res = await executeStep(spec(), webhookStep(), PRIOR, { orgId: 'org_bharat', runId: 'rwh2', mode: 'shadow' }, deps);
+  assert.equal(sent, false, 'shadow must NOT call the webhook');
+  assert.equal(res.deliveryReceipt, undefined, 'no receipt when nothing was delivered');
+  assert.ok(res.wouldPerform, 'records what it would have delivered');
+  assert.equal(res.wouldPerform!.sink, 'webhook');
 });
 
 // ─── GLOBAL live-action gate at the integration layer ──────────────────────────────────────────────

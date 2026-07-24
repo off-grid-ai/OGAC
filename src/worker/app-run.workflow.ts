@@ -192,6 +192,7 @@ function foldResult(result: StepResult): StepResultInput {
     wouldPerform: result.wouldPerform,
     actionImpact: result.actionImpact,
     actionReceipt: result.actionReceipt,
+    deliveryReceipt: result.deliveryReceipt,
   };
 }
 

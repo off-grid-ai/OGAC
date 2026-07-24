@@ -54,6 +54,10 @@ import {
   type SinkAudit,
 } from '@/lib/adapters/sinks/registry';
 import {
+  buildSinkDeliveryReceipt,
+  type SinkDeliveryReceipt,
+} from '@/lib/sink-delivery-receipt';
+import {
   emailEgressVerdict,
   emailMaskingRequired,
   maskEmailForSend,
@@ -116,6 +120,8 @@ export interface StepResult {
   actionImpact?: ActionImpact;
   /** Signed execution evidence. Present only after a real live mutation/replay. */
   actionReceipt?: ActionReceipt;
+  /** Structured, retained proof of a governed egress delivery (webhook/slack/whatsapp). */
+  deliveryReceipt?: SinkDeliveryReceipt;
 }
 
 export interface AppRunOutcome {
@@ -268,7 +274,7 @@ export interface AppRunDeps {
   sendWebhook: (
     config: Record<string, unknown> | undefined,
     input: { runId: string; orgId: string; appId: string; outcome: string },
-  ) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  ) => Promise<{ ok: boolean; configured: boolean; reason: string; status?: number; signature?: string }>;
   /**
    * OUTPUT SINK — post the run's outcome to Slack via a vaulted incoming-webhook URL. Injected for
    * unit-testability; production wires postSlack. The body is already masked/leash-approved.
@@ -276,7 +282,7 @@ export interface AppRunDeps {
   sendSlack: (input: {
     text: string;
     channel?: string;
-  }) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  }) => Promise<{ ok: boolean; configured: boolean; reason: string; status?: number }>;
   /**
    * OUTPUT SINK — send the run's outcome via the on-prem WhatsApp gateway (air-gapped). Injected for
    * unit-testability; production wires sendWhatsApp. HONEST: no gateway URL → { configured:false }.
@@ -284,7 +290,7 @@ export interface AppRunDeps {
   sendWhatsApp: (input: {
     to: string;
     text: string;
-  }) => Promise<{ ok: boolean; configured: boolean; reason: string }>;
+  }) => Promise<{ ok: boolean; configured: boolean; reason: string; status?: number }>;
 }
 
 // ─── defaultDeps — wire the real subsystems (lazy imports keep this module light + test-friendly) ─
@@ -399,17 +405,19 @@ export function defaultDeps(
     async sendWebhook(config, input) {
       const { postWebhook } = await import('@/lib/adapters/sinks/webhook');
       const res = await postWebhook(config, input);
-      return { ok: res.ok, configured: res.configured, reason: res.reason };
+      // Pass status + signature through so the delivery receipt can record the transport status and
+      // prove the payload was HMAC-signed (a bare {ok,configured,reason} would lose both).
+      return { ok: res.ok, configured: res.configured, reason: res.reason, status: res.status, signature: res.signature };
     },
     async sendSlack(input) {
       const { postSlack } = await import('@/lib/adapters/sinks/slack');
       const res = await postSlack(input);
-      return { ok: res.ok, configured: res.configured, reason: res.reason };
+      return { ok: res.ok, configured: res.configured, reason: res.reason, status: res.status };
     },
     async sendWhatsApp(input) {
       const { sendWhatsApp } = await import('@/lib/adapters/sinks/whatsapp');
       const res = await sendWhatsApp(input.to, input.text);
-      return { ok: res.ok, configured: res.configured, reason: res.reason };
+      return { ok: res.ok, configured: res.configured, reason: res.reason, status: res.status };
     },
   };
 }
@@ -845,6 +853,7 @@ export function buildInRunView(
       wouldPerform: r.wouldPerform,
       actionImpact: r.actionImpact,
       actionReceipt: r.actionReceipt,
+      deliveryReceipt: r.deliveryReceipt,
     })),
     outcome: aggregateOutcome(priorResults),
     provenance: null,
@@ -1081,12 +1090,32 @@ async function deliverGovernedSink(
   if (!result.ok) {
     return errorResult(step, `${descriptor.label} sink failed: ${result.reason}`);
   }
+  // Retain a structured, signed proof of the delivery (the deliver-sink analogue of the CRM receipt):
+  // WHAT was sent WHERE, the transport status, whether the payload was signed (+ digest), masked-ness.
+  const destination =
+    (typeof step.config?.[descriptor.destinationField] === 'string'
+      ? (step.config[descriptor.destinationField] as string)
+      : '') || `(${descriptor.label})`;
+  const deliveryReceipt = buildSinkDeliveryReceipt({
+    sink,
+    destination,
+    httpStatus: typeof result.status === 'number' ? result.status : null,
+    signature: typeof result.signature === 'string' ? result.signature : null,
+    masked: decision.masked === true,
+    orgId: ctx.orgId,
+    runId: ctx.runId,
+    stepId: step.id,
+    sentAt: new Date().toISOString(),
+  });
   return {
     stepId: step.id,
     kind: 'output',
     status: 'done',
     output: outcome,
-    detail: `sink: ${sink} — ${result.reason}${decision.masked ? ' (PII masked before send)' : ''}`,
+    detail: `sink: ${sink} — ${result.reason}${decision.masked ? ' (PII masked before send)' : ''}${
+      deliveryReceipt.signed ? '; signed receipt retained' : '; receipt retained'
+    }`,
+    deliveryReceipt,
   };
 }
 
@@ -1098,7 +1127,7 @@ function dispatchSinkDelivery(
   spec: AppSpec,
   ctx: AppRunContext,
   deps: AppRunDeps,
-): Promise<{ ok: boolean; configured: boolean; reason: string }> {
+): Promise<{ ok: boolean; configured: boolean; reason: string; status?: number; signature?: string }> {
   const cfg = step.config ?? {};
   const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
   if (sink === 'webhook') {

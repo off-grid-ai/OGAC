@@ -49,6 +49,7 @@ export interface StepState {
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
   actionImpact?: import('@/lib/action-contract').ActionImpact;
   actionReceipt?: import('@/lib/action-contract').ActionReceipt;
+  deliveryReceipt?: import('@/lib/sink-delivery-receipt').SinkDeliveryReceipt;
   startedAt?: string;
   finishedAt?: string;
 }
@@ -182,6 +183,7 @@ export interface StepResultInput {
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
   actionImpact?: import('@/lib/action-contract').ActionImpact;
   actionReceipt?: import('@/lib/action-contract').ActionReceipt;
+  deliveryReceipt?: import('@/lib/sink-delivery-receipt').SinkDeliveryReceipt;
 }
 
 // ─── deriveRunStatus — the aggregate run status from the per-step array (pure) ────────────────────
@@ -222,6 +224,7 @@ export function applyStepResult(
       ...(result.wouldPerform !== undefined ? { wouldPerform: result.wouldPerform } : {}),
       ...(result.actionImpact !== undefined ? { actionImpact: result.actionImpact } : {}),
       ...(result.actionReceipt !== undefined ? { actionReceipt: result.actionReceipt } : {}),
+      ...(result.deliveryReceipt !== undefined ? { deliveryReceipt: result.deliveryReceipt } : {}),
     };
     if (result.status === 'running' && !s.startedAt) next.startedAt = now;
     if (result.status === 'done' || result.status === 'error') {
@@ -256,6 +259,7 @@ export interface PersistedStepRow {
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
   actionImpact?: import('@/lib/action-contract').ActionImpact;
   actionReceipt?: import('@/lib/action-contract').ActionReceipt;
+  deliveryReceipt?: import('@/lib/sink-delivery-receipt').SinkDeliveryReceipt;
   startedAt?: string;
   finishedAt?: string;
 }
