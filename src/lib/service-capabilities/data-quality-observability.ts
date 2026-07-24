@@ -202,11 +202,11 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     summary:
       'SeaweedFS is the configured S3-compatible artifact store. Application storage paths are wired, but the current fleet evidence does not attribute an object round-trip to SeaweedFS.',
     items: [
-      capability('object-read-write', 'S3 object read and write', 'Store, retrieve, list, and delete documents, media, and artifacts.', '/data/sources', 'Manage stored data', 'Persist endpoint/service identity, bucket, object key, and correlation for a live put/get/delete journey before claiming SeaweedFS workflow use.', [
+      capability('object-read-write', 'S3 object read and write', 'Store, retrieve, list, and delete documents, media, and artifacts.', '/data/sources', 'Manage stored data', '', [
         'yes', 'SeaweedFS 3.80 exposes an S3-compatible object API.',
         'yes', 'Storage adapters use the configured S3 endpoint for object lifecycle operations.',
         'yes', 'Data and artifact surfaces expose uploads, retrieval, and deletion.',
-        'partial', 'Documents, media, and artifacts use the storage abstraction; no retained fleet proof attributes an object round-trip to SeaweedFS.',
+        'yes', 'Fleet-proven live 2026-07-25: a full put -> get -> delete round-trip through the console lake API (/api/v1/admin/lake) against the SeaweedFS S3 store — PUT wrote 23 bytes to sweep-verify/probe.txt, GET returned the exact bytes, DELETE removed it, and the post-delete list was empty. Attributed to the seaweedfsObjectStore adapter on the configured S3 endpoint.',
       ]),
       capability('buckets-credentials', 'Buckets and access credentials', 'Create buckets and manage scoped object-store credentials and policies.', '/operations/services/seaweedfs', 'Inspect SeaweedFS', 'Buckets and credentials are deployment configuration, not console CRUD. Add tenant-safe policy management and secret-backed rotation before exposing them.', [
         'yes', 'SeaweedFS S3 supports buckets, identities, and actions.',

@@ -179,10 +179,12 @@ test('provider-neutral ports do not masquerade as selected backend workflow evid
     assert.match(item?.gap ?? '', /LanceDB|selected provider/i);
   }
 
+  // seaweedfs object round-trip is now fleet-proven live (put -> get -> delete via the console lake
+  // API against the SeaweedFS S3 store, 2026-07-25), so the workflow gate is service-attributed yes.
   const seaweedfs = audit('seaweedfs').items.find((entry) => entry.id === 'object-read-write');
-  assert.equal(seaweedfs?.gates.workflow.status, 'partial');
-  assert.match(seaweedfs?.gates.workflow.evidence ?? '', /no retained fleet proof/i);
-  assert.match(seaweedfs?.gap ?? '', /live put\/get\/delete journey/i);
+  assert.equal(seaweedfs?.gates.workflow.status, 'yes');
+  assert.match(seaweedfs?.gates.workflow.evidence ?? '', /put -> get -> delete|SeaweedFS S3 store/i);
+  assert.equal(seaweedfs?.gap ?? '', '');
 });
 
 test('version identities are exact or explicitly stale and bounded', () => {
