@@ -1385,3 +1385,17 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   masking — it should require an approval + a purpose, like the image-redaction receipt pattern), a
   reason-coded audit event per recovery, and a UI that never bulk-reveals. Until then, choose `encrypt`
   only when a downstream system holds the key, and prefer `hash` when you just need join-ability.
+
+## Gateway analytics/accounting read zero — docs carry no `org` field (2026-07-25)
+
+- **[G-GATEWAY-INDEX-ORG] OPEN — Insights → Analytics/Accounting show zeros while the index holds
+  2,899 real gateway docs.** Isolated during the OpenSearch OIDC cutover (NOT caused by it — the
+  brokered transport returns HTTP 200 and a plain `match_all` sees all 2,899 docs):
+  `analyticsScopeFilters()` adds a `term: { org: <currentOrgId> }` filter for tenant isolation
+  (G-ADV-OBS-ORG), but the gateway aggregator writes its `offgrid-gateway` docs WITHOUT an `org`
+  field, so the filter matches 0. Proven live: `match_all` → 2899 hits; `term org=default` → 0 hits.
+  The tenant filter is CORRECT (dropping it would let one tenant's cost model count another's
+  traffic) — the fix belongs on the producer: have the gateway aggregator stamp `org` (and ideally
+  `project`) on every shipped doc, then backfill or accept a gap for historical docs. Until then these
+  two surfaces are honestly empty rather than wrong, but they LOOK broken to an operator, so this is
+  worth closing before any demo that shows Insights → Analytics.
