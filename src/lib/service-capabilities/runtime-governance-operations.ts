@@ -231,13 +231,13 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
   audit({
     serviceId: 'gateway',
     serviceLabel: 'AI Gateway',
-    upstreamVersion: 'Console release 61b86a720f725bbd6fdd40d0368e499e22c1bc2e',
+    upstreamVersion: 'Live aggregator gateway-aggregator.mjs (script sha256 afc7410e5583262c) against deployed Console SHA 4919b54e',
     versionSource:
-      'Historical Console release 61b86a720f725bbd6fdd40d0368e499e22c1bc2e; scripts/gateway-aggregator.mjs source owner 55064461a42a76a332392e19ea724a06732203b1; onprem fleet SERVER_STATE.md at bc74d828e02db7566b32191650cb58360f9178ae',
+      'live probe on S1 verified 2026-07-24: PID 315 running /Users/admin/offgrid/console/scripts/gateway-aggregator.mjs (script sha256 afc7410e5583262c, started 2026-07-15 19:54:13, PORT=8800, API-key-owned), :8800/v1/models → HTTP 401 (live + enforcing); expected Console SHA = deployed 4919b54e',
     denominatorSource:
       'packages/gateway/src/index.ts; packages/gateway/src/cluster/types.ts; packages/gateway/src/queue/types.ts; Console cloud-egress contract at c0d3e793: src/lib/egress-dlp.ts, src/lib/egress-dlp-run.ts, src/lib/egress-policy-store.ts, and src/app/api/v1/chat/stream/route.ts',
     auditStateEvidence:
-      'Historical auth and routing proof exists, but deploy/push.sh explicitly does not restart the aggregator and the live process has no repo-owned launch artifact or deployed-source stamp. Record the running script checksum, launch manifest revision, PID start time, and expected Console SHA in recover.sh before treating its identity as current.',
+      'The live identity is now recorded (script sha256 afc7410e5583262c, PID start 2026-07-15 19:54:13, expected Console SHA 4919b54e, :8800 live+401), but deploy/push.sh still does not restart the aggregator and the live process is a legacy ROOT process with no repo-owned launchd artifact. Closing this requires installing a root /Library/LaunchDaemons artifact (co.getoffgridai.gateway-aggregator, mirroring the guard-aggregator recover path) — an operator step needing sudo on S1. Until that is installed and a kill→auto-restart is proven, the digest/launch-manifest identity is incomplete and the aggregator will not self-recover.',
     summary:
       'Bounded first-party denominator: authenticated inference, model discovery, fleet routing, and request governance. Direct backend access is not part of the operator contract.',
     capabilities: [
