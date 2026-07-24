@@ -42,9 +42,8 @@ import {
 } from '@/lib/app-run-controls';
 import {
   applyStepResult,
-  completedStepIds,
   initState,
-  nextRunnableSteps,
+  planAdvance,
   type AppRunState,
 } from '@/lib/app-run-plan';
 import {
@@ -1183,7 +1182,14 @@ export async function driveRunnableSteps(
   // Bounded loop: at most one pass per step (a validated DAG). Guards against a pathological cycle.
   const maxIterations = (spec.steps?.length ?? 0) + 1;
   for (let i = 0; i <= maxIterations; i++) {
-    const runnable = nextRunnableSteps(spec, completedStepIds(state));
+    // Guard-aware scheduling: planAdvance also returns the steps to SKIP — those a conditional edge's
+    // false guard (or a skipped predecessor) leaves no live path to. Mark them skipped so they settle
+    // and unblock a downstream merge, without executing.
+    const { runnable, skip } = planAdvance(spec, state);
+    for (const s of skip) {
+      state = applyStepResult(state, s.id, { status: 'skipped', detail: 'branch not taken' });
+    }
+    if (skip.length) await deps.persist(state, input, ctx.orgId);
     if (runnable.length === 0) break;
 
     let paused = false;

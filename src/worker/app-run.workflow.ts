@@ -9,7 +9,7 @@
 //
 // THE STEP LOOP (mirrors runApp in app-run.ts, but durable + pausable):
 //   1. initState(spec) → the queued run state.
-//   2. loop: nextRunnableSteps(spec, completed) — the steps whose predecessors are all done.
+//   2. loop: planAdvance(spec, state) — the steps to run next + the branches to skip (guard-aware).
 //   3. for each runnable step: mark running (fold + persist), then call executeStepActivity.
 //   4. fold the StepResult via applyStepResult; persist.
 //        • error          → halt: the run status is 'error', break out and return.
@@ -43,8 +43,7 @@ import type { AppRunWorkflowInput, AppRunWorkflowResult } from '../lib/app-run-d
 import {
   initState,
   applyStepResult,
-  nextRunnableSteps,
-  completedStepIds,
+  planAdvance,
   type AppRunState,
   type StepResultInput,
 } from '../lib/app-run-plan';
@@ -135,7 +134,14 @@ export async function AppRunWorkflow(
   // Bounded outer loop: at most one pass per step (a validated DAG). Guards a pathological cycle.
   const maxIterations = (spec.steps?.length ?? 0) + 1;
   for (let i = 0; i <= maxIterations; i++) {
-    const runnable = nextRunnableSteps(spec, completedStepIds(state));
+    // Guard-aware scheduling: planAdvance also returns the steps to SKIP — those a conditional edge's
+    // false guard (or a skipped predecessor) leaves no live path to. Mark them skipped so they settle
+    // and unblock a downstream merge, without executing. Pure + deterministic (Temporal-safe).
+    const { runnable, skip } = planAdvance(spec, state);
+    for (const s of skip) {
+      state = applyStepResult(state, s.id, { status: 'skipped', detail: 'branch not taken' });
+    }
+    if (skip.length) await act.persistState(state, input.input, input.orgId);
     if (runnable.length === 0) break;
 
     let halted = false;

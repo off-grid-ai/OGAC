@@ -206,6 +206,61 @@ test('runApp stops at awaiting_human when a human step is hit', async () => {
   assert.equal(out.steps.find((s) => s.stepId === 's3'), undefined);
 });
 
+// ─── Conditional branching — the runner honors edge `when` guards (real runApp loop) ──────────────
+
+const DIAMOND = spec(
+  [
+    { id: 'd', label: 'Decide cashless vs surveyor', kind: 'agent', agentId: 'triage' },
+    { id: 'cashless', label: 'Auto-approve cashless', kind: 'agent', agentId: 'approve' },
+    { id: 'surveyor', label: 'Assign a surveyor', kind: 'agent', agentId: 'assign' },
+    { id: 'out', label: 'Notify', kind: 'output', sink: 'console' },
+  ],
+  [
+    { from: 'd', to: 'cashless', when: 'd contains "cashless"' },
+    { from: 'd', to: 'surveyor', when: 'd contains "surveyor"' },
+    { from: 'cashless', to: 'out' },
+    { from: 'surveyor', to: 'out' },
+  ],
+);
+
+test('runApp takes the guarded branch the decision matches and SKIPS the other (real loop)', async () => {
+  const calledAgents: string[] = [];
+  const deps = fakeDeps({
+    async runAgent(agentId, query) {
+      calledAgents.push(agentId);
+      // The decision step routes to the cashless branch; branch agents just echo.
+      const answer = agentId === 'triage' ? 'Decision: CASHLESS settlement, auto-approve' : `${agentId}: ${query}`;
+      return { id: `run_${agentId}`, answer, status: 'done', citations: [] };
+    },
+  });
+  const out = await runApp(DIAMOND, {}, { orgId: 'org_bharat', runId: 'rb1' }, deps);
+
+  assert.equal(out.status, 'done');
+  // The surveyor branch agent was NEVER invoked — the false guard skipped it.
+  assert.ok(calledAgents.includes('triage'), 'the decision agent ran');
+  assert.ok(calledAgents.includes('approve'), 'the matched (cashless) branch ran');
+  assert.ok(!calledAgents.includes('assign'), 'the unmatched (surveyor) branch was skipped, not executed');
+  // The executed steps are the decision, the taken branch, and the merge — surveyor is absent.
+  const ran = out.steps.map((s) => s.stepId);
+  assert.deepEqual(ran, ['d', 'cashless', 'out'], 'only the live path executed; the merge still ran');
+});
+
+test('runApp takes the OTHER branch when the decision flips (surveyor), skipping cashless', async () => {
+  const calledAgents: string[] = [];
+  const deps = fakeDeps({
+    async runAgent(agentId, query) {
+      calledAgents.push(agentId);
+      const answer = agentId === 'triage' ? 'Decision: send a SURVEYOR to inspect' : `${agentId}: ${query}`;
+      return { id: `run_${agentId}`, answer, status: 'done', citations: [] };
+    },
+  });
+  const out = await runApp(DIAMOND, {}, { orgId: 'org_bharat', runId: 'rb2' }, deps);
+  assert.equal(out.status, 'done');
+  assert.ok(!calledAgents.includes('approve'), 'the cashless branch was skipped');
+  assert.ok(calledAgents.includes('assign'), 'the surveyor branch ran');
+  assert.deepEqual(out.steps.map((s) => s.stepId), ['d', 'surveyor', 'out']);
+});
+
 // ─── GAP #106-a — resolve step.domain by ID first, then LABEL/alias ───────────────────────────────
 
 const DOMS = [
