@@ -208,7 +208,10 @@ export function CrossSellCustomerJourney({
                         <p className="mt-1 text-xs text-muted-foreground">
                           {formatDate(outcome.observedAt)}
                           {outcome.value !== null && outcome.currency
-                            ? ` · ${outcome.currency} ${outcome.value.toLocaleString()}`
+                            ? // Pin the grouping locale: this is Indian BFSI money (INR), so it
+                              // must read 1,25,000 — and a bare toLocaleString() would otherwise
+                              // follow the host's default locale, making the output non-deterministic.
+                              ` · ${outcome.currency} ${outcome.value.toLocaleString('en-IN')}`
                             : ''}
                         </p>
                         <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">

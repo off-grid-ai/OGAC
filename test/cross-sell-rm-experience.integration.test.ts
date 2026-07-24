@@ -215,7 +215,7 @@ test('an observed response stays separate from CRM completion and suggests conve
   assert.match(html, /value="converted" selected=""/);
   assert.match(html, /Observed customer results/);
   assert.match(html, /accepted/);
-  assert.match(html, /INR 125,000/);
+  assert.match(html, /INR 1,25,000/);
   assert.match(html, /CRM completion confirms the system change/);
 });
 
