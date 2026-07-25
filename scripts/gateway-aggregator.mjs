@@ -12,6 +12,7 @@
 // JWT (OFFGRID_KEYCLOAK_URL + _REALM). Keys are ISSUED by Keycloak (a service-account
 // client → client_credentials → JWT) — we don't run our own key store. If neither is
 // configured the endpoint is open (LAN-only dev default).
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -230,8 +231,22 @@ const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX || 'offgrid-gateway';
 // silently LOST. This standalone script can't use the console's credential broker, so it authenticates
 // with the internal break-glass basic user that the security config deliberately keeps enabled.
 // Absent credentials ⇒ no header (correct for a security-OFF cluster), so both deployments work.
-const OS_USER = process.env.OFFGRID_OPENSEARCH_USER || '';
-const OS_PASS = process.env.OFFGRID_OPENSEARCH_PASSWORD || '';
+// Credentials come from the env when the launcher provides them, else from a root-only credential
+// file the script reads ITSELF (line 1 = user, line 2 = password). Reading the file directly means the
+// ship path works no matter which launchd job/wrapper started the process — depending on plist
+// EnvironmentVariables proved fragile (a KeepAlive respawn kept the old job definition's env).
+function readOsCredFile() {
+  try {
+    const path = process.env.OFFGRID_OPENSEARCH_CRED_FILE || '/etc/offgrid/opensearch-basic';
+    const [u, p] = readFileSync(path, 'utf8').split('\n');
+    return { user: (u || '').trim(), pass: (p || '').trim() };
+  } catch {
+    return { user: '', pass: '' };
+  }
+}
+const OS_FILE_CRED = readOsCredFile();
+const OS_USER = process.env.OFFGRID_OPENSEARCH_USER || OS_FILE_CRED.user;
+const OS_PASS = process.env.OFFGRID_OPENSEARCH_PASSWORD || OS_FILE_CRED.pass;
 function osAuthHeaders() {
   if (!OS_USER || !OS_PASS) return {};
   return { authorization: `Basic ${Buffer.from(`${OS_USER}:${OS_PASS}`).toString('base64')}` };
