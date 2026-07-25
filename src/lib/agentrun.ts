@@ -154,7 +154,10 @@ async function gatewayAnswer(
         taskQueue: process.env.OFFGRID_QUEUE_TASK_QUEUE ?? 'offgrid-inference',
         gatewayUrl: GATEWAY_URL,
       };
-      const id = await enqueueInference({ body }, cfg);
+      // Attribution on the QUEUE path too — this is the REAL inference path whenever
+      // OFFGRID_QUEUE_ENABLED=1, so omitting it leaves every agent/app run unattributed (the
+      // org-scoped FinOps/Insights surfaces then read zero for governed runs).
+      const id = await enqueueInference({ body, caller, org: orgId }, cfg);
       const res = await getResult(id, cfg);
       return res.status === 200 ? extractText(res.body) : null;
     } catch {

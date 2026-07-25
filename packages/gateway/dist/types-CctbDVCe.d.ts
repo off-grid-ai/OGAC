@@ -12,6 +12,8 @@ interface QueuedInferenceRequest {
     /** Optional caller/correlation id for observability + idempotent workflow ids. */
     caller?: string;
     corrId?: string;
+    /** Tenant org, forwarded as x-offgrid-org so queued traffic is attributable. */
+    org?: string;
 }
 /** The result of a completed inference workflow. */
 interface QueueResult {

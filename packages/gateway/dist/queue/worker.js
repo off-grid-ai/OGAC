@@ -30,6 +30,9 @@ async function runInference(req) {
   const headers = { "content-type": "application/json", ...queueGatewayHeaders() };
   if (req.caller) headers["x-offgrid-caller"] = req.caller;
   if (req.corrId) headers["x-offgrid-corr-id"] = req.corrId;
+  if (req.org) headers["x-offgrid-org"] = req.org;
+  if (req.caller) headers["x-offgrid-user"] = req.caller;
+  if (req.corrId) headers["x-offgrid-run"] = req.corrId;
   const res = await fetch(url, {
     method: "POST",
     headers,

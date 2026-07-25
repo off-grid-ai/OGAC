@@ -19,6 +19,13 @@ export interface QueuedInferenceRequest {
   /** Optional caller/correlation id for observability + idempotent workflow ids. */
   caller?: string;
   corrId?: string;
+  /**
+   * Tenant org this inference belongs to. Forwarded to the gateway as `x-offgrid-org` so the
+   * aggregator can ATTRIBUTE the traffic doc. Without it a queued (agent/app) run lands
+   * unattributed and the org-scoped FinOps/Insights surfaces read zero for it — the queue is the
+   * real inference path whenever OFFGRID_QUEUE_ENABLED=1, so this is not optional in practice.
+   */
+  org?: string;
 }
 
 /** The result of a completed inference workflow. */

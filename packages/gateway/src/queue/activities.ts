@@ -44,6 +44,12 @@ export async function runInference(req: QueuedInferenceRequest): Promise<QueueRe
   };
   if (req.caller) headers['x-offgrid-caller'] = req.caller;
   if (req.corrId) headers['x-offgrid-corr-id'] = req.corrId;
+  // ATTRIBUTION the aggregator actually reads (it keys on x-offgrid-org / x-offgrid-user /
+  // x-offgrid-run — NOT the -caller/-corr-id names above), so a queued run's traffic doc lands
+  // attributed to its tenant instead of invisible to the org-scoped FinOps surfaces.
+  if (req.org) headers['x-offgrid-org'] = req.org;
+  if (req.caller) headers['x-offgrid-user'] = req.caller;
+  if (req.corrId) headers['x-offgrid-run'] = req.corrId;
 
   const res = await fetch(url, {
     method: 'POST',
