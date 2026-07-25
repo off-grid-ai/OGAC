@@ -225,13 +225,32 @@ const STATS = {};      // per-gateway { requests, errors, totalMs, tokens }
 const startedAt = Date.now();
 const OS_URL = process.env.OFFGRID_OPENSEARCH_URL || 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX || 'offgrid-gateway';
+// OpenSearch AUTH for the ship path. The cluster's security plugin is ENABLED (Phase-D OIDC cutover,
+// 2026-07-25), so an unauthenticated _doc POST is rejected with 401 and the observability doc is
+// silently LOST. This standalone script can't use the console's credential broker, so it authenticates
+// with the internal break-glass basic user that the security config deliberately keeps enabled.
+// Absent credentials ⇒ no header (correct for a security-OFF cluster), so both deployments work.
+const OS_USER = process.env.OFFGRID_OPENSEARCH_USER || '';
+const OS_PASS = process.env.OFFGRID_OPENSEARCH_PASSWORD || '';
+function osAuthHeaders() {
+  if (!OS_USER || !OS_PASS) return {};
+  return { authorization: `Basic ${Buffer.from(`${OS_USER}:${OS_PASS}`).toString('base64')}` };
+}
 // Durable, SIEM-searchable gateway log: fire-and-forget index each call into OpenSearch.
+let shipWarned = false;
 function shipToOpenSearch(e) {
   try {
     fetch(`${OS_URL}/${OS_INDEX}/_doc`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...osAuthHeaders() },
       body: JSON.stringify({ '@timestamp': new Date(e.ts).toISOString(), source: 'gateway-aggregator', ...e }),
+    }).then((r) => {
+      // Log the FIRST rejection loudly: a silently-401ing ship path means the observability index
+      // stops filling while every request still succeeds — the failure mode that hid this before.
+      if (!r.ok && !shipWarned) {
+        shipWarned = true;
+        console.error(`[aggregator] OpenSearch ship REJECTED ${r.status} — observability docs are being dropped (check OFFGRID_OPENSEARCH_USER/PASSWORD)`);
+      }
     }).catch(() => {});
   } catch { /* never block a request on logging */ }
 }
