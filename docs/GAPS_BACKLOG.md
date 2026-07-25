@@ -1399,3 +1399,24 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   `project`) on every shipped doc, then backfill or accept a gap for historical docs. Until then these
   two surfaces are honestly empty rather than wrong, but they LOOK broken to an operator, so this is
   worth closing before any demo that shows Insights → Analytics.
+
+## Gateway attribution must cover ALL inference callers, not just agentrun (2026-07-25)
+
+- **[G-GATEWAY-ATTR-SWEEP] OPEN — the attribution MECHANISM is proven; the coverage is partial.**
+  Proven working end-to-end (2026-07-25): the aggregator stamps `org` from `x-offgrid-org`; the
+  Temporal queue forwards it (isolation test: `org=queueprobe` docs 0 → 1); the console reads the
+  secured index. chat/stream and agentrun's own `gatewayAnswer` (direct + queue) now send it.
+  **But a real agent run STILL produced `org: null`**, because the completion came from a DIFFERENT
+  caller — the grounding step — and there are 12 gateway call sites in total. Until each one that has
+  a tenant in scope stamps attribution, `computeFinOps` / analytics / accounting (all of which read
+  the org-filtered `offgrid-gateway` index) under-report governed-run cost.
+  **Remaining call sites to thread + stamp** (use the shared pure `gatewayAttribution()`; several need
+  `orgId` threaded through their own signatures first):
+  `src/lib/adapters/grounding.ts:80` (the one that produced the null-org doc on the probe),
+  `src/lib/qa/scoring.ts:57`, `src/lib/eval-runner.ts:45` + `:153`, `src/lib/ingest.ts:53`,
+  `src/lib/chat-memory.ts:35`, `src/lib/app-compile.ts:725`,
+  `src/lib/pipeline-execute-wiring.ts:63`, plus the embedding callers
+  `src/lib/rag.ts:48`, `src/lib/org-knowledge.ts:77`, `src/lib/adapters/inference.ts:23`.
+  Verification bar for closing it: run one governed agent run and assert EVERY resulting
+  `offgrid-gateway` doc carries the run's org (not just the completion), then that Insights →
+  Cost/Analytics reports non-zero for that tenant.
