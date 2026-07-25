@@ -21,6 +21,27 @@ export const GATEWAY_CONTROL_URL = ENDPOINTS.controlUrl;
 const GATEWAY_API_KEY = process.env.OFFGRID_GATEWAY_API_KEY ?? '';
 
 /**
+ * ATTRIBUTION headers for an inference call (PURE). The aggregator stamps these onto the
+ * `offgrid-gateway` observability doc, and the console's Insights surfaces filter that index by
+ * `term: { org }` for tenant isolation — so a call that omits the org lands as an UNATTRIBUTED doc
+ * that those surfaces can never show (G-GATEWAY-INDEX-ORG). Every inference call site should spread
+ * this so attribution is stamped one way, in one place, instead of hand-written per call.
+ *
+ * Blank/whitespace values are DROPPED rather than sent empty, so an unknown user/org stays honestly
+ * absent instead of becoming an empty-string attribution.
+ */
+export function gatewayAttribution(
+  attribution: { orgId?: string | null; userId?: string | null } = {},
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  const org = attribution.orgId?.trim();
+  const user = attribution.userId?.trim();
+  if (org) out['x-offgrid-org'] = org;
+  if (user) out['x-offgrid-user'] = user;
+  return out;
+}
+
+/**
  * Synchronous gateway headers (LEGACY seam). Emits exactly what the console sent before the broker:
  * the static `x-api-key` when configured, else no auth. Kept for the many synchronous call sites that
  * can't await; `gatewayHeadersAsync` is the broker-preferring path for calls that can.

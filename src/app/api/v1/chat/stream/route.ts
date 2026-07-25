@@ -61,7 +61,7 @@ import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { GATEWAY_URL, gatewayAttribution, gatewayHeaders } from '@/lib/gateway';
 const enc = new TextEncoder();
 
 type ContentPart =
@@ -588,7 +588,12 @@ export async function POST(req: Request) {
         method: 'POST',
         // x-offgrid-user attributes gateway spend to the real signed-in user (captured into the
         // gateway's OpenSearch log as `caller`) rather than the console's user-agent.
-        headers: gatewayHeaders({ 'content-type': 'application/json', 'x-offgrid-user': userId }),
+        // Attribution (user + tenant org) so the aggregator's observability doc is attributable and
+        // the org-scoped Insights surfaces can actually see it (G-GATEWAY-INDEX-ORG).
+        headers: gatewayHeaders({
+          'content-type': 'application/json',
+          ...gatewayAttribution({ userId, orgId }),
+        }),
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(290000),
       }).catch(() => null);

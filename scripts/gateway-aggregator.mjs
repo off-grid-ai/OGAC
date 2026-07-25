@@ -593,6 +593,11 @@ async function handle(req, res, chunks) {
     // Request-side context for the observability record (A + D above).
     const caller = String(req.headers['user-agent'] || '').slice(0, 80);
     const corrId = String(req.headers['x-offgrid-run'] || req.headers['x-request-id'] || '');
+    // TENANT ORG attribution (G-GATEWAY-INDEX-ORG). The console's observability surfaces filter the
+    // offgrid-gateway index by `term: { org }` for tenant isolation, so a doc with no `org` is
+    // invisible to Insights → Analytics/Accounting. The console (which owns the request-scoped tenant)
+    // sends it as x-offgrid-org; absent ⇒ null (honestly unattributed, never guessed).
+    const org = String(req.headers['x-offgrid-org'] || '').trim().slice(0, 64) || null;
     // PA-15 — per-tenant gateway ATTRIBUTION. When this request arrived on a provisioned per-tenant
     // gateway host ("<slug5><rand5>-gateway.<apex>"), the tunnel/Caddy forwards the original host in
     // the Host header. Resolve it (pure) so the request is attributed to that tenant's gateway on the
@@ -697,12 +702,13 @@ async function handle(req, res, chunks) {
           tps, finish, toolCalls, reasoning: reasoning.slice(0, 2000), caller, corrId, params, msgs,
           tenantGateway: tenantGateway ? tenantGateway.label : null,
           tenantGatewayHost: tenantGateway ? inboundHost.toLowerCase() : null,
+          org,
           input: promptText(body), output: output.slice(0, 2000),
         });
       });
     });
     up.on('error', (e) => {
-      record({ gateway: target.name, model: body.model || target.model, modelServed: target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, caller, corrId, params, msgs, tenantGateway: tenantGateway ? tenantGateway.label : null, tenantGatewayHost: tenantGateway ? inboundHost.toLowerCase() : null, input: promptText(body), output: `(error: ${e.message})` });
+      record({ gateway: target.name, model: body.model || target.model, modelServed: target.model, kind, status: 502, ms: Date.now() - started, bytes: 0, tokens: 0, caller, corrId, params, msgs, tenantGateway: tenantGateway ? tenantGateway.label : null, tenantGatewayHost: tenantGateway ? inboundHost.toLowerCase() : null, org, input: promptText(body), output: `(error: ${e.message})` });
       json(res, 502, { error: { message: `gateway ${target.name} (${target.host}) error: ${e.message}`, type: 'upstream_error' } });
     });
     up.setTimeout(Number(process.env.OFFGRID_GATEWAY_UPSTREAM_TIMEOUT_MS || 300000), () => up.destroy(new Error('upstream timeout')));
