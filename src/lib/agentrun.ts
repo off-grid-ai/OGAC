@@ -40,7 +40,7 @@ import { type CheckResult } from '@/lib/checks';
 import { deepStripNul, stripNul } from '@/lib/jsonb-safe';
 import { correlationIds } from '@/lib/correlation';
 import { costForTokens } from '@/lib/finops';
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { GATEWAY_URL, gatewayAttribution, gatewayHeaders } from '@/lib/gateway';
 import { screenGuardrail } from '@/lib/guardrail-seam';
 import { emitSpan } from '@/lib/otel';
 import { auditEnforcement } from '@/lib/pipeline-contract';
@@ -133,6 +133,7 @@ async function gatewayAnswer(
   system: string,
   model: string,
   caller?: string,
+  orgId?: string,
 ): Promise<string | null> {
   const body = {
     model,
@@ -164,11 +165,12 @@ async function gatewayAnswer(
   try {
     const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
-      // x-offgrid-user attributes the agent run's gateway spend to the invoking user (captured
-      // as `caller` in the gateway's OpenSearch log) for per-user FinOps.
+      // Attribution: the invoking user AND the tenant org, so this run's gateway spend lands
+      // ATTRIBUTED on the observability doc. Without the org the doc is invisible to the org-scoped
+      // FinOps/Insights surfaces, i.e. agent traffic reads as zero cost (G-GATEWAY-INDEX-ORG).
       headers: gatewayHeaders({
         'content-type': 'application/json',
-        ...(caller ? { 'x-offgrid-user': caller } : {}),
+        ...gatewayAttribution({ userId: caller, orgId }),
       }),
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),
@@ -198,6 +200,7 @@ async function compose(
   hits: RetrievalHit[],
   agent: AgentDef,
   caller?: string,
+  orgId?: string,
 ): Promise<string> {
   const context = hits.map((h, i) => `[${i + 1}] ${h.title}: ${h.snippet}`).join('\n');
   const system = systemFor(agent);
@@ -206,7 +209,7 @@ async function compose(
   const cacheKey = `${model}\n${system}\n${query}\n${context}`;
   const cached = await cacheLookup(cacheKey);
   if (cached.hit && cached.answer) return cached.answer;
-  const answer = await gatewayAnswer(query, context, system, model, caller);
+  const answer = await gatewayAnswer(query, context, system, model, caller, orgId);
   if (answer) {
     await cacheStore(cacheKey, answer);
     return answer;
@@ -266,12 +269,12 @@ async function resolveAgentToolCatalog(agent: AgentDef, orgId: string): Promise<
 // FinOps attribution) as a normal answer. It builds the ReAct prompt (pure), calls the gateway, and
 // parses the reply into an action. On an empty/unparseable reply it FINISHES with a best-effort note
 // rather than looping blindly — the loop's budget still bounds it either way.
-function makeGovernedPlanner(model: string, system: string, caller?: string) {
+function makeGovernedPlanner(model: string, system: string, caller?: string, orgId?: string) {
   return async (input: PlanInput) => {
     const prompt = buildPlannerPrompt(input);
     // The planner reply is NOT the final answer, so it must not be cached under the compose key;
     // call the gateway directly with the ReAct system + prompt.
-    const reply = await gatewayAnswer(input.goal, prompt, system, model, caller);
+    const reply = await gatewayAnswer(input.goal, prompt, system, model, caller, orgId);
     const action = reply ? parseAgentAction(reply) : null;
     if (action) return action;
     // No usable action — end the loop honestly with whatever the model said (or a fallback).
@@ -1041,7 +1044,7 @@ export async function runAgent(
     const loop = await runAgentLoop({
       goal: `${modelQuery}${context}`,
       tools: toolCatalog,
-      planNext: makeGovernedPlanner(loopModel, loopSystem, caller),
+      planNext: makeGovernedPlanner(loopModel, loopSystem, caller, attribution.org),
       callTool: makeGovernedToolExecutor(orgId, agent.id, caller, mark, runEgress, actorRole),
       maxIterations: budget,
     });
@@ -1055,7 +1058,7 @@ export async function runAgent(
       t,
     );
   } else {
-    answer = await compose(modelQuery, routed.hits, agent, caller);
+    answer = await compose(modelQuery, routed.hits, agent, caller, attribution.org);
     mark('answer', 'compose', answer.slice(0, 120), [], t);
   }
 
