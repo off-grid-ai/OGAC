@@ -4,6 +4,7 @@ import type { OnlineScore } from '../src/lib/qa/online-scores.ts';
 import {
   detectQualityRegression,
   regressedSubjects,
+  regressionHeadline,
   type QualityRegressionView,
 } from '../src/lib/qa/quality-regression.ts';
 
@@ -173,4 +174,49 @@ test('the defaults are a 10-run recent window with a 5-run minimum on each side'
   assert.equal(w.status, 'regressed');
   assert.equal(w.recentCount, 10);
   assert.equal(w.baselineCount, 20);
+});
+
+// ─── the summary badge above the per-subject table ────────────────────────────────────────────────
+// Found by screenshotting the live page: every subject read 'insufficient-data' while the badge
+// claimed "no decline detected" — a false all-clear at the badge, exactly what the rule avoids at
+// the data layer. These lock that shut.
+
+test('a summary never claims "no decline" when nothing was comparable', () => {
+  const subjects = detectQualityRegression([...run(0, 10, 0.91), ...run(10, 2, 0.44)]);
+  assert.deepEqual(subjects.map((s) => s.status), ['insufficient-data']);
+
+  const headline = regressionHeadline(subjects);
+  assert.equal(headline.tone, 'insufficient-data');
+  assert.equal(headline.label, 'not enough data yet');
+  assert.notEqual(headline.label, 'no decline detected');
+});
+
+test('a summary claims "no decline" only once a subject was actually judged healthy', () => {
+  const subjects = detectQualityRegression([...run(0, 6, 0.88), ...run(6, 6, 0.86)], {
+    recentSize: 6,
+    minSamples: 5,
+  });
+  assert.deepEqual(subjects.map((s) => s.status), ['ok']);
+  assert.deepEqual(regressionHeadline(subjects), { tone: 'ok', label: 'no decline detected' });
+});
+
+test('one declining subject dominates the summary even beside healthy and unjudgeable ones', () => {
+  const subjects = [
+    ...detectQualityRegression([...run(0, 6, 0.9), ...run(6, 6, 0.4)], { recentSize: 6, minSamples: 5 }),
+    ...detectQualityRegression(
+      [...run(0, 6, 0.88).map((s) => ({ ...s, subjectId: 'b', runId: `b${s.runId}` })),
+       ...run(6, 6, 0.87).map((s) => ({ ...s, subjectId: 'b', runId: `b2${s.runId}` }))],
+      { recentSize: 6, minSamples: 5 },
+    ),
+    ...detectQualityRegression(run(0, 3, 0.5).map((s) => ({ ...s, subjectId: 'c', runId: `c${s.runId}` }))),
+  ];
+  assert.deepEqual(subjects.map((s) => s.status), ['regressed', 'ok', 'insufficient-data']);
+
+  const headline = regressionHeadline(subjects);
+  assert.equal(headline.tone, 'regressed');
+  assert.equal(headline.label, '1 getting worse');
+});
+
+test('an empty subject list is unknown, not healthy', () => {
+  assert.deepEqual(regressionHeadline([]), { tone: 'insufficient-data', label: 'not enough data yet' });
 });

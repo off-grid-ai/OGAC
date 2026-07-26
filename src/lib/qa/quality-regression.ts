@@ -134,6 +134,33 @@ export function regressedSubjects(verdicts: readonly RegressionVerdict[]): Regre
   return verdicts.filter((v) => v.status === 'regressed');
 }
 
+export interface RegressionHeadline {
+  tone: RegressionStatus;
+  label: string;
+}
+
+/**
+ * The one-line summary above the per-subject table. PURE.
+ *
+ * The distinction this exists to protect: "nothing is declining" and "nothing could be judged yet"
+ * must not render as the same green badge. A summary that says "no decline detected" while every
+ * subject underneath reads 'insufficient-data' is a false all-clear — precisely the lie the rule
+ * avoids at the data layer, and it would sneak back in at the badge if this were computed inline.
+ */
+export function regressionHeadline(
+  subjects: readonly RegressionVerdict[],
+): RegressionHeadline {
+  const regressed = subjects.filter((v) => v.status === 'regressed').length;
+  if (regressed > 0) {
+    return { tone: 'regressed', label: `${regressed} getting worse` };
+  }
+  // Only claim "no decline" when at least one subject was actually comparable.
+  if (subjects.some((v) => v.status === 'ok')) {
+    return { tone: 'ok', label: 'no decline detected' };
+  }
+  return { tone: 'insufficient-data', label: 'not enough data yet' };
+}
+
 // ─── thin read (I/O) ──────────────────────────────────────────────────────────────────────────────
 
 export interface QualityRegressionView {

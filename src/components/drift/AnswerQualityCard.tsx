@@ -8,7 +8,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { QualityRegressionView, RegressionStatus } from '@/lib/qa/quality-regression';
+import {
+  regressionHeadline,
+  type QualityRegressionView,
+  type RegressionStatus,
+} from '@/lib/qa/quality-regression';
 
 // Presentation only — every judgement already happened in the pure rule upstream. This decides
 // nothing about whether quality regressed; it only renders the verdict it is handed.
@@ -28,7 +32,8 @@ const STATUS_LABEL: Record<RegressionStatus, string> = {
 const pct = (n: number): string => `${Math.round(n * 100)}%`;
 
 export function AnswerQualityCard({ view }: Readonly<{ view: QualityRegressionView }>) {
-  const { subjects, regressed, measured, retained } = view;
+  const { subjects, measured, retained } = view;
+  const headline = regressionHeadline(subjects);
 
   return (
     <Card>
@@ -50,13 +55,8 @@ export function AnswerQualityCard({ view }: Readonly<{ view: QualityRegressionVi
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge
-                variant="secondary"
-                className={regressed.length ? STATUS_CLASS.regressed : STATUS_CLASS.ok}
-              >
-                {regressed.length
-                  ? `${regressed.length} getting worse`
-                  : 'no decline detected'}
+              <Badge variant="secondary" className={STATUS_CLASS[headline.tone]}>
+                {headline.label}
               </Badge>
               <span>
                 {retained} scored {retained === 1 ? 'answer' : 'answers'} across {subjects.length}{' '}
@@ -81,7 +81,9 @@ export function AnswerQualityCard({ view }: Readonly<{ view: QualityRegressionVi
                       <TableCell className="font-medium">
                         {s.subjectId}
                         {s.status === 'regressed' ? (
-                          <span className="block text-xs font-normal text-muted-foreground">
+                          // TableCell is whitespace-nowrap; without this override the sentence forces
+                          // the column to its full width and pushes the score columns off-screen.
+                          <span className="block max-w-[28rem] whitespace-normal text-xs font-normal text-muted-foreground">
                             {s.detail}
                           </span>
                         ) : null}
