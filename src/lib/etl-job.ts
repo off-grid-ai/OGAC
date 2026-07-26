@@ -42,6 +42,10 @@ export interface EtlJobSpec {
   cron?: string; // required when trigger === 'schedule'
   // Row cap per run (safety valve; clamped).
   rowLimit?: number;
+  // QUALITY GATE (optional, default off): run an expectation suite over the projected rows before
+  // they land, and — in 'block' mode — refuse the write when the data fails. Shape + decision owned
+  // by lib/etl-quality-gate.ts. Absent ⇒ no checkpoint runs (existing jobs unchanged).
+  qualityGate?: import('./etl-quality-gate').EtlQualityGate;
   createdAt?: string;
   updatedAt?: string;
   lastRunStatus?: EtlJobStatus;

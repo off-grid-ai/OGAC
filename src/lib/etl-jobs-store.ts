@@ -13,6 +13,12 @@
 // lineage. If/when Airbyte connection-creation is wired, compileToAirbyteConfig is the ready mapper.
 
 import { randomUUID } from 'node:crypto';
+import { geDataQuality } from '@/lib/adapters/data-quality';
+import {
+  normalizeQualityGate,
+  qualityGateDecision,
+  qualityGateEnabled,
+} from '@/lib/etl-quality-gate';
 import { db } from '@/db';
 import { kestraOrchestration } from '@/lib/adapters/kestra';
 import { execConnectorQuery } from '@/lib/connector-exec';
@@ -68,6 +74,7 @@ export async function ensureEtlJobsSchema(): Promise<void> {
     // The visual DAG spec (source → transforms → destination) authored in the builder. Added after
     // the flat-mapping model shipped, so ALTER idempotently for a DB that has the older table.
     await db.execute(sql`ALTER TABLE etl_jobs ADD COLUMN IF NOT EXISTS dag jsonb;`);
+    await db.execute(sql`ALTER TABLE etl_jobs ADD COLUMN IF NOT EXISTS quality_gate jsonb;`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS etl_runs (
         id text PRIMARY KEY,
@@ -118,6 +125,7 @@ function rowToSpec(r: Record<string, unknown>): EtlJobSpec {
     createdAt: iso(r.created_at),
     updatedAt: iso(r.updated_at),
     dag: r.dag && typeof r.dag === 'object' ? (r.dag as EtlDagSpec) : undefined,
+    qualityGate: r.quality_gate ? normalizeQualityGate(r.quality_gate) : undefined,
   };
 }
 
@@ -203,15 +211,16 @@ export async function createEtlJob(
   const id = `etl_${randomUUID().slice(0, 12)}`;
   const mappingsJson = JSON.stringify(draft.mappings ?? []);
   const dagJson = draft.dag ? JSON.stringify(draft.dag) : null;
+  const gateJson = draft.qualityGate ? JSON.stringify(normalizeQualityGate(draft.qualityGate)) : null;
   const rowLimit = draft.rowLimit != null ? clampRowLimit(draft.rowLimit) : null;
   const res = await db.execute(sql`
     INSERT INTO etl_jobs
       (id, org_id, name, source_connector_id, source_resource, dest_database, dest_table,
-       mappings, trigger, cron, row_limit, dag)
+       mappings, trigger, cron, row_limit, dag, quality_gate)
     VALUES
       (${id}, ${orgId}, ${draft.name}, ${draft.sourceConnectorId}, ${draft.sourceResource},
        ${draft.destDatabase}, ${draft.destTable}, ${mappingsJson}::jsonb, ${draft.trigger},
-       ${draft.cron ?? null}, ${rowLimit}, ${dagJson}::jsonb)
+       ${draft.cron ?? null}, ${rowLimit}, ${dagJson}::jsonb, ${gateJson}::jsonb)
     RETURNING *`);
   const job = rowToSpec((res.rows as Record<string, unknown>[])[0]);
   // A scheduled job's flow (with its cron trigger) must be live in the engine at save time.
@@ -327,6 +336,7 @@ export async function runJob(job: EtlJobSpec, orgId: string = DEFAULT_ORG): Prom
   let rowsRead = 0;
   let rowsWritten = 0;
   let redacted = 0;
+  let qualityReason: string | null = null;
   let message = '';
 
   try {
@@ -354,6 +364,34 @@ export async function runJob(job: EtlJobSpec, orgId: string = DEFAULT_ORG): Prom
     const projected = redactResult.rows.map((r) => projectRow(r, job.mappings));
     const cols = destColumns(job.mappings, projected);
 
+    // 4b. QUALITY GATE — the last chance to stop bad data before it lands. Runs the configured
+    // expectation suite over the PROJECTED rows (what would actually be written) and consults the
+    // pure decision. mode 'off' (the default) skips the checkpoint entirely, so existing jobs are
+    // unchanged; 'block' refuses the write on a failing verdict — or on an unreachable engine, since
+    // an unverifiable guarantee is not a guarantee.
+    const gate = normalizeQualityGate(job.qualityGate);
+    if (qualityGateEnabled(gate)) {
+      let verdict = null as Awaited<ReturnType<typeof geDataQuality.runCheckpoint>> | null;
+      try {
+        verdict = await geDataQuality.runCheckpoint(
+          gate.suite ?? `etl:${job.id}`,
+          projected,
+          gate.expectations,
+        );
+      } catch {
+        verdict = null; // the decision treats this as unverifiable
+      }
+      const outcome = qualityGateDecision(gate, verdict);
+      qualityReason = outcome.reason;
+      if (outcome.block) {
+        // A gated sync is a FAILED run — it did not succeed and nothing landed. The message carries
+        // WHY, so the run history distinguishes "quality blocked it" from an engine/connector error.
+        throw new Error(
+          `${outcome.reason}. ${rowsRead} rows read; NOTHING was written to ${job.destDatabase}.${job.destTable}.`,
+        );
+      }
+    }
+
     // 5. Land in ClickHouse: ensure db + table, truncate (full-refresh), insert.
     await warehouseExec(buildCreateDatabaseSql(job.destDatabase));
     await warehouseExec(buildCreateTableSql(job.destDatabase, job.destTable, cols));
@@ -371,7 +409,7 @@ export async function runJob(job: EtlJobSpec, orgId: string = DEFAULT_ORG): Prom
     }
 
     status = normalizeRunStatus('ok');
-    message = `Moved ${rowsRead} rows → ${job.destDatabase}.${job.destTable} (${redacted} values redacted).`;
+    message = `Moved ${rowsRead} rows → ${job.destDatabase}.${job.destTable} (${redacted} values redacted).${qualityReason ? ` ${qualityReason}.` : ''}`;
   } catch (err) {
     status = 'failed';
     message = describeError(err);
