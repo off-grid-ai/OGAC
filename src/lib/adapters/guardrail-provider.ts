@@ -233,6 +233,22 @@ export function guardrailNotConfigured(engine = 'llm-guard'): PiiResult {
 // FAIL CLOSED: configured + unreachable ⇒ the run is BLOCKED (never a silent fall-open). NOT
 // configured ⇒ an explicit "not configured" state (never a faked clean pass).
 //
+// Resolve the scanners the operator has explicitly DISABLED, as the engine's suppress list. Never
+// throws and never blocks the scan: a policy-store failure means we send no suppression (the
+// deployment's own configuration stands) rather than failing a governed check over a config read.
+async function resolveSuppressed(orgId?: string): Promise<string[] | undefined> {
+  try {
+    const [{ listGuardrailRules }, { suppressedScanners }] = await Promise.all([
+      import('@/lib/guardrails-rules'),
+      import('@/lib/guardrails-catalog'),
+    ]);
+    const list = suppressedScanners(await listGuardrailRules(orgId?.trim() || undefined));
+    return list.length ? list : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const llmGuardPii: PiiPort = {
   meta: {
     id: 'llm-guard',
@@ -244,16 +260,21 @@ export const llmGuardPii: PiiPort = {
     description:
       'The authoritative content-guardrail engine. Input uses /analyze/prompt; generated output uses /analyze/output with its prompt context. Scanner configuration, including India recognizers, is loaded from the fleet CONFIG_FILE at startup. FAIL CLOSED when configured but unreachable.',
   },
-  async scan(text) {
+
+  async scan(text, orgId) {
     const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
     // Honest "not configured": no URL ⇒ the step did NOT screen. The UI reports this as "guardrails
     // not configured yet" (calm) via the registry's `configured` flag. Never a faked clean pass.
     if (!url) return guardrailNotConfigured();
 
     try {
+      // An operator's DISABLED scanners are suppressed per-request — this is what makes a console
+      // toggle actually change what the engine enforces (0.3.16 has no scanner CRUD API).
+      const suppress = await resolveSuppressed(orgId);
       const response = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, {
         phase: 'input',
         prompt: text,
+        ...(suppress ? { scanners_suppress: suppress } : {}),
       });
       return {
         ...normalizeLlmGuardResponse(text, response.body),
@@ -268,14 +289,16 @@ export const llmGuardPii: PiiPort = {
       return guardrailUnavailable(reason);
     }
   },
-  async scanOutput(prompt, output) {
+  async scanOutput(prompt, output, orgId) {
     const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
     if (!url) return guardrailNotConfigured();
     try {
+      const suppress = await resolveSuppressed(orgId);
       const response = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, {
         phase: 'output',
         prompt,
         output,
+        ...(suppress ? { scanners_suppress: suppress } : {}),
       });
       return {
         ...normalizeLlmGuardResponse(output, response.body),

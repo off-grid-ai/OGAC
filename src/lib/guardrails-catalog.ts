@@ -777,3 +777,42 @@ export function isItemEnabled(
 ): boolean {
   return rules.some((r) => r.matcher === 'entity' && r.pattern === item.entity);
 }
+
+// ─── Scanner SUPPRESSION — making an operator's toggle actually change enforcement ────────────────
+//
+// The gap this closes: the console let an operator enable/disable LLM Guard scanners, but nothing
+// ever reached the engine — LLM Guard 0.3.16 loads its scanner set from CONFIG_FILE at start and
+// accepts only a per-request `scanners_suppress` list. So a disabled scanner kept firing and the UI
+// was lying. This PURE rule turns the operator's rule set into that suppress list.
+//
+// DIRECTION MATTERS: the engine can only be told what to SKIP, never what to add. So this can
+// honestly disable a scanner the deployment runs; it can NOT enable one the deployment doesn't load
+// (that stays a deploy-config concern, and `itemAvailability` already reports it that way).
+
+/** A guardrail rule as this rule needs it (structurally compatible with GuardrailRule). */
+export interface ScannerRuleLike {
+  matcher: string;
+  pattern: string;
+  enabled: boolean;
+}
+
+/**
+ * The `scanners_suppress` list for a request: every LLM Guard scanner the catalog knows about whose
+ * governing rule the operator has EXPLICITLY DISABLED. PURE.
+ *
+ * Silence (no rule for a scanner) means "leave the deployment's default alone" — we only suppress on
+ * an explicit disable, so adopting this feature never silently weakens an existing deployment.
+ * Returns scanner CLASS names (e.g. "Toxicity"), which is what the engine expects.
+ */
+export function suppressedScanners(rules: readonly ScannerRuleLike[]): string[] {
+  const disabledTokens = new Set(
+    rules.filter((r) => r.matcher === 'entity' && r.enabled === false).map((r) => r.pattern.trim().toUpperCase()),
+  );
+  if (disabledTokens.size === 0) return [];
+  const out = new Set<string>();
+  for (const item of GUARDRAIL_CATALOG) {
+    if (item.engine !== 'llm-guard' || !item.scanner) continue;
+    if (disabledTokens.has(item.entity.trim().toUpperCase())) out.add(item.scanner);
+  }
+  return [...out].sort();
+}
