@@ -1232,35 +1232,17 @@ export async function runAgent(
 // next/server `after()`), gated by the `online-evals` flag and OFFGRID_QA_SAMPLE_RATE, so it never
 // adds latency to the response. Best-effort: all failures are swallowed.
 export async function scoreRun(run: AgentRun, orgId: string = DEFAULT_ORG): Promise<void> {
-  try {
-    if (run.status !== 'done') return;
-    if (!(await getFlags().isEnabled('online-evals', true))) return;
-    const rate = Number(process.env.OFFGRID_QA_SAMPLE_RATE ?? '1');
-    if (Number.isFinite(rate) && Math.random() > rate) return;
-    const scored = await scoreInteraction({
-      input: run.query,
-      output: run.answer,
-      sources: run.citations.map((c) => c.snippet),
-      name: `agent:${run.agentId}`,
-      traceId: correlationIds(run.id).traceId,
-      orgId,
-    });
-    // RETAIN the verdict in the console's own store so quality-over-time survives Langfuse being
-    // down/undeployed — an eval you cannot look back on is a one-off, not a standing loop. Additive
-    // and never load-bearing: retainOnlineScore never throws.
-    const { retainOnlineScore, toOnlineScore } = await import('@/lib/qa/online-scores');
-    await retainOnlineScore(
-      toOnlineScore({
-        runId: run.id,
-        orgId,
-        subjectId: `agent:${run.agentId}`,
-        quality: scored.verdict.quality,
-        faithfulness: scored.verdict.faithfulness,
-        judged: scored.judged,
-        reasoning: scored.verdict.reasoning,
-      }),
-    );
-  } catch {
-    /* best-effort online scoring */
-  }
+  if (run.status !== 'done') return;
+  // The flag/sample/judge/retain policy is shared with app-run scoring (qa/score-and-retain) so the
+  // two paths cannot drift apart. This function's only job is to describe an agent run as a subject.
+  const { scoreAndRetain } = await import('@/lib/qa/score-and-retain');
+  await scoreAndRetain({
+    runId: run.id,
+    orgId,
+    subjectId: `agent:${run.agentId}`,
+    input: run.query,
+    output: run.answer,
+    sources: run.citations.map((c) => c.snippet),
+    traceId: correlationIds(run.id).traceId,
+  });
 }

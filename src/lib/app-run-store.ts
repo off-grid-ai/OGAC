@@ -77,6 +77,16 @@ export async function upsertAppRunState(
         ...(finished ? { finishedAt: new Date() } : {}),
       },
     });
+
+  // A finished app run becomes a retained quality verdict, so answer-quality regression covers apps
+  // and not just agents. This is the ONE place both execution paths (inline runApp and the durable
+  // Temporal workflow) converge, so the trigger belongs here rather than duplicated at each caller.
+  // Out-of-band and best-effort: scoreAppRun never throws, and it is deliberately not awaited into
+  // the run's critical path — persisting the run must not wait on a judge.
+  if (finished) {
+    const { scoreAppRun } = await import('@/lib/qa/app-run-score');
+    void scoreAppRun(state, input, orgId);
+  }
 }
 
 // Mark an app run cancelled after its durable workflow was cancelled/terminated from the console
