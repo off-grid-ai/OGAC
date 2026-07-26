@@ -4,6 +4,7 @@ import type { OnlineScore } from '../src/lib/qa/online-scores.ts';
 import {
   detectQualityRegression,
   regressedSubjects,
+  type QualityRegressionView,
 } from '../src/lib/qa/quality-regression.ts';
 
 // Build a verdict. `n` orders them in time (higher n = newer), so a test reads as a timeline.

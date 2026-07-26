@@ -1,3 +1,4 @@
+import { AnswerQualityCard } from '@/components/drift/AnswerQualityCard';
 import { DriftCatalog } from '@/components/drift/DriftCatalog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import { describeDriftAttribution } from '@/lib/drift-run';
 import { listDriftRuns } from '@/lib/drift-runs';
 import { readDriftView, type DriftDisplayStatus } from '@/lib/drift-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { readQualityRegression } from '@/lib/qa/quality-regression';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +31,7 @@ export default async function QualityDriftPage() {
   const orgId = await currentOrgId();
   const { data, error } = await readDriftView({ orgId });
   const retained = await listDriftRuns(10, orgId);
+  const answerQuality = await readQualityRegression(orgId);
   const adapter = getDrift().meta;
   const engineStatus = {
     evidentlySelected: adapter.id === 'evidently',
@@ -98,6 +101,8 @@ export default async function QualityDriftPage() {
             )}
           </CardContent>
         </Card>
+
+        <AnswerQualityCard view={answerQuality} />
 
         <Card>
           <CardHeader>

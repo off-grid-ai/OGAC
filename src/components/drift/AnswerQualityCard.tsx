@@ -1,0 +1,113 @@
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import type { QualityRegressionView, RegressionStatus } from '@/lib/qa/quality-regression';
+
+// Presentation only — every judgement already happened in the pure rule upstream. This decides
+// nothing about whether quality regressed; it only renders the verdict it is handed.
+
+const STATUS_CLASS: Record<RegressionStatus, string> = {
+  ok: 'bg-primary/10 text-primary',
+  regressed: 'bg-destructive/10 text-destructive',
+  'insufficient-data': 'bg-muted text-foreground',
+};
+
+const STATUS_LABEL: Record<RegressionStatus, string> = {
+  ok: 'holding',
+  regressed: 'getting worse',
+  'insufficient-data': 'not enough data',
+};
+
+const pct = (n: number): string => `${Math.round(n * 100)}%`;
+
+export function AnswerQualityCard({ view }: Readonly<{ view: QualityRegressionView }>) {
+  const { subjects, regressed, measured, retained } = view;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Answer quality</CardTitle>
+        <CardDescription className="text-xs">
+          Drift evidence above watches the data going in. This watches what your people actually
+          read: every governed answer is scored, and each app is compared against its own earlier
+          runs, so a slide shows up here before your users start noticing it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!measured ? (
+          // Honest empty state. Nothing scored yet is NOT the same as everything being fine.
+          <p className="py-8 text-center text-xs text-muted-foreground">
+            No answers have been scored yet, so quality is unmeasured rather than confirmed healthy.
+            Scoring starts on its own as governed runs go through.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge
+                variant="secondary"
+                className={regressed.length ? STATUS_CLASS.regressed : STATUS_CLASS.ok}
+              >
+                {regressed.length
+                  ? `${regressed.length} getting worse`
+                  : 'no decline detected'}
+              </Badge>
+              <span>
+                {retained} scored {retained === 1 ? 'answer' : 'answers'} across {subjects.length}{' '}
+                {subjects.length === 1 ? 'app' : 'apps'}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>App or agent</TableHead>
+                    <TableHead className="text-right">Recent</TableHead>
+                    <TableHead className="text-right">Earlier</TableHead>
+                    <TableHead className="text-right">Runs</TableHead>
+                    <TableHead className="text-right">Verdict</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subjects.map((s) => (
+                    <TableRow key={s.subjectId}>
+                      <TableCell className="font-medium">
+                        {s.subjectId}
+                        {s.status === 'regressed' ? (
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            {s.detail}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs tabular-nums">
+                        {pct(s.recentQuality)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                        {s.baselineCount === 0 ? '—' : pct(s.baselineQuality)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                        {s.recentCount}/{s.baselineCount}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="secondary" className={STATUS_CLASS[s.status]}>
+                          {STATUS_LABEL[s.status]}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

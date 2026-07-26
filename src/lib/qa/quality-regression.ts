@@ -16,7 +16,7 @@
 //   • The comparison is RECENT vs the BASELINE BEFORE IT — not recent vs all-time, which would keep
 //     firing forever once quality shifted to a new (possibly accepted) level.
 
-import type { OnlineScore } from '@/lib/qa/online-scores';
+import type { OnlineScore, QualityTrend } from '@/lib/qa/online-scores';
 
 export interface RegressionOptions {
   /** How many of the newest judged verdicts form the "recent" window. */
@@ -132,4 +132,40 @@ export function detectQualityRegression(
 /** Just the regressed subjects — what an alert or a dashboard badge actually wants. PURE. */
 export function regressedSubjects(verdicts: readonly RegressionVerdict[]): RegressionVerdict[] {
   return verdicts.filter((v) => v.status === 'regressed');
+}
+
+// ─── thin read (I/O) ──────────────────────────────────────────────────────────────────────────────
+
+export interface QualityRegressionView {
+  retained: number;
+  /** false ⇒ nothing has been judged yet. An empty result is "not measured", NOT "all clear". */
+  measured: boolean;
+  subjects: RegressionVerdict[];
+  regressed: RegressionVerdict[];
+  /** The standing per-subject averages, from the same read — so callers need only one query. */
+  trend: QualityTrend[];
+}
+
+/**
+ * Read this org's retained verdicts and run the rule over them. Thin: one await plus the pure call.
+ *
+ * DRY — the API route and the drift page both answer "are our answers getting worse?", so they share
+ * THIS composition rather than each pairing listOnlineScores with detectQualityRegression themselves.
+ * Two copies of that pairing would drift the moment either side changed a default.
+ */
+export async function readQualityRegression(
+  orgId: string,
+  options: RegressionOptions = {},
+  limit = 500,
+): Promise<QualityRegressionView> {
+  const { listOnlineScores, summarizeQuality } = await import('@/lib/qa/online-scores');
+  const scores = await listOnlineScores(orgId, limit);
+  const subjects = detectQualityRegression(scores, options);
+  return {
+    retained: scores.length,
+    measured: scores.some((s) => s.judged),
+    subjects,
+    regressed: regressedSubjects(subjects),
+    trend: summarizeQuality(scores),
+  };
 }
