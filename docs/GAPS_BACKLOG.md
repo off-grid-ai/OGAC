@@ -1453,3 +1453,38 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   are already proven live, so the natural close is to emit a regression as an alert/action rather than
   waiting for someone to look. Until then the honest claim is "detected and visible", not "you will
   be notified".
+
+## App-run quality scoring CLOSED — and it immediately exposed a dropped-input defect (2026-07-26)
+
+- **[G-QUALITY-REGRESSION-APPS] ✅ RESOLVED + fleet-verified (2026-07-26).** App runs now retain a
+  judge verdict, so answer-quality regression covers apps and not just agents. The trigger sits at
+  `upsertAppRunState` — the ONE seam both execution paths converge on (inline `runApp`
+  `app-run.ts:367`, durable Temporal activity `app-run.activities.ts:141`) — so it could not be
+  half-wired the way an earlier two-path fix was. Proven live on BOTH paths against real apps created
+  and run through the real routes:
+  - INLINE (`mode=inline`, `apprun_bded357a`) → `online_scores` row `subject_id=app:app_fea1f2a0`, `judged=true`
+  - DURABLE (`mode=durable`, `apprun_85a1141e`) → row `subject_id=app:app_f5a95cef`, `judged=true`
+  The app-worker + queue were restarted (`launchctl kickstart`) so the tsx workers picked up the
+  change — a `.next`-only deploy would have missed them. Test data cleaned up afterwards.
+  DRY: the flag/sample/judge/retain policy lives once in `src/lib/qa/score-and-retain.ts`, shared by
+  agent and app scoring. Failed/cancelled runs are deliberately NOT scored (a run with no answer has
+  no answer quality; scoring its empty output as 0 would corrupt the trend with reliability problems).
+
+- **[G-APP-INPUT-DROPPED] 🔴 OPEN (P0-usability) — an app NEVER passes the person's input to its
+  agent steps.** Found by the scoring work above: the judge reported *"The user provided a clear
+  question ('What is a governed AI platform, in one sentence?'), but the agent responded with a
+  generic error message stating no question was provided"* — twice, on both execution paths.
+  Root cause (code-confirmed, not inferred): `buildAgentQuery(step, priorResults)`
+  (`src/lib/app-run.ts:430`) composes the agent's query from **the step label + prior step outputs
+  only**. The run's trigger/form input is passed into `driveRunnableSteps` but used ONLY for
+  `deps.persist(...)` — `executeStep` (`app-run.ts:491`) never receives it, so NO step kind can see
+  what the person submitted. It is stored on the `app_runs` row and otherwise discarded.
+  **Why this matters more than it looks:** the builder's north star is non-technical staff building a
+  workflow where someone fills a form and gets an answer. Today such an app RUNS, reports `done`, and
+  returns "no question was provided" — a silent wrong answer, not an error. The existing demo apps
+  only work because a `connector-query` step supplies their data, which masks the defect entirely.
+  Fix shape: thread the run input into `executeStep`/`buildAgentQuery` as a first-class context block
+  (pure change in `buildAgentQuery` + signature threading), respecting the existing PII-masking order
+  (the input must be masked before it reaches the model, exactly as prior-step context already is).
+  Verification bar: an app whose only step is an agent, run with a form question, must answer THAT
+  question, and its retained verdict must score well instead of 0.1.
