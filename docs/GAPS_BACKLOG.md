@@ -1420,3 +1420,36 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   Verification bar for closing it: run one governed agent run and assert EVERY resulting
   `offgrid-gateway` doc carries the run's org (not just the completion), then that Insights →
   Cost/Analytics reports non-zero for that tenant.
+
+## Answer-quality regression detection is live, but blind to APP runs (2026-07-26)
+
+- **DELIVERED + fleet-verified (2026-07-26): declining answer quality is now detected.**
+  Drift previously watched only the DATA going in (Evidently presets over columns). Nothing watched
+  the answers. Now that every judged verdict is retained (`online_scores`), the pure
+  `detectQualityRegression` (`src/lib/qa/quality-regression.ts`) compares each subject's newest
+  verdicts against the baseline BEFORE them, and `GET /api/v1/admin/qa/regression` +
+  the Answer-quality card on `/solutions/quality/drift` surface it.
+  Verified live through the real route + real DB: steady 0.90→0.87 → `ok`;
+  degraded 0.90→0.42 → `regressed` ("Answers are getting worse: quality fell from 0.9 to 0.42…")
+  and present in `regressed[]`; a judge outage (6 unjudged) → `insufficient-data`, NOT a false
+  quality collapse; a tenant with nothing scored → `measured:false`, never a green all-clear.
+
+- **[G-QUALITY-REGRESSION-APPS] OPEN — the signal only covers AGENT runs, not APP runs.**
+  `scoreRun()` is invoked from four agent-run routes only (`/admin/run`,
+  `/admin/agents/runs`, `/admin/agent-runs/[id]/rerun`,
+  `/admin/agent-runs/workflows/[wf]/rerun`). The app-worker path never scores, so no app run ever
+  writes an `online_scores` row and **no app can ever appear in the regression verdict** — the
+  surface will read "no decline detected" for an app whose answers are collapsing. Apps are the
+  operator-facing product, so this is the coverage that matters most.
+  Fix: retain a verdict on app-run completion the same out-of-band way (`after(() => scoreRun(...))`
+  is the agent-side pattern; the app worker runs `src/` via tsx so it needs the equivalent inside the
+  worker, plus a worker restart on deploy).
+  Verification bar for closing it: run one governed APP, confirm an `online_scores` row lands with
+  the app as `subjectId`, then confirm that app appears as a subject on
+  `/solutions/quality/drift`.
+
+- **[G-QUALITY-REGRESSION-ALERT] OPEN — detection is pull-only; nobody is told.**
+  An operator has to visit the drift page to learn quality slipped. Outbound actions (webhook egress)
+  are already proven live, so the natural close is to emit a regression as an alert/action rather than
+  waiting for someone to look. Until then the honest claim is "detected and visible", not "you will
+  be notified".
