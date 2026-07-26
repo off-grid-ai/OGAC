@@ -61,9 +61,10 @@ test('parseRunQuery: a context line with an empty kind tag falls back to "step"'
   assert.equal(v.task, 'go');
 });
 
-test('parseRunQuery: empty / null / undefined → empty task, no context', () => {
-  assert.deepEqual(parseRunQuery(''), { task: '', context: [] });
-  assert.deepEqual(parseRunQuery('   '), { task: '', context: [] });
-  assert.deepEqual(parseRunQuery(null), { task: '', context: [] });
-  assert.deepEqual(parseRunQuery(undefined), { task: '', context: [] });
+test('parseRunQuery: empty / null / undefined → empty task, no context, no request', () => {
+  const empty = { task: '', context: [], request: '' };
+  assert.deepEqual(parseRunQuery(''), empty);
+  assert.deepEqual(parseRunQuery('   '), empty);
+  assert.deepEqual(parseRunQuery(null), empty);
+  assert.deepEqual(parseRunQuery(undefined), empty);
 });

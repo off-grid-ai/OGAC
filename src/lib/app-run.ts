@@ -97,6 +97,20 @@ export interface AppRunContext {
    * via resolveRunMode and threads it here; the executor applies the pure shouldIntercept per step.
    */
   mode?: RunMode;
+  /**
+   * G-APP-INPUT-DROPPED — what the PERSON actually submitted (the trigger/form record).
+   *
+   * This used to go only to `deps.persist`, so it was stored on the run row and then discarded:
+   * `executeStep` never received it and `buildAgentQuery` composed the model query from the step
+   * label plus prior step outputs alone. An app whose first step was an agent therefore ran, reported
+   * `done`, and answered "no question was provided" — a silent wrong answer rather than an error. It
+   * only looked fine on the demo apps because a connector-query step supplied their data.
+   *
+   * It lives on the context (not a new parameter on five signatures) because the run's input IS run
+   * context, and the context already reaches every step handler on both execution paths. OPTIONAL +
+   * ADDITIVE: absent ⇒ exactly the previous behaviour.
+   */
+  input?: Record<string, unknown>;
 }
 
 export interface StepResult {
@@ -427,14 +441,61 @@ export function defaultDeps(
 // it already travels through `providedSourcesFromPriorResults`, where it remains independently
 // maskable, citeable and groundable. Copying those rows into the query duplicates sensitive data,
 // forces redundant guardrail scans and collapses source provenance into prompt text.
-export function buildAgentQuery(step: AppStep, priorResults: StepResult[]): string {
+export function buildAgentQuery(
+  step: AppStep,
+  priorResults: StepResult[],
+  input?: Record<string, unknown>,
+): string {
   const label = step.label || step.id;
+  const requestBlock = describeRunInput(input);
   const contextBlocks = priorResults
     .filter((r) => r.kind !== 'connector-query' && r.output?.trim())
     .map((r) => `- [${r.kind}] ${r.output!.trim()}`);
-  if (contextBlocks.length === 0) return label;
-  return `CONTEXT FROM PRIOR STEPS:\n${contextBlocks.join('\n')}\n\nTASK: ${label}`;
+
+  if (contextBlocks.length === 0 && !requestBlock) return label;
+
+  // The person's own request comes FIRST: it is the thing being asked, and prior step outputs are
+  // context for answering it. Ordering it after the context block invited the model to treat the
+  // upstream chatter as the task.
+  const sections = [
+    ...(requestBlock ? [`THE REQUEST:\n${requestBlock}`] : []),
+    ...(contextBlocks.length ? [`CONTEXT FROM PRIOR STEPS:\n${contextBlocks.join('\n')}`] : []),
+    `TASK: ${label}`,
+  ];
+  return sections.join('\n\n');
 }
+
+/** Fields on the trigger/form record worth naming as the request, in preference order. */
+const REQUEST_FIELDS = ['input', 'query', 'question', 'prompt', 'text', 'message', 'body'];
+
+/**
+ * Render the person's submitted input as a prompt block, or '' when there is nothing to say. PURE.
+ *
+ * A single obvious free-text field is passed through verbatim — quoting a whole record around it only
+ * adds noise. Anything else becomes `key: value` lines so a multi-field form (an amount, a policy
+ * number, a branch) reaches the model intact. Nested objects are skipped rather than rendered as
+ * "[object Object]", and values are bounded so a large webhook payload cannot blow the prompt.
+ */
+export function describeRunInput(input?: Record<string, unknown>): string {
+  if (!input) return '';
+  const entries = Object.entries(input).filter(
+    ([, v]) => v !== null && v !== undefined && typeof v !== 'object' && String(v).trim() !== '',
+  );
+  if (entries.length === 0) return '';
+
+  if (entries.length === 1) {
+    const [key, value] = entries[0];
+    const text = String(value).trim();
+    if (REQUEST_FIELDS.includes(key)) return text.slice(0, MAX_RUN_INPUT_CHARS);
+  }
+  return entries
+    .map(([k, v]) => `${k}: ${String(v).trim()}`)
+    .join('\n')
+    .slice(0, MAX_RUN_INPUT_CHARS);
+}
+
+/** Bound on the rendered input block — a webhook trigger can carry an arbitrarily large record. */
+export const MAX_RUN_INPUT_CHARS = 4000;
 
 /**
  * Project connector outputs into the canonical source shape consumed by a grounded agent. The
@@ -665,7 +726,11 @@ async function executeAgentStep(
   // the same pure applyPiiEscalation() the agent/chat/pipeline paths use. Best-effort: a detector
   // outage leaves the query as-is (the egress leash's local-only guarantee still holds). Additive:
   // with no pipeline / masking not escalated, the query is untouched (legacy behaviour).
-  let query = buildAgentQuery(step, priorResults);
+  // ctx.input is the person's submitted request (G-APP-INPUT-DROPPED). It is folded in HERE, before
+  // the masking below, so the submitted text is PII-scanned on exactly the same path as prior-step
+  // context — a form field carrying a PAN must never reach the model raw just because a human typed
+  // it rather than a connector reading it.
+  let query = buildAgentQuery(step, priorResults, ctx.input);
   const requireMasking = effectivePiiMasking(false, modelVerdict);
   if (requireMasking) {
     // FAIL CLOSED (SECURITY #236 fix 2): masking is MANDATED for this call, so a masker that errors
@@ -1179,6 +1244,12 @@ export async function driveRunnableSteps(
   let state = startState;
   const results: StepResult[] = [...priorResults];
 
+  // The person's submitted input rides on the context so every step handler can see it
+  // (G-APP-INPUT-DROPPED). Set HERE — the one shared driving loop — so both inline entry points
+  // (runApp and resumeAppRun) get it without either repeating the wiring. An explicit ctx.input from
+  // the caller wins, which is how the durable worker supplies it.
+  const stepCtx: AppRunContext = { ...ctx, input: ctx.input ?? input };
+
   // Bounded loop: at most one pass per step (a validated DAG). Guards against a pathological cycle.
   const maxIterations = (spec.steps?.length ?? 0) + 1;
   for (let i = 0; i <= maxIterations; i++) {
@@ -1198,7 +1269,7 @@ export async function driveRunnableSteps(
       state = applyStepResult(state, step.id, { status: 'running' });
       await deps.persist(state, input, ctx.orgId);
 
-      const result = await executeStep(spec, step, results, ctx, deps);
+      const result = await executeStep(spec, step, results, stepCtx, deps);
       results.push(result);
       state = applyStepResult(state, step.id, {
         status: result.status,

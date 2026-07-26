@@ -106,8 +106,21 @@ export default async function RunDetailPage({
           {/* Agent run — recorded step timeline + answer + checks */}
           {agent ? (
             <div className="space-y-4">
-              {parsedQuery && (parsedQuery.task || parsedQuery.context.length > 0) ? (
+              {parsedQuery &&
+              (parsedQuery.task || parsedQuery.context.length > 0 || parsedQuery.request) ? (
                 <Section title="Query">
+                  {/* What the person submitted, shown above the instruction it was answered against —
+                      an operator reading a run needs to see the actual request, not just the label. */}
+                  {parsedQuery.request ? (
+                    <div className="mb-3 rounded-md border border-border/60 bg-muted/30 p-3">
+                      <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Requested
+                      </div>
+                      <pre className="whitespace-pre-wrap text-sm text-foreground">
+                        {parsedQuery.request}
+                      </pre>
+                    </div>
+                  ) : null}
                   {parsedQuery.task ? (
                     <pre className="whitespace-pre-wrap text-sm text-foreground">
                       {parsedQuery.task}

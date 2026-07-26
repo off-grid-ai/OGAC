@@ -122,6 +122,11 @@ export async function executeStepActivity(
     // Thread the run mode so a SHADOW durable run's side-effecting sinks NO-OP on the worker path
     // identically to the inline path (executeStep applies the pure shouldIntercept per step).
     mode: input.mode ?? 'live',
+    // G-APP-INPUT-DROPPED — the person's submitted request. The workflow input has always carried it;
+    // it simply never reached the context, so a durable agent step was asked to answer a question it
+    // could not see. The inline loop sets this in driveRunnableSteps; the worker must set it here, or
+    // the two paths would answer differently for the same app.
+    input: input.input,
   };
   return executeStep(spec, step, priorResults, ctx, deps);
 }
