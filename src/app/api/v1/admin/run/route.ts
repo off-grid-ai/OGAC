@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { dispatchAgentRun } from '@/lib/agent-run-dispatch';
+import { scoreRun } from '@/lib/agentrun';
 import { actorFromSession } from '@/lib/audit-actor';
 import { requireUser } from '@/lib/authz';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
@@ -24,6 +26,7 @@ export async function POST(req: Request) {
 
   // Governed path — resolve the composed Agent block (id may arrive as "agent:foo").
   const agentId = typeof rawAgentId === 'string' ? rawAgentId.replace(/^agent:/, '') : '';
+  const orgIdForRun = await currentOrgId();
   if (agentId) {
     try {
       const d = await dispatchAgentRun({
@@ -31,7 +34,7 @@ export async function POST(req: Request) {
         query: String(input),
         caller,
         requireReview: !!requireReview,
-        orgId: await currentOrgId(),
+        orgId: orgIdForRun,
         actor: actorFromSession(gate),
       });
       // Durable submit accepted but the pipeline is still executing in the worker — surface the ids
@@ -44,6 +47,10 @@ export async function POST(req: Request) {
       }
       const run = d.run;
       if (!run) return NextResponse.json({ output: '', error: `unknown agent "${agentId}"` }, { status: 404 });
+      // Continuous quality: score the completed run out-of-band and RETAIN the verdict, exactly as
+      // the rerun routes already do. Without this the standard run path — the one that does the
+      // enterprise's actual work — was never scored, so the standing quality loop had no input.
+      after(() => scoreRun(run, orgIdForRun));
       return NextResponse.json({
         output: run.answer,
         governed: true,
