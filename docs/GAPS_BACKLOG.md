@@ -1488,3 +1488,40 @@ outside this diff. Global coverage thresholds (94.54/88.96/95.53/94.54) all pass
   (the input must be masked before it reaches the model, exactly as prior-step context already is).
   Verification bar: an app whose only step is an agent, run with a form question, must answer THAT
   question, and its retained verdict must score well instead of 0.1.
+
+## G-APP-INPUT-DROPPED ✅ RESOLVED + fleet-verified (2026-07-26)
+
+An app now passes the person's submitted request to its agent steps. The input travels on
+`AppRunContext` (not a new parameter on five signatures — the run's input IS run context, and the
+context already reaches every step handler): the inline loop sets it once in `driveRunnableSteps`
+(shared by `runApp` + `resumeAppRun`), and the durable worker sets it in `executeStepActivity` from
+the workflow input that had always carried it. One seam per path, no duplicated wiring.
+
+**Outcome proof (live, both execution paths, same app spec and same question before/after):**
+
+| | before | after |
+|---|---|---|
+| answer | "I cannot answer the question because no specific question was provided." | "A governed AI platform is an AI system designed with built-in controls, policies, and oversight to ensure ethical use, compliance, and accountability." |
+| judge quality | 0.1 (*"the user provided a clear question ... but the agent responded with a generic error message"*) | **1.0** (*"directly answers the user's prompt"*) |
+
+- INLINE `apprun_7357da45` → quality 1.0, faithfulness 1.0
+- DURABLE `apprun_0f6914b9` → quality 1.0, faithfulness 1.0
+- Composed query verified in the DB: `THE REQUEST:\n<question>\n\nTASK: Answer the question`, and with
+  an upstream step, `THE REQUEST: … CONTEXT FROM PRIOR STEPS: … TASK: …`.
+- **The submitted input is genuinely on the guardrail + masking path** (this was the security-relevant
+  claim, and it is live-verified rather than only code-ordered): the run timeline for the composed
+  query shows step 3 `pre guard — pii:pass guardrail-rules:pass injection:pass` and step 5
+  `llm-guard mask — no PII to mask`. A form field carrying a PAN is scanned exactly as connector-read
+  context is, so typing one cannot reach the model raw.
+- App-worker + queue + agent-worker restarted (`launchctl kickstart`) — the tsx workers run `src/`, so
+  a `.next`-only deploy would have missed the durable path entirely.
+- Operator surface verified by screenshot: the run-detail Query panel now shows a **REQUESTED** block
+  above the task, with prior context still collapsible.
+- Additive: with no input the composed query is byte-identical to before (two tests assert exactly that).
+
+`run-query-view.ts` is the composer's inverse and was updated in the same change — a request-first
+query previously fell through to "one big task string", so the panel would have shown the whole
+composed blob as the title. A round-trip test over all four composed shapes now pins the two together.
+
+Test artifacts (temporary apps, verdicts, child agent runs) were removed afterwards; `online_scores`
+is back to the single pre-existing row.
