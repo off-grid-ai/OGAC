@@ -1237,7 +1237,7 @@ export async function scoreRun(run: AgentRun, orgId: string = DEFAULT_ORG): Prom
     if (!(await getFlags().isEnabled('online-evals', true))) return;
     const rate = Number(process.env.OFFGRID_QA_SAMPLE_RATE ?? '1');
     if (Number.isFinite(rate) && Math.random() > rate) return;
-    await scoreInteraction({
+    const scored = await scoreInteraction({
       input: run.query,
       output: run.answer,
       sources: run.citations.map((c) => c.snippet),
@@ -1245,6 +1245,21 @@ export async function scoreRun(run: AgentRun, orgId: string = DEFAULT_ORG): Prom
       traceId: correlationIds(run.id).traceId,
       orgId,
     });
+    // RETAIN the verdict in the console's own store so quality-over-time survives Langfuse being
+    // down/undeployed — an eval you cannot look back on is a one-off, not a standing loop. Additive
+    // and never load-bearing: retainOnlineScore never throws.
+    const { retainOnlineScore, toOnlineScore } = await import('@/lib/qa/online-scores');
+    await retainOnlineScore(
+      toOnlineScore({
+        runId: run.id,
+        orgId,
+        subjectId: `agent:${run.agentId}`,
+        quality: scored.verdict.quality,
+        faithfulness: scored.verdict.faithfulness,
+        judged: scored.judged,
+        reasoning: scored.verdict.reasoning,
+      }),
+    );
   } catch {
     /* best-effort online scoring */
   }
