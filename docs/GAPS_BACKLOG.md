@@ -1656,3 +1656,23 @@ constant (or mark them as a serial//`--test-concurrency=1` group), and give DB i
 their own schema-per-worker so they cannot contend. Until then, a single timing failure on a busy
 machine should be re-run on an idle one BEFORE being treated as a regression — and that re-run should
 be reported, never quietly repeated until green.
+
+## Phase 4.10-B #7 — Fleet token: RESOLVED as NOT-APPLICABLE (2026-07-27)
+
+Probed rather than assumed. **FleetDM is running** on the box (`http://127.0.0.1:8934` — `/healthz`
+returns 200, `/` returns a 307 to its login), but it has **no API token anywhere**: not in OpenBao
+(`fleet/api-token` empty) and not in env (`OFFGRID_FLEET_TOKEN` / `FLEET_TOKEN` both unset). So the
+broker correctly resolves `none` and the console cannot call the Fleet API.
+
+**There is no engineering work left on our side.** The console-side provisioning shipped with
+Phase 4.10-B #6: `PUT /api/v1/admin/services/credentials {service:"fleet", token:"…"}` stores it in
+OpenBao, the plan already classifies fleet as `native-bearer`, and `mdm.ts` reads through the broker.
+The moment a token exists it works, with no code change.
+
+Creating that token requires signing into FleetDM as its admin and minting one — a credential only
+the operator holds. Combined with MDM being explicitly deprioritised by the founder ("fuck MDM for
+now"), this is **not-applicable until MDM is wanted**, not an open engineering gap.
+
+To activate later: log into FleetDM → create an API-only user → copy its token → save it in
+Governance → service credentials (or `PUT` the route above). The inventory endpoint will flip
+`fleet` from `source:none` to `source:vault`.
