@@ -5,32 +5,19 @@
 //
 // Auth + base URL follow the SAME convention as `langfuse.ts` (documented there): base is
 // OFFGRID_LANGFUSE_URL; the Basic header prefers the service-token broker's `basic` project keypair
-// (getServiceCredential('langfuse')) and falls back to the env keys UNCHANGED. The broker-vs-legacy
-// DECISION is the shared PURE `chooseLangfuseAuth` — imported, NOT re-implemented (DRY on the rule).
-import { getServiceCredential } from './service-credentials';
-import { chooseLangfuseAuth, NO_CREDENTIAL } from './service-credentials-lib';
+// Auth resolution (vaulted keypair first, env fallback) is the ONE shared rule in langfuse-auth.ts.
+import { langfuseAuthHeader, langfuseEnvAuthConfigured } from '@/lib/langfuse-auth';
 
-const b64 = (s: string) => Buffer.from(s).toString('base64');
 
 function base(): string | undefined {
   return process.env.OFFGRID_LANGFUSE_URL;
 }
 
 // The legacy env-derived Basic header: explicit pk/sk, else the base64 OTLP auth blob. Same shape as
-// langfuse.ts's legacyAuthHeader (which is private there); duplicated minimally by design — the
-// constraint is to NOT edit langfuse.ts, and the pure decision below is shared.
-function legacyAuthHeader(): string | null {
-  const pk = process.env.OFFGRID_LANGFUSE_PUBLIC_KEY;
-  const sk = process.env.OFFGRID_LANGFUSE_SECRET_KEY;
-  if (pk && sk) return `Basic ${b64(`${pk}:${sk}`)}`;
-  const otlp = process.env.OFFGRID_LANGFUSE_AUTH;
-  return otlp ? `Basic ${otlp}` : null;
-}
 
-/** Broker-preferring Basic header (async). Broker keypair wins; else the legacy env header; else null. */
+/** Broker-preferring Basic header — the ONE shared rule (langfuse-auth.ts). */
 async function authHeader(): Promise<string | null> {
-  const cred = await getServiceCredential('langfuse');
-  return chooseLangfuseAuth(cred, legacyAuthHeader(), b64);
+  return langfuseAuthHeader();
 }
 
 /**
@@ -39,7 +26,7 @@ async function authHeader(): Promise<string | null> {
  * so this reflects env only and never flips the gate before provisioning.
  */
 export function langfuseConfigured(): boolean {
-  return Boolean(base()) && chooseLangfuseAuth(NO_CREDENTIAL, legacyAuthHeader(), b64) !== null;
+  return Boolean(base()) && langfuseEnvAuthConfigured();
 }
 
 export class LangfuseHttpError extends Error {

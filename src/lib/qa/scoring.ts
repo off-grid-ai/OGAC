@@ -7,9 +7,9 @@ import { randomUUID } from 'node:crypto';
 // caller, it just returns posted:false.
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
+import { langfuseAuthHeader, langfuseEnvAuthConfigured } from '@/lib/langfuse-auth';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 const LANGFUSE_URL = process.env.OFFGRID_LANGFUSE_URL;
-const LANGFUSE_AUTH = process.env.OFFGRID_LANGFUSE_AUTH; // base64("public-key:secret-key")
 
 export interface Interaction {
   input: string;
@@ -97,7 +97,11 @@ function scoreEvent(traceId: string, name: string, value: number, comment: strin
 
 // Push a trace (if we created the id) + the numeric scores to Langfuse via the ingestion API.
 async function postToLangfuse(i: Interaction, traceId: string, v: JudgeVerdict): Promise<boolean> {
-  if (!LANGFUSE_URL || !LANGFUSE_AUTH) return false;
+  if (!LANGFUSE_URL) return false;
+  // Resolved per call, not at module load: a credential provisioned into the vault must take effect
+  // without restarting the console (and a module-load constant could never see it).
+  const auth = await langfuseAuthHeader();
+  if (!auth) return false;
   const ts = new Date().toISOString();
   const batch: IngestionEvent[] = [];
   if (!i.traceId) {
@@ -113,7 +117,7 @@ async function postToLangfuse(i: Interaction, traceId: string, v: JudgeVerdict):
   try {
     const res = await fetch(`${LANGFUSE_URL}/api/public/ingestion`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Basic ${LANGFUSE_AUTH}` },
+      headers: { 'content-type': 'application/json', authorization: auth },
       body: JSON.stringify({ batch }),
       signal: AbortSignal.timeout(8000),
     });
@@ -140,5 +144,5 @@ export async function scoreInteraction(i: Interaction): Promise<ScoreResult> {
 }
 
 export function scoringConfigured(): boolean {
-  return Boolean(LANGFUSE_URL && LANGFUSE_AUTH);
+  return Boolean(LANGFUSE_URL) && langfuseEnvAuthConfigured();
 }

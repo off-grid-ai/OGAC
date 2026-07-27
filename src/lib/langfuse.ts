@@ -10,40 +10,27 @@
 //   OFFGRID_LANGFUSE_PUBLIC_KEY / OFFGRID_LANGFUSE_SECRET_KEY  (falls back to decoding *_AUTH)
 //
 // Phase 4.10-B: the Basic-auth project keys now flow through the service-token broker
-// (`getServiceCredential('langfuse')`). The broker's per-service plan classifies langfuse as
+// Auth resolution is the ONE shared rule in langfuse-auth.ts. The broker's plan classifies langfuse as
 // 'native-basic', so it returns a `{ kind:'basic', publicKey, secretKey }` project keypair (pk:sk) —
 // NOT a Keycloak JWT (Langfuse's REST API is HTTP Basic, it doesn't validate KC tokens). When OpenBao
 // has the keypair provisioned it's preferred; until then the broker returns `kind:'none'` and we fall
-// back to the current env keys UNCHANGED — byte-identical to today. Selection is the pure, unit-tested
-// `chooseLangfuseAuth`.
-import { getServiceCredential } from './service-credentials';
-import { chooseLangfuseAuth, NO_CREDENTIAL } from './service-credentials-lib';
+// back to the current env keys UNCHANGED — byte-identical to today.
+import { langfuseAuthHeader, langfuseEnvAuthConfigured } from '@/lib/langfuse-auth';
 
 const BASE = process.env.OFFGRID_LANGFUSE_URL;
-const PK = process.env.OFFGRID_LANGFUSE_PUBLIC_KEY;
-const SK = process.env.OFFGRID_LANGFUSE_SECRET_KEY;
 
-const b64 = (s: string) => Buffer.from(s).toString('base64');
 
-// The legacy env-derived Basic header: explicit pk/sk, else the base64 OTLP auth blob. Kept as the
-// fallback branch; `chooseLangfuseAuth` prefers a broker keypair over this.
-function legacyAuthHeader(): string | null {
-  if (PK && SK) return `Basic ${b64(`${PK}:${SK}`)}`;
-  const otlp = process.env.OFFGRID_LANGFUSE_AUTH;
-  return otlp ? `Basic ${otlp}` : null;
-}
 
-// Broker-preferring Basic header (async). Broker keypair wins; else the legacy env header; else null.
+// Broker-preferring Basic header — the ONE shared rule (langfuse-auth.ts).
 async function authHeader(): Promise<string | null> {
-  const cred = await getServiceCredential('langfuse');
-  return chooseLangfuseAuth(cred, legacyAuthHeader(), b64);
+  return langfuseAuthHeader();
 }
 
 // Synchronous "is read-back configured?" — reflects env only (the broker is async + returns `none`
 // until provisioned, so this stays byte-identical to today: a broker keypair simply becomes usable
 // once present without flipping this gate before it's provisioned).
 export function langfuseReadConfigured(): boolean {
-  return Boolean(BASE) && chooseLangfuseAuth(NO_CREDENTIAL, legacyAuthHeader(), b64) !== null;
+  return Boolean(BASE) && langfuseEnvAuthConfigured();
 }
 
 async function lfGet<T>(path: string): Promise<T> {
