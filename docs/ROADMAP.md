@@ -1200,3 +1200,38 @@ call time — `src/lib/langfuse-auth.ts`.
   `identities.json` seeded server-side, and this deployment is a demo box where the stated threat model
   is "SSH is the only risk", so it is hardening rather than a live exposure. Do it with the next infra
   maintenance window, not as a code-only change that could break the proven object round-trip.
+
+### Phase 4.11 — DoD probe run, and what it found (2026-07-27)
+
+Ran Phase 4.11's own definition of done as a live probe rather than assuming the surfaces implied it:
+*"a chat by user X shows up attributed to X with its tokens/cost. No un-attributed actions."*
+
+Both surfaces already existed (filterable audit log + CSV/JSON export; accounting aggregations by
+actor/project/model). The DoD failed on the **cost** half, and the probe found three things:
+
+1. **✅ FIXED — `agent.run` audit events had NULL tokens and NULL cost.** `gatewayAnswer` returned
+   `Promise<string|null>`: the gateway replies `{choices, usage}` and the run path called
+   `extractText` and discarded `usage`. `auditRun` already accepted tokens; nothing ever passed any.
+   Now both inference paths report usage, priced with the same `costForTokens` the FinOps surfaces
+   use, so ledger and rollups cannot disagree.
+   **Verified live:** `agent.run … actor=user:service@offgrid.local org=default model=qwen3-vl-8b`
+   **`tok=132 cost=0.000264 ATTRIBUTED`** (was `tok=— cost=—`).
+
+2. **✅ FIXED — only ONE of the two answer paths was instrumented.** A governed run answers either via
+   `compose` (non-autonomous) or `runAgentLoop`+`makeGovernedPlanner` (agent with tools). The first
+   fix covered only `compose`; agents with tools still reported nothing. Both are wired now, and
+   usage ACCUMULATES across loop iterations (`sumUsage`) — keeping only the last call would bill a
+   ten-step run as its final step alone.
+
+3. **🔴 OPEN — `G-GATEWAY-ATTR-SWEEP`, re-confirmed live.** The gateway observability docs for a
+   governed run ship with `caller="node"` and `org="(unattributed)"` (3 of 4 docs in the probe
+   window). So the OpenSearch spend rollup still cannot break a run down per user or per org even
+   though the Postgres audit ledger now can. Deliberately not touched: it spans ~10 gateway call
+   sites and the founder vetoed that sweep as a refactor. **Consequence to state plainly:** per-user
+   and per-org spend in Insights → Accounting under-reports governed-run cost; the audit log is now
+   the trustworthy source for per-run cost.
+
+**Probe gotcha worth remembering:** the first two re-runs still showed null tokens because the probe
+reused the SAME query, so `compose` cache-hit and no model call happened at all — the single gateway
+doc in the window was the out-of-band judge, not the answer. A cached answer genuinely costs nothing;
+the probe now uses a unique query per run.
