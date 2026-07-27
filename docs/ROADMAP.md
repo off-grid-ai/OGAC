@@ -1174,3 +1174,29 @@ Probed the live fleet rather than trusting the plan. What the broker ACTUALLY re
 Next on this phase, in order: **#6 Langfuse env → OpenBao** (a real secret sitting in a plaintext file
 on disk, and the `native-basic` plan + broker already exist — only the population and the adapter read
 are missing), then **#7 Fleet token**, then **#5 SeaweedFS SigV4**.
+
+### Phase 4.10-B item #6 — Langfuse credential provisioning ✅ LIVE (2026-07-27)
+
+An operator can move a service credential out of the plaintext env file into OpenBao from the console.
+`GET|PUT|DELETE /api/v1/admin/services/credentials`. Proven live on the fleet:
+
+| step | result |
+|---|---|
+| inventory before | `langfuse source=env` (plaintext `OFFGRID_LANGFUSE_AUTH`), `fleet source=none`, `seaweedfs source=none` |
+| wrong credential shape | 400 — *"langfuse authenticates with a public key + secret key"* (a token would land in leaves the broker never reads: looks configured, authenticates nothing) |
+| vault the keypair | 200, `source` flips `env → vault`; **secret is not echoed back** (write-only) |
+| **running app picks it up** | resolved header matches the VAULTED keypair — **no restart**, which the old module-load constant made impossible |
+| remove it | 200, falls back to env, inventory returns to `source=env` |
+| unknown service | 400 |
+
+Also fixed by the DRY pass: the Langfuse auth rule existed in three copies (two private
+`legacyAuthHeader`s plus a module-level constant in `qa/scoring.ts`). One shared rule now, resolved at
+call time — `src/lib/langfuse-auth.ts`.
+
+**Remaining on Phase 4.10-B, with honest priority:**
+- **#7 Fleet token** — DEFERRED. Fleet has a URL and no token, but MDM is explicitly deprioritised by
+  the founder ("fuck MDM for now"). Provisioning is ready the moment a token exists.
+- **#5 SeaweedFS SigV4** — still anonymous loopback. Provisioning is ready; the flip also needs
+  `identities.json` seeded server-side, and this deployment is a demo box where the stated threat model
+  is "SSH is the only risk", so it is hardening rather than a live exposure. Do it with the next infra
+  maintenance window, not as a code-only change that could break the proven object round-trip.
