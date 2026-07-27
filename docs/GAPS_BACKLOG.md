@@ -1559,3 +1559,34 @@ retained — the only moment a subject's status can change — so there is no sc
   same dispatcher; keep the env var as the fallback so existing fleets keep working.
   Until then the honest claim is "alerts work and are proven, but only an admin with shell access can
   point them somewhere".
+
+## G-QUALITY-ALERT-DESTINATION ✅ RESOLVED + fleet-verified (2026-07-27)
+
+Quality alerts are now configurable in the console instead of only in `.env.local` on the box. Full
+CRUD on an org-scoped destination (self-creating `quality_alert_destination` table, no migration
+step) plus a **Send test** action, surfaced as a card on Solutions → Quality → Drift.
+
+**Live proof through the real HTTP routes on the deployed console:**
+
+| step | result |
+|---|---|
+| nothing configured | `GET` → `destination:null, source:none`; `POST /test` → 400 *"No destination configured…"* |
+| operator saves a URL | `PUT` 200 → stored, `source` becomes `console` |
+| operator sends a test | 200, `delivered:true`, receiver called once, **signature valid** against the vaulted secret, subject *"Answer quality is slipping: test:connection-check"*, body clearly marked a TEST |
+| operator PAUSES (env var also set on the box) | `active: {url:null, source:'console', paused:true}`; test → 400 *"alerts are paused"*; **receiver NOT called** |
+| non-http(s) destination | `PUT file://…` → 400, never stored as an egress target |
+| operator removes it | `DELETE` 200 `removed:true`, back to `source:none` |
+
+The pause case is the one that mattered: falling through to the env var would have made "pause"
+appear to do nothing on a box where the env var is set, so an operator would believe alerts were off
+while they kept being delivered.
+
+- `validAlertUrl` is now the ONE definition of a valid destination — used by the route validating
+  operator input, the env fallback and the sender, so the UI cannot accept something the sender
+  rejects.
+- `sendQualityAlert` takes the resolved destination explicitly rather than reading env itself.
+- Writes, deletes and tests are audited (`qa.alert-destination.{set,delete,test}`).
+- UI verified by screenshot: "alerts on" badge, last-changed-by attribution, populated URL, and
+  Save / Send test / Pause / Remove. An env-configured destination says so explicitly rather than
+  showing a blank field that reads as "alerts are off".
+- Seeded test data removed afterwards; destinations and alert-state tables back to 0 rows.
