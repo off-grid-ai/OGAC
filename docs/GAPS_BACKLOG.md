@@ -1626,3 +1626,33 @@ Tested properties: no scope ⇒ byte-identical to before; attribution survives a
 runs never cross-attribute** (one tenant's spend billed to another would be the worst failure here,
 so it has its own test); an explicit per-call attribution still wins; a nested scope merges rather
 than erasing; blank values stay honestly absent.
+
+## [G-TEST-LOAD-SENSITIVITY] OPEN (P2, hygiene) — timing tests fail on a loaded machine (2026-07-27)
+
+The suite contains tests that assert **timeout boundaries**, and they fail when the machine is busy —
+which is exactly when someone is iterating (a production build, dev servers, or a parallel test run).
+That makes the merge gate unreliable at the worst moment and trains people to re-run until green,
+which is how a real failure eventually gets waved through.
+
+**Measured, not guessed** (`test/action-crm.integration.test.ts` →
+*"the real HTTP action boundary times out with a bounded useful failure"*):
+
+| machine state | duration | result |
+|---|---|---|
+| production build running concurrently | 65s | ✖ fail |
+| build + isolated re-run | 118s | ✖ fail |
+| build + dev servers | 400s+ | ✖ timed out |
+| **idle** | **11.3s** | **✔ pass (6/6)** |
+
+Attribution was checked properly rather than assumed: the same test passes on the stashed baseline
+AND passes with the changes present once the machine is idle, so it is load, not a code regression.
+
+Two DB integration tests (`solution-blueprint-api`, app-as-agent binding) showed the same pattern
+earlier the same day — failing once under parallel execution, passing in isolation and on re-run.
+Root cause there is contention on the single shared Postgres rather than CPU.
+
+**Fix shape:** make the timing assertions relative to a measured baseline rather than a wall-clock
+constant (or mark them as a serial//`--test-concurrency=1` group), and give DB integration tests
+their own schema-per-worker so they cannot contend. Until then, a single timing failure on a busy
+machine should be re-run on an idle one BEFORE being treated as a regression — and that re-run should
+be reported, never quietly repeated until green.
