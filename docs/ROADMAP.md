@@ -1235,3 +1235,35 @@ actor/project/model). The DoD failed on the **cost** half, and the probe found t
 reused the SAME query, so `compose` cache-hit and no model call happened at all — the single gateway
 doc in the window was the out-of-band judge, not the answer. A cached answer genuinely costs nothing;
 the probe now uses a unique query per run.
+
+### Phase 4.11 — per-user spend now attributed, without the vetoed sweep ✅ LIVE (2026-07-27)
+
+The accounting surface aggregated the OpenSearch gateway index, which cannot attribute governed runs
+(`caller="node"`, no `org`) — so per-user spend read as unattributed and governed traffic looked free.
+Rather than threading attribution through ~10 gateway call sites (the vetoed `G-GATEWAY-ATTR-SWEEP`),
+the rollup now reads the **audit ledger**, which carries actor + org + project + model + tokens + cost
+on every governed run.
+
+**Verified live on the fleet:**
+```
+LEDGER rollup (24h, org=default)
+  totals : {"requests":1,"promptTokens":96,"completionTokens":36,"tokens":132,"costUsd":0.000264}
+  byActor: [["service@offgrid.local", 1, 132, 0.000264]]
+  byModel: [["qwen3-vl-8b", 1, 132, 0.000264]]
+  source the surface will use: ledger
+```
+
+Two sources, one shape; the page reports which is in force instead of switching silently. The ledger
+wins when it can attribute; the gateway index stays the fallback for traffic the console did not
+originate; and index traffic that cannot be attributed is explained in words rather than rendered as
+an empty table that reads as "nobody spent anything".
+
+Correctness choices worth keeping: cost is SUMMED from the ledger (never re-priced from a user's
+combined tokens, which would mix a local model's zero rate with a cloud rate); org totals come from
+the ACTOR rollup (project is optional, so totalling projects would drop project-less calls); only rows
+with tokens count (config-change events must not inflate request counts); and "attributed" means we
+know WHO, not that it cost money — otherwise a fully on-prem tenant on free local models would look
+unattributed.
+
+**`G-GATEWAY-ATTR-SWEEP` remains open** and still matters for traffic the console does not originate —
+but governed-run spend is no longer blocked behind it.
