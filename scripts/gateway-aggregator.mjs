@@ -625,7 +625,12 @@ async function handle(req, res, chunks) {
     const started = Date.now();
     const streaming = body.stream === true;
     // Request-side context for the observability record (A + D above).
-    const caller = String(req.headers['user-agent'] || '').slice(0, 80);
+    // WHO made this call. The console owns the request-scoped identity and sends it as
+    // x-offgrid-user; prefer that over the user-agent, which is just "node" for every server-side
+    // fetch and so collapsed every user's spend into one meaningless bucket.
+    const caller =
+      String(req.headers['x-offgrid-user'] || '').trim().slice(0, 120) ||
+      String(req.headers['user-agent'] || '').slice(0, 80);
     const corrId = String(req.headers['x-offgrid-run'] || req.headers['x-request-id'] || '');
     // TENANT ORG attribution (G-GATEWAY-INDEX-ORG). The console's observability surfaces filter the
     // offgrid-gateway index by `term: { org }` for tenant isolation, so a doc with no `org` is
