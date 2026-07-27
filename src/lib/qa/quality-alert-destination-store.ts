@@ -10,6 +10,7 @@
 
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { toAlertChannel, type AlertChannel } from '@/lib/qa/quality-alert-dispatch';
 
 const DEFAULT_ORG = 'default';
 
@@ -25,6 +26,8 @@ export async function ensureAlertDestinationSchema(): Promise<void> {
         updated_at timestamptz NOT NULL DEFAULT now(),
         updated_by text);
     `);
+    // Additive column so existing rows keep working as webhook destinations.
+    await db.execute(sql`ALTER TABLE quality_alert_destination ADD COLUMN IF NOT EXISTS channel text NOT NULL DEFAULT 'webhook';`);
   })().catch((e) => {
     ensurePromise = null;
     throw e;
@@ -34,7 +37,9 @@ export async function ensureAlertDestinationSchema(): Promise<void> {
 
 export interface AlertDestinationRecord {
   orgId: string;
+  /** Webhook URL, email recipient, or an optional Slack channel override — depends on `channel`. */
   url: string;
+  channel: AlertChannel;
   /** Paused rather than deleted — an operator can silence alerts without losing the URL. */
   enabled: boolean;
   updatedAt: string;
@@ -48,7 +53,7 @@ export async function getAlertDestination(
   try {
     await ensureAlertDestinationSchema();
     const res = await db.execute(sql`
-      SELECT org_id, url, enabled, updated_at, updated_by
+      SELECT org_id, url, enabled, channel, updated_at, updated_by
       FROM quality_alert_destination WHERE org_id = ${orgId};
     `);
     const row = (res.rows as unknown as Record<string, unknown>[])[0];
@@ -56,6 +61,7 @@ export async function getAlertDestination(
     return {
       orgId: String(row.org_id),
       url: String(row.url),
+      channel: toAlertChannel(row.channel),
       enabled: row.enabled !== false,
       updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
       updatedBy: row.updated_by == null ? null : String(row.updated_by),
@@ -71,13 +77,14 @@ export async function setAlertDestination(
   url: string,
   enabled: boolean,
   updatedBy?: string,
+  channel: AlertChannel = 'webhook',
 ): Promise<void> {
   await ensureAlertDestinationSchema();
   await db.execute(sql`
-    INSERT INTO quality_alert_destination (org_id, url, enabled, updated_at, updated_by)
-    VALUES (${orgId}, ${url}, ${enabled}, now(), ${updatedBy ?? null})
+    INSERT INTO quality_alert_destination (org_id, url, enabled, channel, updated_at, updated_by)
+    VALUES (${orgId}, ${url}, ${enabled}, ${channel}, now(), ${updatedBy ?? null})
     ON CONFLICT (org_id) DO UPDATE SET
-      url = EXCLUDED.url, enabled = EXCLUDED.enabled,
+      url = EXCLUDED.url, enabled = EXCLUDED.enabled, channel = EXCLUDED.channel,
       updated_at = now(), updated_by = EXCLUDED.updated_by;
   `);
 }

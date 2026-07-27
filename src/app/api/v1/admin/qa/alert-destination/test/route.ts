@@ -48,7 +48,15 @@ export async function POST(req: Request) {
     at: new Date().toISOString(),
   };
 
-  const result = await sendQualityAlert(alert, orgId, url);
+  const result = await sendQualityAlert(
+    alert,
+    orgId,
+    url,
+    undefined,
+    undefined,
+    undefined,
+    resolved?.channel ?? 'webhook',
+  );
   auditFromSession(gate, orgId, {
     action: 'qa.alert-destination.test',
     resource: `quality-alert-destination:${orgId}`,

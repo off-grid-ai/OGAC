@@ -199,6 +199,7 @@ test(
         url: 'https://env-fallback.example.com/q',
         source: 'env',
         paused: false,
+        channel: 'webhook',
       });
 
       // Save one in the console: it takes over, and the write is attributed.
@@ -211,6 +212,7 @@ test(
         url: 'https://console.example.com/q',
         source: 'console',
         paused: false,
+        channel: 'webhook',
       });
 
       // Pausing silences alerts even though the env var is still set on the box.

@@ -270,6 +270,7 @@ test('a console destination beats the server env var', async () => {
     url: 'https://console.example.com/q',
     source: 'console',
     paused: false,
+    channel: 'webhook',
   });
 });
 
@@ -281,6 +282,7 @@ test('the env var still works for fleets configured before the console setting e
     url: 'https://env.example.com/q',
     source: 'env',
     paused: false,
+    channel: 'webhook',
   });
 });
 
@@ -294,6 +296,7 @@ test('pausing in the console silences alerts even when the env var is set', asyn
     url: null,
     source: 'console',
     paused: true,
+    channel: 'webhook',
   });
 });
 
@@ -303,6 +306,7 @@ test('nothing configured anywhere is reported as none, not as a silent success',
     url: null,
     source: 'none',
     paused: false,
+    channel: 'webhook',
   });
 });
 
@@ -315,6 +319,7 @@ test('a stored destination that is not http(s) falls back rather than being trus
     url: 'https://env.example.com/q',
     source: 'env',
     paused: false,
+    channel: 'webhook',
   });
 });
 
@@ -350,4 +355,83 @@ test('an explicit destination overrides the env when sending', async () => {
   );
 
   assert.equal(calledUrl, 'https://console.example.com/q');
+});
+
+// ─── delivering where the team already looks: Slack and email channels ────────────────────────────
+
+test('each channel validates the thing it actually needs', async () => {
+  const { validateAlertTarget } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+
+  // Storing the wrong kind of target would only fail later, when a real regression tried to use it.
+  assert.equal(validateAlertTarget('webhook', 'https://hooks.example.com/q').ok, true);
+  assert.equal(validateAlertTarget('webhook', 'ops@bank.example').ok, false);
+
+  assert.equal(validateAlertTarget('email', 'ops@bank.example').ok, true);
+  assert.equal(validateAlertTarget('email', 'https://hooks.example.com/q').ok, false);
+  assert.equal(validateAlertTarget('email', 'not-an-address').ok, false);
+  assert.equal(validateAlertTarget('email', 'no@domain').ok, false);
+
+  // Slack holds its own incoming-webhook URL, so no target is required.
+  assert.deepEqual(validateAlertTarget('slack', ''), { ok: true, target: '' });
+  assert.deepEqual(validateAlertTarget('slack', '  #ai-quality '), { ok: true, target: '#ai-quality' });
+});
+
+test('an unknown channel falls back to webhook rather than being invented', async () => {
+  const { toAlertChannel } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  assert.equal(toAlertChannel('slack'), 'slack');
+  assert.equal(toAlertChannel('email'), 'email');
+  assert.equal(toAlertChannel('carrier-pigeon'), 'webhook');
+  assert.equal(toAlertChannel(undefined), 'webhook');
+  assert.equal(toAlertChannel(null), 'webhook');
+});
+
+test('a Slack destination with no channel override still counts as configured', async () => {
+  // The trap: Slack legitimately has no URL of its own, so a Boolean(url) check would treat a working
+  // Slack setup as unconfigured and silently skip every alert.
+  const { destinationConfigured, resolveDestination } = await import(
+    '../src/lib/qa/quality-alert-dispatch.ts'
+  );
+  const resolved = resolveDestination({ url: '', enabled: true, channel: 'slack' }, {} as NodeJS.ProcessEnv);
+
+  assert.equal(resolved.channel, 'slack');
+  assert.equal(resolved.source, 'console');
+  assert.equal(destinationConfigured(resolved), true);
+});
+
+test('an email destination is configured by its recipient, not by a URL', async () => {
+  const { destinationConfigured, resolveDestination } = await import(
+    '../src/lib/qa/quality-alert-dispatch.ts'
+  );
+  const resolved = resolveDestination(
+    { url: 'ops@bank.example', enabled: true, channel: 'email' },
+    {} as NodeJS.ProcessEnv,
+  );
+  assert.equal(resolved.channel, 'email');
+  assert.equal(resolved.url, 'ops@bank.example');
+  assert.equal(destinationConfigured(resolved), true);
+});
+
+test('pausing silences every channel, not just webhook', async () => {
+  const { destinationConfigured, resolveDestination } = await import(
+    '../src/lib/qa/quality-alert-dispatch.ts'
+  );
+  for (const channel of ['webhook', 'slack', 'email'] as const) {
+    const resolved = resolveDestination(
+      { url: 'ops@bank.example', enabled: false, channel },
+      { OFFGRID_QUALITY_ALERT_WEBHOOK: 'https://env.example.com/q' } as NodeJS.ProcessEnv,
+    );
+    assert.equal(resolved.paused, true, `${channel} must pause`);
+    assert.equal(destinationConfigured(resolved), false, `${channel} must not deliver while paused`);
+  }
+});
+
+test('the human message says what happened, for a person reading Slack or email', async () => {
+  const { alertMessageText } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  const [alert] = planQualityAlerts([], [verdict('app:kyc', 'regressed')], NOW).alerts;
+  const text = alertMessageText(alert, 'org_bharat');
+
+  assert.match(text, /Answer quality is slipping: app:kyc/);
+  assert.match(text, /getting worse/);
+  assert.match(text, /Recent 40% vs 90% earlier\./);
+  assert.match(text, /Tenant: org_bharat/);
 });

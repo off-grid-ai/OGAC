@@ -10,6 +10,7 @@ import { planQualityAlerts, type QualityAlert } from '@/lib/qa/quality-alert-pla
 import { listAlertState, saveAlertState } from '@/lib/qa/quality-alert-store';
 import {
   type DestinationSource,
+  destinationConfigured,
   resolveDestination,
   sendQualityAlert,
 } from '@/lib/qa/quality-alert-dispatch';
@@ -27,7 +28,9 @@ export interface AlertSweepResult {
 /** Resolve this org's destination: the console setting first, then the env fallback. */
 export async function resolveOrgDestination(orgId: string) {
   const stored = await getAlertDestination(orgId);
-  return resolveDestination(stored ? { url: stored.url, enabled: stored.enabled } : null);
+  return resolveDestination(
+    stored ? { url: stored.url, enabled: stored.enabled, channel: stored.channel } : null,
+  );
 }
 
 /**
@@ -45,7 +48,7 @@ export async function runQualityAlertSweep(
     // Skip the whole read when the operator has not opted in (or has paused alerts) — an
     // unconfigured fleet should not pay a regression query per governed run for alerts nobody gets.
     const destination = await resolveOrgDestination(orgId);
-    const configured = Boolean(destination.url);
+    const configured = destinationConfigured(destination);
     if (!configured) return { ...empty, source: destination.source };
 
     const view = await readQualityRegression(orgId);
@@ -61,7 +64,15 @@ export async function runQualityAlertSweep(
 
     let delivered = 0;
     for (const alert of alerts) {
-      const res = await sendQualityAlert(alert, orgId, destination.url);
+      const res = await sendQualityAlert(
+        alert,
+        orgId,
+        destination.url,
+        undefined,
+        undefined,
+        undefined,
+        destination.channel,
+      );
       if (res.ok) delivered += 1;
     }
 

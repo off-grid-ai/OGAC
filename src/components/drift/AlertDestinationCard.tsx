@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { DestinationSource } from '@/lib/qa/quality-alert-dispatch';
+import type { AlertChannel, DestinationSource } from '@/lib/qa/quality-alert-dispatch';
 
 // Manage where answer-quality alerts are delivered, and prove the destination works before a real
 // regression depends on it. This is the CRUD surface for a setting that used to live only in a
@@ -15,6 +15,7 @@ import type { DestinationSource } from '@/lib/qa/quality-alert-dispatch';
 
 export interface AlertDestinationView {
   url: string;
+  channel: AlertChannel;
   enabled: boolean;
   updatedAt: string;
   updatedBy: string | null;
@@ -31,6 +32,7 @@ type Feedback = { tone: 'ok' | 'error'; text: string } | null;
 export function AlertDestinationCard({ destination, activeSource, paused }: Readonly<Props>) {
   const router = useRouter();
   const [url, setUrl] = useState(destination?.url ?? '');
+  const [channel, setChannel] = useState<AlertChannel>(destination?.channel ?? 'webhook');
   const [busy, setBusy] = useState<'save' | 'test' | 'remove' | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -56,7 +58,7 @@ export function AlertDestinationCard({ destination, activeSource, paused }: Read
       const res = await fetch('/api/v1/admin/qa/alert-destination', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url, enabled }),
+        body: JSON.stringify({ url, enabled, channel }),
       });
       const body = await res.json().catch(() => ({}));
       return {
@@ -129,28 +131,55 @@ export function AlertDestinationCard({ destination, activeSource, paused }: Read
           {destination?.updatedBy ? <span>Last changed by {destination.updatedBy}</span> : null}
         </div>
 
+        <div className="space-y-1.5">
+          <Label className="text-xs">Deliver by</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {(['slack', 'email', 'webhook'] as AlertChannel[]).map((option) => (
+              <Button
+                key={option}
+                size="sm"
+                variant={channel === option ? 'default' : 'outline'}
+                onClick={() => setChannel(option)}
+                disabled={busy !== null}
+              >
+                {option === 'webhook' ? 'Webhook' : option === 'slack' ? 'Slack' : 'Email'}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="space-y-1.5">
             <Label htmlFor="alert-destination" className="text-xs">
-              Destination URL
+              {channel === 'email'
+                ? 'Send to (email address)'
+                : channel === 'slack'
+                  ? 'Slack channel (optional)'
+                  : 'Destination URL'}
             </Label>
             <Input
               id="alert-destination"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://hooks.example.com/quality-alerts"
+              placeholder={
+                channel === 'email'
+                  ? 'ops@yourbank.example'
+                  : channel === 'slack'
+                    ? '#ai-quality (leave blank for the sink default)'
+                    : 'https://hooks.example.com/quality-alerts'
+              }
               spellCheck={false}
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => save(true)} disabled={busy !== null || !url.trim()}>
+            <Button size="sm" onClick={() => save(true)} disabled={busy !== null || (!url.trim() && channel !== 'slack')}>
               {busy === 'save' ? 'Saving…' : 'Save'}
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={sendTest}
-              disabled={busy !== null || (!url.trim() && activeSource === 'none')}
+              disabled={busy !== null || (!url.trim() && channel !== 'slack' && activeSource === 'none')}
             >
               {busy === 'test' ? 'Sending…' : 'Send test'}
             </Button>

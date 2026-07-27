@@ -37,7 +37,9 @@ export default async function QualityDriftPage() {
   const answerQuality = await readQualityRegression(orgId);
   const alertDestinationRow = await getAlertDestination(orgId);
   const activeDestination = resolveDestination(
-    alertDestinationRow ? { url: alertDestinationRow.url, enabled: alertDestinationRow.enabled } : null,
+    alertDestinationRow
+      ? { url: alertDestinationRow.url, enabled: alertDestinationRow.enabled, channel: alertDestinationRow.channel }
+      : null,
   );
   const adapter = getDrift().meta;
   const engineStatus = {

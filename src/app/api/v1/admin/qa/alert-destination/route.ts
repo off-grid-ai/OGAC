@@ -6,7 +6,7 @@ import {
   getAlertDestination,
   setAlertDestination,
 } from '@/lib/qa/quality-alert-destination-store';
-import { resolveDestination, validAlertUrl } from '@/lib/qa/quality-alert-dispatch';
+import { resolveDestination, toAlertChannel, validateAlertTarget } from '@/lib/qa/quality-alert-dispatch';
 import { currentOrgId } from '@/lib/tenancy';
 
 // Where this tenant's answer-quality alerts are delivered — full CRUD, so an operator configures it
@@ -24,7 +24,9 @@ export async function GET(req: Request) {
 
   const orgId = await currentOrgId();
   const stored = await getAlertDestination(orgId);
-  const resolved = resolveDestination(stored ? { url: stored.url, enabled: stored.enabled } : null);
+  const resolved = resolveDestination(
+    stored ? { url: stored.url, enabled: stored.enabled, channel: stored.channel } : null,
+  );
 
   return NextResponse.json({
     object: 'quality_alert_destination',
@@ -40,19 +42,20 @@ export async function PUT(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
 
-  const body = (await req.json().catch(() => null)) as { url?: unknown; enabled?: unknown } | null;
-  const url = validAlertUrl(body?.url);
-  if (!url) {
-    return NextResponse.json(
-      { error: 'a destination url is required and must be an http(s):// endpoint' },
-      { status: 400 },
-    );
-  }
+  const body = (await req.json().catch(() => null)) as
+    | { url?: unknown; enabled?: unknown; channel?: unknown }
+    | null;
+  const channel = toAlertChannel(body?.channel);
+  // Each channel needs a different target; validating per-channel stops us storing a destination that
+  // only fails when a real regression tries to use it.
+  const target = validateAlertTarget(channel, body?.url);
+  if (!target.ok) return NextResponse.json({ error: target.reason }, { status: 400 });
+  const url = target.target;
   const enabled = body?.enabled !== false;
 
   const orgId = await currentOrgId();
   try {
-    await setAlertDestination(orgId, url, enabled, gate.user.email ?? undefined);
+    await setAlertDestination(orgId, url, enabled, gate.user.email ?? undefined, channel);
     auditFromSession(gate, orgId, {
       action: 'qa.alert-destination.set',
       resource: `quality-alert-destination:${orgId}`,
