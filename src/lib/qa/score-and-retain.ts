@@ -66,7 +66,7 @@ export async function scoreAndRetain(subject: ScoreSubject): Promise<boolean> {
 
     // Retain in the console's own store so quality-over-time survives Langfuse being down or
     // undeployed, and so the regression rule has something to read.
-    return await retainOnlineScore(
+    const retained = await retainOnlineScore(
       toOnlineScore({
         runId: subject.runId,
         orgId: subject.orgId,
@@ -77,7 +77,25 @@ export async function scoreAndRetain(subject: ScoreSubject): Promise<boolean> {
         reasoning: scored.verdict.reasoning,
       }),
     );
+
+    // A new verdict is the only thing that can change this subject's regression status, so this is
+    // exactly when to check whether an operator should be told — no scheduler, no polling loop that
+    // goes quiet precisely when the fleet is busy. Best-effort and not awaited into the caller's path;
+    // it no-ops entirely when no alert destination is configured.
+    if (retained) void runAlertSweepFor(subject.orgId, subject.subjectId);
+
+    return retained;
   } catch {
     return false; // best-effort: a scoring failure is never the run's problem
+  }
+}
+
+/** Dynamic import so the alerting chain never enters a caller's module graph unless a verdict lands. */
+async function runAlertSweepFor(orgId: string, subjectId: string): Promise<void> {
+  try {
+    const { runQualityAlertSweep } = await import('@/lib/qa/quality-alert-run');
+    await runQualityAlertSweep(orgId, subjectId);
+  } catch {
+    /* alerting is additive — it must never affect the scored run */
   }
 }
