@@ -1525,3 +1525,37 @@ composed blob as the title. A round-trip test over all four composed shapes now 
 
 Test artifacts (temporary apps, verdicts, child agent runs) were removed afterwards; `online_scores`
 is back to the single pre-existing row.
+
+## G-QUALITY-REGRESSION-ALERT ✅ RESOLVED + fleet-verified (2026-07-27)
+
+Answer-quality regressions are now DELIVERED, not just displayed. Alerts are transitions (pure
+`planQualityAlerts`), remembered in a self-creating `quality_alert_state` table, and signed over the
+actions-out webhook primitives (vault secret + `signWebhookBody`). Triggered when a verdict is
+retained — the only moment a subject's status can change — so there is no scheduler to operate.
+
+**Live proof on the deployed box** (real Postgres, real HTTP receiver, real HMAC):
+
+| scenario | result |
+|---|---|
+| quality falls 0.92 → 0.38 | 1 alert delivered — *"Answers are getting worse: quality fell from 0.92 to 0.38 … over the last 10 runs"* |
+| same bad data, swept again | 0 alerts, destination NOT called again — the memory held |
+| quality recovers | 1 alert — *"Answer quality recovered: app:alert_live_probe"* |
+| judge outage (judged window starved) | **0 alerts, no false all-clear** — the remembered regression survives |
+
+- Signature verified valid against the secret the code actually resolves — the **vaulted operator
+  secret**, not the probe's env fallback (`resolveWebhookSecret` is vault-first by design).
+- Payload: `{event: offgrid.quality_regression, kind, subjectId, subject, detail, recentQuality,
+  baselineQuality, dimensions}` over `x-offgrid-signature` + `x-offgrid-event`.
+- `quality_alert_state` self-created on the box — no migration step, confirmed present after deploy.
+- Alert state is persisted ONLY for alerts that actually delivered: a dead destination means the next
+  verdict retries. A duplicate alert is recoverable; permanent silence on a real regression is not.
+- Unconfigured fleets skip the read entirely and report `configured:false` — never a pretend success.
+
+- **[G-QUALITY-ALERT-DESTINATION] OPEN (P2) — the destination is an env var, not a console setting.**
+  `OFFGRID_QUALITY_ALERT_WEBHOOK` must be set in `.env.local` on the box, so an operator cannot
+  configure or test where quality alerts go from the console. That is below this repo's full-CRUD bar
+  for operator surfaces (every module should be manageable in-product, not by editing env on a
+  server). Fix shape: an org-scoped destination setting with a "send test alert" action, reusing the
+  same dispatcher; keep the env var as the fallback so existing fleets keep working.
+  Until then the honest claim is "alerts work and are proven, but only an admin with shell access can
+  point them somewhere".
