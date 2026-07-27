@@ -1,3 +1,4 @@
+import { withGatewayScope } from '@/lib/gateway-scope';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
@@ -557,7 +558,27 @@ async function maybeRunSandboxTool(ref: string, mark: Mark): Promise<void> {
   mark('sandbox', result.engine, detail, [ref], t);
 }
 
+/**
+ * Run one governed agent. Opens the ambient gateway attribution scope for the WHOLE run, so every
+ * inference underneath it — the answer, grounding, retrieval embeddings, the out-of-band judge — is
+ * stamped with this run's org/user on the observability doc. Before this, only the two call sites
+ * that passed attribution explicitly were attributed and the rest shipped `org: null`
+ * (G-GATEWAY-ATTR-SWEEP).
+ */
 export async function runAgent(
+  agentId: string,
+  query: string,
+  caller?: string,
+  requireReview = false,
+  orgId: string = DEFAULT_ORG,
+  context?: RunContext,
+): Promise<AgentRun | null> {
+  return withGatewayScope({ orgId: context?.org ?? orgId, userId: caller }, () =>
+    runAgentImpl(agentId, query, caller, requireReview, orgId, context),
+  );
+}
+
+async function runAgentImpl(
   agentId: string,
   query: string,
   caller?: string,

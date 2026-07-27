@@ -10,6 +10,7 @@
 // relative specifiers work without depending on an @/-alias resolver in that runtime (mirrors
 // agent-run.activities.ts).
 
+import { withGatewayScope } from '../lib/gateway-scope';
 import type { AppSpec, AppStep } from '../lib/app-model';
 import { runApp as _unusedRunApp, executeStep, defaultDeps } from '../lib/app-run';
 import type { StepResult, AppRunContext, AppRunDeps } from '../lib/app-run';
@@ -128,7 +129,12 @@ export async function executeStepActivity(
     // the two paths would answer differently for the same app.
     input: input.input,
   };
-  return executeStep(spec, step, priorResults, ctx, deps);
+  // The durable path calls executeStep directly (it does not go through runApp), so it must open the
+  // attribution scope itself or a worker-executed step would ship unattributed gateway docs while the
+  // identical inline step shipped attributed ones.
+  return withGatewayScope({ orgId: ctx.orgId, userId: ctx.actor }, () =>
+    executeStep(spec, step, priorResults, ctx, deps),
+  );
 }
 
 /**

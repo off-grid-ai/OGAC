@@ -25,6 +25,7 @@
 //   executeStep(spec, step, priorResults, ctx) → StepResult   (run ONE runnable step)
 //   runApp(spec, input, ctx)                    → AppRunOutcome (run the whole spec inline)
 
+import { withGatewayScope } from '@/lib/gateway-scope';
 import { randomUUID } from 'node:crypto';
 import type { AppSpec, AppStep, ActionStep } from '@/lib/app-model';
 import {
@@ -1221,7 +1222,11 @@ export async function runApp(
 ): Promise<AppRunOutcome> {
   const state = initState(spec, ctx.runId);
   await deps.persist(state, input, ctx.orgId);
-  return driveRunnableSteps(spec, state, [], input, ctx, deps);
+  // Every inference this app makes — agent steps, grounding, guardrail model calls — is attributed to
+  // the app's tenant on the observability doc (G-GATEWAY-ATTR-SWEEP).
+  return withGatewayScope({ orgId: ctx.orgId, userId: ctx.actor }, () =>
+    driveRunnableSteps(spec, state, [], input, ctx, deps),
+  );
 }
 
 // ─── driveRunnableSteps — the ONE step-driving loop (DRY: runApp + resumeAppRun both use it) ──────

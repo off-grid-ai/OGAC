@@ -7,6 +7,7 @@
 // then it returns `kind:'none'` and we fall back to the legacy static `x-api-key` — BYTE-IDENTICAL to
 // the pre-broker behavior, so nothing breaks pre-deploy. The auth-selection rule is the pure,
 // unit-tested `chooseGatewayAuth`.
+import { currentGatewayScope } from '@/lib/gateway-scope';
 import { getServiceCredential, invalidateServiceCredential } from './service-credentials';
 import { chooseGatewayAuth, NO_CREDENTIAL } from './service-credentials-lib';
 import { resolveGatewayEndpoints } from './gateway-endpoints';
@@ -47,10 +48,15 @@ export function gatewayAttribution(
  * can't await; `gatewayHeadersAsync` is the broker-preferring path for calls that can.
  */
 export function gatewayHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  // G-GATEWAY-ATTR-SWEEP: stamp the ambient run's attribution here, at the ONE seam every gateway
+  // caller already funnels through, instead of threading orgId through ten signatures (several of
+  // them port interfaces). An explicit `extra` still wins, so callers that pass their own
+  // attribution are unaffected; with no scope this is byte-identical to before.
+  const ambient = gatewayAttribution(currentGatewayScope() ?? {});
   if (ENDPOINTS.inferenceApiKey)
-    return { authorization: `Bearer ${ENDPOINTS.inferenceApiKey}`, ...extra };
+    return { authorization: `Bearer ${ENDPOINTS.inferenceApiKey}`, ...ambient, ...extra };
   // NO_CREDENTIAL → chooseGatewayAuth falls straight through to the legacy x-api-key branch.
-  return { ...chooseGatewayAuth(NO_CREDENTIAL, GATEWAY_API_KEY || undefined), ...extra };
+  return { ...chooseGatewayAuth(NO_CREDENTIAL, GATEWAY_API_KEY || undefined), ...ambient, ...extra };
 }
 
 /**
@@ -61,10 +67,13 @@ export function gatewayHeaders(extra: Record<string, string> = {}): Record<strin
 export async function gatewayHeadersAsync(
   extra: Record<string, string> = {},
 ): Promise<Record<string, string>> {
+  // Same ambient attribution as the sync seam — read BEFORE the await, because AsyncLocalStorage
+  // context is preserved across awaits but reading it first keeps the two seams provably identical.
+  const ambient = gatewayAttribution(currentGatewayScope() ?? {});
   if (ENDPOINTS.inferenceApiKey)
-    return { authorization: `Bearer ${ENDPOINTS.inferenceApiKey}`, ...extra };
+    return { authorization: `Bearer ${ENDPOINTS.inferenceApiKey}`, ...ambient, ...extra };
   const cred = await getServiceCredential('gateway');
-  return { ...chooseGatewayAuth(cred, GATEWAY_API_KEY || undefined), ...extra };
+  return { ...chooseGatewayAuth(cred, GATEWAY_API_KEY || undefined), ...ambient, ...extra };
 }
 
 export function gatewayControlHeaders(extra: Record<string, string> = {}): Record<string, string> {
