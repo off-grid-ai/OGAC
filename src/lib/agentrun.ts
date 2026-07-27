@@ -116,6 +116,41 @@ function extractText(data: unknown): string | null {
   return typeof text === 'string' && text.trim() ? text.trim() : null;
 }
 
+/** Token usage reported by the gateway for one completion. */
+export interface RunUsage {
+  prompt: number;
+  completion: number;
+  total: number;
+}
+
+/**
+ * Pull the OpenAI-shaped `usage` block off a gateway response. PURE.
+ *
+ * Phase 4.11 requires audit events to carry tokens AND cost — "who did what, and what it cost". The
+ * agent-run path asked the gateway, got `{choices, usage}` back, and threw the usage away, so every
+ * `agent.run` audit row landed with null tokens and null cost and per-user spend could not be
+ * attributed at all.
+ *
+ * A missing or unparseable block returns null rather than zeros: "the gateway did not report usage"
+ * and "this run cost nothing" are different claims, and recording the second when the first is true
+ * would understate spend silently.
+ */
+export function extractUsage(data: unknown): RunUsage | null {
+  const u = (data as { usage?: Record<string, unknown> })?.usage;
+  if (!u || typeof u !== 'object') return null;
+  const num = (v: unknown): number => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
+  };
+  const prompt = num(u.prompt_tokens);
+  const completion = num(u.completion_tokens);
+  // Trust an explicit total; otherwise derive it, so a gateway that reports only the parts still
+  // produces a usable figure.
+  const reported = num(u.total_tokens);
+  const total = reported || prompt + completion;
+  return total > 0 ? { prompt, completion, total } : null;
+}
+
 // Compose the answer. `system` carries the agent's natural-language instruction (built-ins use a
 // terse default); `model` lets a custom agent name a target, otherwise the gateway default applies
 // (and the model-routing rules at the gateway still decide where it actually runs).
@@ -134,6 +169,9 @@ async function gatewayAnswer(
   model: string,
   caller?: string,
   orgId?: string,
+  // Usage is reported back through this sink rather than widening the return type, so the many
+  // existing call sites that only want the answer text stay untouched.
+  onUsage?: (usage: RunUsage) => void,
 ): Promise<string | null> {
   const body = {
     model,
@@ -159,7 +197,10 @@ async function gatewayAnswer(
       // org-scoped FinOps/Insights surfaces then read zero for governed runs).
       const id = await enqueueInference({ body, caller, org: orgId }, cfg);
       const res = await getResult(id, cfg);
-      return res.status === 200 ? extractText(res.body) : null;
+      if (res.status !== 200) return null;
+      const queued = extractUsage(res.body);
+      if (queued) onUsage?.(queued);
+      return extractText(res.body);
     } catch {
       /* queue unavailable — fall through to a direct call */
     }
@@ -178,7 +219,11 @@ async function gatewayAnswer(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(20000),
     });
-    return res.ok ? extractText(await res.json()) : null;
+    if (!res.ok) return null;
+    const payload = await res.json();
+    const usage = extractUsage(payload);
+    if (usage) onUsage?.(usage);
+    return extractText(payload);
   } catch {
     return null;
   }
@@ -204,6 +249,7 @@ async function compose(
   agent: AgentDef,
   caller?: string,
   orgId?: string,
+  onUsage?: (usage: RunUsage) => void,
 ): Promise<string> {
   const context = hits.map((h, i) => `[${i + 1}] ${h.title}: ${h.snippet}`).join('\n');
   const system = systemFor(agent);
@@ -212,7 +258,7 @@ async function compose(
   const cacheKey = `${model}\n${system}\n${query}\n${context}`;
   const cached = await cacheLookup(cacheKey);
   if (cached.hit && cached.answer) return cached.answer;
-  const answer = await gatewayAnswer(query, context, system, model, caller, orgId);
+  const answer = await gatewayAnswer(query, context, system, model, caller, orgId, onUsage);
   if (answer) {
     await cacheStore(cacheKey, answer);
     return answer;
@@ -527,6 +573,9 @@ export async function runAgent(
   // Canonical attributed audit (Phase 4.11): who ran which agent, its outcome/model, correlated by
   // runId. Emitted on EVERY terminal path (denied / blocked / done), best-effort. Actor/org/project
   // come from the resolved attribution so inline and durable emit an identical event.
+  // Captured from the gateway response so the terminal audit can report REAL tokens + cost rather
+  // than the null columns Phase 4.11's DoD forbids.
+  let runUsage: RunUsage | null = null;
   const auditRun = (status: string, tokens = 0): void => {
     recordAudit({
       actor: attribution.actor,
@@ -535,7 +584,11 @@ export async function runAgent(
       action: 'agent.run',
       resource: `agent:${agentId}`,
       model: runModel,
-      tokens: tokens ? { prompt: 0, completion: 0, total: tokens } : null,
+      // Prefer the gateway's reported usage; the numeric argument stays as the fallback for paths that
+      // only know a total. Cost is priced from the SAME finops rate the FinOps surfaces use, so the
+      // audit ledger and the spend rollups cannot disagree.
+      tokens: runUsage ?? (tokens ? { prompt: 0, completion: 0, total: tokens } : null),
+      costUsd: runUsage ? costForTokens(runModel, runUsage.total) : null,
       outcome: outcomeFromStatus(status),
       runId,
     });
@@ -1061,7 +1114,9 @@ export async function runAgent(
       t,
     );
   } else {
-    answer = await compose(modelQuery, routed.hits, agent, caller, attribution.org);
+    answer = await compose(modelQuery, routed.hits, agent, caller, attribution.org, (u) => {
+      runUsage = u;
+    });
     mark('answer', 'compose', answer.slice(0, 120), [], t);
   }
 
