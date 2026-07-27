@@ -87,3 +87,44 @@ test('the audited cost uses the same finops rate the spend surfaces use', () => 
   assert.ok(local >= 0);
   assert.ok(cloud >= local, 'a cloud model must not price below a local one');
 });
+
+// ─── an autonomous run bills the SUM of its iterations ────────────────────────────────────────────
+
+test('a multi-step agent run accumulates usage across every model call', async () => {
+  const { sumUsage } = await import('../src/lib/agentrun.ts');
+
+  // A ReAct loop calls the model once per iteration. Keeping only the last call would bill a
+  // ten-step run as if it were its final step — the defect this guards.
+  const iterations = [
+    { prompt: 900, completion: 40, total: 940 },
+    { prompt: 1200, completion: 55, total: 1255 },
+    { prompt: 1500, completion: 30, total: 1530 },
+  ];
+  let running: ReturnType<typeof sumUsage> | null = null;
+  for (const it of iterations) running = sumUsage(running, it);
+
+  assert.deepEqual(running, { prompt: 3600, completion: 125, total: 3725 });
+  assert.notDeepEqual(running, iterations[2], 'must not report only the final call');
+});
+
+test('the first call establishes the total; nothing is lost or double-counted', async () => {
+  const { sumUsage } = await import('../src/lib/agentrun.ts');
+  const one = { prompt: 10, completion: 2, total: 12 };
+
+  assert.deepEqual(sumUsage(null, one), one);
+  assert.deepEqual(sumUsage(one, { prompt: 0, completion: 0, total: 0 }), one);
+});
+
+test('accumulated cost equals the cost of the accumulated tokens', async () => {
+  const { sumUsage } = await import('../src/lib/agentrun.ts');
+  const a = { prompt: 1000, completion: 100, total: 1100 };
+  const b = { prompt: 500, completion: 50, total: 550 };
+  const combined = sumUsage(a, b);
+
+  // Pricing the summed total must match summing the priced parts, or a multi-step run's audited
+  // cost would disagree with the spend rollup.
+  assert.equal(
+    costForTokens('gpt-4o', combined.total),
+    costForTokens('gpt-4o', a.total) + costForTokens('gpt-4o', b.total),
+  );
+});

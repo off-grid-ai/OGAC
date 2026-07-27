@@ -151,6 +151,21 @@ export function extractUsage(data: unknown): RunUsage | null {
   return total > 0 ? { prompt, completion, total } : null;
 }
 
+/**
+ * Add one completion's usage to a run's running total. PURE.
+ *
+ * An autonomous (ReAct) run calls the model once per iteration, so a run's cost is the SUM over its
+ * iterations — keeping only the last call would bill a ten-step run as if it were its final step.
+ */
+export function sumUsage(soFar: RunUsage | null, next: RunUsage): RunUsage {
+  if (!soFar) return next;
+  return {
+    prompt: soFar.prompt + next.prompt,
+    completion: soFar.completion + next.completion,
+    total: soFar.total + next.total,
+  };
+}
+
 // Compose the answer. `system` carries the agent's natural-language instruction (built-ins use a
 // terse default); `model` lets a custom agent name a target, otherwise the gateway default applies
 // (and the model-routing rules at the gateway still decide where it actually runs).
@@ -318,12 +333,18 @@ async function resolveAgentToolCatalog(agent: AgentDef, orgId: string): Promise<
 // FinOps attribution) as a normal answer. It builds the ReAct prompt (pure), calls the gateway, and
 // parses the reply into an action. On an empty/unparseable reply it FINISHES with a best-effort note
 // rather than looping blindly — the loop's budget still bounds it either way.
-function makeGovernedPlanner(model: string, system: string, caller?: string, orgId?: string) {
+function makeGovernedPlanner(
+  model: string,
+  system: string,
+  caller?: string,
+  orgId?: string,
+  onUsage?: (usage: RunUsage) => void,
+) {
   return async (input: PlanInput) => {
     const prompt = buildPlannerPrompt(input);
     // The planner reply is NOT the final answer, so it must not be cached under the compose key;
     // call the gateway directly with the ReAct system + prompt.
-    const reply = await gatewayAnswer(input.goal, prompt, system, model, caller, orgId);
+    const reply = await gatewayAnswer(input.goal, prompt, system, model, caller, orgId, onUsage);
     const action = reply ? parseAgentAction(reply) : null;
     if (action) return action;
     // No usable action — end the loop honestly with whatever the model said (or a fallback).
@@ -576,6 +597,11 @@ export async function runAgent(
   // Captured from the gateway response so the terminal audit can report REAL tokens + cost rather
   // than the null columns Phase 4.11's DoD forbids.
   let runUsage: RunUsage | null = null;
+  // An autonomous run calls the model once PER ITERATION, so usage must SUM. Overwriting would bill a
+  // ten-step run as if it were its last step alone.
+  const addUsage = (u: RunUsage): void => {
+    runUsage = sumUsage(runUsage, u);
+  };
   const auditRun = (status: string, tokens = 0): void => {
     recordAudit({
       actor: attribution.actor,
@@ -1100,7 +1126,7 @@ export async function runAgent(
     const loop = await runAgentLoop({
       goal: `${modelQuery}${context}`,
       tools: toolCatalog,
-      planNext: makeGovernedPlanner(loopModel, loopSystem, caller, attribution.org),
+      planNext: makeGovernedPlanner(loopModel, loopSystem, caller, attribution.org, addUsage),
       callTool: makeGovernedToolExecutor(orgId, agent.id, caller, mark, runEgress, actorRole),
       maxIterations: budget,
     });
@@ -1114,9 +1140,7 @@ export async function runAgent(
       t,
     );
   } else {
-    answer = await compose(modelQuery, routed.hits, agent, caller, attribution.org, (u) => {
-      runUsage = u;
-    });
+    answer = await compose(modelQuery, routed.hits, agent, caller, attribution.org, addUsage);
     mark('answer', 'compose', answer.slice(0, 120), [], t);
   }
 
