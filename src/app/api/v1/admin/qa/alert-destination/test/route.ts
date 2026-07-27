@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import type { QualityAlert } from '@/lib/qa/quality-alert-plan';
-import { sendQualityAlert, validAlertUrl } from '@/lib/qa/quality-alert-dispatch';
+import { destinationConfigured, sendQualityAlert, validAlertUrl } from '@/lib/qa/quality-alert-dispatch';
 import { resolveOrgDestination } from '@/lib/qa/quality-alert-run';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -25,12 +25,16 @@ export async function POST(req: Request) {
   const resolved = candidate ? null : await resolveOrgDestination(orgId);
   const url = candidate ?? resolved?.url ?? null;
 
-  if (!url) {
+  // "Can we deliver?" is channel-dependent, so it must NOT be `!url`. A Slack destination has no URL
+  // of its own — the sink holds the incoming-webhook URL — so a bare url check rejected a perfectly
+  // valid Slack setup and made it untestable. Caught by the live probe, not by any unit test.
+  const deliverable = candidate !== null || (resolved ? destinationConfigured(resolved) : false);
+  if (!deliverable) {
     return NextResponse.json(
       {
         error: resolved?.paused
           ? 'Quality alerts are paused — enable the destination before sending a test.'
-          : 'No destination configured. Save an http(s) endpoint first, or pass one as `url`.',
+          : 'No destination configured. Save a destination first, or pass one as `url`.',
       },
       { status: 400 },
     );

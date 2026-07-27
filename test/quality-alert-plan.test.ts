@@ -435,3 +435,35 @@ test('the human message says what happened, for a person reading Slack or email'
   assert.match(text, /Recent 40% vs 90% earlier\./);
   assert.match(text, /Tenant: org_bharat/);
 });
+
+test('"can we deliver?" is never a bare url check', async () => {
+  // The live probe caught this: the test route asked `!url` and so rejected a valid Slack
+  // destination as unconfigured, making Slack untestable from the console. Any deliverability
+  // decision must go through destinationConfigured, which knows what each channel needs.
+  const { destinationConfigured, resolveDestination } = await import(
+    '../src/lib/qa/quality-alert-dispatch.ts'
+  );
+  const slack = resolveDestination({ url: '', enabled: true, channel: 'slack' }, {} as NodeJS.ProcessEnv);
+
+  assert.equal(slack.url, null, 'Slack genuinely has no url of its own');
+  assert.equal(Boolean(slack.url), false, 'which is exactly why a bare url check fails');
+  assert.equal(destinationConfigured(slack), true, 'but it IS deliverable');
+});
+
+test('an unconfigured or paused destination is still refused', async () => {
+  const { destinationConfigured, resolveDestination } = await import(
+    '../src/lib/qa/quality-alert-dispatch.ts'
+  );
+  assert.equal(
+    destinationConfigured(resolveDestination(null, {} as NodeJS.ProcessEnv)),
+    false,
+    'nothing configured anywhere',
+  );
+  assert.equal(
+    destinationConfigured(
+      resolveDestination({ url: '', enabled: false, channel: 'slack' }, {} as NodeJS.ProcessEnv),
+    ),
+    false,
+    'a paused Slack destination must not deliver',
+  );
+});
