@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createElement } from 'react';
 import { CostInsightsView } from '@/components/insights/CostInsightsView';
 import { computeAccounting } from '@/lib/accounting';
+import { chooseAccounting, computeLedgerAccounting } from '@/lib/accounting-ledger';
 import { isRangePreset, type RangePreset } from '@/lib/accounting-aggs';
 import {
   INSIGHTS_COST_DESTINATIONS,
@@ -42,7 +43,16 @@ export async function AccountingInsightsSource({
     params.pipeline,
     pipelines.map((pipeline) => pipeline.id),
   );
-  const accounting = await computeAccounting(range, facet ? pipelineTag(facet) : null);
+  // Two sources, one shape. The audit ledger attributes governed runs to the actor the console
+  // resolved; the gateway index still sees traffic the console did not originate but cannot attribute
+  // it today (G-GATEWAY-ATTR-SWEEP). chooseAccounting prefers whichever can actually answer
+  // "who spent this", and says so rather than rendering a confident zero.
+  const [indexAccounting, ledgerAccounting] = await Promise.all([
+    computeAccounting(range, facet ? pipelineTag(facet) : null),
+    computeLedgerAccounting(range, orgId),
+  ]);
+  const resolved = chooseAccounting(ledgerAccounting, indexAccounting);
+  const accounting = resolved.accounting;
   const facetName = facet
     ? (pipelines.find((pipeline) => pipeline.id === facet)?.name ?? facet)
     : null;
