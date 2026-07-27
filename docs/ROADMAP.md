@@ -1122,5 +1122,55 @@ zero data leaving the perimeter, working with the source systems the enterprise 
 
 ---
 
-_Last updated: 2026-07-08. Owned by: console team._
+_Last updated: 2026-07-27. Owned by: console team._
 _Related: `README.md`, `docs/research/`, `platform/DATA_PLANE_PARITY.md`, `../shared/ROADMAP.md`_
+
+---
+
+## Phase 4.12 — Answer quality: detect, cover, alert (LIVE 2026-07-27)
+
+**The outcome:** an enterprise finds out its AI is getting worse *before* its users do — on the apps
+people actually use, delivered to a destination the operator controls and has tested, and without
+crying wolf when the judge is merely down.
+
+Drift already watched the DATA going in (Evidently presets over columns). Nothing watched the thing
+the enterprise actually feels: the answers. This phase closed that end to end. Each item was deployed
+to the fleet and proven against real services — not merely merged.
+
+| # | Item | State | Evidence |
+|---|---|---|---|
+| 1 | **Answer-quality regression detection** — pure rule over retained judge verdicts; recent window vs the baseline before it | ✅ LIVE | 0.90→0.87 `ok`; 0.90→0.42 `regressed`; judge outage → `insufficient-data`, not a false collapse |
+| 2 | **App-run scoring** (`G-QUALITY-REGRESSION-APPS`) — the signal covers apps, not just agents | ✅ LIVE | verdicts retained on BOTH paths: inline `apprun_7357da45`, durable `apprun_0f6914b9` |
+| 3 | **App input reaches the agent** (`G-APP-INPUT-DROPPED`) — found by #2 | ✅ LIVE | same app + question: *"no specific question was provided"* q=0.1 → a real answer q=**1.0** |
+| 4 | **Regression alerting** (`G-QUALITY-REGRESSION-ALERT`) — transitions, not states | ✅ LIVE | fires once, silent while it persists, fires on recovery, **no false all-clear** on a judge outage |
+| 5 | **Operator-managed destination** (`G-QUALITY-ALERT-DESTINATION`) — full CRUD + Send test | ✅ LIVE | save → test delivered + signature valid; **pause silences even with the env var set**; `file://` rejected |
+
+Surfaces: Solutions → Quality → Drift (Answer quality card + Where quality alerts go card);
+`GET /api/v1/admin/qa/regression`; `GET|PUT|DELETE /api/v1/admin/qa/alert-destination` + `POST …/test`.
+
+**Why #3 matters beyond its own fix:** an app whose first step was an agent RAN, reported `done`, and
+answered "no question was provided" — a silent wrong answer, not an error. The demo apps hid it
+because a connector-query step supplies their data. It was only found because #2 made a judge read
+app answers. Outcome verification found what no test or typecheck could.
+
+**Still open here:** alert delivery speaks webhook only (Slack + email sinks exist and can reuse the
+same dispatcher).
+
+---
+
+## Phase 4.10 — Phase-B credential audit (VERIFIED 2026-07-27, not from the doc)
+
+Probed the live fleet rather than trusting the plan. What the broker ACTUALLY resolves today:
+
+| service | plan | secret in OpenBao | resolves | reality |
+|---|---|---|---|---|
+| gateway | `oidc-jwt` | **yes** | bearer | ✅ Phase B #4 done (legacy `OFFGRID_GATEWAY_API_KEY` still set as fallback) |
+| opensearch | `oidc-jwt` | **yes** | bearer | ✅ Phase D #9 done (cutover 2026-07-25) |
+| langfuse | `native-basic` | no | none | 🔴 **Phase B #6 open** — credential lives in PLAINTEXT env (`OFFGRID_LANGFUSE_AUTH`), not OpenBao |
+| fleet | `native-bearer` | no | none | 🔴 **Phase B #7 open** — `OFFGRID_FLEET_URL` is set but there is **no token at all**, so MDM cannot authenticate |
+| seaweedfs | `s3` | no | none | 🔴 **Phase B #5 open** — still anonymous loopback, no SigV4 keys |
+| marquez / opa / presidio | `none` | — | none | Phase C — edge-gate (Caddy `forward_auth`), correctly `none` so no wrong-kind credential is sent |
+
+Next on this phase, in order: **#6 Langfuse env → OpenBao** (a real secret sitting in a plaintext file
+on disk, and the `native-basic` plan + broker already exist — only the population and the adapter read
+are missing), then **#7 Fleet token**, then **#5 SeaweedFS SigV4**.
