@@ -8,13 +8,26 @@
 import { readQualityRegression } from '@/lib/qa/quality-regression';
 import { planQualityAlerts, type QualityAlert } from '@/lib/qa/quality-alert-plan';
 import { listAlertState, saveAlertState } from '@/lib/qa/quality-alert-store';
-import { alertDestination, sendQualityAlert } from '@/lib/qa/quality-alert-dispatch';
+import {
+  type DestinationSource,
+  resolveDestination,
+  sendQualityAlert,
+} from '@/lib/qa/quality-alert-dispatch';
+import { getAlertDestination } from '@/lib/qa/quality-alert-destination-store';
 
 export interface AlertSweepResult {
   evaluated: number;
   alerts: QualityAlert[];
   delivered: number;
   configured: boolean;
+  /** Which destination was in force — so a caller can tell a console setting from the env fallback. */
+  source?: DestinationSource;
+}
+
+/** Resolve this org's destination: the console setting first, then the env fallback. */
+export async function resolveOrgDestination(orgId: string) {
+  const stored = await getAlertDestination(orgId);
+  return resolveDestination(stored ? { url: stored.url, enabled: stored.enabled } : null);
 }
 
 /**
@@ -29,24 +42,26 @@ export async function runQualityAlertSweep(
 ): Promise<AlertSweepResult> {
   const empty: AlertSweepResult = { evaluated: 0, alerts: [], delivered: 0, configured: false };
   try {
-    // Skip the whole read when the operator has not opted in — an unconfigured fleet should not pay
-    // a query per governed run for alerts nobody receives.
-    const configured = Boolean(alertDestination());
-    if (!configured) return empty;
+    // Skip the whole read when the operator has not opted in (or has paused alerts) — an
+    // unconfigured fleet should not pay a regression query per governed run for alerts nobody gets.
+    const destination = await resolveOrgDestination(orgId);
+    const configured = Boolean(destination.url);
+    if (!configured) return { ...empty, source: destination.source };
 
     const view = await readQualityRegression(orgId);
     const subjects = subjectId
       ? view.subjects.filter((s) => s.subjectId === subjectId)
       : view.subjects;
-    if (subjects.length === 0) return { ...empty, configured };
+    if (subjects.length === 0) return { ...empty, configured, source: destination.source };
 
     const prev = await listAlertState(orgId);
     const { alerts, next } = planQualityAlerts(prev, subjects);
-    if (alerts.length === 0) return { evaluated: subjects.length, alerts: [], delivered: 0, configured };
+    if (alerts.length === 0)
+      return { evaluated: subjects.length, alerts: [], delivered: 0, configured, source: destination.source };
 
     let delivered = 0;
     for (const alert of alerts) {
-      const res = await sendQualityAlert(alert, orgId);
+      const res = await sendQualityAlert(alert, orgId, destination.url);
       if (res.ok) delivered += 1;
     }
 
@@ -61,7 +76,7 @@ export async function runQualityAlertSweep(
       );
     }
 
-    return { evaluated: subjects.length, alerts, delivered, configured };
+    return { evaluated: subjects.length, alerts, delivered, configured, source: destination.source };
   } catch {
     return empty; // best-effort: alerting must never disturb the run that triggered it
   }

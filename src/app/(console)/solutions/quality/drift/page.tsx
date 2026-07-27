@@ -1,3 +1,4 @@
+import { AlertDestinationCard } from '@/components/drift/AlertDestinationCard';
 import { AnswerQualityCard } from '@/components/drift/AnswerQualityCard';
 import { DriftCatalog } from '@/components/drift/DriftCatalog';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,8 @@ import { describeDriftAttribution } from '@/lib/drift-run';
 import { listDriftRuns } from '@/lib/drift-runs';
 import { readDriftView, type DriftDisplayStatus } from '@/lib/drift-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { getAlertDestination } from '@/lib/qa/quality-alert-destination-store';
+import { resolveDestination } from '@/lib/qa/quality-alert-dispatch';
 import { readQualityRegression } from '@/lib/qa/quality-regression';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -32,6 +35,10 @@ export default async function QualityDriftPage() {
   const { data, error } = await readDriftView({ orgId });
   const retained = await listDriftRuns(10, orgId);
   const answerQuality = await readQualityRegression(orgId);
+  const alertDestinationRow = await getAlertDestination(orgId);
+  const activeDestination = resolveDestination(
+    alertDestinationRow ? { url: alertDestinationRow.url, enabled: alertDestinationRow.enabled } : null,
+  );
   const adapter = getDrift().meta;
   const engineStatus = {
     evidentlySelected: adapter.id === 'evidently',
@@ -103,6 +110,12 @@ export default async function QualityDriftPage() {
         </Card>
 
         <AnswerQualityCard view={answerQuality} />
+
+        <AlertDestinationCard
+          destination={alertDestinationRow}
+          activeSource={activeDestination.source}
+          paused={activeDestination.paused}
+        />
 
         <Card>
           <CardHeader>

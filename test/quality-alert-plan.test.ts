@@ -194,7 +194,7 @@ test('the payload carries the whole story and is deterministic for a fixed time'
 test('an unconfigured destination reports not-configured, never a fake success', () => {
   return (async () => {
     const [alert] = planQualityAlerts([], [verdict('app:kyc', 'regressed')], NOW).alerts;
-    const res = await sendQualityAlert(alert, 'default', () => new Date(NOW), {} as NodeJS.ProcessEnv);
+    const res = await sendQualityAlert(alert, 'default', null, () => new Date(NOW), {} as NodeJS.ProcessEnv);
 
     assert.equal(res.ok, false);
     assert.equal(res.configured, false);
@@ -209,6 +209,7 @@ test('a delivered alert is signed over exactly the bytes that were sent', async 
   const res = await sendQualityAlert(
     alert,
     'org_bharat',
+    null,
     () => new Date(NOW),
     {
       OFFGRID_QUALITY_ALERT_WEBHOOK: 'https://hooks.example.com/q',
@@ -245,16 +246,108 @@ test('a destination that rejects or is unreachable is reported honestly', async 
     OFFGRID_WEBHOOK_SECRET: 'test-secret',
   } as NodeJS.ProcessEnv;
 
-  const rejected = await sendQualityAlert(alert, 'default', () => new Date(NOW), env, (async () =>
+  const rejected = await sendQualityAlert(alert, 'default', null, () => new Date(NOW), env, (async () =>
     new Response('nope', { status: 500 })) as unknown as typeof fetch);
   assert.equal(rejected.ok, false);
   assert.equal(rejected.configured, true);
   assert.match(rejected.reason, /returned 500/);
 
-  const down = await sendQualityAlert(alert, 'default', () => new Date(NOW), env, (async () => {
+  const down = await sendQualityAlert(alert, 'default', null, () => new Date(NOW), env, (async () => {
     throw new Error('ECONNREFUSED');
   }) as unknown as typeof fetch);
   assert.equal(down.ok, false);
   assert.equal(down.configured, true);
   assert.match(down.reason, /unreachable/);
+});
+
+// ─── which destination wins (G-QUALITY-ALERT-DESTINATION) ─────────────────────────────────────────
+
+test('a console destination beats the server env var', async () => {
+  const { resolveDestination } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  const env = { OFFGRID_QUALITY_ALERT_WEBHOOK: 'https://env.example.com/q' } as NodeJS.ProcessEnv;
+
+  assert.deepEqual(resolveDestination({ url: 'https://console.example.com/q', enabled: true }, env), {
+    url: 'https://console.example.com/q',
+    source: 'console',
+    paused: false,
+  });
+});
+
+test('the env var still works for fleets configured before the console setting existed', async () => {
+  const { resolveDestination } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  const env = { OFFGRID_QUALITY_ALERT_WEBHOOK: 'https://env.example.com/q' } as NodeJS.ProcessEnv;
+
+  assert.deepEqual(resolveDestination(null, env), {
+    url: 'https://env.example.com/q',
+    source: 'env',
+    paused: false,
+  });
+});
+
+test('pausing in the console silences alerts even when the env var is set', async () => {
+  // Otherwise "pause" would appear to do nothing on a box that still has the env var configured —
+  // the operator would believe alerts were off while they kept being delivered.
+  const { resolveDestination } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  const env = { OFFGRID_QUALITY_ALERT_WEBHOOK: 'https://env.example.com/q' } as NodeJS.ProcessEnv;
+
+  assert.deepEqual(resolveDestination({ url: 'https://console.example.com/q', enabled: false }, env), {
+    url: null,
+    source: 'console',
+    paused: true,
+  });
+});
+
+test('nothing configured anywhere is reported as none, not as a silent success', async () => {
+  const { resolveDestination } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  assert.deepEqual(resolveDestination(null, {} as NodeJS.ProcessEnv), {
+    url: null,
+    source: 'none',
+    paused: false,
+  });
+});
+
+test('a stored destination that is not http(s) falls back rather than being trusted', async () => {
+  // A bad row (hand-edited, or written before validation) must never become an egress target.
+  const { resolveDestination } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  const env = { OFFGRID_QUALITY_ALERT_WEBHOOK: 'https://env.example.com/q' } as NodeJS.ProcessEnv;
+
+  assert.deepEqual(resolveDestination({ url: 'file:///etc/passwd', enabled: true }, env), {
+    url: 'https://env.example.com/q',
+    source: 'env',
+    paused: false,
+  });
+});
+
+test('one rule decides what a valid destination is, everywhere', async () => {
+  const { validAlertUrl } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  assert.equal(validAlertUrl('https://hooks.example.com/q'), 'https://hooks.example.com/q');
+  assert.equal(validAlertUrl('  http://127.0.0.1:9000/x  '), 'http://127.0.0.1:9000/x');
+  assert.equal(validAlertUrl('ftp://example.com'), null);
+  assert.equal(validAlertUrl('javascript:alert(1)'), null);
+  assert.equal(validAlertUrl(''), null);
+  assert.equal(validAlertUrl(null), null);
+  assert.equal(validAlertUrl(42), null);
+});
+
+test('an explicit destination overrides the env when sending', async () => {
+  const { sendQualityAlert } = await import('../src/lib/qa/quality-alert-dispatch.ts');
+  const [alert] = planQualityAlerts([], [verdict('app:kyc', 'regressed')], NOW).alerts;
+  let calledUrl = '';
+
+  await sendQualityAlert(
+    alert,
+    'default',
+    'https://console.example.com/q',
+    () => new Date(NOW),
+    {
+      OFFGRID_QUALITY_ALERT_WEBHOOK: 'https://env.example.com/q',
+      OFFGRID_WEBHOOK_SECRET: 's',
+    } as NodeJS.ProcessEnv,
+    (async (url: string) => {
+      calledUrl = String(url);
+      return new Response('{}', { status: 200 });
+    }) as unknown as typeof fetch,
+  );
+
+  assert.equal(calledUrl, 'https://console.example.com/q');
 });

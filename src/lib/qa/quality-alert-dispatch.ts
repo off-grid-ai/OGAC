@@ -50,10 +50,55 @@ export function buildQualityAlertPayload(
   };
 }
 
-/** The operator's destination for quality alerts. PURE — must be an explicit http(s) endpoint. */
-export function alertDestination(env: NodeJS.ProcessEnv = process.env): string | null {
-  const url = (env.OFFGRID_QUALITY_ALERT_WEBHOOK ?? '').trim();
+/**
+ * A usable alert destination, or null. PURE — the ONE rule for what counts as a valid destination,
+ * shared by the env fallback, the stored setting, and the route that validates operator input. Two
+ * copies of this check would eventually disagree about which URLs are acceptable.
+ *
+ * Only http(s) is accepted: the air-gap guarantee is that we POST exactly where the operator said,
+ * and nowhere a `file:`/`gopher:` style scheme could redirect us.
+ */
+export function validAlertUrl(value: unknown): string | null {
+  const url = typeof value === 'string' ? value.trim() : '';
   return /^https?:\/\/\S+$/i.test(url) ? url : null;
+}
+
+/** The env-configured fallback destination. PURE. */
+export function alertDestination(env: NodeJS.ProcessEnv = process.env): string | null {
+  return validAlertUrl(env.OFFGRID_QUALITY_ALERT_WEBHOOK);
+}
+
+/** Where a stored destination can come from, for reporting which one is in force. */
+export type DestinationSource = 'console' | 'env' | 'none';
+
+export interface ResolvedDestination {
+  url: string | null;
+  source: DestinationSource;
+  /** Set when a destination exists but the operator has paused it — not the same as unconfigured. */
+  paused: boolean;
+}
+
+/**
+ * Decide which destination wins. PURE.
+ *
+ * The console setting beats the env var so an operator can retarget alerts without shell access, and
+ * the env var remains a working fallback for fleets configured before this existed. A PAUSED console
+ * destination silences alerts outright rather than falling through to the env — otherwise pausing in
+ * the UI would appear to do nothing on a box that still has the env var set.
+ */
+export function resolveDestination(
+  stored: { url: string; enabled: boolean } | null,
+  env: NodeJS.ProcessEnv = process.env,
+): ResolvedDestination {
+  if (stored) {
+    const url = validAlertUrl(stored.url);
+    if (!stored.enabled) return { url: null, source: 'console', paused: true };
+    if (url) return { url, source: 'console', paused: false };
+  }
+  const fallback = alertDestination(env);
+  return fallback
+    ? { url: fallback, source: 'env', paused: false }
+    : { url: null, source: 'none', paused: false };
 }
 
 export interface AlertSendResult {
@@ -74,16 +119,19 @@ export interface AlertSendResult {
 export async function sendQualityAlert(
   alert: QualityAlert,
   orgId: string,
+  destination?: string | null,
   now: () => Date = () => new Date(),
   env: NodeJS.ProcessEnv = process.env,
   fetchImpl: typeof fetch = fetch,
 ): Promise<AlertSendResult> {
-  const url = alertDestination(env);
+  // An explicit destination (the console setting, resolved by the caller) wins; absent one, fall back
+  // to the env var so fleets configured before the console setting existed keep working.
+  const url = validAlertUrl(destination) ?? alertDestination(env);
   if (!url) {
     return {
       ok: false,
       configured: false,
-      reason: 'Quality alerts not configured — set OFFGRID_QUALITY_ALERT_WEBHOOK to an http(s) endpoint.',
+      reason: 'Quality alerts not configured — set a destination in the console (or OFFGRID_QUALITY_ALERT_WEBHOOK).',
     };
   }
   const secret = await resolveWebhookSecret(env);

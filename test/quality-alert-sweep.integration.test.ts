@@ -178,3 +178,60 @@ test(
     }
   },
 );
+
+test(
+  'the console destination is managed in the DB and wins over the env fallback',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async () => {
+    const {
+      deleteAlertDestination,
+      getAlertDestination,
+      setAlertDestination,
+    } = await import('@/lib/qa/quality-alert-destination-store');
+    const { resolveOrgDestination } = await import('@/lib/qa/quality-alert-run');
+
+    process.env.OFFGRID_QUALITY_ALERT_WEBHOOK = 'https://env-fallback.example.com/q';
+    try {
+      // Nothing stored yet ⇒ the env fallback is what is actually in force.
+      await deleteAlertDestination(ORG);
+      assert.equal(await getAlertDestination(ORG), null);
+      assert.deepEqual(await resolveOrgDestination(ORG), {
+        url: 'https://env-fallback.example.com/q',
+        source: 'env',
+        paused: false,
+      });
+
+      // Save one in the console: it takes over, and the write is attributed.
+      await setAlertDestination(ORG, 'https://console.example.com/q', true, 'ops@bank.example');
+      const saved = await getAlertDestination(ORG);
+      assert.equal(saved?.url, 'https://console.example.com/q');
+      assert.equal(saved?.enabled, true);
+      assert.equal(saved?.updatedBy, 'ops@bank.example');
+      assert.deepEqual(await resolveOrgDestination(ORG), {
+        url: 'https://console.example.com/q',
+        source: 'console',
+        paused: false,
+      });
+
+      // Pausing silences alerts even though the env var is still set on the box.
+      await setAlertDestination(ORG, 'https://console.example.com/q', false, 'ops@bank.example');
+      const paused = await resolveOrgDestination(ORG);
+      assert.equal(paused.url, null);
+      assert.equal(paused.paused, true);
+
+      // A paused destination makes the sweep inert rather than falling through to the env.
+      const { runQualityAlertSweep } = await import('@/lib/qa/quality-alert-run');
+      const swept = await runQualityAlertSweep(ORG, SUBJ);
+      assert.equal(swept.configured, false);
+      assert.equal(swept.delivered, 0);
+
+      // Removing it falls back to the env again — and removing twice is honest about finding nothing.
+      assert.equal(await deleteAlertDestination(ORG), true);
+      assert.equal(await deleteAlertDestination(ORG), false);
+      assert.equal((await resolveOrgDestination(ORG)).source, 'env');
+    } finally {
+      delete process.env.OFFGRID_QUALITY_ALERT_WEBHOOK;
+      await deleteAlertDestination(ORG).catch(() => {});
+    }
+  },
+);
