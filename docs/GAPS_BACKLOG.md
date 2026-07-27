@@ -1590,3 +1590,39 @@ while they kept being delivered.
   Save / Send test / Pause / Remove. An env-configured destination says so explicitly rather than
   showing a blank field that reads as "alerts are off".
 - Seeded test data removed afterwards; destinations and alert-state tables back to 0 rows.
+
+## G-GATEWAY-ATTR-SWEEP ✅ RESOLVED + fleet-verified (2026-07-27)
+
+Every inference a governed run makes is now attributed on the observability doc — org AND user.
+
+**The approach mattered more than the fix.** The obvious route was to add `orgId` to ten signatures
+(grounding, scoring, eval-runner ×2, ingest, chat-memory, app-compile, pipeline-execute-wiring, rag,
+org-knowledge, inference adapter), several of them port interfaces with multiple implementations.
+That was rejected once as too wide a change to public seams, and that rejection was right.
+
+The better seam already existed: all ten build their headers with `gatewayHeaders()`. Attribution is
+stamped THERE from an ambient run scope (`AsyncLocalStorage`, `src/lib/gateway-scope.ts`), opened once
+per run in `runAgent`, `runApp`, and the durable worker's `executeStepActivity` (which bypasses
+`runApp`, so it opens its own — otherwise a worker step would be attributed differently from an
+identical inline one). **Zero signature changes.**
+
+A second, separate defect at the producer: the aggregator derived `caller` from the `user-agent`
+header, which is `"node"` for every server-side fetch — so even once identity was sent, every user's
+spend collapsed into one bucket. It now prefers `x-offgrid-user`.
+
+**Verified live — the exact bar this gap specified ("EVERY resulting doc carries the run's org"):**
+
+| dimension | before | after |
+|---|---|---|
+| `by_caller` | `node=4` | **`service@offgrid.local=4`** |
+| `by_org` | `(unattributed)=3, default=1` | **`default=4`** |
+| audit row | `tok=— cost=—` | `tok=132 cost=0.000254` |
+
+The 4 docs include the two embedding calls (`all-MiniLM-L6-v2`, from `rag.ts` / `org-knowledge.ts`)
+that were previously unattributed — i.e. the fix reaches the deep, several-awaits-down calls that
+were the actual problem, not just the top-level completion.
+
+Tested properties: no scope ⇒ byte-identical to before; attribution survives awaits; **concurrent
+runs never cross-attribute** (one tenant's spend billed to another would be the worst failure here,
+so it has its own test); an explicit per-call attribution still wins; a nested scope merges rather
+than erasing; blank values stay honestly absent.
