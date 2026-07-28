@@ -1676,3 +1676,33 @@ now"), this is **not-applicable until MDM is wanted**, not an open engineering g
 To activate later: log into FleetDM → create an API-only user → copy its token → save it in
 Governance → service credentials (or `PUT` the route above). The inventory endpoint will flip
 `fleet` from `source:none` to `source:vault`.
+
+## Phase 4.10-B #5 — SeaweedFS SigV4: CODE COMPLETE, awaiting a server-side flip (2026-07-27)
+
+Probed rather than assumed, and the roadmap was **pessimistic**: the SigV4 code already exists and is
+tested. `src/lib/s3-sigv4.ts:signS3Request` is a real AWS-SigV4 signer with a deterministic-clock unit
+test (`test/adapter-auth-selection.test.ts`), and `adapters/s3-object-store.ts` signs every request
+whenever the broker returns an `s3` credential — falling through to an unsigned call only when it
+resolves `none`. `src/lib/files.ts` uses the same signer.
+
+So there is **no console-side work left**:
+- signer — done and tested
+- broker plan (`seaweedfs: 's3'`) — done
+- provisioning of the keypair into OpenBao — shipped with Phase 4.10-B #6
+  (`PUT /api/v1/admin/services/credentials {service:"seaweedfs", publicKey, secretKey}`)
+
+What remains is one **infrastructure** step: SeaweedFS itself must be given a matching
+`identities.json` (it currently accepts anonymous S3 on the loopback — `:8333` answers 200 with no
+credentials), and the same keypair stored in OpenBao. The instant both exist, every object call is
+signed with no code change.
+
+**Deliberately NOT flipped in this session, and the reason matters:** it is a live change to the
+object store that the proven object round-trip depends on, and the only route to the box right now is
+a cloudflared tunnel that is dropping large transfers (`rsync failed after 5 attempts`). Making an
+auth-breaking infra change over a connection too degraded to reliably roll back is how a demo box
+becomes an outage. It also sits on a deployment whose stated threat model is "SSH is the only risk",
+so it is hardening rather than a live exposure.
+
+To activate: generate a keypair → add it to SeaweedFS `identities.json` and restart the container →
+store the same pair via the credentials route → confirm `source` flips to `vault` and re-run the
+object round-trip.
