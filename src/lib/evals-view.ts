@@ -84,16 +84,19 @@ function rate(passed: number, total: number): number {
 // Passed is capped at total so a malformed record (passed > total) can't produce a negative failed
 // count or a pass-rate over 100%.
 function normalizeRun(raw: RawEvalRun): EvalRunView {
-  const total = nonNegInt(raw?.total);
-  const passed = Math.min(nonNegInt(raw?.passed), total);
+  // One guarded read instead of six `raw?.` chains.
+  const { id, engine, score, total: rawTotal, passed: rawPassed, startedAt } = raw ?? {};
+  const total = nonNegInt(rawTotal);
+  // A row claiming more passes than cases is corrupt; clamp rather than report >100%.
+  const passed = Math.min(nonNegInt(rawPassed), total);
   return {
-    id: str(raw?.id) ?? '(unknown)',
-    engine: str(raw?.engine) ?? DEFAULT_SUITE,
-    score: clampScore(raw?.score),
+    id: str(id) ?? '(unknown)',
+    engine: str(engine) ?? DEFAULT_SUITE,
+    score: clampScore(score),
     total,
     passed,
     failed: total - passed,
-    startedAt: str(raw?.startedAt),
+    startedAt: str(startedAt),
   };
 }
 
@@ -112,35 +115,42 @@ export interface NormalizeEvalsInput {
 
 // Normalize raw eval-run + golden-case records into the clean display model. Never throws — any
 // missing or malformed field degrades to a safe default rather than crashing the read-back page.
-export function normalizeEvals(input: NormalizeEvalsInput | null | undefined): EvalsView {
-  const src = input ?? {};
-  const runs = (Array.isArray(src.runs) ? src.runs : []).map(normalizeRun).sort(byStartedDesc);
-
-  // Per-suite rollup, keyed by engine. Insertion order follows recentRuns (already newest-first),
-  // so the resulting suites list is most-recently-run first.
-  const suiteMap = new Map<string, SuiteRollup>();
+/**
+ * Per-suite rollup, keyed by engine. PURE.
+ *
+ * Insertion order follows `runs` (already newest-first), so the suites list comes out
+ * most-recently-run first without a second sort.
+ */
+function rollupSuites(runs: EvalRunView[]): SuiteRollup[] {
+  const bySuite = new Map<string, SuiteRollup>();
   for (const r of runs) {
-    let s = suiteMap.get(r.engine);
-    if (!s) {
-      s = {
-        engine: r.engine,
-        runs: 0,
-        total: 0,
-        passed: 0,
-        failed: 0,
-        passRate: 0,
-        lastRun: null,
-      };
-      suiteMap.set(r.engine, s);
-    }
+    const s = bySuite.get(r.engine) ?? {
+      engine: r.engine,
+      runs: 0,
+      total: 0,
+      passed: 0,
+      failed: 0,
+      passRate: 0,
+      lastRun: null,
+    };
     s.runs += 1;
     s.total += r.total;
     s.passed += r.passed;
     s.failed += r.failed;
+    // A run with no timestamp must not become the "last run" — unknown is not recent.
     if (r.startedAt && (s.lastRun === null || r.startedAt > s.lastRun)) s.lastRun = r.startedAt;
+    bySuite.set(r.engine, s);
   }
-  const suites = [...suiteMap.values()];
+  const suites = [...bySuite.values()];
   for (const s of suites) s.passRate = rate(s.passed, s.total);
+  return suites;
+}
+
+export function normalizeEvals(input: NormalizeEvalsInput | null | undefined): EvalsView {
+  const src = input ?? {};
+  const runs = (Array.isArray(src.runs) ? src.runs : []).map(normalizeRun).sort(byStartedDesc);
+
+  const suites = rollupSuites(runs);
 
   const cases = runs.reduce((n, r) => n + r.total, 0);
   const passed = runs.reduce((n, r) => n + r.passed, 0);

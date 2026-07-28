@@ -234,9 +234,7 @@ export async function updateEvalDef(
 export async function deleteEvalDef(id: string, orgId?: string): Promise<void> {
   await ensureEvalDefsSchema();
   if (orgId !== undefined) {
-    await db.execute(
-      sql`DELETE FROM eval_definitions WHERE id = ${id} AND org_id = ${orgId};`,
-    );
+    await db.execute(sql`DELETE FROM eval_definitions WHERE id = ${id} AND org_id = ${orgId};`);
     return;
   }
   await db.execute(sql`DELETE FROM eval_definitions WHERE id = ${id};`);

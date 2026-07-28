@@ -15,25 +15,40 @@ function fallbackModel(): string {
   return process.env.OFFGRID_EVAL_MODEL?.trim() || 'gemma-4-e4b';
 }
 
+interface JudgeChain {
+  agent: { id: string; pipelineId: string | null } | null;
+  pipeline: { id: string; gatewayId: string | null; defaultModel: string | null } | null;
+  gateway: { id: string; defaultModel: string | null } | null;
+}
+
+const EMPTY_CHAIN: JudgeChain = { agent: null, pipeline: null, gateway: null };
+
+/** Walk agent → pipeline → gateway, stopping at the first link that is not wired. */
+async function loadJudgeChain(orgId: string): Promise<JudgeChain> {
+  const agent = (await getCustomAgent(judgeAgentId(orgId), orgId)) ?? null;
+  const pipeline = agent?.pipelineId ? await getPipeline(agent.pipelineId, orgId) : null;
+  const gateway = pipeline?.gatewayId ? await getGatewayRow(pipeline.gatewayId, orgId) : null;
+  // Project each row onto the minimal shape the pure resolver needs — it must not depend on the
+  // full DB row types, so a schema change cannot reach the routing rule.
+  return {
+    agent: pick(agent, (a) => ({ id: a.id, pipelineId: a.pipelineId })),
+    pipeline: pick(pipeline, (pl) => ({
+      id: pl.id,
+      gatewayId: pl.gatewayId,
+      defaultModel: pl.defaultModel,
+    })),
+    gateway: pick(gateway, (gw) => ({ id: gw.id, defaultModel: gw.defaultModel })),
+  };
+}
+
+/** Project a maybe-row onto a smaller shape, preserving "absent" as null. */
+function pick<T, R>(row: T | null | undefined, onto: (row: T) => R): R | null {
+  return row ? onto(row) : null;
+}
+
 export async function loadJudgeRouting(orgId: string): Promise<JudgeRouting> {
-  try {
-    const agent = (await getCustomAgent(judgeAgentId(orgId), orgId)) ?? null;
-    const pipeline = agent?.pipelineId ? await getPipeline(agent.pipelineId, orgId) : null;
-    const gateway = pipeline?.gatewayId ? await getGatewayRow(pipeline.gatewayId, orgId) : null;
-    return resolveJudgeRouting({
-      agent: agent ? { id: agent.id, pipelineId: agent.pipelineId } : null,
-      pipeline: pipeline
-        ? { id: pipeline.id, gatewayId: pipeline.gatewayId, defaultModel: pipeline.defaultModel }
-        : null,
-      gateway: gateway ? { id: gateway.id, defaultModel: gateway.defaultModel } : null,
-      fallbackModel: fallbackModel(),
-    });
-  } catch {
-    return resolveJudgeRouting({
-      agent: null,
-      pipeline: null,
-      gateway: null,
-      fallbackModel: fallbackModel(),
-    });
-  }
+  // An unreachable DB yields an EMPTY chain, not a thrown error: resolveJudgeRouting then returns the
+  // honest bootstrap fallback, so the judge still runs and says its chain is unwired.
+  const chain = await loadJudgeChain(orgId).catch(() => EMPTY_CHAIN);
+  return resolveJudgeRouting({ ...chain, fallbackModel: fallbackModel() });
 }

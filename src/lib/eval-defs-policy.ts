@@ -28,9 +28,7 @@ export interface EvalDefDraft {
   description: string;
 }
 
-export type EvalDefValidation =
-  | { ok: true; value: EvalDefDraft }
-  | { ok: false; error: string };
+export type EvalDefValidation = { ok: true; value: EvalDefDraft } | { ok: false; error: string };
 
 const ENGINES = new Set<EvalEngine>([
   'ragas',
@@ -137,12 +135,27 @@ export function validateEvalDef(input: EvalDefInput | null | undefined): EvalDef
   if (!identity.ok) return identity;
   const { name, templateId, tpl, metric } = identity.value;
   // Destructure the template's defaults once; four separate `tpl?.x` reads say the same thing.
-  const { engine: tplEngine, direction: tplDir, defaultThreshold, description: tplDesc } = tpl ?? {};
+  const {
+    engine: tplEngine,
+    direction: tplDir,
+    defaultThreshold,
+    description: tplDesc,
+  } = tpl ?? {};
 
-  const engine = pickEnum<EvalEngine>(trimStr(src.engine).toLowerCase(), tplEngine, ENGINES, 'engine');
+  const engine = pickEnum<EvalEngine>(
+    trimStr(src.engine).toLowerCase(),
+    tplEngine,
+    ENGINES,
+    'engine',
+  );
   if (!engine.ok) return engine;
 
-  const direction = pickEnum<MetricDirection>(trimStr(src.direction), tplDir, DIRECTIONS, 'direction');
+  const direction = pickEnum<MetricDirection>(
+    trimStr(src.direction),
+    tplDir,
+    DIRECTIONS,
+    'direction',
+  );
   if (!direction.ok) return direction;
 
   const threshold = resolveThreshold(src.threshold, defaultThreshold);

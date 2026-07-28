@@ -19,12 +19,7 @@
 //               through the gateway; degrades to the first-party heuristic when no gateway/judge.
 //   heuristic — first-party, always-on in-process scorer (no external dependency)
 export type EvalEngine =
-  | 'ragas'
-  | 'evidently'
-  | 'guardrails'
-  | 'presidio'
-  | 'deepeval'
-  | 'heuristic';
+  'ragas' | 'evidently' | 'guardrails' | 'presidio' | 'deepeval' | 'heuristic';
 
 // How the metric reads. `higher-better` (relevancy, faithfulness) passes when score ≥ threshold;
 // `lower-better` (toxicity, bias, PII leakage) passes when score ≤ threshold.
@@ -256,7 +251,8 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Across a multi-turn chat, does the assistant remember what the user already told it — or ask for the same thing twice?',
     metric: 'knowledge_retention',
-    method: 'Knowledge-retention judge over the turn history (falls back to a repetition heuristic)',
+    method:
+      'Knowledge-retention judge over the turn history (falls back to a repetition heuristic)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -305,7 +301,8 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Did the agent call the RIGHT tools (and only those), versus the tools it was expected to use?',
     metric: 'tool_correctness',
-    method: 'Tool-correctness — called vs expected tools (exact F1, deterministic when a tool trace is present)',
+    method:
+      'Tool-correctness — called vs expected tools (exact F1, deterministic when a tool trace is present)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.8,
@@ -355,7 +352,8 @@ export const EVAL_TEMPLATES: readonly EvalTemplate[] = [
     description:
       'Write your own pass rule in plain English — e.g. “Does the answer cite a policy doc and stay under 200 words?” — and an LLM judge scores every answer against it. No metric to pick.',
     metric: 'g_eval',
-    method: 'Custom rubric — chain-of-thought LLM-as-judge over your criteria, scored via the gateway (needs a gateway judge; no honest score without one)',
+    method:
+      'Custom rubric — chain-of-thought LLM-as-judge over your criteria, scored via the gateway (needs a gateway judge; no honest score without one)',
     engine: 'deepeval',
     direction: 'higher-better',
     defaultThreshold: 0.7,
@@ -389,68 +387,75 @@ export interface EngineEnv {
 // presidio/guardrails → degrade to a first-party fallback, so "available" is true but detail names
 //   the upgrade; the *degraded* flag tells the UI to say "heuristic fallback".
 // ragas/evidently → require their sidecar URL; unavailable (with the env var) when unset.
+/**
+ * How each engine reports itself, as data.
+ *
+ * The distinction the table makes explicit — and which a switch buried — is between an engine that
+ * becomes UNAVAILABLE without its service (ragas, evidently: there is no offline substitute for a
+ * retrieval-quality or drift computation) and one that DEGRADES to a first-party fallback but still
+ * runs (presidio, guardrails, deepeval). Reporting the second as unavailable would hide working
+ * capability; reporting the first as available would promise a score we cannot produce.
+ */
+interface EngineSpec {
+  /** The configured service URL, if this engine needs one. Absent ⇒ always available. */
+  url?: (env: EngineEnv) => string | undefined;
+  whenConfigured: string;
+  whenMissing: string;
+  /** true ⇒ still runs without the service, on the first-party fallback. */
+  degradesGracefully?: boolean;
+}
+
+const ENGINE_SPECS: Record<EvalEngine, EngineSpec> = {
+  heuristic: { whenConfigured: 'First-party, always on (in-process).', whenMissing: '' },
+  ragas: {
+    url: (e) => e.ragasUrl,
+    whenConfigured: 'Retrieval-quality scorer configured.',
+    whenMissing:
+      'Set OFFGRID_RAGAS_URL (compose `qa` profile) to compute real retrieval-quality metrics.',
+  },
+  evidently: {
+    url: (e) => e.evidentlyUrl,
+    whenConfigured: 'Drift/quality collector configured.',
+    whenMissing: 'Set OFFGRID_EVIDENTLY_URL to run drift/quality suites.',
+  },
+  presidio: {
+    url: (e) => e.presidioUrl,
+    whenConfigured: 'PII detector configured.',
+    whenMissing: 'PII detector not configured — using the first-party regex PII scan (degraded).',
+    degradesGracefully: true,
+  },
+  guardrails: {
+    url: (e) => e.guardrailsUrl,
+    whenConfigured: 'Content validators configured.',
+    whenMissing:
+      'Content-validation service not configured — using the first-party heuristic (degraded).',
+    degradesGracefully: true,
+  },
+  // LLM-as-judge metrics scored through the gateway. Without one they degrade to the first-party
+  // heuristic; custom criteria have no heuristic, and the runner reports that honestly per-run.
+  deepeval: {
+    url: (e) => e.gatewayUrl,
+    whenConfigured: 'AI judge runs via the configured gateway.',
+    whenMissing:
+      'No gateway judge configured — using the first-party heuristic (degraded). Custom criteria need a gateway judge.',
+    degradesGracefully: true,
+  },
+};
+
 export function engineAvailability(engine: EvalEngine, env: EngineEnv): EngineAvailability {
-  switch (engine) {
-    case 'heuristic':
-      return { engine, available: true, detail: 'First-party, always on (in-process).' };
-    case 'ragas':
-      return env.ragasUrl
-        ? { engine, available: true, detail: 'Retrieval-quality scorer configured.' }
-        : {
-            engine,
-            available: false,
-            detail:
-              'Set OFFGRID_RAGAS_URL (compose `qa` profile) to compute real retrieval-quality metrics.',
-          };
-    case 'evidently':
-      return env.evidentlyUrl
-        ? { engine, available: true, detail: 'Drift/quality collector configured.' }
-        : {
-            engine,
-            available: false,
-            detail: 'Set OFFGRID_EVIDENTLY_URL to run drift/quality suites.',
-          };
-    case 'presidio':
-      return env.presidioUrl
-        ? { engine, available: true, detail: 'PII detector configured.' }
-        : {
-            engine,
-            available: true,
-            detail: 'PII detector not configured — using the first-party regex PII scan (degraded).',
-          };
-    case 'guardrails':
-      return env.guardrailsUrl
-        ? { engine, available: true, detail: 'Content validators configured.' }
-        : {
-            engine,
-            available: true,
-            detail:
-              'Content-validation service not configured — using the first-party heuristic (degraded).',
-          };
-    case 'deepeval':
-      // LLM-as-judge metrics scored through the gateway. With a gateway configured the judge runs
-      // for real; without one they degrade to the first-party heuristic. (Custom criteria have no
-      // heuristic — the runner reports "needs a gateway" honestly per-run.)
-      return env.gatewayUrl
-        ? { engine, available: true, detail: 'AI judge runs via the configured gateway.' }
-        : {
-            engine,
-            available: true,
-            detail:
-              'No gateway judge configured — using the first-party heuristic (degraded). Custom criteria need a gateway judge.',
-          };
-  }
+  const spec = ENGINE_SPECS[engine];
+  if (!spec.url) return { engine, available: true, detail: spec.whenConfigured };
+  if (spec.url(env)) return { engine, available: true, detail: spec.whenConfigured };
+  return { engine, available: spec.degradesGracefully === true, detail: spec.whenMissing };
 }
 
 // True when the engine, though "available", is running a degraded first-party fallback rather than
 // the named external tool. Drives the honest "heuristic fallback" badge in the UI.
 export function isDegraded(engine: EvalEngine, env: EngineEnv): boolean {
-  const a = engineAvailability(engine, env);
-  if (!a.available) return false; // unavailable is a separate state, not "degraded"
-  if (engine === 'presidio') return !env.presidioUrl;
-  if (engine === 'guardrails') return !env.guardrailsUrl;
-  if (engine === 'deepeval') return !env.gatewayUrl;
-  return false;
+  if (!engineAvailability(engine, env).available) return false; // unavailable ≠ degraded
+  const spec = ENGINE_SPECS[engine];
+  // Degraded = it runs, but on the first-party fallback because its service is absent.
+  return spec.degradesGracefully === true && !spec.url?.(env);
 }
 
 export function getTemplate(id: string): EvalTemplate | undefined {

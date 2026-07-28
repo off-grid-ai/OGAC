@@ -8,12 +8,7 @@ import {
   type GEvalResult,
 } from '@/lib/eval-geval';
 import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
-import {
-  heuristicScore,
-  rollupMetrics,
-  scoreMetric,
-  type MetricScore,
-} from '@/lib/eval-metrics';
+import { heuristicScore, rollupMetrics, scoreMetric, type MetricScore } from '@/lib/eval-metrics';
 import { capEvalSamples } from '@/lib/eval-sampling';
 import type { EvalEngine } from '@/lib/eval-templates';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
@@ -40,7 +35,11 @@ interface Sample {
   groundTruth: string;
 }
 
-async function generateAnswer(question: string, contexts: string[], model: string): Promise<string> {
+async function generateAnswer(
+  question: string,
+  contexts: string[],
+  model: string,
+): Promise<string> {
   const ctx = contexts.map((c, i) => `[${i + 1}] ${c}`).join('\n');
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: 'POST',
@@ -141,7 +140,9 @@ function gatewayJudgeConfigured(): boolean {
 // text it returns a `parsed:false` result so the caller records no score and surfaces the reason.
 async function gEvalJudge(criteria: string, s: Sample, model: string): Promise<GEvalResult> {
   if (!gatewayJudgeConfigured()) {
-    return gEvalUnavailable('No gateway judge configured (set OFFGRID_GATEWAY_URL) — G-Eval needs one.');
+    return gEvalUnavailable(
+      'No gateway judge configured (set OFFGRID_GATEWAY_URL) — G-Eval needs one.',
+    );
   }
   const prompt = buildGEvalPrompt(criteria, {
     question: s.question,
@@ -211,7 +212,9 @@ export async function runEvalDef(
   const computedBy: EvalEngine | 'heuristic' = aggregate === undefined ? 'heuristic' : 'ragas';
   const scored =
     aggregate === undefined
-      ? samples.map((sample) => scoreMetric(tpl, heuristicSampleScore(def.metric, sample), 'heuristic', def.threshold))
+      ? samples.map((sample) =>
+          scoreMetric(tpl, heuristicSampleScore(def.metric, sample), 'heuristic', def.threshold),
+        )
       : [scoreMetric(tpl, aggregate, 'ragas', def.threshold)];
 
   return persistRun(def, [...perSample, ...scored], computedBy, orgId);

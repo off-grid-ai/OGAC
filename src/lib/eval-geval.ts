@@ -77,21 +77,28 @@ function normalize(raw: number): number {
 // Parse the judge's raw text. Prefers the explicit "SCORE: n" line; falls back to the last integer
 // 1..5 that appears in the text. Returns parsed:false when no integer verdict is present, so the
 // runner degrades honestly rather than inventing a number.
+/**
+ * The 1–5 the judge gave, or null. PURE.
+ *
+ * A labelled "SCORE: 4" wins outright. Only if there is no label do we fall back to the LAST
+ * standalone 1–5 in the text — last, because a judge that reasons before answering ("a 2 would be
+ * harsh… I'll say 4") states its verdict at the end.
+ */
+function findScore(t: string): number | null {
+  const labeled = /SCORE\s*[:=]?\s*([1-5])(?:\s*\/\s*5)?/i.exec(t);
+  if (labeled) return Number(labeled[1]);
+  const nums = t.match(/\b([1-5])\b/g);
+  return nums?.length ? Number(nums.at(-1)) : null;
+}
+
 export function parseGEvalScore(text: string): GEvalResult {
   const t = (text ?? '').trim();
   if (!t) return { score: 0, raw: null, rationale: '', parsed: false };
 
-  let raw: number | null = null;
-  const labeled = /SCORE\s*[:=]?\s*([1-5])(?:\s*\/\s*5)?/i.exec(t);
-  if (labeled) {
-    raw = Number(labeled[1]);
-  } else {
-    // Fallback: the last standalone 1..5 integer anywhere in the text.
-    const nums = t.match(/\b([1-5])\b/g);
-    if (nums && nums.length > 0) raw = Number(nums.at(-1));
-  }
-
-  if (raw === null || !Number.isFinite(raw)) {
+  const raw = findScore(t);
+  if (raw === null) {
+    // Unparseable is reported as parsed:false with the model's own words as the rationale — the
+    // caller records NO score rather than a fabricated one.
     return { score: 0, raw: null, rationale: t.slice(0, 500), parsed: false };
   }
 

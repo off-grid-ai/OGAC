@@ -20,8 +20,7 @@ export interface GoldenCaseDraft {
 }
 
 export type GoldenCaseValidation =
-  | { ok: true; value: GoldenCaseDraft }
-  | { ok: false; error: string };
+  { ok: true; value: GoldenCaseDraft } | { ok: false; error: string };
 
 // The engines a run may target — mirrors the registered EVALS_PORTS ids. A golden case's `suite`
 // is free-form (which suite it belongs to), but a RUN must name one of these evaluators.
@@ -37,7 +36,9 @@ function trimStr(v: unknown): string {
 // Validate + normalize a golden-case create/update payload. Query and expected are required;
 // name defaults to the query; suite defaults to `golden`. Never throws — returns a discriminated
 // result the thin route maps to a 400 or a store write.
-export function validateGoldenCase(input: GoldenCaseInput | null | undefined): GoldenCaseValidation {
+export function validateGoldenCase(
+  input: GoldenCaseInput | null | undefined,
+): GoldenCaseValidation {
   const src = input ?? {};
   const query = trimStr(src.query);
   const expected = trimStr(src.expected);

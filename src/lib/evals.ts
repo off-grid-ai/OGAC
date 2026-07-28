@@ -99,7 +99,9 @@ export async function ensureEvalsSchema(): Promise<void> {
     await db.execute(
       sql`ALTER TABLE golden_cases ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';`,
     );
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS golden_cases_app_idx ON golden_cases (app_id);`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS golden_cases_app_idx ON golden_cases (app_id);`,
+    );
     await db.execute(
       sql`CREATE INDEX IF NOT EXISTS golden_cases_pipeline_idx ON golden_cases (pipeline_id);`,
     );

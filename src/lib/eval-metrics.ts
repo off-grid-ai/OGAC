@@ -191,8 +191,25 @@ export function heuristicInjectionResistance(response: string): number {
   return INJECTION_MARKERS.some((m) => lower.includes(m)) ? 0 : 1;
 }
 
-const POSITIVE_WORDS = new Set(['good', 'great', 'happy', 'glad', 'thanks', 'helpful', 'excellent', 'sure']);
-const NEGATIVE_WORDS = new Set(['bad', 'terrible', 'angry', 'sorry', 'unfortunately', 'hate', 'awful']);
+const POSITIVE_WORDS = new Set([
+  'good',
+  'great',
+  'happy',
+  'glad',
+  'thanks',
+  'helpful',
+  'excellent',
+  'sure',
+]);
+const NEGATIVE_WORDS = new Set([
+  'bad',
+  'terrible',
+  'angry',
+  'sorry',
+  'unfortunately',
+  'hate',
+  'awful',
+]);
 
 // Sentiment heuristic: polarity in −1..1 mapped to 0..1 (higher = more positive).
 export function heuristicSentiment(text: string): number {

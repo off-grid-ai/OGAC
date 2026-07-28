@@ -86,7 +86,17 @@ export interface RagasAttributionView {
  * every field defensively so a legacy/foreign run row (no attribution, or a different engine's) can
  * never throw in the UI; unknown/missing fields degrade to empty rather than crashing the page.
  */
-export function describeRagasAttribution(attr: Record<string, unknown> | null | undefined): RagasAttributionView | null {
+/** A string field with a fallback for anything that is not one. */
+const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
+/** A string field that must be null rather than '' when absent — an id is either known or unknown. */
+const idOrNull = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+/** Only the real strings out of a maybe-array; anything else contributes nothing. */
+const stringList = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+
+export function describeRagasAttribution(
+  attr: Record<string, unknown> | null | undefined,
+): RagasAttributionView | null {
   if (!attr || typeof attr !== 'object') return null;
   const judge = (attr.judge ?? {}) as Record<string, unknown>;
   const returned = (attr.returned ?? {}) as Record<string, unknown>;
@@ -94,8 +104,7 @@ export function describeRagasAttribution(attr: Record<string, unknown> | null | 
     name: m,
     pct: Math.round((returned[m] as number) * 100),
   }));
-  const omitted = Array.isArray(attr.omitted) ? attr.omitted.filter((x): x is string => typeof x === 'string') : [];
-  const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
+  const omitted = stringList(attr.omitted);
   return {
     engine: str(attr.engine, 'ragas'),
     sidecarService: str(attr.sidecarService, '—'),
@@ -103,9 +112,9 @@ export function describeRagasAttribution(attr: Record<string, unknown> | null | 
     judgeModel: str(judge.model, '—'),
     judgeConformant: judge.conformant === true,
     judgeAttribution: str(judge.attribution),
-    agentId: typeof judge.agentId === 'string' ? judge.agentId : null,
-    pipelineId: typeof judge.pipelineId === 'string' ? judge.pipelineId : null,
-    gatewayId: typeof judge.gatewayId === 'string' ? judge.gatewayId : null,
+    agentId: idOrNull(judge.agentId),
+    pipelineId: idOrNull(judge.pipelineId),
+    gatewayId: idOrNull(judge.gatewayId),
     metrics,
     omitted,
     engineProven: attr.engineProven === true,
@@ -118,7 +127,11 @@ export function describeRagasAttribution(attr: Record<string, unknown> | null | 
  * Aggregate a Ragas run into a 0..100 score. PURE. Prefers the returned metrics' mean (the real
  * engine signal); falls back to the retrieval pass-rate only when the sidecar returned nothing.
  */
-export function ragasScore(returned: Record<string, number>, passed: number, total: number): number {
+export function ragasScore(
+  returned: Record<string, number>,
+  passed: number,
+  total: number,
+): number {
   const vals = Object.values(returned).filter(isFinite01);
   if (vals.length > 0) {
     return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100);
