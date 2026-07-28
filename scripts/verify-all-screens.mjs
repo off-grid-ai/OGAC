@@ -94,7 +94,7 @@ await page.getByRole('button', { name: /^sign in$/i }).click();
 await page.waitForURL((u) => !u.pathname.startsWith('/signin'), { timeout: 30000 }).catch(() => {});
 
 const report = [];
-console.log('verdict\tstatus\troute\tchars\th1');
+console.log('verdict\tstatus\troute\tmainChars\th1');
 
 for (const route of routes) {
   const name = route.replace(/^\//, '').replace(/\//g, '_') || 'root';
@@ -104,6 +104,7 @@ for (const route of routes) {
   api4xx = [];
   let status = 0;
   let text = '';
+  let mainText = '';
   let h1 = '';
   let landed = route;
   try {
@@ -117,6 +118,11 @@ for (const route of routes) {
     await page.waitForTimeout(WAIT);
     landed = new URL(page.url()).pathname;
     text = await page.locator('body').innerText().catch(() => '');
+    // The THIN verdict has to be measured on the CONTENT, not on the document. Every authenticated
+    // console screen paints ~545 characters of chrome (demo banner + sidebar nav + header), so a screen
+    // that rendered literally nothing still reports ~700 body chars and the old `chars < 220` rule could
+    // never fire — /operations/health/metrics/alerts read 760 body chars for 215 chars of content.
+    mainText = (await page.locator('main').first().innerText().catch(() => '')) || '';
     // ':visible' matters: the small-screen gate ("Open this on a bigger screen") is an h1 that is
     // display:none at 1440px, yet innerText on a hidden node still returns its text — so a plain
     // locator('h1') reports a heading the operator cannot see, and the THIN rule below (which trusts
@@ -130,6 +136,7 @@ for (const route of routes) {
   }
 
   const chars = text.replace(/\s+/g, ' ').trim().length;
+  const mainChars = mainText.replace(/\s+/g, ' ').trim().length;
   const failMatch = FAIL_TEXT.exec(text);
   const reasons = [];
   if (status >= 400) reasons.push(`http ${status}`);
@@ -144,27 +151,31 @@ for (const route of routes) {
   }
 
   let verdict = reasons.length ? 'BROKEN' : 'OK';
-  // Rendered, no errors, but essentially nothing painted: a real surface for a demo needs content.
-  if (verdict === 'OK' && chars < 220 && !h1) verdict = 'THIN';
+  // Rendered, no errors, but essentially nothing painted INSIDE <main>: a heading and a one-line blurb
+  // and then nothing is not a surface anyone can be shown. 200 chars is about "title + subtitle only" —
+  // the emptiest screen that still has real structure (an all-zero metrics panel) measures ~215.
+  if (verdict === 'OK' && mainChars < 200) verdict = 'THIN';
 
   report.push({
     route,
     verdict,
     status,
     chars,
+    mainChars,
+    mainText: mainChars < 400 ? mainText.replace(/\s+/g, ' ').trim() : undefined,
     h1: h1.slice(0, 60),
     reason: reasons.join(' | ') || undefined,
     landed,
     api4xx: api4xx.length ? [...new Set(api4xx)].slice(0, 6) : undefined,
     aborted: aborted.length ? [...new Set(aborted)].slice(0, 6) : undefined,
   });
-  console.log(`${verdict}\t${status}\t${route}\t${chars}\t${(h1 || '').slice(0, 42)}${reasons.length ? '\t' + reasons.join(' | ') : ''}`);
+  console.log(`${verdict}\t${status}\t${route}\t${mainChars}\t${(h1 || '').slice(0, 42)}${reasons.length ? '\t' + reasons.join(' | ') : ''}`);
 }
 
 writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 2));
 const by = (v) => report.filter((r) => r.verdict === v);
 console.log(`\n── ${report.length} screens: ${by('OK').length} OK · ${by('THIN').length} THIN · ${by('BROKEN').length} BROKEN`);
 for (const r of by('BROKEN')) console.log(`BROKEN ${r.route} — ${r.reason}`);
-for (const r of by('THIN')) console.log(`THIN   ${r.route} — ${r.chars} chars`);
+for (const r of by('THIN')) console.log(`THIN   ${r.route} — ${r.mainChars} chars in <main>: ${r.mainText || ''}`);
 
 await browser.close();
