@@ -52,6 +52,21 @@ export const DEMO_TENANTS: readonly DemoTenant[] = [
 ];
 
 /**
+ * The demo tenants to offer as destinations on a SIGNIN page, given that page's tenant slug.
+ *
+ * On a tenant's own host the visitor has already arrived at the console they want and their read-only
+ * creds are shown instead, so offering to send them elsewhere is noise. On the apex host there is no
+ * tenant to sign in to, and a visitor who lands there has no way to reach either demo -  which is the
+ * gap this closes. Every href is re-validated, so a rotted entry is dropped rather than rendered.
+ */
+export function signinDemoTenants(
+  tenantSlug: string | null | undefined,
+): readonly DemoTenant[] {
+  if (tenantSlug) return [];
+  return DEMO_TENANTS.filter((t) => demoTenantHref(t.href) !== null);
+}
+
+/**
  * Guards a demo href before it is rendered as a link: it must be an absolute https URL on the
  * getoffgridai.co domain. A malformed or foreign URL returns null (the caller renders nothing)
  * rather than shipping a broken or off-domain link.

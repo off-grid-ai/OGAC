@@ -12,9 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { readSigninDemoBanner } from '@/lib/demo-hellobar';
+import { signinDemoTenants } from '@/lib/demo-tenants';
 import { tenantSlugFromHost } from '@/lib/route-access';
 import { SigninDemoBanner } from './SigninDemoBanner';
 import { SigninHeader } from './SigninHeader';
+import { SigninTenantLinks } from './SigninTenantLinks';
 
 // Provider availability is read from env at request time (not baked at build).
 export const dynamic = 'force-dynamic';
@@ -117,7 +119,8 @@ export default async function SignInPage({
   // gives the demo tenant SLUG, which picks that tenant's own read-only viewer creds from env. The
   // visitor is logged out at signin, so this is host-gated (not role-gated like the authed hellobar).
   const host = (await headers()).get('host');
-  const demoBanner = readSigninDemoBanner(tenantSlugFromHost(host));
+  const tenantSlug = tenantSlugFromHost(host);
+  const demoBanner = readSigninDemoBanner(tenantSlug);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -222,6 +225,11 @@ export default async function SignInPage({
                 <WriteToUsDialog />
               </div>
             </div>
+
+            {/* On the apex host there is no tenant to sign in to, so offer the two live read-only
+              demos. On a tenant's own host this renders nothing (that visitor is already there and
+              gets their creds in the banner above). */}
+            <SigninTenantLinks tenants={signinDemoTenants(tenantSlug)} />
 
             <p className="pt-1 text-center text-[10px] uppercase tracking-wide text-muted-foreground">
               One control plane · no lock-in

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEMO_HOST_SUFFIX, DEMO_TENANTS, demoTenantHref } from '@/lib/demo-tenants';
+import { DEMO_HOST_SUFFIX, DEMO_TENANTS, demoTenantHref, signinDemoTenants } from '@/lib/demo-tenants';
 
 test('DEMO_TENANTS: bank then insurer, each with a verified https console URL', () => {
   assert.equal(DEMO_TENANTS.length, 2);
@@ -44,4 +44,32 @@ test('demoTenantHref: rejects non-https, foreign host, and garbage', () => {
   assert.equal(demoTenantHref('https://notgetoffgridai.co/'), null, 'suffix must be a real dot boundary');
   assert.equal(demoTenantHref('not a url'), null);
   assert.equal(demoTenantHref(''), null);
+});
+
+// ─── signinDemoTenants: the apex signin page needs a door to the demos ───────────────────────────
+
+test('the apex signin page offers both demo tenants', () => {
+  const offered = signinDemoTenants(null);
+  assert.equal(offered.length, 2);
+  assert.deepEqual(
+    offered.map((t) => t.flavour),
+    ['bank', 'insurer'],
+    'bank first, insurer second — the same order the landing CTA reads in',
+  );
+  // Every offered destination must be a real, validated https getoffgridai.co URL.
+  for (const t of offered) {
+    assert.equal(demoTenantHref(t.href), t.href, `${t.slug} must expose a valid href`);
+    assert.match(t.href, /^https:\/\/[a-z]+-onprem-console\.getoffgridai\.co\//);
+    assert.ok(t.name.trim().length > 0, `${t.slug} must have a display name`);
+  }
+});
+
+test('undefined host resolves the same as the apex — offer the demos rather than nothing', () => {
+  assert.equal(signinDemoTenants(undefined).length, 2);
+});
+
+test('a tenant’s OWN signin page offers nothing — it would send the visitor away from where they arrived', () => {
+  for (const slug of ['bharatunion', 'suraksha', 'someotherorg']) {
+    assert.deepEqual(signinDemoTenants(slug), [], `${slug} must not be offered other tenants`);
+  }
 });
