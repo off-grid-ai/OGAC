@@ -1,5 +1,5 @@
-import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
+import { PipelineNotFound } from '@/components/pipelines/PipelineNotFound';
 import { PipelineOverview } from '@/components/pipelines/PipelineOverview';
 import { listEvalDefs } from '@/lib/eval-defs';
 import { listGoldenCases } from '@/lib/evals';
@@ -34,7 +34,10 @@ export default async function PipelineOverviewPage({
   const { id } = await params;
   const orgId = await currentOrgId();
   const p = await getPipeline(id, orgId);
-  if (!p) notFound();
+  // A bare 404 is a dead end for an operator who arrived from a stale bookmark or a consumer bound to
+  // a pipeline that no longer exists here. Name the id, say it isn't in THIS org (it may well exist in
+  // another), and offer the way back.
+  if (!p) return <PipelineNotFound id={id} />;
 
   const [evalsAttached, goldenCases, orgPolicyRules, orgGuardrailRules, versions, consumers] =
     await Promise.all([

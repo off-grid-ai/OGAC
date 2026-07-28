@@ -3,20 +3,29 @@
 // App and runtime-agent surfaces know their OWN explicit pipelineId. Null means deliberately unbound;
 // the org Chat default is a Chat-only rule and must never appear on an App chip.
 //
-// This file only reads pipeline names and composes the view. Honest: when nothing is explicitly bound
-// it returns an unbound chip, never a fake inherited contract.
+// This file only reads pipeline names and composes the view — every DECISION lives in the pure
+// `pipeline-chip-policy`. Honest on both edges: nothing bound returns an unbound chip, and a bound id
+// with no matching row returns a `missing` chip rather than a plausible-looking healthy one.
 
-import type { PipelineChipData } from '@/components/pipelines/PipelineChip';
+import {
+  type PipelineChipData,
+  type PipelineLookup,
+  consumerChip,
+  explicitConsumerPipelineId,
+  lookupIn,
+} from '@/lib/pipeline-chip-policy';
 import { getPipeline, listPipelines } from '@/lib/pipelines';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
-/** App/runtime-agent bindings are explicit: blank/null stays unbound, never Chat-inherited. */
-export function explicitConsumerPipelineId(pipelineId: string | null | undefined): string | null {
-  return pipelineId?.trim() || null;
-}
+export { explicitConsumerPipelineId };
+export type { PipelineChipData };
 
 /**
  * Resolve the chip for a single App/agent consumer. Null is deliberately unbound.
+ *
+ * A read FAILURE and a genuine absence are both reported as `found: false`. That is deliberate: we
+ * cannot claim a consumer is governed by a pipeline we could not confirm exists, and the degraded
+ * chip says exactly that instead of asserting a binding we have not verified.
  */
 export async function resolveConsumerChip(
   boundPipelineId: string | null | undefined,
@@ -25,7 +34,8 @@ export async function resolveConsumerChip(
   const resolved = explicitConsumerPipelineId(boundPipelineId);
   if (!resolved) return { id: null };
   const p = await getPipeline(resolved, orgId).catch(() => null);
-  return { id: resolved, name: p?.name ?? resolved, inherited: false };
+  const lookup: PipelineLookup = p ? { found: true, name: p.name } : { found: false };
+  return consumerChip(resolved, lookup);
 }
 
 /**
@@ -42,6 +52,6 @@ export async function resolveConsumerChips(
   return boundPipelineIds.map((bound) => {
     const resolved = explicitConsumerPipelineId(bound);
     if (!resolved) return { id: null };
-    return { id: resolved, name: nameById.get(resolved) ?? resolved, inherited: false };
+    return consumerChip(resolved, lookupIn(nameById, resolved));
   });
 }

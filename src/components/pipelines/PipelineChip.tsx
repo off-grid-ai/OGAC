@@ -5,25 +5,21 @@
 // the join-key is legible wherever a consumer appears. Purely presentational (no hooks / no I/O) so it
 // drops into server OR client components alike — the caller resolves the binding (see resolveChip).
 //
-// Two honest states:
+// Three honest states:
 //   • bound      → "Runs on: <name>" linking to /pipelines/<id>.
 //   • inherited  → the consumer pins nothing; it falls back to the org-default chat pipeline. We name
 //                  that default (still a link) with an "org default" hint, OR — when no default is
 //                  configured at all — a neutral "ungoverned" chip (never a fabricated pipeline).
+//   • missing    → an id is bound but no such pipeline exists in this org. Stated inline and NOT a
+//                  link: the whole defect was a confident chip deep-linking an operator into a 404.
 
-import { GitBranch } from '@phosphor-icons/react/dist/ssr';
+import { GitBranch, WarningCircle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import type { PipelineChipData } from '@/lib/pipeline-chip-policy';
 import { cn } from '@/lib/utils';
 
-export interface PipelineChipData {
-  /** The RESOLVED pipeline governing this consumer (own binding, else org default). Null ⇒ ungoverned. */
-  id: string | null;
-  /** The resolved pipeline's display name (falls back to the id when a name isn't available). */
-  name?: string | null;
-  /** True when the consumer pins nothing itself and is inheriting the org-default chat pipeline. */
-  inherited?: boolean;
-}
+export type { PipelineChipData };
 
 export function PipelineChip({
   pipeline,
@@ -53,6 +49,28 @@ export function PipelineChip({
   }
 
   const label = pipeline.name?.trim() || pipeline.id;
+
+  // Bound to a pipeline that isn't in this org. Say so where the operator is looking, and give them
+  // the id — it's what they need to repair the binding or recognise a cross-deployment paste.
+  if (pipeline.missing) {
+    return (
+      <Badge
+        variant="outline"
+        className={cn(
+          'gap-1 border-destructive/40 font-normal text-destructive',
+          text,
+          className,
+        )}
+        title={`This consumer is bound to pipeline "${pipeline.id}", which does not exist in this organisation. It is NOT governed by that pipeline — re-bind it to a pipeline that exists.`}
+      >
+        <WarningCircle className="size-3" />
+        <span className="max-w-[10rem] truncate sm:max-w-[18rem]">
+          Pipeline not found: {pipeline.id}
+        </span>
+      </Badge>
+    );
+  }
+
   return (
     <Link
       href={`/runtime/pipelines/${pipeline.id}`}
