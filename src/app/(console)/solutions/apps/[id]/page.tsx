@@ -26,9 +26,13 @@ function Row({
   href,
   icon,
 }: Readonly<{ run: WorkRun; href: string; icon: React.ReactNode }>) {
-  const when = Number.isNaN(Date.parse(run.startedAt))
+  // Formatted DETERMINISTICALLY, never with toLocaleString: that renders in the server's locale and
+  // timezone and then again in the browser's, and the two disagree — which is exactly the hydration
+  // mismatch (React #418) this page shipped with on first deploy.
+  const parsed = Date.parse(run.startedAt);
+  const when = Number.isNaN(parsed)
     ? null
-    : new Date(run.startedAt).toLocaleString();
+    : `${new Date(parsed).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
   return (
     <Link
       href={href}
