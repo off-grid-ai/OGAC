@@ -102,23 +102,11 @@ export async function compileAppSpec(
   deps: CompileDeps = defaultDeps,
 ): Promise<CompileResult> {
   const desc = (description ?? '').trim();
-  const loadedDomains = await deps.loadDomains(ctx.orgId).catch(() => [] as DataDomain[]);
-  const allowedDataDomainIds = ctx.allowedDataDomainIds;
-  const domains = allowedDataDomainIds
-    ? loadedDomains.filter((domain) => allowedDataDomainIds.has(domain.id))
-    : loadedDomains;
+  const domains = await loadAllowedDomains(ctx, deps);
 
   // 1. LLM path — decompose, then re-bind + gap-check EVERY step ourselves (untrusted output).
-  let assembled: Assembled | null = null;
-  const plan = await deps.modelDecompose(desc, domains).catch(() => null);
-  if (plan && Array.isArray(plan.steps) && plan.steps.length > 0) {
-    const built = assembleFromPlan(plan, desc, domains);
-    // Only accept the model plan if it produced at least one real step.
-    if (built.steps.length > 0) assembled = built;
-  }
-
   // 2. Deterministic heuristic fallback — same binding rules, no model.
-  if (!assembled) assembled = heuristicDecompose(desc, domains);
+  const assembled = (await planFromModel(desc, domains, deps)) ?? heuristicDecompose(desc, domains);
 
   const spec = finalizeSpec(assembled, ctx, desc);
 
@@ -128,6 +116,36 @@ export async function compileAppSpec(
   if (!v.ok) gaps.push(...v.errors.map((e) => `Spec did not validate: ${e}`));
 
   return { spec, gaps };
+}
+
+/**
+ * The domains this compile may bind to: the org's declared set, narrowed to the resolver-approved
+ * ids when the caller supplied them. An unreachable domain store degrades to none — the compiler then
+ * gaps every data phrase rather than fabricating a source.
+ */
+async function loadAllowedDomains(ctx: CompileCtx, deps: CompileDeps): Promise<DataDomain[]> {
+  const loaded = await deps.loadDomains(ctx.orgId).catch(() => [] as DataDomain[]);
+  const allowed = ctx.allowedDataDomainIds;
+  return allowed ? loaded.filter((d) => allowed.has(d.id)) : loaded;
+}
+
+/**
+ * The model's plan, assembled and re-bound by us — or null to use the deterministic heuristic.
+ *
+ * Null covers every way the model can fail to be useful: unavailable, a non-array shape, no steps, or
+ * a plan whose every step was dropped for naming data we cannot resolve. That last case is the
+ * important one: a plan that assembles to nothing is not a plan, and accepting it would hand the
+ * author an empty app instead of the heuristic's honest attempt.
+ */
+async function planFromModel(
+  desc: string,
+  domains: DataDomain[],
+  deps: CompileDeps,
+): Promise<Assembled | null> {
+  const plan = await deps.modelDecompose(desc, domains).catch(() => null);
+  if (!plan || !Array.isArray(plan.steps) || plan.steps.length === 0) return null;
+  const built = assembleFromPlan(plan, desc, domains);
+  return built.steps.length > 0 ? built : null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -360,6 +378,22 @@ function finishAssembly(
 // The lead-in is the data reads named BEFORE the "if"; the branch comes from buildConditionalBranch;
 // every non-output branch leaf merges into ONE terminal output so each path ends at an emit.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * The data reads stated BEFORE the conditional ("read the claim, if amount > 1L …"). PURE.
+ * Only 'data' clauses count — a decision stated before the "if" belongs to the branch, not ahead of it.
+ */
+function leadInDataSteps(description: string, domains: DataDomain[], gaps: string[]): AppStep[] {
+  const ifAt = description.search(/\bif\b/i);
+  const steps: AppStep[] = [];
+  for (const clause of segment(ifAt > 0 ? description.slice(0, ifAt) : '')) {
+    if (classifyClause(clause) !== 'data') continue;
+    const phrase = extractDataPhrase(clause);
+    const bound = bindDataPhrase(phrase, domains, `s${steps.length + 1}`, titleCase(phrase), gaps);
+    if (bound) steps.push(bound);
+  }
+  return steps;
+}
+
 function heuristicBranchDecompose(
   description: string,
   cond: ConditionalClause,
@@ -371,16 +405,8 @@ function heuristicBranchDecompose(
   let n = 0;
 
   // Lead-in: data reads mentioned before the conditional ("read the claim, if amount > 1L …").
-  const ifAt = description.search(/\bif\b/i);
-  for (const clause of segment(ifAt > 0 ? description.slice(0, ifAt) : '')) {
-    if (classifyClause(clause) !== 'data') continue;
-    const phrase = extractDataPhrase(clause);
-    const bound = bindDataPhrase(phrase, domains, `s${n + 1}`, titleCase(phrase), gaps);
-    if (bound) {
-      steps.push(bound);
-      n += 1;
-    }
-  }
+  steps.push(...leadInDataSteps(description, domains, gaps));
+  n = steps.length;
   const leadLast = steps.at(-1)?.id;
 
   // The branch (decision + guarded branches); ids continue after the lead-in.
@@ -457,18 +483,31 @@ export function finalizeSpec(assembled: Assembled, ctx: CompileCtx, description:
   // LINEAR path (unchanged): guarantee a terminal output sink for EVERY compile path (a governed app
   // always ends by emitting its result), then chain the ordered steps into a one-entry graph. Also
   // guarantees ≥1 step so an empty description still yields a valid (output-only) spec.
-  const steps = [...assembled.steps];
-  const last = steps.at(-1);
-  if (last?.kind !== 'output') {
-    const usedIds = new Set(steps.map((s) => s.id));
-    let outId = `s${steps.length + 1}`;
-    while (usedIds.has(outId)) outId += 'x';
-    steps.push({ id: outId, label: 'Output', kind: 'output', sink: 'console' });
-  }
-  const edges: AppEdge[] =
-    steps.length > 1 ? steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id })) : [];
+  const steps = withTerminalOutput(assembled.steps);
+  return { ...base, steps, edges: chainLinear(steps) };
+}
 
-  return { ...base, steps, edges };
+/**
+ * Guarantee the terminal output sink every governed app ends with. PURE.
+ *
+ * The id is nudged until it is free rather than assumed: a dropped connector-query means step ids are
+ * not necessarily dense, so `s${length+1}` can already be taken and a duplicate id would fail
+ * validation with a confusing message instead of an honest one.
+ */
+function withTerminalOutput(input: AppStep[]): AppStep[] {
+  const steps = [...input];
+  if (steps.at(-1)?.kind === 'output') return steps;
+
+  const used = new Set(steps.map((s) => s.id));
+  let id = `s${steps.length + 1}`;
+  while (used.has(id)) id += 'x';
+  steps.push({ id, label: 'Output', kind: 'output', sink: 'console' });
+  return steps;
+}
+
+/** Chain ordered steps into the one-entry linear graph the text builder keeps. PURE. */
+function chainLinear(steps: AppStep[]): AppEdge[] {
+  return steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -564,23 +603,29 @@ export function detectConditional(text: string): ConditionalClause | null {
   const rest = ifm[1].slice(0, em.index).trim();
   if (!elseText) return null;
 
-  let condition: string;
-  let thenText: string;
-  const tm = /^(.+?)[,;]?\s+then\s+(.+)$/is.exec(rest);
-  if (tm) {
-    condition = tm[1];
-    thenText = tm[2];
-  } else {
-    const ci = rest.indexOf(',');
-    if (ci < 0) return null; // no "then" and no comma ⇒ can't split condition from action
-    condition = rest.slice(0, ci);
-    thenText = rest.slice(ci + 1);
-  }
-  condition = condition.trim().replace(/[,;.]+$/, '');
-  thenText = thenText.trim().replace(/[,;.]+$/, '');
-  if (!condition || !thenText) return null;
-  return { condition, thenText, elseText };
+  const split = splitConditionAndAction(rest);
+  if (!split) return null;
+  return { ...split, elseText };
 }
+
+/**
+ * Split "amount > 1L then escalate" / "amount > 1L, escalate" into its condition and its action. PURE.
+ *
+ * Only an explicit "then" or a comma counts as the boundary. Guessing one from, say, the first verb
+ * would silently mis-split a condition and produce a branch that tests the wrong thing — worse than
+ * declining and letting the linear path handle it.
+ */
+function splitConditionAndAction(rest: string): { condition: string; thenText: string } | null {
+  const tm = /^(.+?)[,;]?\s+then\s+(.+)$/is.exec(rest);
+  const ci = rest.indexOf(',');
+  if (!tm && ci < 0) return null;
+
+  const condition = trimClause(tm ? tm[1] : rest.slice(0, ci));
+  const thenText = trimClause(tm ? tm[2] : rest.slice(ci + 1));
+  return condition && thenText ? { condition, thenText } : null;
+}
+
+const trimClause = (v: string): string => v.trim().replace(/[,;.]+$/, '');
 
 // Build one branch clause into a step (output/human/agent) — the branch tail the merge wires to.
 function branchStep(clause: string, id: string): AppStep {
