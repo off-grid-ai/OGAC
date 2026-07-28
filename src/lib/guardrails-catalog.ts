@@ -161,7 +161,8 @@ export const GUARDRAIL_CATALOG: GuardrailCatalogItem[] = [
     engine: 'presidio',
     entity: 'IBAN_CODE',
     defaultEnabled: true,
-    description: 'Detect international bank account numbers (IBAN). Recommended for financial data.',
+    description:
+      'Detect international bank account numbers (IBAN). Recommended for financial data.',
   },
   {
     id: 'crypto',
@@ -806,7 +807,9 @@ export interface ScannerRuleLike {
  */
 export function suppressedScanners(rules: readonly ScannerRuleLike[]): string[] {
   const disabledTokens = new Set(
-    rules.filter((r) => r.matcher === 'entity' && r.enabled === false).map((r) => r.pattern.trim().toUpperCase()),
+    rules
+      .filter((r) => r.matcher === 'entity' && r.enabled === false)
+      .map((r) => r.pattern.trim().toUpperCase()),
   );
   if (disabledTokens.size === 0) return [];
   const out = new Set<string>();

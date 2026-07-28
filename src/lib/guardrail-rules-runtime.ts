@@ -135,6 +135,64 @@ function replaceAll(
  * transform actions change it); block/flag/log leave it untouched (the run is denied or merely
  * observed, not rewritten).
  */
+interface RuleHit {
+  matched: boolean;
+  /** The text after any transform this rule performed (unchanged when it did not transform). */
+  text: string;
+  /** The rule could not be evaluated at all and contributes nothing — not the same as "no match". */
+  skipped?: boolean;
+}
+
+/**
+ * Evaluate ONE rule against the current text. PURE.
+ *
+ * Separating "did it match" from "what did it do" is the point: block/flag/log only need the boolean,
+ * while a transform rewrites. An uncompilable regex is reported as SKIPPED rather than as a non-match
+ * — a pattern that cannot be evaluated has not cleared the text, and conflating the two would let a
+ * broken rule read as a clean pass.
+ */
+function applyRule(
+  rule: GuardrailRule,
+  text: string,
+  detected: Set<string>,
+  detectorRedactedText?: string,
+): RuleHit {
+  return rule.matcher === 'entity'
+    ? applyEntityRule(rule, text, detected, detectorRedactedText)
+    : applyRegexRule(rule, text);
+}
+
+/** Act on a DETECTOR hit for this entity type; the detector already produced the redacted form. */
+function applyEntityRule(
+  rule: GuardrailRule,
+  text: string,
+  detected: Set<string>,
+  detectorRedactedText?: string,
+): RuleHit {
+  if (!detected.has(rule.pattern.toUpperCase())) return { matched: false, text };
+  const usable = isTransform(rule.action) && detectorRedactedText && detectorRedactedText !== text;
+  return { matched: true, text: usable ? detectorRedactedText : text };
+}
+
+/** Match (and for a transform, rewrite) the operator's own pattern. */
+function applyRegexRule(rule: GuardrailRule, text: string): RuleHit {
+  let re: RegExp;
+  try {
+    re = new RegExp(rule.pattern, 'g');
+  } catch {
+    // Shouldn't happen — validateRule compiled it on write — but a rule that no longer compiles must
+    // not throw the whole scan, and must not read as a clean pass either.
+    return { matched: false, text, skipped: true };
+  }
+
+  if (!isTransform(rule.action)) {
+    // `re` is global and test() advances lastIndex, so use a fresh non-stateful check.
+    return { matched: new RegExp(rule.pattern).test(text), text };
+  }
+  const res = replaceAll(text, re, rule.action, rule.label || rule.pattern);
+  return res.changed ? { matched: true, text: res.text } : { matched: false, text };
+}
+
 export function applyGuardrailRules(
   input: string,
   rules: GuardrailRule[],
@@ -164,41 +222,10 @@ export function applyGuardrailRules(
       continue;
     }
 
-    // Does this rule MATCH the text? For a transform action we also rewrite; for block/flag/log we
-    // only need the boolean "did it match".
-    let matched = false;
-
-    if (rule.matcher === 'regex') {
-      let re: RegExp;
-      try {
-        re = new RegExp(rule.pattern, 'g');
-      } catch {
-        // A pattern that no longer compiles (shouldn't happen — validateRule compiled it on write)
-        // is skipped rather than throwing the whole scan. Fail safe, not closed.
-        continue;
-      }
-      if (isTransform(rule.action)) {
-        const res = replaceAll(text, re, rule.action, rule.label || rule.pattern);
-        if (res.changed) {
-          text = res.text;
-          matched = true;
-        }
-      } else {
-        // block / flag / log — detect a match without rewriting. `re` is global; test() advances
-        // lastIndex, so we test a fresh, non-stateful check.
-        matched = new RegExp(rule.pattern).test(text);
-      }
-    } else {
-      // matcher === 'entity' — act on a detector hit of this entity type.
-      if (detected.has(rule.pattern.toUpperCase())) {
-        matched = true;
-        if (isTransform(rule.action) && detectorRedactedText && detectorRedactedText !== text) {
-          text = detectorRedactedText;
-        }
-      }
-    }
-
-    if (!matched) continue;
+    const hit = applyRule(rule, text, detected, detectorRedactedText);
+    if (hit.skipped) continue; // uncompilable pattern — fail safe, not closed
+    text = hit.text;
+    if (!hit.matched) continue;
 
     record(rule);
     const contributed: GuardrailRuleVerdict = isTransform(rule.action)
@@ -253,6 +280,10 @@ export async function loadEnforcedGuardrailRules(orgId: string): Promise<Guardra
     const rules = await listGuardrailRules(orgId);
     return rules.filter((r) => r.enabled);
   } catch (err) {
+    // Deliberate console: this scan is about to run WITHOUT the operator's rules, which is a
+    // security-relevant degradation. Failing closed would break every run on a transient DB blip, so
+    // we degrade — but it must be visible in the server log rather than swallowed.
+    // eslint-disable-next-line no-console
     console.warn(
       '[guardrail-rules] load failed, running without operator rules:',
       err instanceof Error ? err.message : String(err),

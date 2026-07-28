@@ -53,9 +53,7 @@ export interface NormalizedRule {
   enabled: boolean;
 }
 
-export type ValidationResult =
-  | { ok: true; value: NormalizedRule }
-  | { ok: false; error: string };
+export type ValidationResult = { ok: true; value: NormalizedRule } | { ok: false; error: string };
 
 function isMatcher(v: unknown): v is RuleMatcher {
   return typeof v === 'string' && (RULE_MATCHERS as readonly string[]).includes(v);
@@ -87,25 +85,41 @@ export function validateRule(draft: RuleDraft | null | undefined): ValidationRes
   if (!isAction(d.action)) {
     return { ok: false, error: `action must be one of ${RULE_ACTIONS.join(' | ')}` };
   }
-  const rawPattern = typeof d.pattern === 'string' ? d.pattern.trim() : '';
-  if (!rawPattern) {
-    return { ok: false, error: 'pattern is required' };
-  }
-  // Entity names are a stable upper-snake token; regex sources are kept verbatim.
-  const pattern = d.matcher === 'entity' ? rawPattern.toUpperCase() : rawPattern;
-  if (d.matcher === 'entity' && !/^[A-Z][A-Z0-9_]*$/.test(pattern)) {
-    return { ok: false, error: 'entity name must be UPPER_SNAKE (e.g. US_SSN)' };
-  }
-  if (d.matcher === 'regex') {
-    const err = regexError(pattern);
-    if (err) return { ok: false, error: `invalid regex: ${err}` };
-  }
+  const checked = checkPattern(d.matcher, d.pattern);
+  if (!checked.ok) return checked;
+  const pattern = checked.pattern;
 
   const label = typeof d.label === 'string' ? d.label.trim().slice(0, 200) : '';
   // enabled defaults to true; only an explicit `false` disables.
   const enabled = d.enabled === undefined ? true : d.enabled !== false;
 
   return { ok: true, value: { matcher: d.matcher, pattern, action: d.action, label, enabled } };
+}
+
+/**
+ * Normalise and check the rule's pattern for its matcher. PURE.
+ *
+ * The two matchers have genuinely different contracts, and conflating them is how a rule gets saved
+ * that can never fire: an entity name is a stable UPPER_SNAKE token the detector emits, while a regex
+ * is the operator's own source kept verbatim. A regex is compiled HERE, on write, so a broken pattern
+ * is refused at the point someone can fix it rather than silently skipped at scan time.
+ */
+function checkPattern(
+  matcher: 'entity' | 'regex',
+  raw: unknown,
+): { ok: true; pattern: string } | { ok: false; error: string } {
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (!trimmed) return { ok: false, error: 'pattern is required' };
+
+  if (matcher === 'entity') {
+    const pattern = trimmed.toUpperCase();
+    return /^[A-Z][A-Z0-9_]*$/.test(pattern)
+      ? { ok: true, pattern }
+      : { ok: false, error: 'entity name must be UPPER_SNAKE (e.g. US_SSN)' };
+  }
+
+  const err = regexError(trimmed);
+  return err ? { ok: false, error: `invalid regex: ${err}` } : { ok: true, pattern: trimmed };
 }
 
 // ─── Thin adapter (I/O) ─────────────────────────────────────────────────────

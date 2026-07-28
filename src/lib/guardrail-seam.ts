@@ -65,7 +65,12 @@ export function screenOutcome(
   if (error !== undefined) {
     const reason = error instanceof Error ? error.message : String(error);
     const synthetic = guardScreenErrorCheck(phase, reason);
-    return { outcome: 'blocked', checks: [synthetic], failedClosed: true, detail: synthetic.detail! };
+    return {
+      outcome: 'blocked',
+      checks: [synthetic],
+      failedClosed: true,
+      detail: synthetic.detail!,
+    };
   }
   const outcome = outcomeFromChecks(checks);
   return {
@@ -107,7 +112,11 @@ export async function screenGuardrail(
   timeoutMs: number = GUARDRAIL_SCREEN_TIMEOUT_MS,
 ): Promise<ScreenVerdict> {
   try {
-    const checks = await withTimeout(runChecks(phase, { ...ctx, phase }), timeoutMs, `guardrail ${phase} screen`);
+    const checks = await withTimeout(
+      runChecks(phase, { ...ctx, phase }),
+      timeoutMs,
+      `guardrail ${phase} screen`,
+    );
     return screenOutcome(phase, checks);
   } catch (err) {
     return screenOutcome(phase, [], err);

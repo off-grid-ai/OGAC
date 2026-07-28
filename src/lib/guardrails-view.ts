@@ -132,7 +132,10 @@ function isRemoteEngine(engine: GuardrailsEngine): boolean {
   return (REMOTE_ENGINES as readonly string[]).includes(engine);
 }
 
-function normalizeDemo(raw: RawScanResult | null | undefined, input: string): GuardrailsDemo | undefined {
+function normalizeDemo(
+  raw: RawScanResult | null | undefined,
+  input: string,
+): GuardrailsDemo | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const entities = Array.isArray(raw.entities)
     ? raw.entities.filter((e): e is string => typeof e === 'string')
@@ -172,7 +175,10 @@ export function buildGuardrailsView(
   return {
     engine,
     adapterId,
-    vendor: str(m.vendor, engine === 'presidio' ? 'Microsoft Presidio' : 'Off Grid AI checks spine'),
+    vendor: str(
+      m.vendor,
+      engine === 'presidio' ? 'Microsoft Presidio' : 'Off Grid AI checks spine',
+    ),
     license: str(m.license, engine === 'presidio' ? 'MIT' : 'first-party'),
     description: str(m.description),
     // The always-on regex floor is reachable by definition; only a remote engine can be unreachable.
