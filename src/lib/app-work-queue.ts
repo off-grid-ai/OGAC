@@ -145,3 +145,55 @@ export function statusLabel(status: string): string {
       return status;
   }
 }
+
+// ─── runSubject — a readable line for a case, derived from the run's own input ────────────────────
+//
+// Every row on the work screen rendered the literal word "Case", because nothing was deriving a subject
+// from the run. A queue of eight identical "Case · Completed" rows is unusable: you cannot tell which
+// case is yours, which is urgent, or whether two rows are the same claim twice.
+//
+// The input jsonb IS the case, so the subject comes from it. Preference order is deliberate: an
+// explicit human-authored field first, then the first short scalar values. We never invent a subject —
+// an input we cannot summarise returns null and the caller shows its own fallback.
+
+/** Field names an author is likely to have used for "what this case is about". */
+const SUBJECT_KEYS = ['subject', 'title', 'summary', 'name', 'description', 'query', 'question'];
+
+/** Values long enough to be a document body rather than a label are not subjects. */
+const MAX_SUBJECT = 120;
+
+function scalarText(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const t = value.trim().replace(/\s+/g, ' ');
+    return t.length > 0 ? t.slice(0, MAX_SUBJECT) : null;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return null;
+}
+
+/**
+ * A one-line subject for a case, or null when the input cannot honestly be summarised.
+ *
+ * Keys are humanised (claim_amount → "Claim amount") because a non-technical reader should never see a
+ * database-shaped identifier in the thing they are reading.
+ */
+export function runSubject(input: unknown): string | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const record = input as Record<string, unknown>;
+
+  for (const key of SUBJECT_KEYS) {
+    const direct = scalarText(record[key]);
+    if (direct) return direct;
+  }
+
+  // No named subject: describe the case by its first couple of fields, labelled readably.
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(record)) {
+    const text = scalarText(value);
+    if (!text) continue;
+    const label = key.replace(/[_-]+/g, ' ').trim();
+    parts.push(`${label.charAt(0).toUpperCase()}${label.slice(1)}: ${text}`);
+    if (parts.length === 2) break;
+  }
+  return parts.length > 0 ? parts.join(' · ').slice(0, MAX_SUBJECT) : null;
+}

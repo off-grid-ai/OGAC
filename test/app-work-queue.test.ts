@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   arrivalSentence,
   buildAppWorkQueue,
+  runSubject,
   statusLabel,
   type WorkRun,
 } from '../src/lib/app-work-queue.ts';
@@ -136,4 +137,45 @@ test('unparseable timestamps sort last instead of throwing', () => {
     q.waiting.map((r) => r.id),
     ['good', 'bad'],
   );
+});
+
+// ─── runSubject: a queue of identical "Case" rows is unusable ─────────────────────────────────────
+
+test('an explicit subject-ish field wins', () => {
+  assert.equal(runSubject({ subject: 'Reimbursement for travel' }), 'Reimbursement for travel');
+  assert.equal(runSubject({ title: 'Motor claim FNOL' }), 'Motor claim FNOL');
+  assert.equal(runSubject({ query: 'Is this PAN valid?' }), 'Is this PAN valid?');
+});
+
+test('with no named subject, the first fields describe the case with readable labels', () => {
+  // A non-technical reader must never see a database-shaped key.
+  const subject = runSubject({ claim_amount: '12400', customer_name: 'Priya Sharma' });
+  assert.equal(subject, 'Claim amount: 12400 · Customer name: Priya Sharma');
+  assert.doesNotMatch(subject ?? '', /_/);
+});
+
+test('at most two fields are used, so a row stays one line', () => {
+  const subject = runSubject({ a: '1', b: '2', c: '3', d: '4' });
+  assert.equal(subject, 'A: 1 · B: 2');
+});
+
+test('an input that cannot be summarised returns null rather than inventing a subject', () => {
+  for (const input of [null, undefined, {}, [], 'a string', 42, { nested: { deep: 'value' } }]) {
+    assert.equal(runSubject(input), null, `${JSON.stringify(input)} must not produce a subject`);
+  }
+});
+
+test('blank and whitespace-only values are not subjects', () => {
+  assert.equal(runSubject({ subject: '   ' }), null);
+  assert.equal(runSubject({ subject: '', title: 'Fallback title' }), 'Fallback title');
+});
+
+test('long text is truncated and newlines collapsed, so a row cannot break the layout', () => {
+  const subject = runSubject({ subject: `${'x'.repeat(400)}` });
+  assert.ok((subject ?? '').length <= 120);
+  assert.equal(runSubject({ subject: 'line one\n\nline two' }), 'line one line two');
+});
+
+test('numbers and booleans are usable subjects', () => {
+  assert.equal(runSubject({ policy_number: 88123 }), 'Policy number: 88123');
 });

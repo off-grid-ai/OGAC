@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { PageFrame } from '@/components/PageFrame';
 import { Card, CardContent } from '@/components/ui/card';
 import { listAppRuns } from '@/lib/app-run-store';
-import { buildAppWorkQueue, statusLabel, type WorkRun } from '@/lib/app-work-queue';
+import { buildAppWorkQueue, runSubject, statusLabel, type WorkRun } from '@/lib/app-work-queue';
 import { getApp } from '@/lib/apps-store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -69,7 +69,9 @@ export default async function AppWorkPage({
       status: String(r.status),
       startedAt:
         r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? ''),
-      subject: (r as { inputSummary?: string | null }).inputSummary ?? null,
+      // The run's own input IS the case, so the subject is derived from it. Without this every row
+      // rendered the literal word "Case" and a queue of eight identical rows told the reader nothing.
+      subject: runSubject((r as { input?: unknown }).input),
     })),
   });
 
