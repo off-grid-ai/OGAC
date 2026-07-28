@@ -59,15 +59,15 @@ export function resolveJudgeRouting(input: {
   fallbackModel: string;
 }): JudgeRouting {
   const { agent, pipeline, gateway, fallbackModel } = input;
-  const chainModel =
-    (pipeline?.defaultModel?.trim() || gateway?.defaultModel?.trim() || '') || null;
-  const boundToPipeline = !!agent && !!pipeline && agent.pipelineId === pipeline.id;
-  const pipelineOnGateway = !!pipeline && !!gateway && pipeline.gatewayId === gateway.id;
-  const conformant = boundToPipeline && pipelineOnGateway && chainModel !== null;
+  const chainModel = judgeChainModel(pipeline, gateway);
 
-  if (conformant) {
+  // CONFORMANT means the whole governed chain is intact: the judge agent is bound to the pipeline,
+  // that pipeline runs on the gateway, and the chain resolves a model. Anything less is the honest
+  // bootstrap fallback — the judge still runs, but its attribution says the chain is not wired, so a
+  // score is never presented as governed when it was not.
+  if (isConformantChain(agent, pipeline, gateway) && chainModel !== null) {
     return {
-      model: chainModel as string,
+      model: chainModel,
       agentId: agent!.id,
       pipelineId: pipeline!.id,
       gatewayId: gateway!.id,
@@ -75,14 +75,50 @@ export function resolveJudgeRouting(input: {
       attribution: `judge=${agent!.id} pipeline=${pipeline!.id} gateway=${gateway!.id} model=${chainModel}`,
     };
   }
+
+  return bootstrapRouting(agent, pipeline, gateway, chainModel ?? fallbackModel);
+}
+
+/**
+ * The honest non-conformant result. PURE. The judge still runs — refusing to score would be worse —
+ * but every id it could not resolve is reported as null and the attribution says the chain is
+ * incomplete, so a score from an unwired judge is never mistaken for a governed one.
+ */
+function bootstrapRouting(
+  agent: JudgeAgentLike | null,
+  pipeline: JudgePipelineLike | null,
+  gateway: JudgeGatewayLike | null,
+  model: string,
+): JudgeRouting {
   return {
-    model: chainModel ?? fallbackModel,
+    model,
     agentId: agent?.id ?? null,
     pipelineId: pipeline?.id ?? null,
     gatewayId: gateway?.id ?? null,
     conformant: false,
-    attribution: `judge chain incomplete — bootstrap fallback model=${chainModel ?? fallbackModel} (agent/pipeline/gateway not fully wired)`,
+    attribution: `judge chain incomplete — bootstrap fallback model=${model} (agent/pipeline/gateway not fully wired)`,
   };
+}
+
+/** The model the governed chain resolves: the pipeline's, else the gateway's, else none. PURE. */
+function judgeChainModel(
+  pipeline: JudgePipelineLike | null,
+  gateway: JudgeGatewayLike | null,
+): string | null {
+  const fromPipeline = pipeline?.defaultModel?.trim();
+  if (fromPipeline) return fromPipeline;
+  const fromGateway = gateway?.defaultModel?.trim();
+  return fromGateway || null;
+}
+
+/** Is the agent → pipeline → gateway chain actually wired end to end? PURE. */
+function isConformantChain(
+  agent: JudgeAgentLike | null,
+  pipeline: JudgePipelineLike | null,
+  gateway: JudgeGatewayLike | null,
+): boolean {
+  if (!agent || !pipeline || !gateway) return false;
+  return agent.pipelineId === pipeline.id && pipeline.gatewayId === gateway.id;
 }
 
 export interface GatewayChoice {

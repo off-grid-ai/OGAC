@@ -7,15 +7,15 @@ import {
   parseGEvalScore,
   type GEvalResult,
 } from '@/lib/eval-geval';
+import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
 import {
   heuristicScore,
   rollupMetrics,
   scoreMetric,
   type MetricScore,
 } from '@/lib/eval-metrics';
-import type { EvalEngine } from '@/lib/eval-templates';
 import { capEvalSamples } from '@/lib/eval-sampling';
-import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
+import type { EvalEngine } from '@/lib/eval-templates';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
 import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -201,70 +201,92 @@ export async function runEvalDef(
   // Judge-only: there is no honest heuristic for arbitrary criteria. If no gateway judge is
   // configured (or every judge call fails), we record NOTHING and surface the reason — never a
   // fabricated score. The criteria is the def's description (what the operator wrote when applying).
-  if (def.metric === 'g_eval') {
-    const criteria = def.description || def.name;
-    let anyParsed = false;
-    let reason = '';
-    for (const s of samples) {
-      const r = await gEvalJudge(criteria, s, judge.model);
-      if (r.parsed) {
-        anyParsed = true;
-        perSample.push(scoreMetric(tpl, r.score, 'deepeval', def.threshold));
-      } else {
-        reason = r.rationale || reason;
-      }
-    }
-    if (!anyParsed) {
-      // Honest unavailable: persist a 0/0 run tagged unavailable so the surface shows it ran but
-      // could not score, with the reason — not a fake pass/fail.
-      const id = `ed_run_${randomUUID().slice(0, 6)}`;
-      const engineTag = `${def.metric}:unavailable`;
-      // PA-12: tag the run with the eval def's pipeline binding so Drift is per-pipeline exact.
-      await recordEvalRun(
-        { id, engine: engineTag, score: 0, total: 0, passed: 0, pipelineId: def.pipelineId },
-        orgId,
-      );
-      return {
-        run: {
-          id,
-          engine: engineTag,
-          score: 0,
-          total: 0,
-          passed: 0,
-          startedAt: new Date().toISOString(),
-          pipelineId: def.pipelineId,
-        },
-        metrics: [],
-        computedBy: 'unavailable',
-        unavailableReason: reason || 'G-Eval judge unavailable — no score recorded.',
-      };
-    }
-    return persistRun(def, perSample, 'deepeval', orgId);
-  }
+  if (def.metric === 'g_eval') return runGEval(def, samples, tpl, judge.model, orgId);
 
   // ── ragas (real sidecar) or first-party heuristic for everything else ────────────────────────────
   const ragas = usesRagas(def) ? await ragasMetrics(samples, [def.metric], judge.model) : null;
-  const computedBy: EvalEngine | 'heuristic' =
-    ragas?.[def.metric] !== undefined ? 'ragas' : 'heuristic';
+  const aggregate = ragas?.[def.metric];
+  // Ragas returns ONE dataset-level aggregate per metric; the heuristic scores every sample. Which
+  // engine actually produced the number is recorded on the run, never assumed from which was asked.
+  const computedBy: EvalEngine | 'heuristic' = aggregate === undefined ? 'heuristic' : 'ragas';
+  const scored =
+    aggregate === undefined
+      ? samples.map((sample) => scoreMetric(tpl, heuristicSampleScore(def.metric, sample), 'heuristic', def.threshold))
+      : [scoreMetric(tpl, aggregate, 'ragas', def.threshold)];
 
-  if (computedBy === 'ragas' && ragas) {
-    // Ragas returns dataset-level aggregate per metric — score the whole run once against it.
-    const value = ragas[def.metric] ?? 0;
-    perSample.push(scoreMetric(tpl, value, 'ragas', def.threshold));
-  } else {
-    for (const s of samples) {
-      const value = heuristicScore(def.metric, {
-        question: s.question,
-        answer: s.answer,
-        contexts: s.contexts,
-        groundTruth: s.groundTruth,
-        source: s.contexts.join(' '),
-      });
-      perSample.push(scoreMetric(tpl, value, 'heuristic', def.threshold));
-    }
+  return persistRun(def, [...perSample, ...scored], computedBy, orgId);
+}
+
+/** Score one golden sample offline, mapping the sample shape onto the heuristic's inputs. */
+function heuristicSampleScore(
+  metric: string,
+  sample: { question: string; answer: string; contexts: string[]; groundTruth?: string },
+): number {
+  return heuristicScore(metric, {
+    question: sample.question,
+    answer: sample.answer,
+    contexts: sample.contexts,
+    groundTruth: sample.groundTruth,
+    source: sample.contexts.join(' '),
+  });
+}
+
+/**
+ * G-Eval: a custom LLM-as-judge over the operator's own plain-English criteria.
+ *
+ * Judge-ONLY by design — there is no honest heuristic for arbitrary criteria, so if no judge is
+ * configured or every call fails we record a 0/0 run tagged `unavailable` WITH the reason, rather
+ * than a fabricated pass or fail. An eval surface that invents a score when it could not measure is
+ * worse than one that admits it did not run.
+ */
+async function runGEval(
+  def: EvalDef,
+  samples: Awaited<ReturnType<typeof buildSamples>>,
+  tpl: { metric: string; direction: EvalDef['direction']; defaultThreshold: number },
+  judgeModel: string,
+  orgId: string,
+): Promise<EvalDefRunResult> {
+  const criteria = def.description || def.name;
+  const perSample: MetricScore[] = [];
+  let reason = '';
+
+  for (const sample of samples) {
+    const r = await gEvalJudge(criteria, sample, judgeModel);
+    if (r.parsed) perSample.push(scoreMetric(tpl, r.score, 'deepeval', def.threshold));
+    else reason = r.rationale || reason;
   }
 
-  return persistRun(def, perSample, computedBy, orgId);
+  if (perSample.length > 0) return persistRun(def, perSample, 'deepeval', orgId);
+  return unavailableRun(def, reason, orgId);
+}
+
+/** Persist an honest "it ran but could not score" result, with the reason. */
+async function unavailableRun(
+  def: EvalDef,
+  reason: string,
+  orgId: string,
+): Promise<EvalDefRunResult> {
+  const id = `ed_run_${randomUUID().slice(0, 6)}`;
+  const engineTag = `${def.metric}:unavailable`;
+  // PA-12: tag the run with the eval def's pipeline binding so Drift is per-pipeline exact.
+  await recordEvalRun(
+    { id, engine: engineTag, score: 0, total: 0, passed: 0, pipelineId: def.pipelineId },
+    orgId,
+  );
+  return {
+    run: {
+      id,
+      engine: engineTag,
+      score: 0,
+      total: 0,
+      passed: 0,
+      startedAt: new Date().toISOString(),
+      pipelineId: def.pipelineId,
+    },
+    metrics: [],
+    computedBy: 'unavailable',
+    unavailableReason: reason || 'G-Eval judge unavailable — no score recorded.',
+  };
 }
 
 // Roll up + persist a scored run, tagged with the engine that actually computed it. Shared by the
