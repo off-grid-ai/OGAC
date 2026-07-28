@@ -1344,8 +1344,9 @@ Suite 5122 → 5231 passing; coverage held ≈94.4 / 88.4 / 95.4 / 94.4 througho
 ### Genuinely left
 
 **Infra / needs the box or a credential (no console-side work remains):**
-- **SeaweedFS SigV4** — signer + broker plan + provisioning all done and tested; needs
-  `identities.json` on SeaweedFS plus the keypair stored. IN PROGRESS.
+- ~~**SeaweedFS SigV4**~~ ✅ **DONE 2026-07-28** — anonymous S3 now 403s (read/list/write); the signed
+  console path round-trips (99 objects listed; write→read→delete verified). Keypair vaulted first so
+  there was no lock-out window. All three Phase 4.10-B items are now closed.
 - **Fleet token** — FleetDM is live but has no token; provisioning is ready. NOT-APPLICABLE until MDM
   is wanted (founder-deprioritised).
 - **DB test contention** — two integration tests fail under parallel execution on the single shared
