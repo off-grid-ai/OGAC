@@ -1,142 +1,325 @@
-import { ArrowLeft, ArrowRight } from '@phosphor-icons/react/dist/ssr';
+// ─── Blueprint detail — the ONE blueprint page (requirements + deploy + edit) ────────────────────────
+//
+// This surface used to exist TWICE. /solutions/library/[id] listed the contract and offered an edit
+// form but no way to act on it; /solutions/catalogue/[id] (this file's origin) computed the live
+// requirement checklist and could actually deploy — and was unreachable from the sidebar, which only
+// ever showed "Library". So the page that could DO something was the one nobody could find.
+//
+// They are now one page at the canonical /solutions/library/[id]: the live requirements checklist and
+// deployment panel from the catalogue version, plus the contract editor from the library version. The
+// old /solutions/catalogue routes redirect here so existing links keep working.
+import { ArrowLeft } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { auth } from '@/auth';
 import { PageFrame } from '@/components/PageFrame';
-import { BlueprintForm } from '@/components/solutions/BlueprintForm';
+import {
+  SolutionDeploymentPanel,
+  SolutionRequirementList,
+  type SolutionRequirementView,
+} from '@/components/solutions/SolutionDeploymentPanel';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getActionDescriptor } from '@/lib/action-contract';
+import { isCompatibleCrmActionConnector } from '@/lib/action-connector-compatibility';
+import { getTemplateSourceSpec, listTemplates } from '@/lib/apps-store';
+import { listDomains } from '@/lib/data-domains-store';
+import { getEnterpriseContext } from '@/lib/enterprise-context';
+import { requireModuleForUser } from '@/lib/module-access';
 import { formatOutcomeCurrency, summarizeOutcome } from '@/lib/outcome-contract';
+import { listPipelines } from '@/lib/pipelines';
+import {
+  registeredTemplateMatches,
+  solutionAppRequirements,
+} from '@/lib/solution-template-deployment';
+import { evaluateSolutionCompatibility } from '@/lib/solution-blueprints';
+import { BlueprintForm } from '@/components/solutions/BlueprintForm';
 import { getSolutionBlueprint, listSolutionDeployments } from '@/lib/solution-blueprints-store';
+import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
-export default async function BlueprintDetailPage({
-  params,
-}: Readonly<{ params: Promise<{ id: string }> }>) {
-  const orgId = await currentOrgId();
-  const { id } = await params;
-  const [blueprint, deployments] = await Promise.all([
-    getSolutionBlueprint(id, orgId),
-    listSolutionDeployments(orgId),
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ deploy?: string }>;
+};
+
+const CAPABILITY_COPY = {
+  'grounded-inference': {
+    label: 'Grounded enterprise AI',
+    detail: 'The App can use approved organization data through its governed AI pipeline.',
+    status: 'ready',
+  },
+  'human-approval': {
+    label: 'Human approval',
+    detail: 'A person reviews the recommendation before any governed action can run.',
+    status: 'approval-required',
+  },
+  'report-output': {
+    label: 'Governed report output',
+    detail: 'The workflow produces a retained report from the completed run.',
+    status: 'ready',
+  },
+} as const;
+
+function canonical(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+export default async function BlueprintDetailPage({ params, searchParams }: Props) {
+  await requireModuleForUser('studio');
+  const [{ id }, { deploy }, orgId, session] = await Promise.all([
+    params,
+    searchParams,
+    currentOrgId(),
+    auth(),
   ]);
+  const blueprint = await getSolutionBlueprint(id, orgId);
   if (!blueprint) notFound();
+  const linkedDeployments = (await listSolutionDeployments(orgId)).filter(
+    (deployment) => deployment.blueprintId === id,
+  );
+
+  const actor = {
+    userId: session?.user?.email ?? 'unknown-user',
+    role: session?.user?.role,
+  };
+  const [templates, pipelines, domains, connectors, context] = await Promise.all([
+    listTemplates(orgId),
+    listPipelines(orgId),
+    listDomains(orgId),
+    listConnectors(orgId),
+    getEnterpriseContext({ orgId, actor }),
+  ]);
+
+  const registeredTemplate = templates.find((template) =>
+    registeredTemplateMatches(blueprint.sourceTemplateKey, template),
+  );
+  const source = registeredTemplate
+    ? await getTemplateSourceSpec(registeredTemplate.id, orgId)
+    : null;
+  const sourceRequirements = source
+    ? solutionAppRequirements(source)
+    : { dataDomains: [], actions: [] };
+  const domainTokens = domains.flatMap((domain) => [domain.id, domain.label, ...domain.aliases]);
+  const compatiblePipelines = source
+    ? pipelines.filter((pipeline) => {
+        const permission = context.resources.find(
+          (resource) => resource.ref === `pipeline:${pipeline.id}`,
+        );
+        return (
+          permission?.canSelect === true &&
+          evaluateSolutionCompatibility(
+            blueprint,
+            { ...source, pipelineId: pipeline.id },
+            pipeline,
+            domainTokens,
+          ).compatible
+        );
+      })
+    : [];
+  const compatibleConnectors = connectors.filter(isCompatibleCrmActionConnector);
+  const buildPermission = context.intentDecisions.find((item) => item.intent === 'build.create');
+
+  const requirements: SolutionRequirementView[] = [
+    {
+      id: 'registered-workflow',
+      label: 'Registered workflow',
+      detail:
+        registeredTemplate && source && blueprint.adoptable
+          ? `${registeredTemplate.title} is the exact published workflow registered for this Blueprint version.`
+          : !blueprint.adoptable
+            ? 'This Blueprint does not yet have a verified runtime asset.'
+            : 'The registered workflow is not visible to your organization.',
+      status: registeredTemplate && source && blueprint.adoptable ? 'ready' : 'unavailable',
+      ...(!registeredTemplate || !source || !blueprint.adoptable
+        ? { remedyHref: '/solutions/templates' }
+        : {}),
+    },
+    ...blueprint.requiredDataDomains.map((required): SolutionRequirementView => {
+      const token = canonical(required);
+      const domain = domains.find((candidate) =>
+        [candidate.id, candidate.label, ...candidate.aliases].some(
+          (value) => canonical(value) === token,
+        ),
+      );
+      const resolved = domain
+        ? context.resources.find((resource) => resource.ref === `data:${domain.id}`)
+        : undefined;
+      return {
+        id: `data-${required}`,
+        label: required,
+        detail: resolved?.reason ?? 'This organization data domain has not been declared.',
+        status: resolved?.canSelect ? 'ready' : 'unavailable',
+        ...(!resolved?.canSelect ? { remedyHref: resolved?.remedyHref ?? '/data/domains' } : {}),
+      };
+    }),
+    {
+      id: 'governed-pipeline',
+      label: blueprint.requiredPipelineName,
+      detail: compatiblePipelines.length
+        ? `${compatiblePipelines.length} published pipeline${compatiblePipelines.length === 1 ? '' : 's'} satisfy the data ceiling, workflow, and your access policy.`
+        : 'No published pipeline currently satisfies this solution and your access policy.',
+      status: compatiblePipelines.length ? 'ready' : 'unavailable',
+      ...(compatiblePipelines.length ? {} : { remedyHref: '/runtime/pipelines' }),
+    },
+    ...blueprint.requiredCapabilities.map((capability): SolutionRequirementView => ({
+      id: `capability-${capability}`,
+      ...CAPABILITY_COPY[capability],
+    })),
+    ...sourceRequirements.actions.map((action): SolutionRequirementView => {
+      const resolved = context.resources.find(
+        (resource) => resource.ref === `action:${action.actionId}`,
+      );
+      const descriptor = getActionDescriptor(action.actionId);
+      return {
+        id: `action-${action.stepId}`,
+        label: descriptor.label,
+        detail: resolved?.reason ?? 'Your action permission could not be verified.',
+        status: resolved?.canSelect
+          ? resolved.requiresApproval
+            ? 'approval-required'
+            : 'ready'
+          : 'unavailable',
+        ...(!resolved?.canSelect
+          ? { remedyHref: resolved?.remedyHref ?? '/governance/access' }
+          : {}),
+      };
+    }),
+    ...(sourceRequirements.actions.length
+      ? [
+          {
+            id: 'action-connection',
+            label: 'Enterprise action connection',
+            detail: compatibleConnectors.length
+              ? `${compatibleConnectors.length} verified on-prem CRM connection${compatibleConnectors.length === 1 ? '' : 's'} can perform this solution's governed actions.`
+              : 'Add a verified on-prem CRM connection before this solution can write back.',
+            status: compatibleConnectors.length ? ('ready' as const) : ('unavailable' as const),
+            ...(compatibleConnectors.length ? {} : { remedyHref: '/data/sources' }),
+          },
+        ]
+      : []),
+    {
+      id: 'deployment-permission',
+      label: 'Your App permission',
+      detail: buildPermission?.reason ?? 'Your permission to create Apps could not be verified.',
+      status: buildPermission?.status === 'allowed' ? 'ready' : 'unavailable',
+      ...(buildPermission?.status === 'allowed' ? {} : { remedyHref: '/governance/access' }),
+    },
+  ];
+
   const outcome = summarizeOutcome(blueprint.outcome);
-  const linked = deployments.filter((deployment) => deployment.blueprintId === id);
+
   return (
     <PageFrame>
-      <div className="space-y-6">
-        <header>
-          <Link
-            href="/solutions/library"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft /> Solution library
-          </Link>
-          <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-primary">
-                {blueprint.industry} · {blueprint.process}
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold">{blueprint.title}</h1>
-              <p className="mt-2 max-w-4xl text-sm text-muted-foreground">{blueprint.summary}</p>
-            </div>
-            {blueprint.adoptable ? (
-              <Link
-                href={`/solutions/deployed?blueprint=${encodeURIComponent(blueprint.id)}`}
-                className="inline-flex items-center gap-2 text-sm text-primary"
-              >
-                Deploy through an existing App <ArrowRight />
-              </Link>
-            ) : (
-              <p className="max-w-md text-xs text-muted-foreground">
-                Runtime incomplete. Publish the matching App and governed pipeline, and declare
-                every required tenant data domain; readiness updates automatically.
-              </p>
-            )}
+      <div className="w-full space-y-6">
+        <Link
+          href="/solutions/library"
+          className="inline-flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" aria-hidden /> Blueprints
+        </Link>
+
+        <header className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.55fr)] lg:items-end">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-primary">
+              {blueprint.industry} / {blueprint.process} / v{blueprint.currentVersion}
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold">{blueprint.title}</h1>
+            <p className="mt-2 max-w-4xl text-sm text-muted-foreground">{blueprint.summary}</p>
           </div>
+          <Card className="shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">What success means</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <p className="text-muted-foreground">Target</p>
+                <p className="mt-1 font-medium">
+                  {blueprint.outcome.target.value.toLocaleString()} {blueprint.outcome.metricUnit}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">First-year net value</p>
+                <p className="mt-1 font-medium">
+                  {formatOutcomeCurrency(outcome.firstYearNetValue, blueprint.outcome.roi.currency)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </header>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {[
-            [
-              'Baseline',
-              `${blueprint.outcome.baseline.value.toLocaleString()} ${blueprint.outcome.metricUnit}`,
-            ],
-            [
-              'Target',
-              `${blueprint.outcome.target.value.toLocaleString()} ${blueprint.outcome.metricUnit}`,
-            ],
-            ['Definition version', `v${blueprint.currentVersion}`],
-            [
-              '1Y net value',
-              formatOutcomeCurrency(outcome.firstYearNetValue, blueprint.outcome.roi.currency),
-            ],
-            [
-              'Payback',
-              outcome.paybackMonths === null ? 'Not justified' : `${outcome.paybackMonths} months`,
-            ],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border bg-card p-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-              <p className="mt-2 text-sm font-medium">{value}</p>
-            </div>
-          ))}
-        </div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <section className="rounded-lg border bg-card p-5">
-            <h2 className="text-sm font-medium">Requirements</h2>
-            <dl className="mt-4 space-y-3 text-xs">
-              <div>
-                <dt className="text-muted-foreground">Business owner</dt>
-                <dd className="mt-1">{blueprint.businessOwner}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Data domains</dt>
-                <dd className="mt-1">{blueprint.requiredDataDomains.join(' · ')}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Capabilities</dt>
-                <dd className="mt-1">{blueprint.requiredCapabilities.join(' · ')}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Governed pipeline</dt>
-                <dd className="mt-1">{blueprint.requiredPipelineName}</dd>
-              </div>
-            </dl>
-          </section>
-          <section className="rounded-lg border bg-card p-5">
-            <h2 className="text-sm font-medium">Benchmark & proof</h2>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {blueprint.proof.status === 'verified'
-                ? blueprint.proof.summary
-                : 'Unverified starter hypothesis — no production proof is claimed.'}
-            </p>
-            <p className="mt-4 text-xs">
-              Definition v{blueprint.currentVersion} · evidence {blueprint.proof.status}
-            </p>
-            {blueprint.proof.evidenceLinks.map((href) => (
-              <Link key={href} href={href} className="mt-3 block text-xs text-primary">
-                View evidence →
-              </Link>
-            ))}
-          </section>
-          <section className="rounded-lg border bg-card p-5">
-            <h2 className="text-sm font-medium">Deployments</h2>
-            <p className="mt-3 text-3xl font-semibold">{linked.length}</p>
+
+        <section aria-labelledby="requirements-heading" className="space-y-4">
+          <div>
+            <h2 id="requirements-heading" className="text-base font-medium">
+              What this solution needs
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Tenant Apps bound to this reusable proof contract.
+              Every item below comes from your live organization context. Nothing unavailable is
+              hidden or silently replaced.
             </p>
-            <Link href="/solutions/deployed" className="mt-4 block text-xs text-primary">
-              Manage deployments →
-            </Link>
-          </section>
-        </div>
-        <details className="rounded-lg border">
-          <summary className="cursor-pointer px-5 py-4 text-sm font-medium">
-            Edit blueprint contract
-          </summary>
-          <div className="border-t p-4">
-            <BlueprintForm blueprint={blueprint} />
           </div>
-        </details>
+          <SolutionRequirementList requirements={requirements} />
+        </section>
+
+        <SolutionDeploymentPanel
+          blueprintId={blueprint.id}
+          blueprintVersion={blueprint.currentVersion}
+          solutionTitle={blueprint.title}
+          detailHref={`/solutions/library/${encodeURIComponent(blueprint.id)}`}
+          deploying={deploy === '1'}
+          requirements={requirements}
+          templates={
+            registeredTemplate
+              ? [
+                  {
+                    id: registeredTemplate.id,
+                    title: registeredTemplate.title,
+                    vars: registeredTemplate.templateVars.vars,
+                  },
+                ]
+              : []
+          }
+          pipelines={compatiblePipelines.map((pipeline) => ({
+            id: pipeline.id,
+            label: pipeline.name,
+          }))}
+          connectors={compatibleConnectors.map((connector) => ({
+            id: connector.id,
+            label: connector.name,
+          }))}
+          hasActions={sourceRequirements.actions.length > 0}
+        />
+
+        {/* Adoption state for THIS blueprint, and the contract editor. Both were only on the old
+          library page; keeping them here is what makes this a single place to understand and act. */}
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <Card className="shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Deployments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-mono text-3xl font-semibold tabular-nums">
+                {linkedDeployments.length}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Apps bound to this blueprint. A deployment is what turns this contract's promised
+                outcome into measured evidence.
+              </p>
+              <Link href="/solutions/deployed" className="mt-4 inline-block text-xs text-primary">
+                Manage deployments →
+              </Link>
+            </CardContent>
+          </Card>
+          <details className="rounded-lg border">
+            <summary className="cursor-pointer px-5 py-4 text-sm font-medium">
+              Edit blueprint contract
+            </summary>
+            <div className="border-t p-4">
+              <BlueprintForm blueprint={blueprint} />
+            </div>
+          </details>
+        </section>
       </div>
     </PageFrame>
   );

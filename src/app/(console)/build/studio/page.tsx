@@ -54,12 +54,20 @@ export default async function StudioPage() {
               and report on it.
             </p>
           </div>
-          <Button asChild>
-            <Link href="/solutions/apps/new?mode=chat">
-              <Lightning weight="fill" className="size-4" />
-              New app
-            </Link>
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Templates are contextual to Apps (a template IS an app, published for another team to
+              clone), so they are deliberately not a sidebar row. This is the way in — without it the
+              surface would be orphaned. */}
+            <Button asChild variant="outline">
+              <Link href="/solutions/templates">Start from a template</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/solutions/apps/new?mode=chat">
+                <Lightning weight="fill" className="size-4" />
+                New app
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Stat band */}

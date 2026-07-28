@@ -1,5 +1,8 @@
+import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
 import { PageFrame } from '@/components/PageFrame';
 import { SolutionsFlow } from '@/components/solutions/SolutionsFlow';
+import { listAgentRuns } from '@/lib/agentrun';
+import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { listApps, listTemplates } from '@/lib/apps-store';
 import {
   listSolutionBlueprints,
@@ -41,9 +44,32 @@ export default async function SolutionsRoot() {
     templateCount: (templates ?? []).length,
   });
 
+  // The shared section-hub composition (consistent with the other seven sections), with the flow
+  // rendered in its slot. The three counters alone are what made this page uninformative; the flow
+  // supplies the relationship they cannot express.
+  const runs = await safeWithTimeout(() => listAgentRuns(6, orgId), 1200, null);
+  const model = buildDomainDashboard('solutions', {
+    facts: flow.stages.map((stage) => ({
+      label: stage.title,
+      value: String(stage.count),
+      description: stage.blockedReason ?? stage.whatItIs,
+      href: stage.action.href,
+      state: stage.state === 'blocked' ? ('attention' as const) : ('neutral' as const),
+    })),
+    activities: (runs ?? []).map((run) => ({
+      id: run.id,
+      label: run.agentId,
+      detail: `${run.status}: ${run.query}`,
+      timestamp: run.startedAt.slice(0, 10),
+      href: `/solutions/agents/${run.agentId}/runs/${run.id}`,
+    })),
+  });
+
   return (
     <PageFrame>
-      <SolutionsFlow flow={flow} />
+      <DomainDashboard model={model}>
+        <SolutionsFlow flow={flow} />
+      </DomainDashboard>
     </PageFrame>
   );
 }

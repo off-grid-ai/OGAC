@@ -22,6 +22,17 @@ export default async function SolutionLibraryPage() {
             implement it.
           </p>
         </header>
+        {/* Deployed is contextual to Blueprints (an adoption is a STATE of a blueprint), so it is not a
+          sidebar row. This is the way in. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/solutions/deployed"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-foreground no-underline transition-colors hover:border-primary/50"
+          >
+            Deployed blueprints
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
         <details className="rounded-lg border">
           <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 text-sm font-medium">
             <Plus /> Create a custom blueprint

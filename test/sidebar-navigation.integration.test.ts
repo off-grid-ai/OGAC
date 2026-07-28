@@ -8,9 +8,11 @@ import { SidebarNav } from '../src/components/Sidebar.tsx';
 test('the rendered sidebar is the only global collection hierarchy', () => {
   const html = renderToStaticMarkup(createElement(SidebarNav));
 
+  // Deployed and Templates are intentionally absent: both are `placement: 'contextual'`, discovered
+  // inside their parent surface (Blueprints and Apps) rather than as their own sidebar rows. Their
+  // reachability is asserted in nav-groups.test.ts.
   for (const [label, href] of [
-    ['Library', '/solutions/library'],
-    ['Deployed', '/solutions/deployed'],
+    ['Blueprints', '/solutions/library'],
     ['Prompts', '/work/prompts'],
     ['Artifacts', '/work/artifacts'],
     ['Domains', '/data/domains'],

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   NAV_GROUPS,
@@ -120,8 +121,16 @@ test('every standalone collection is in the sidebar and contextual resources dec
   const contextual = CANONICAL_OWNERS.filter((owner) => owner.placement === 'contextual');
   assert.deepEqual(
     contextual.map((owner) => owner.id),
-    ['agents', 'sandbox', 'quality-results', 'clusters'],
+    ['solution-deployments', 'templates', 'agents', 'sandbox', 'quality-results', 'clusters'],
   );
+  // Solutions previously showed TEN top-level rows, four of them different flavours of "reusable
+  // thing". A deployment is a STATE of a blueprint and a template IS an app, so both now live inside
+  // their parent rather than beside it.
+  assert.equal(
+    contextual.find((owner) => owner.id === 'solution-deployments')?.sidebarParent,
+    'solution-library',
+  );
+  assert.equal(contextual.find((owner) => owner.id === 'templates')?.sidebarParent, 'apps');
   assert.equal(contextual.find((owner) => owner.id === 'agents')?.sidebarParent, 'apps');
   assert.equal(contextual.find((owner) => owner.id === 'sandbox')?.sidebarParent, 'apps');
   assert.equal(
@@ -184,4 +193,47 @@ test('a contextual sidebar parent is a sidebar owner in the same section', () =>
       `${owner.id} sidebar parent must share its section`,
     );
   }
+});
+
+test('the Solutions sidebar stays consolidated — no flat wall of sibling collections', () => {
+  const section = sidebarSections(MODULES).find((candidate) => candidate.id === 'solutions');
+  assert.ok(section, 'solutions section must exist');
+
+  // Was SEVEN top-level rows: Apps, Library, Deployed, Templates, Reviews, Tools, Quality — four of
+  // them different flavours of "reusable thing", with nothing stating how they related. A deployment
+  // is a STATE of a blueprint and a template IS an app, so both are now contextual: discovered inside
+  // their parent's page, which is what `placement: 'contextual'` has always meant here.
+  assert.deepEqual(section.items.map((item) => item.label), [
+    'Apps',
+    'Blueprints',
+    'Reviews',
+    'Tools',
+    'Quality',
+  ]);
+});
+
+/**
+ * Read a route's page source, following a one-line `export { default } from '@/...'` re-export.
+ * Several console routes are thin aliases onto a shared implementation, so reading the route file
+ * alone would assert against an import statement rather than the surface the operator sees.
+ */
+function pageSource(route: string): string {
+  const source = readFileSync(`src/app/(console)/${route}/page.tsx`, 'utf8');
+  const reexport = /export \{ default \} from '@\/(.+?)';/.exec(source.trim());
+  return reexport ? readFileSync(`src/${reexport[1]}.tsx`, 'utf8') : source;
+}
+
+test('demoted Solutions collections stay reachable from their parent surface', () => {
+  // Contextual owners are deliberately absent from the sidebar, so the parent PAGE is the only way in.
+  // If that link is missing the surface is orphaned — a worse defect than a long sidebar.
+  assert.match(
+    pageSource('solutions/apps'),
+    /\/solutions\/templates/,
+    'the Apps page must link Templates',
+  );
+  assert.match(
+    pageSource('solutions/library'),
+    /\/solutions\/deployed/,
+    'the Blueprints page must link Deployed',
+  );
 });

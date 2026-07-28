@@ -67,11 +67,12 @@ function StageCard({ stage, index }: Readonly<{ stage: SolutionStage; index: num
 export function SolutionsFlow({ flow }: Readonly<{ flow: Flow }>) {
   return (
     <div className="w-full space-y-6">
+      {/* No <h1> here: this renders inside the shared DomainDashboard shell, which owns the page
+        heading. Two h1s would break the document outline and the heading assertions in the e2e sweep. */}
       <header>
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">
-          Blueprint · App · Deployment
+          How this fits together
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Solutions</h1>
         <p className="mt-2 max-w-4xl text-sm leading-relaxed text-muted-foreground">
           A <span className="text-foreground">blueprint</span> is the contract — the outcome promised
           and what it requires. An <span className="text-foreground">app</span> is the workflow that

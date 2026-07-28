@@ -1,5 +1,6 @@
 import { ArrowRight } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DomainDashboardModel } from '@/lib/domain-dashboard';
@@ -11,7 +12,19 @@ const FACT_STATE_CLASS = {
   attention: 'border-destructive/50',
 } as const;
 
-export function DomainDashboard({ model }: Readonly<{ model: DomainDashboardModel }>) {
+/**
+ * The shared section-hub composition. Every top-level domain route renders this so the eight sections
+ * look and behave alike (enforced by domain-dashboard-routes.integration.test.ts).
+ *
+ * `children` is an optional slot for section-specific content that the generic fact/activity/module
+ * model cannot express — used by Solutions to show how blueprints, apps and deployments connect, which
+ * three unrelated counters could not convey. It renders between the facts and the activity feed so the
+ * shared shell stays intact rather than a section forking its own layout.
+ */
+export function DomainDashboard({
+  model,
+  children,
+}: Readonly<{ model: DomainDashboardModel; children?: ReactNode }>) {
   return (
     <section aria-labelledby={`${model.id}-dashboard-title`} className="w-full space-y-6">
       <div className="border-b border-border pb-5">
@@ -94,6 +107,8 @@ export function DomainDashboard({ model }: Readonly<{ model: DomainDashboardMode
           </Button>
         </div>
       </div>
+
+      {children}
 
       {model.activities.length ? (
         <div aria-labelledby={`${model.id}-activity-title`}>

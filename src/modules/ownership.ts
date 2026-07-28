@@ -210,10 +210,22 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
   },
 
   {
+    id: 'apps',
+    section: 'solutions',
+    label: 'Apps',
+    description: 'Business use cases and agents across their full lifecycle.',
+    route: '/solutions/apps',
+    gate: 'studio',
+    placement: 'sidebar',
+  },
+  {
     id: 'solution-library',
     section: 'solutions',
-    label: 'Library',
-    description: 'Reusable BFSI solution blueprints with requirements, proof, and ROI contracts.',
+    // "Blueprints" names the ENTITY. "Library" was a container word that said nothing, and sat
+    // alongside "Templates" and "Deployed" as a third indistinguishable flavour of reusable thing.
+    label: 'Blueprints',
+    description:
+      'Outcome contracts an app can implement: what is promised, what data it needs, and its proof.',
     route: '/solutions/library',
     gate: 'studio',
     placement: 'sidebar',
@@ -225,7 +237,9 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Blueprint bindings to tenant Apps, runs, and measured evidence.',
     route: '/solutions/deployed',
     gate: 'studio',
-    placement: 'sidebar',
+    // A deployment is a STATE of a blueprint (this app implements it), not an independent collection.
+    placement: 'contextual',
+    sidebarParent: 'solution-library',
   },
   {
     id: 'templates',
@@ -234,16 +248,9 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     description: 'Reusable workflow SOPs one team publishes for another team to adopt.',
     route: '/solutions/templates',
     gate: 'studio',
-    placement: 'sidebar',
-  },
-  {
-    id: 'apps',
-    section: 'solutions',
-    label: 'Apps',
-    description: 'Business use cases and agents across their full lifecycle.',
-    route: '/solutions/apps',
-    gate: 'studio',
-    placement: 'sidebar',
+    // A template IS an app, published for another team to clone — it belongs inside Apps, not beside it.
+    placement: 'contextual',
+    sidebarParent: 'apps',
   },
   {
     id: 'agents',
