@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
 import { activeTabForPath, appTabHref, lifecycleTabs } from '../src/lib/app-lifecycle.ts';
 
@@ -68,4 +69,35 @@ test('activeTabForPath: an unknown sub-segment falls back to Work', () => {
 test('activeTabForPath: a path for a different app is not claimed', () => {
   assert.equal(activeTabForPath('/solutions/apps/other', 'app_42'), null);
   assert.equal(activeTabForPath('/build/studio', 'app_42'), null);
+});
+
+// ─── Exactly one h1 per app page ─────────────────────────────────────────────────────────────────
+// The app shell (AppLifecycleNav) renders the app's NAME as the h1, so it is present and correct on
+// every tab including those with no heading of their own. A tab page adding its own h1 therefore gives
+// the page two — an incoherent document outline, and a screen reader announcing two page titles.
+// This was shipped briefly when the app name was promoted to h1 while five tab pages still had theirs.
+test('no per-app tab page declares its own h1 — the shell owns it', () => {
+  const dir = 'src/app/(console)/build/apps/[id]';
+  const offenders: string[] = [];
+
+  const walk = (path: string): void => {
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+      const full = `${path}/${entry.name}`;
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name === 'page.tsx' && readFileSync(full, 'utf8').includes('<h1')) {
+        offenders.push(full);
+      }
+    }
+  };
+  walk(dir);
+
+  assert.deepEqual(offenders, [], 'these tab pages must use h2; the app name is the page h1');
+});
+
+test('the app shell renders the app name as the page h1', () => {
+  // The other half of the invariant: if the shell stops declaring one, app pages have no heading at
+  // all — which is how they came to rely on the mobile gate's hidden h1.
+  const nav = readFileSync('src/components/build/AppLifecycleNav.tsx', 'utf8');
+  assert.match(nav, /<h1[^>]*>\s*\{title\}/, 'AppLifecycleNav must render {title} as an h1');
 });

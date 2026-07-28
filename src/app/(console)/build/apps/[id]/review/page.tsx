@@ -32,7 +32,7 @@ export default async function AppReviewTab({ params }: Readonly<{ params: Promis
           <UserCircle className="size-4" weight="fill" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Review</h1>
+          <h2 className="text-lg font-semibold text-foreground">Review</h2>
           <p className="text-sm text-muted-foreground">
             Runs of {app.title} paused for a human decision. Open one to approve, reject, or edit its
             output — the run resumes on your decision.

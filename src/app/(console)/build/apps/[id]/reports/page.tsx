@@ -50,7 +50,7 @@ export default async function AppReportsTab({ params }: Readonly<{ params: Promi
           <ChartBar className="size-4" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Reports</h1>
+          <h2 className="text-lg font-semibold text-foreground">Reports</h2>
           <p className="text-sm text-muted-foreground">
             Outcomes across every run of {app.title} — completions, failures, human decisions,
             exceptions, throughput and cost.

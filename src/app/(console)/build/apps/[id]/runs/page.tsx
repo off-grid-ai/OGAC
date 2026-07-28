@@ -33,7 +33,7 @@ export default async function AppRunsTab({ params }: Readonly<{ params: Promise<
             <Pulse className="size-4" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-foreground">Runs</h1>
+            <h2 className="text-lg font-semibold text-foreground">Runs</h2>
             <p className="text-sm text-muted-foreground">
               Every run of {app.title}.
               {awaiting > 0 ? (

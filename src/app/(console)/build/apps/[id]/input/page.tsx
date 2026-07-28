@@ -47,7 +47,7 @@ export default async function AppInputTab({ params }: Readonly<{ params: Promise
   return (
     <div className="w-full space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-lg font-semibold text-foreground">Run {app.title}</h1>
+        <h2 className="text-lg font-semibold text-foreground">Run {app.title}</h2>
         <Badge variant="secondary" className="bg-muted text-muted-foreground">
           {isSimpleAgent(app) ? 'agent' : `${app.steps.length} steps`}
         </Badge>

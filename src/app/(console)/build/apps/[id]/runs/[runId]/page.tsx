@@ -38,7 +38,7 @@ export default async function AppRunDetail({
             <Pulse className="size-4" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-foreground">{app.title}</h1>
+            <h2 className="text-lg font-semibold text-foreground">{app.title}</h2>
             <p className="text-sm text-muted-foreground">
               Live status — watch each step execute, and approve or reject when it pauses for review.
             </p>
