@@ -1627,7 +1627,7 @@ runs never cross-attribute** (one tenant's spend billed to another would be the 
 so it has its own test); an explicit per-call attribution still wins; a nested scope merges rather
 than erasing; blank values stay honestly absent.
 
-## [G-TEST-LOAD-SENSITIVITY] OPEN (P2, hygiene) — timing tests fail on a loaded machine (2026-07-27)
+## [G-TEST-LOAD-SENSITIVITY] ✅ RESOLVED (2026-07-27) — timing tests were failing on a loaded machine
 
 The suite contains tests that assert **timeout boundaries**, and they fail when the machine is busy —
 which is exactly when someone is iterating (a production build, dev servers, or a parallel test run).
@@ -1706,3 +1706,19 @@ so it is hardening rather than a live exposure.
 To activate: generate a keypair → add it to SeaweedFS `identities.json` and restart the container →
 store the same pair via the credentials route → confirm `source` flips to `vault` and re-run the
 object round-trip.
+
+**✅ RESOLVED (2026-07-27).** Both wall-clock ceilings replaced, keeping the discriminating signal:
+
+- `action-crm` abort boundary — the LOWER bound (`>= 4.5s`) is the real assertion: the call must
+  actually reach the five-second abort rather than failing instantly for an unrelated reason, which
+  would pass for the wrong reason. The upper bound only has to separate "bounded" from "hung", so it
+  is now generous rather than `< 7_000`.
+- `with-timeout` — instead of loosening the tolerance, the GAP was widened: a 5s slow promise against
+  a 30ms deadline, asserting it returned nowhere near the slow promise. The discriminator is "did not
+  wait for it", not an exact wall-clock figure.
+
+**Verified against the real failure condition, not assumed:** 16/16 pass with 8 CPU-saturating
+workers running — the same contention that previously produced 65s, 118s and a full timeout.
+
+The DB-contention half (two integration tests failing under parallel execution on the single shared
+Postgres) is unchanged and remains the weaker point; schema-per-worker is still the fix there.
