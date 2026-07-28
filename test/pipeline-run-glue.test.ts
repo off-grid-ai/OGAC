@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import type { PipelineView } from '@/lib/pipelines';
 import {
   type ChatBindingIO,
-  isAgentPipelineBindingValid,
+  isConsumerPipelineBindingValid,
   resolveAgentBinding,
   resolveChatBinding,
 } from '@/lib/pipeline-run-glue';
@@ -66,13 +66,13 @@ test('agent binding validation is org-scoped and null is deliberately valid', as
     assert.equal(orgId, 'org_a');
     return { id, status: 'published' } as PipelineView;
   };
-  assert.equal(await isAgentPipelineBindingValid(null, 'org_a', lookup), true);
+  assert.equal(await isConsumerPipelineBindingValid(null, 'org_a', lookup), true);
   assert.equal(lookups, 0);
-  assert.equal(await isAgentPipelineBindingValid('pl_a', 'org_a', lookup), true);
+  assert.equal(await isConsumerPipelineBindingValid('pl_a', 'org_a', lookup), true);
   assert.equal(lookups, 1);
-  assert.equal(await isAgentPipelineBindingValid('pl_b', 'org_a', async () => null), false);
+  assert.equal(await isConsumerPipelineBindingValid('pl_b', 'org_a', async () => null), false);
   assert.equal(
-    await isAgentPipelineBindingValid(
+    await isConsumerPipelineBindingValid(
       'pl_draft',
       'org_a',
       async () => ({ id: 'pl_draft', status: 'draft' }) as PipelineView,

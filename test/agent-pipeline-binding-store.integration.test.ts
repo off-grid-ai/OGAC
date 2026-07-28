@@ -85,11 +85,11 @@ describe('agent pipeline binding persistence + tenant isolation (real Postgres)'
     agentB = created.id;
 
     assert.equal(
-      await binding.isAgentPipelineBindingValid(pipelineB, orgA),
+      await binding.isConsumerPipelineBindingValid(pipelineB, orgA),
       false,
       'org A cannot bind a pipeline owned by org B',
     );
-    assert.equal(await binding.isAgentPipelineBindingValid(pipelineB, orgB), true);
+    assert.equal(await binding.isConsumerPipelineBindingValid(pipelineB, orgB), true);
     assert.equal(await store.getCustomAgent(agentB, orgA), undefined, 'org A cannot read B agent');
     assert.equal((await store.getCustomAgent(agentB, orgB))?.pipelineId, pipelineB);
   });

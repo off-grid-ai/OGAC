@@ -38,7 +38,7 @@ export function PipelineNotFound({ id }: Readonly<{ id: string }>) {
               pipeline that exists here.
             </p>
             <Button asChild variant="outline" size="sm">
-              <Link href="/build/pipelines">
+              <Link href="/runtime/pipelines">
                 <ArrowLeft className="size-3" />
                 All pipelines
               </Link>

@@ -175,8 +175,16 @@ export async function resolveAgentRunBinding(
 
 export type AgentPipelineLookup = typeof getPipeline;
 
-/** Validate a persisted/requested agent binding inside the caller's org. Null is deliberately valid. */
-export async function isAgentPipelineBindingValid(
+/**
+ * Validate a persisted/requested CONSUMER binding inside the caller's org. Null is deliberately valid
+ * (unbound is a configuration, not a fault); a non-null id must resolve to a pipeline that exists here
+ * AND is consumable.
+ *
+ * Every consumer that can pin a pipeline — agent, app, chat project — validates through this one rule.
+ * Letting a write accept an unresolvable id is how dangling bindings got persisted in the first place
+ * (G-COH-PIPE-404): the read surfaces then had to guess, and guessed "healthy".
+ */
+export async function isConsumerPipelineBindingValid(
   pipelineId: string | null,
   orgId: string,
   lookup: AgentPipelineLookup = getPipeline,

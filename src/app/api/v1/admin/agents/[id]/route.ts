@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { parseEditPatch } from '@/lib/agent-form';
 import { findAppByAgentId } from '@/lib/apps-store';
 import { requireAdmin } from '@/lib/authz';
-import { isAgentPipelineBindingValid } from '@/lib/pipeline-run-glue';
+import { isConsumerPipelineBindingValid } from '@/lib/pipeline-run-glue';
 import {
   deleteCustomAgent,
   getCustomAgent,
@@ -64,7 +64,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
   if (
     patch.pipelineId !== undefined &&
-    !(await isAgentPipelineBindingValid(patch.pipelineId, orgId))
+    !(await isConsumerPipelineBindingValid(patch.pipelineId, orgId))
   ) {
     return NextResponse.json({ error: 'pipeline not found in this organisation' }, { status: 400 });
   }
