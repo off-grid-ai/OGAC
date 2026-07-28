@@ -48,14 +48,36 @@ export default async function SolutionsRoot() {
   // rendered in its slot. The three counters alone are what made this page uninformative; the flow
   // supplies the relationship they cannot express.
   const runs = await safeWithTimeout(() => listAgentRuns(6, orgId), 1200, null);
+  const publishedApps = (apps ?? []).filter((app) => app.published).length;
+  const adoptableBlueprints = (blueprints ?? []).filter((item) => item.adoptable).length;
   const model = buildDomainDashboard('solutions', {
-    facts: flow.stages.map((stage) => ({
-      label: stage.title,
-      value: String(stage.count),
-      description: stage.blockedReason ?? stage.whatItIs,
-      href: stage.action.href,
-      state: stage.state === 'blocked' ? ('attention' as const) : ('neutral' as const),
-    })),
+    // Deliberately NOT the three chain counts again: the chain below already shows Blueprints / Apps /
+    // Deployed with their descriptions, and repeating them made one page say everything twice. These
+    // are the readiness numbers the chain does not carry.
+    facts: [
+      {
+        label: 'Published apps',
+        value: `${publishedApps} of ${(apps ?? []).length}`,
+        description: 'Only a published app can be run by someone other than its author.',
+        href: '/solutions/apps',
+        state: publishedApps === 0 && (apps ?? []).length > 0 ? ('attention' as const) : ('neutral' as const),
+      },
+      {
+        label: 'Blueprints ready to deploy',
+        value: `${adoptableBlueprints} of ${(blueprints ?? []).length}`,
+        description:
+          'Ready means a real app and governed pipeline already satisfy the contract, so it can be bound now.',
+        href: '/solutions/library',
+        state: adoptableBlueprints === 0 && (blueprints ?? []).length > 0 ? ('attention' as const) : ('neutral' as const),
+      },
+      {
+        label: 'Reusable templates',
+        value: String(flow.templateCount),
+        description: 'Apps published for another team to clone as a starting point.',
+        href: '/solutions/templates',
+        state: 'neutral' as const,
+      },
+    ],
     activities: (runs ?? []).map((run) => ({
       id: run.id,
       label: run.agentId,

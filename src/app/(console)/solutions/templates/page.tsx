@@ -22,7 +22,7 @@ export default async function TemplateLibraryPage() {
       <div className="w-full space-y-6">
         <header>
           <p className="text-[10px] uppercase tracking-widest text-primary">Reusable SOPs</p>
-          <h1 className="mt-1 text-xl font-semibold">Template library</h1>
+          <h1 className="mt-1 text-xl font-semibold">Templates</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Workflows one team built and published so another team can adopt them in minutes — no
             rebuilding. Open a template to see its steps and the values you fill in, then adopt it

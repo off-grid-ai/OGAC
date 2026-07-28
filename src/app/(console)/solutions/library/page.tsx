@@ -15,7 +15,7 @@ export default async function SolutionLibraryPage() {
       <div className="space-y-6">
         <header>
           <p className="text-[10px] uppercase tracking-widest text-primary">Use-case contracts</p>
-          <h1 className="mt-1 text-xl font-semibold">Solution library</h1>
+          <h1 className="mt-1 text-xl font-semibold">Blueprints</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Reusable BFSI contracts define the owner, requirements, outcome hypothesis, and
             evidence. A Blueprint is deployable only after a real App and governed pipeline
@@ -56,10 +56,12 @@ export default async function SolutionLibraryPage() {
                       {blueprint.industry} · {blueprint.process}
                     </span>
                     <h2 className="mt-1 font-medium">{blueprint.title}</h2>
+                    {/* "Runtime contract satisfied" / "Runtime bindings incomplete" described the
+                      internal check, not what the operator can DO about it. */}
                     <p className="mt-1 text-xs text-muted-foreground">
                       {blueprint.adoptable
-                        ? 'Runtime contract satisfied'
-                        : 'Runtime bindings incomplete'}
+                        ? 'Ready to deploy'
+                        : 'Not ready — no app implements this contract yet'}
                     </p>
                   </div>
                   <ArrowRight className="mt-1 size-4 text-muted-foreground transition-transform group-hover:translate-x-1" />

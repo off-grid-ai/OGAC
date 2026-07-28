@@ -58,7 +58,7 @@ const DOMAIN_DEFINITIONS: Record<DomainDashboardId, DomainDefinition> = {
     summary:
       'Codify important business processes into reusable AI apps, then prove and improve their value through every run.',
     primaryAction: { label: 'Build an app', href: '/solutions/apps/new' },
-    secondaryAction: { label: 'Browse library', href: '/solutions/library' },
+    secondaryAction: { label: 'Browse blueprints', href: '/solutions/library' },
   },
   data: {
     headline: 'Make enterprise context reusable intelligence',
