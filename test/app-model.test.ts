@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   type AppSpec,
@@ -346,4 +347,17 @@ test('appNeedsDataSource: false for an app with no connector-query steps at all'
     edges: [{ from: 's1', to: 's2' }],
   });
   assert.equal(appNeedsDataSource(app), false);
+});
+
+// ─── Every supported trigger must be offerable in the builder ────────────────────────────────────
+// WhatsApp shipped as a valid TriggerKind, was dispatched by lib/triggers.ts, and was still absent
+// from the builder's picker — a capability the platform ran but no author could select. This asserts
+// the model's trigger list stays complete, so adding a kind without surfacing it fails here.
+test('TRIGGER_KINDS covers every channel the builder offers, WhatsApp included', () => {
+  const builder = readFileSync('src/components/build/AppBuilder.tsx', 'utf8');
+  // Tolerate multi-line entries: a prettier-wrapped option is still an offered option.
+  const offered = [...builder.matchAll(/kind: '([a-z-]+)',\s*label:/g)].map((m) => m[1]);
+  for (const kind of ['on-demand', 'webhook', 'schedule', 'email', 'whatsapp']) {
+    assert.ok(offered.includes(kind), `${kind} must be offered in the builder's trigger picker`);
+  }
 });

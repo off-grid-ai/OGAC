@@ -113,11 +113,20 @@ const STEP_KINDS: { kind: AppStepKind; label: string }[] = [
   { kind: 'output', label: 'Output' },
 ];
 
+// Every TriggerKind the model supports must be offered here. WhatsApp was accepted by AppSpec and
+// dispatched by lib/triggers.ts but missing from this list, so an author could not choose a channel the
+// platform already ran — and work that already arrives by WhatsApp is exactly the enterprise input this
+// is for. A trigger the model supports but the builder hides is a capability nobody can reach.
 const TRIGGERS: { kind: TriggerKind; label: string; hint: string }[] = [
   { kind: 'on-demand', label: 'On demand', hint: 'A person runs it from a form' },
   { kind: 'webhook', label: 'Webhook', hint: 'An inbound HTTP call starts a run' },
   { kind: 'schedule', label: 'Schedule', hint: 'Runs on a recurring cron' },
   { kind: 'email', label: 'Email', hint: 'An incoming email starts a run (on-prem)' },
+  {
+    kind: 'whatsapp',
+    label: 'WhatsApp',
+    hint: 'An incoming WhatsApp message starts a run (on-prem gateway)',
+  },
 ];
 
 const VISIBILITY: { id: AppSpec['visibility']; label: string; hint: string }[] = [
