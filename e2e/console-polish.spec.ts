@@ -55,7 +55,11 @@ for (const surface of OPERATOR_SURFACES) {
     const response = await page.goto(surface.path, { waitUntil: 'networkidle' });
     expect(response?.status(), `${surface.name} should load`).toBeLessThan(400);
 
-    await expect(page.locator('h1').first()).toBeVisible();
+    const heading = page.locator('h1').first();
+    await expect(heading).toBeVisible();
+    // The mobile gate is always server-rendered and hidden only by CSS, so its heading used to be the
+    // first h1 on EVERY page — satisfying this assertion while telling us nothing about the surface.
+    await expect(heading).not.toHaveText(/bigger screen/i);
     // A surface that renders an unhandled error boundary is broken even if the route returns 200.
     await expect(page.getByText(/application error|unhandled runtime|something went wrong/i)).toHaveCount(0);
   });

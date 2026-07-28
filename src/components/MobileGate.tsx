@@ -21,7 +21,12 @@ export function MobileGate() {
         <p className="font-mono text-[0.7rem] uppercase tracking-[0.2em] text-primary">
           Off Grid AI
         </p>
-        <h1 className="text-lg font-semibold text-foreground">Open this on a bigger screen</h1>
+        {/* NOT an h1. This gate is always server-rendered and only hidden by CSS (md:hidden), so an
+          h1 here became the FIRST heading on every console page — the document's title read "Open this
+          on a bigger screen" at every viewport, screen-reader users at desktop width heard it as the
+          page title, and it silently satisfied the h1 assertions in the e2e suite and screen sweep,
+          hiding pages that have no real heading of their own. It is styled identically. */}
+        <p className="text-lg font-semibold text-foreground">Open this on a bigger screen</p>
       </div>
 
       <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
