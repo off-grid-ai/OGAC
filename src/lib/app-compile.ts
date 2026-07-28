@@ -803,6 +803,45 @@ export const defaultDeps: CompileDeps = {
   modelDecompose: (description, domains) => gatewayDecompose(description, domains),
 };
 
+/**
+ * The declared data sources, as the prompt lists them. PURE. The model may ONLY name one of these,
+ * and every phrase it returns is still re-resolved by us — this constrains the model, it does not
+ * trust it.
+ */
+function declaredDomainList(domains: DataDomain[]): string {
+  if (domains.length === 0) return '(none declared)';
+  return domains.map(domainPromptLine).join('\n');
+}
+
+function domainPromptLine(d: DataDomain): string {
+  const aliases = d.aliases?.length ? ` (aka: ${d.aliases.join(', ')})` : '';
+  return `- ${d.label}${aliases}`;
+}
+
+/** The assistant message text from an OpenAI-shaped completion, or '' if the reply is not one. */
+function completionText(data: unknown): string {
+  const choices = (data as { choices?: { message?: { content?: string } }[] })?.choices;
+  return String(choices?.[0]?.message?.content ?? '');
+}
+
+/**
+ * Pull a step plan out of the model's reply, or null. PURE.
+ *
+ * Every failure here is a reason to FALL BACK to the deterministic heuristic, not to throw: a chatty
+ * reply, no JSON object in it, malformed JSON, or a shape with no steps. The compiler must always
+ * yield a spec, so an unusable model response is a non-event.
+ */
+function parseModelPlan(data: unknown): ModelPlan | null {
+  const m = /\{[\s\S]*\}/.exec(completionText(data));
+  if (!m) return null;
+  try {
+    const parsed = JSON.parse(m[0]) as ModelPlan;
+    return Array.isArray(parsed.steps) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 // Ask the local gateway to decompose the description. Constrains the model to ONLY the declared
 // domain labels/aliases; we still re-resolve every returned phrase. Returns null on any failure/junk
 // so the caller falls back to the deterministic heuristic — the compiler always yields a spec.
@@ -810,12 +849,7 @@ async function gatewayDecompose(
   description: string,
   domains: DataDomain[],
 ): Promise<ModelPlan | null> {
-  const domainList =
-    domains.length > 0
-      ? domains
-          .map((d) => `- ${d.label}${d.aliases?.length ? ` (aka: ${d.aliases.join(', ')})` : ''}`)
-          .join('\n')
-      : '(none declared)';
+  const domainList = declaredDomainList(domains);
 
   const sys =
     'You decompose a described business process into an ordered list of workflow steps for a ' +
@@ -852,13 +886,7 @@ async function gatewayDecompose(
       signal: AbortSignal.timeout(45000),
     });
     if (!r.ok) return null;
-    const data = await r.json();
-    const text: string = data?.choices?.[0]?.message?.content ?? '';
-    const m = /\{[\s\S]*\}/.exec(text);
-    if (!m) return null;
-    const parsed = JSON.parse(m[0]) as ModelPlan;
-    if (!Array.isArray(parsed.steps)) return null;
-    return parsed;
+    return parseModelPlan(await r.json());
   } catch {
     return null; // gateway unavailable / timeout / junk → deterministic fallback
   }
