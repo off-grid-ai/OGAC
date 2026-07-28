@@ -150,52 +150,70 @@ export function assembleFromPlan(
     const kind = String(ps.kind ?? '').trim();
     n += 1;
     const idBase = `s${n}`;
-    switch (kind) {
-      case 'connector-query': {
-        const phrase = (ps.dataPhrase ?? ps.label ?? '').trim();
-        const bound = bindDataPhrase(phrase, domains, idBase, ps.label, gaps);
-        if (bound) steps.push(bound);
-        else n -= 1; // dropped (unbindable) — don't consume a step number
-        break;
-      }
-      case 'agent':
-        steps.push({
-          id: idBase,
-          label: ps.label?.trim() || 'Decision',
-          kind: 'agent',
-          inlineAgent: {
-            systemPrompt:
-              ps.instruction?.trim() ||
-              ps.label?.trim() ||
-              `Reason over the prior step results for: ${description}`,
-            grounded: true,
-          },
-        });
-        break;
-      case 'human':
-        steps.push({ id: idBase, label: ps.label?.trim() || 'Human review', kind: 'human' });
-        break;
-      case 'guardrail':
-        steps.push({ id: idBase, label: ps.label?.trim() || 'Guardrail check', kind: 'guardrail' });
-        break;
-      case 'output':
-        steps.push({
-          id: idBase,
-          label: ps.label?.trim() || 'Output',
-          kind: 'output',
-          sink: normalizeSink(ps.sink),
-        });
-        break;
-      default:
-        // Unknown kind from the model — never guess a step type into existence.
-        gaps.push(`Ignored step of unknown kind '${kind}'${ps.label ? ` (${ps.label})` : ''}`);
-        n -= 1;
-        break;
+
+    // connector-query is the one kind that can legitimately DROP (an unbindable data phrase must
+    // never become a fabricated domain), so it keeps its own branch rather than pretending to be a
+    // plain builder that always returns a step.
+    if (kind === 'connector-query') {
+      const bound = bindDataPhrase(planDataPhrase(ps), domains, idBase, ps.label, gaps);
+      if (bound) steps.push(bound);
+      else n -= 1; // dropped — don't consume a step number
+      continue;
     }
+
+    const build = SIMPLE_STEP_BUILDERS[kind];
+    if (!build) {
+      // Unknown kind from the model — never guess a step type into existence.
+      gaps.push(unknownKindGap(kind, ps.label));
+      n -= 1;
+      continue;
+    }
+    steps.push(build(ps, idBase, description));
   }
 
   return finishAssembly(steps, gaps, plan.title, plan.summary, description);
 }
+
+/** The phrase a connector-query step should bind against — its explicit dataPhrase, else its label. */
+function planDataPhrase(ps: ModelPlanStep): string {
+  return (ps.dataPhrase ?? ps.label ?? '').trim();
+}
+
+/** The honest gap recorded when the model proposes a step kind we do not implement. */
+function unknownKindGap(kind: string, label?: string): string {
+  return `Ignored step of unknown kind '${kind}'${label ? ` (${label})` : ''}`;
+}
+
+/**
+ * The step kinds that map 1:1 from a plan step to an AppStep. A lookup rather than a switch so adding
+ * a kind is a new entry, not another case — and so `assembleFromPlan` reads as the loop it actually
+ * is (bind-or-drop, build, or record a gap) instead of burying that shape under five bodies.
+ */
+const SIMPLE_STEP_BUILDERS: Record<
+  string,
+  (ps: ModelPlanStep, idBase: string, description: string) => AppStep
+> = {
+  agent: (ps, id, description) => ({
+    id,
+    label: ps.label?.trim() || 'Decision',
+    kind: 'agent',
+    inlineAgent: {
+      systemPrompt:
+        ps.instruction?.trim() ||
+        ps.label?.trim() ||
+        `Reason over the prior step results for: ${description}`,
+      grounded: true,
+    },
+  }),
+  human: (ps, id) => ({ id, label: ps.label?.trim() || 'Human review', kind: 'human' }),
+  guardrail: (ps, id) => ({ id, label: ps.label?.trim() || 'Guardrail check', kind: 'guardrail' }),
+  output: (ps, id) => ({
+    id,
+    label: ps.label?.trim() || 'Output',
+    kind: 'output',
+    sink: normalizeSink(ps.sink),
+  }),
+};
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // PURE — deterministic heuristic decomposition (the no-gateway fallback)
