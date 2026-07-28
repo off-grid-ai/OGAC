@@ -132,14 +132,26 @@ export interface AgentRunWorkflowResult {
 
 /** Coerce an unknown into a canonical Actor, or undefined if it isn't a usable {type,id} shape. Pure
  *  — accepts only the two valid actor types and a non-empty id; label defaults to the id. */
+/** A trimmed non-empty string, or undefined. Blank input is ABSENT, never ''. */
+function trimmedOrUndefined(v: unknown): string | undefined {
+  return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+}
+
 export function normalizeActor(raw: unknown): Actor | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as { type?: unknown; id?: unknown; label?: unknown };
   const type = r.type === 'machine' || r.type === 'user' ? r.type : undefined;
-  const id = typeof r.id === 'string' && r.id.trim() ? r.id.trim() : undefined;
+  const id = trimmedOrUndefined(r.id);
+  // An actor needs BOTH a kind and an id; a half-identified actor is worse than none, because it
+  // would attribute an action to something the audit trail cannot resolve.
   if (!type || !id) return undefined;
-  const label = typeof r.label === 'string' && r.label.trim() ? r.label.trim() : id;
-  return { type, id, label };
+  return { type, id, label: trimmedOrUndefined(r.label) ?? id };
+}
+
+/** A required string field, or a throw naming which one was missing. */
+function required(v: unknown, field: string): string {
+  if (typeof v !== 'string' || !v.trim()) throw new Error(`${field} required`);
+  return v;
 }
 
 /** Validate + normalize a raw submission into a workflow input. Throws on missing required fields. */
@@ -155,24 +167,20 @@ export function toWorkflowInput(raw: {
   binding?: unknown;
   asker?: unknown;
 }): AgentRunWorkflowInput {
-  if (typeof raw.agentId !== 'string' || !raw.agentId.trim()) {
-    throw new Error('agentId required');
-  }
-  if (typeof raw.query !== 'string' || !raw.query.trim()) {
-    throw new Error('query required');
-  }
-  if (typeof raw.runId !== 'string' || !raw.runId.trim()) {
-    throw new Error('runId required');
-  }
+  const agentId = required(raw.agentId, 'agentId');
+  const query = required(raw.query, 'query');
+  const runId = required(raw.runId, 'runId');
   return {
-    agentId: raw.agentId,
-    query: raw.query,
-    runId: raw.runId,
+    agentId,
+    query,
+    runId,
     caller: typeof raw.caller === 'string' ? raw.caller : undefined,
     requireReview: raw.requireReview === true,
+    // orgId keeps its UNTRIMMED value when present — it is an identifier the caller supplied, not
+    // display text, and silently rewriting an identifier is how a tenant mismatch hides.
     orgId: typeof raw.orgId === 'string' && raw.orgId.trim() ? raw.orgId : undefined,
     actor: normalizeActor(raw.actor),
-    project: typeof raw.project === 'string' && raw.project.trim() ? raw.project.trim() : undefined,
+    project: trimmedOrUndefined(raw.project),
     asker: normalizeAsker(raw.asker),
     binding: normalizeWorkflowBinding(raw.binding),
   };
@@ -189,20 +197,26 @@ function normalizeAsker(raw: unknown): Asker | undefined {
   return subject || roles.length > 0 ? { subject, roles } : undefined;
 }
 
+/**
+ * Is this a genuinely bound binding? The contract must name the SAME pipeline it is attached to —
+ * a contract for a different pipeline is not a weaker binding, it is the wrong one.
+ */
+function isCoherentBinding(binding: Partial<AgentPipelineBinding>): boolean {
+  if (binding.state !== 'bound') return false;
+  if (typeof binding.pipelineId !== 'string' || !binding.pipelineId.trim()) return false;
+  return Boolean(binding.contract) && binding.contract?.pipelineId === binding.pipelineId;
+}
+
 function normalizeWorkflowBinding(raw: unknown): AgentPipelineBinding | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (typeof raw !== 'object') throw new Error('valid agent binding required');
   const binding = raw as Partial<AgentPipelineBinding>;
   if (binding.state === 'unbound') return { state: 'unbound', pipelineId: null, contract: null };
-  if (
-    binding.state === 'bound' &&
-    typeof binding.pipelineId === 'string' &&
-    binding.pipelineId.trim() &&
-    binding.contract &&
-    binding.contract.pipelineId === binding.pipelineId
-  ) {
+  if (isCoherentBinding(binding)) {
     return binding as Extract<AgentPipelineBinding, { state: 'bound' }>;
   }
+  // Fail CLOSED. A malformed binding must never degrade to "unbound" — that would run the agent
+  // ungoverned, which is precisely the state the binding exists to prevent.
   throw new Error('valid agent binding required');
 }
 

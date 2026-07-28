@@ -4,7 +4,7 @@
 // workflow (worker/app-run.workflow.ts) + its submitter adapter will make. Everything here is a
 // plain function over plain data — the routing decision (does this app NEED the durable path),
 // workflow-id derivation, config resolution, and the pure helpers the workflow uses to advance a
-// multi-step run.  (* one type-only import of AppSpec, erased at compile — safe in a Temporal bundle.)
+// multi-step run.  (* type-only imports, erased at compile — safe inside a Temporal bundle.)
 //
 // WHY a separate durability decision for apps: a single agent only needs Temporal when the operator
 // opts into the async queue (durableEnabled). A multi-step app ALSO needs it whenever it can PAUSE
@@ -12,6 +12,8 @@
 // restart. `shouldRunDurably` encodes exactly that: multi-step OR has-a-human ⇒ durable required.
 
 import type { AppSpec } from '@/lib/app-model';
+import type { Actor } from '@/lib/audit-event';
+import type { Asker } from '@/lib/retrieval/acl';
 
 // ── Config ───────────────────────────────────────────────────────────────────────────────────
 
@@ -96,9 +98,6 @@ export function appWorkflowIdFor(appId: string, runId: string): string {
 }
 
 // ── Workflow I/O contract (2B implements the workflow against this shape) ────────────────────────
-
-import type { Actor } from '@/lib/audit-event';
-import type { Asker } from '@/lib/retrieval/acl';
 
 /**
  * Input handed to AppRunWorkflow (Phase 2B). Carries the resolved caller context (like

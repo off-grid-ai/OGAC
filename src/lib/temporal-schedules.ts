@@ -104,25 +104,42 @@ export function isValidCron(spec: string): boolean {
 }
 
 /** Validate + normalize a create request into a ScheduleSpec. Throws on invalid input. */
+/** A required string field, or a throw naming which one was missing. */
+function requiredField(v: unknown, field: string): string {
+  if (typeof v !== 'string' || !v.trim()) throw new Error(`${field} required`);
+  return v;
+}
+
+/**
+ * The operator's schedule id, sanitised — or a generated one. Throws if sanitisation empties it,
+ * rather than silently substituting a generated id: the operator would then be managing a schedule
+ * under a name they never chose and cannot find.
+ */
+function resolveScheduleId(requested: unknown, agentId: string): string {
+  const base =
+    typeof requested === 'string' && requested.trim()
+      ? requested
+      : `agentsched-${agentId}-${Date.now().toString(36)}`;
+  const id = sanitizeScheduleId(base);
+  if (!id) throw new Error('scheduleId resolved empty after sanitization');
+  return id;
+}
+
 export function toScheduleSpec(raw: CreateScheduleRequest, orgId: string): ScheduleSpec {
   if (!orgId.trim()) throw new Error('orgId required');
-  if (typeof raw.agentId !== 'string' || !raw.agentId.trim()) throw new Error('agentId required');
-  if (typeof raw.query !== 'string' || !raw.query.trim()) throw new Error('query required');
+  const agentId = requiredField(raw.agentId, 'agentId');
+  const query = requiredField(raw.query, 'query');
   if (typeof raw.cron !== 'string' || !isValidCron(raw.cron)) {
     throw new Error('valid cron spec required (5- or 6-field cron, or an @macro)');
   }
-  const requestedId =
-    typeof raw.scheduleId === 'string' && raw.scheduleId.trim()
-      ? sanitizeScheduleId(raw.scheduleId)
-      : sanitizeScheduleId(`agentsched-${raw.agentId}-${Date.now().toString(36)}`);
-  if (!requestedId) throw new Error('scheduleId resolved empty after sanitization');
+  const requestedId = resolveScheduleId(raw.scheduleId, agentId);
   return {
     scheduleId: namespacedScheduleId(orgId, 'agent', requestedId),
     orgId,
     cron: raw.cron.trim(),
     input: {
-      agentId: raw.agentId,
-      query: raw.query,
+      agentId,
+      query,
       caller: typeof raw.caller === 'string' && raw.caller.trim() ? raw.caller : undefined,
       requireReview: raw.requireReview === true,
       orgId,

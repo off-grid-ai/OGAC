@@ -135,25 +135,37 @@ function looksLikeRunId(candidate: string): boolean {
   return UUID_RE.test(candidate);
 }
 
-export function runIdFromWorkflowId(workflowId: string): string | undefined {
-  let prefix: string | undefined;
-  if (workflowId.startsWith('agentrun-')) prefix = 'agentrun-';
-  else if (workflowId.startsWith('apprun-')) prefix = 'apprun-';
-  if (!prefix) return undefined;
-  const rest = workflowId.slice(prefix.length); // <agent-or-app>-<runId>
-  // Scan each '-' boundary; the runId is the FIRST suffix that matches a known runId shape. The
-  // agent/app segment is sanitized to [A-Za-z0-9_.-], so a prefixed/UUID runId is unambiguous
-  // against it (an agentId would have to itself be `run_…`/a UUID to collide — not a real case).
+const WORKFLOW_PREFIXES = ['agentrun-', 'apprun-'] as const;
+
+/**
+ * The first '-'-delimited suffix that LOOKS like a runId. PURE.
+ *
+ * The agent/app segment is sanitised to [A-Za-z0-9_.-], so a prefixed or UUID runId is unambiguous
+ * against it — an agentId would have to itself be `run_…` or a UUID to collide.
+ */
+function recognisedRunId(rest: string): string | undefined {
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] !== '-') continue;
     const candidate = rest.slice(i + 1);
     if (looksLikeRunId(candidate)) return candidate;
   }
-  // No embedded-hyphen runId matched. Fall back to the last '-' token (covers a bare runId with no
-  // recognized prefix and no internal '-', e.g. the `run_x` test fixture) — but never a trailing '-'.
+  return undefined;
+}
+
+/**
+ * Fallback: the text after the LAST '-'. Covers a bare runId with no recognised prefix and no
+ * internal '-'. A trailing '-' yields nothing rather than an empty id.
+ */
+function lastSegment(rest: string): string | undefined {
   const idx = rest.lastIndexOf('-');
-  if (idx < 0 || idx === rest.length - 1) return undefined;
-  return rest.slice(idx + 1);
+  return idx < 0 || idx === rest.length - 1 ? undefined : rest.slice(idx + 1);
+}
+
+export function runIdFromWorkflowId(workflowId: string): string | undefined {
+  const prefix = WORKFLOW_PREFIXES.find((candidate) => workflowId.startsWith(candidate));
+  if (!prefix) return undefined;
+  const rest = workflowId.slice(prefix.length); // <agent-or-app>-<runId>
+  return recognisedRunId(rest) ?? lastSegment(rest);
 }
 
 /** Shape one raw execution-info record into a JSON-safe row. */
