@@ -29,6 +29,8 @@ const PASS = process.env.DEMO_PASS;
 // so that "nothing rendered" means the screen is empty, not that we photographed it mid-fetch.
 const WAIT = Number(process.env.WAIT_MS || 3500);
 const SHOTS = process.env.SHOTS !== '0';
+// Ceiling on each individual DOM read/screenshot, so no single screen can stall the whole sweep.
+const READ_MS = Number(process.env.READ_MS || 8000);
 
 if (!USER || !PASS) {
   console.error('DEMO_USER and DEMO_PASS are required');
@@ -107,6 +109,9 @@ for (const route of routes) {
   let mainText = '';
   let h1 = '';
   let landed = route;
+  // Wall time per route. A screen that takes minutes to become readable is a finding in its own right,
+  // and recording it is what tells a genuinely slow page apart from a sweep that simply hung.
+  const t0 = Date.now();
   try {
     // NOT 'networkidle'. The console's sidebar keeps firing RSC prefetches for the links it shows, so
     // the network never goes idle on a data-dense screen and goto() times out — which the sweep then
@@ -117,7 +122,9 @@ for (const route of routes) {
     status = resp?.status() ?? 0;
     await page.waitForTimeout(WAIT);
     landed = new URL(page.url()).pathname;
-    text = await page.locator('body').innerText().catch(() => '');
+    // Every read below is explicitly bounded. Playwright's default 30s auto-wait, applied three times on
+    // a busy page, let one route (/build/studio/forge) hold the sweep for twelve minutes.
+    text = await page.locator('body').innerText({ timeout: READ_MS }).catch(() => '');
     // The THIN verdict has to be measured on the CONTENT, not on the document. Every authenticated
     // console screen paints ~545 characters of chrome (demo banner + sidebar nav + header), so a screen
     // that rendered literally nothing still reports ~700 body chars and the old `chars < 220` rule could
@@ -126,14 +133,16 @@ for (const route of routes) {
     // do not use one) — otherwise those screens measure 0 content chars and get condemned as THIN.
     mainText =
       (await page.locator('main').count().catch(() => 0)) > 0
-        ? (await page.locator('main').first().innerText().catch(() => '')) || ''
+        ? (await page.locator('main').first().innerText({ timeout: READ_MS }).catch(() => '')) || ''
         : text;
     // ':visible' matters: the small-screen gate ("Open this on a bigger screen") is an h1 that is
     // display:none at 1440px, yet innerText on a hidden node still returns its text — so a plain
     // locator('h1') reports a heading the operator cannot see, and the THIN rule below (which trusts
     // "has an h1") would never fire on a page whose only real content failed to render.
-    h1 = await page.locator('h1:visible').first().innerText().catch(() => '');
-    if (SHOTS) await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false });
+    h1 = await page.locator('h1:visible').first().innerText({ timeout: READ_MS }).catch(() => '');
+    if (SHOTS) {
+      await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false, timeout: READ_MS }).catch(() => {});
+    }
   } catch (e) {
     report.push({ route, verdict: 'BROKEN', reason: `navigation: ${String(e.message).slice(0, 90)}`, status });
     console.log(`BROKEN\t${status}\t${route}\t-\tnavigation failed`);
@@ -167,6 +176,7 @@ for (const route of routes) {
     status,
     chars,
     mainChars,
+    ms: Date.now() - t0,
     mainText: mainChars < 400 ? mainText.replace(/\s+/g, ' ').trim() : undefined,
     h1: h1.slice(0, 60),
     reason: reasons.join(' | ') || undefined,
@@ -182,5 +192,6 @@ const by = (v) => report.filter((r) => r.verdict === v);
 console.log(`\n── ${report.length} screens: ${by('OK').length} OK · ${by('THIN').length} THIN · ${by('BROKEN').length} BROKEN`);
 for (const r of by('BROKEN')) console.log(`BROKEN ${r.route} — ${r.reason}`);
 for (const r of by('THIN')) console.log(`THIN   ${r.route} — ${r.mainChars} chars in <main>: ${r.mainText || ''}`);
+for (const r of report.filter((x) => x.ms > 15000)) console.log(`SLOW   ${r.route} — ${r.ms}ms to become readable`);
 
 await browser.close();
