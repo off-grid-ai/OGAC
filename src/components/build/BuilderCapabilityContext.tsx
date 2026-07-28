@@ -202,24 +202,35 @@ export function BuilderCapabilityContext({
     (item) => item.selectionState === 'selectable-with-approval',
   ).length;
   const readOnly = items.filter((item) => item.selectionState === 'read-only').length;
+  // COLLAPSED BY DEFAULT. This inventory renders ABOVE the app preview, and at ~58 items across four
+  // columns it filled the entire panel — so the builder opened on a catalogue and pushed the thing you
+  // are actually building below the fold. What matters on arrival is the one-line answer ("51 ready"),
+  // not every row; the rows are one click away for when you want to browse.
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Available to you</CardTitle>
-        <CardDescription>
-          Choose from what is already connected and allowed. Options that need setup or approval
-          stay visible with the next step.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-          <span>{ready} ready</span>
-          <span>{approvalRequired} need approval</span>
-          <span>{readOnly} unavailable</span>
-          {view.summary.omitted > 0 ? (
-            <span>{view.summary.omitted} not shown by access</span>
-          ) : null}
-        </div>
+    <details className="group rounded-lg border border-border bg-card">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-3 text-xs">
+        <span className="font-medium text-foreground">What you can use</span>
+        <span className="text-[11px] text-muted-foreground">{ready} ready</span>
+        {approvalRequired > 0 ? (
+          <span className="text-[11px] text-muted-foreground">
+            {approvalRequired} need approval
+          </span>
+        ) : null}
+        {readOnly > 0 ? (
+          <span className="text-[11px] text-muted-foreground">{readOnly} unavailable</span>
+        ) : null}
+        {view.summary.omitted > 0 ? (
+          <span className="text-[11px] text-muted-foreground">
+            {view.summary.omitted} not shown by access
+          </span>
+        ) : null}
+        <span className="ml-auto text-[11px] text-primary group-open:hidden">Browse</span>
+        <span className="ml-auto hidden text-[11px] text-primary group-open:inline">Hide</span>
+      </summary>
+      <div className="space-y-3 border-t border-border p-3">
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Everything already connected and allowed for you. Your app inherits it — you never wire it up.
+        </p>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {slices.map((slice) => (
             <section key={slice.id} className="min-w-0 rounded-md border border-border p-3">
@@ -236,7 +247,9 @@ export function BuilderCapabilityContext({
                   {slice.statusLabel}
                 </Badge>
               </div>
-              {slice.remedyHref ? (
+              {/* Only offer a remedy when something is actually wrong. "Fix this section" next to an
+                "Available" badge contradicts itself and made every section look broken. */}
+              {slice.remedyHref && slice.status !== 'ready' ? (
                 <Link
                   className="mt-2 inline-flex text-[11px] text-primary underline-offset-4 hover:underline"
                   href={slice.remedyHref}
@@ -256,7 +269,7 @@ export function BuilderCapabilityContext({
             </section>
           ))}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </details>
   );
 }

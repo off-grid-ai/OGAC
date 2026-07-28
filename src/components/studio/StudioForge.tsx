@@ -249,13 +249,18 @@ export function StudioForge({
       <div className="flex min-h-[32rem] min-w-0 flex-1 flex-col rounded-lg border border-border bg-card lg:min-h-0">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
           <div className="flex gap-1">
+            {/* Until Forge has produced a spec there is nothing to preview, and all three tabs
+              rendered the SAME placeholder — so clicking Flow or Governance appeared to do nothing at
+              all. Disable them until there is something to show, and say why on hover. */}
             {PREVIEWS.map((item) => (
               <button
                 key={item.id}
                 type="button"
+                disabled={!spec}
+                title={spec ? undefined : 'Describe what you want to build first — then the app, its flow, and its governance appear here.'}
                 onClick={() => navigatePreview(item.id)}
                 aria-pressed={preview === item.id}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 ${
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
                   preview === item.id
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:text-foreground'
@@ -287,8 +292,14 @@ export function StudioForge({
           </div>
           {!spec ? (
             <div className="mx-auto max-w-xl space-y-4 pt-6">
-              <div className="text-center text-sm text-muted-foreground">
-                Your app preview will appear here. It already inherits everything below — you never start from zero.
+              <div className="space-y-2 text-center">
+                <p className="text-sm text-foreground">
+                  Describe what you want in plain language on the left.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Forge builds the steps, binds your data and pipeline, and shows the app here. You can
+                  edit every step afterwards — and you never start from zero.
+                </p>
               </div>
               <InheritanceBanner summary={summary} />
             </div>
