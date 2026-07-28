@@ -42,9 +42,12 @@ export function AppLifecycleNav({
           <span className="text-muted-foreground/40" aria-hidden>
             /
           </span>
-          <span className="truncate text-sm font-medium text-foreground" title={title}>
+          {/* The app's NAME is the page heading. It was a <span>, so every app surface relied on the
+            mobile gate's hidden h1 and had no heading of its own — the document title never said which
+            app you were looking at. Visual weight is unchanged. */}
+          <h1 className="truncate text-sm font-medium text-foreground" title={title}>
             {title}
-          </span>
+          </h1>
           {pipeline ? <PipelineChip pipeline={pipeline} size="xs" /> : null}
           {/* On mobile the rail takes a full row and scrolls sideways; on desktop (md+) it keeps its
               original inline-right position (ml-auto, wrapping) so wide screens are unchanged. */}
