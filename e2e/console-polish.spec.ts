@@ -118,6 +118,25 @@ test('every surface is reachable by its own URL — navigation lives in the addr
   await expect(page.locator('h1').first()).toBeVisible();
 });
 
+test('a pipeline id that does not exist degrades instead of dead-ending in a 404', async ({
+  page,
+}) => {
+  // G-COH-PIPE-404. Operators arrive here from stale bookmarks and from consumers bound to pipelines
+  // that were deleted or seeded into another deployment. A bare 404 gave them no id, no org context
+  // and no way forward.
+  const id = 'pl_e2e_definitely_not_a_real_pipeline';
+  await page.goto(`/runtime/pipelines/${id}`, { waitUntil: 'networkidle' });
+
+  const body = await page.locator('body').innerText();
+  expect(body, 'the degraded state must name the id the operator asked for').toContain(id);
+  expect(
+    /not found in this organisation/i.test(body),
+    'it must say the pipeline is not in THIS org — the read is org-scoped, so that is the only honest claim',
+  ).toBe(true);
+  // The way forward, not a dead end.
+  await expect(page.getByRole('link', { name: /all pipelines/i })).toBeVisible();
+});
+
 test('the quality surface states its empty case honestly', async ({ page }) => {
   await page.goto('/solutions/quality/drift', { waitUntil: 'networkidle' });
 
