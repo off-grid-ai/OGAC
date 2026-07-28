@@ -127,29 +127,52 @@ export function validateBuilderInput(
 ): ValidationResult {
   if (!input) return { ok: false, error: 'missing input' };
   const goal = (input.goal ?? '').trim();
-  if (goal.length < 10) {
-    return { ok: false, error: 'Describe what the assistant should do (at least a sentence).' };
-  }
-  if (goal.length > 4000) return { ok: false, error: 'Description is too long (max 4000 chars).' };
-  const visibility = VISIBILITIES.has(input.visibility as Visibility)
-    ? (input.visibility as Visibility)
-    : 'private';
-  const toolIds = uniqueStrings(input.toolIds);
+  const problem = goalProblem(goal);
+  if (problem) return { ok: false, error: problem };
+
   const collectionIds = uniqueStrings(input.collectionIds);
   const templateId = typeof input.templateId === 'string' ? input.templateId : '';
-  // Grounding defaults on unless explicitly turned off, or the chosen template prefers it off and
-  // the user hasn't overridden it. If the user picked collections, grounding is implied on.
-  const tpl = getTemplate(templateId);
-  let grounded: boolean;
-  if (typeof input.grounded === 'boolean') grounded = input.grounded;
-  else if (tpl) grounded = tpl.grounded;
-  else grounded = true;
-  if (collectionIds.length > 0) grounded = true;
-  const title = (input.title ?? '').trim() || deriveTitle(goal);
   return {
     ok: true,
-    value: { goal, title, templateId, toolIds, collectionIds, grounded, visibility },
+    value: {
+      goal,
+      title: (input.title ?? '').trim() || deriveTitle(goal),
+      templateId,
+      toolIds: uniqueStrings(input.toolIds),
+      collectionIds,
+      grounded: resolveGrounding(input.grounded, getTemplate(templateId), collectionIds.length),
+      visibility: VISIBILITIES.has(input.visibility as Visibility)
+        ? (input.visibility as Visibility)
+        : 'private',
+    },
   };
+}
+
+/**
+ * Why this description cannot be used, in words the author can act on — or null if it is fine. PURE.
+ * The lower bound is deliberately a sentence, not a word: "invoices" describes nothing an assistant
+ * could be built from, and accepting it would produce a confidently useless agent.
+ */
+function goalProblem(goal: string): string | null {
+  if (goal.length < 10) return 'Describe what the assistant should do (at least a sentence).';
+  if (goal.length > 4000) return 'Description is too long (max 4000 chars).';
+  return null;
+}
+
+/**
+ * Should this assistant answer only from its sources? PURE, and ordered by who is most entitled to
+ * decide: an explicit choice by the author wins; otherwise the template's preference; otherwise on.
+ * Picking collections overrides all of it — attaching sources and then not using them is never what
+ * the author meant, and silently ignoring them is how an assistant invents answers.
+ */
+function resolveGrounding(
+  explicit: boolean | undefined,
+  template: GuidedTemplate | undefined,
+  collectionCount: number,
+): boolean {
+  if (collectionCount > 0) return true;
+  if (typeof explicit === 'boolean') return explicit;
+  return template ? template.grounded : true;
 }
 
 function uniqueStrings(v: unknown): string[] {
