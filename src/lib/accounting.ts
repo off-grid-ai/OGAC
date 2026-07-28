@@ -6,6 +6,7 @@ import {
   parseAccountingResponse,
   resolveRange,
 } from '@/lib/accounting-aggs';
+import { opensearchFetch } from '@/lib/opensearch-http';
 import { currentOrgId } from '@/lib/tenancy';
 
 // Usage & spend accounting — token usage + spend attributed PER USER, PER PROJECT/ORG, and PER
@@ -15,7 +16,6 @@ import { currentOrgId } from '@/lib/tenancy';
 // Unreachable/empty → real zeros, never synthetic. The pure query builder + response parser live in
 // accounting-aggs.ts (zero-IO, unit-tested). This is a thin I/O adapter that injects the clock + env
 // and prices via finops.
-import { opensearchFetch } from '@/lib/opensearch-http';
 
 const OS_URL = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
 const OS_INDEX = process.env.OFFGRID_GATEWAY_INDEX ?? 'offgrid-gateway';

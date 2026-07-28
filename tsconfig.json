@@ -38,6 +38,8 @@
     "node_modules",
     "vendor",
     "test",
+    "e2e",
+    "playwright.config.ts",
     "packages"
   ]
 }

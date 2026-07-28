@@ -44,3 +44,7 @@ docs/EY_USE_CASES_PLAN.md
 **/*-ey-seed.ts
 **/ey-usecase*
 **/data-domains-ey-seed*
+
+# Playwright
+test-results/
+playwright-report/

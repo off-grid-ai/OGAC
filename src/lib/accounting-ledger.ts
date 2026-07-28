@@ -54,9 +54,15 @@ export function foldAttributed(rows: readonly LedgerGroupRow[]): AttributedSpend
   for (const row of rows) {
     const label = row.label?.trim() || UNATTRIBUTED;
     const model = row.model?.trim() || UNKNOWN_MODEL;
-    const entry =
-      byLabel.get(label) ??
-      { label, requests: 0, promptTokens: 0, completionTokens: 0, tokens: 0, costUsd: 0, byModel: [] };
+    const entry = byLabel.get(label) ?? {
+      label,
+      requests: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      tokens: 0,
+      costUsd: 0,
+      byModel: [],
+    };
 
     entry.requests += row.requests;
     entry.promptTokens += row.promptTokens;
@@ -76,7 +82,10 @@ export function foldAttributed(rows: readonly LedgerGroupRow[]): AttributedSpend
 
   // Biggest spender first — an operator opens this to find who is costing money.
   return [...byLabel.values()]
-    .map((e) => ({ ...e, byModel: e.byModel.sort((a, b) => b.costUsd - a.costUsd || b.tokens - a.tokens) }))
+    .map((e) => ({
+      ...e,
+      byModel: e.byModel.sort((a, b) => b.costUsd - a.costUsd || b.tokens - a.tokens),
+    }))
     .sort((a, b) => b.costUsd - a.costUsd || b.tokens - a.tokens);
 }
 
@@ -85,9 +94,14 @@ export function foldByModel(rows: readonly LedgerGroupRow[]): ModelSpend[] {
   const byModel = new Map<string, ModelSpend>();
   for (const row of rows) {
     const model = row.model?.trim() || UNKNOWN_MODEL;
-    const entry =
-      byModel.get(model) ??
-      { model, requests: 0, promptTokens: 0, completionTokens: 0, tokens: 0, costUsd: 0 };
+    const entry = byModel.get(model) ?? {
+      model,
+      requests: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      tokens: 0,
+      costUsd: 0,
+    };
     entry.requests += row.requests;
     entry.promptTokens += row.promptTokens;
     entry.completionTokens += row.completionTokens;
@@ -218,10 +232,7 @@ export function hasAttributedSpend(a: Accounting): boolean {
  * console did not originate. If neither can attribute, we say so rather than rendering a confident
  * zero.
  */
-export function chooseAccounting(
-  ledger: Accounting,
-  index: Accounting,
-): ResolvedAccounting {
+export function chooseAccounting(ledger: Accounting, index: Accounting): ResolvedAccounting {
   if (hasAttributedSpend(ledger)) return { accounting: ledger, source: 'ledger' };
   if (hasAttributedSpend(index)) return { accounting: index, source: 'gateway-index' };
   const indexSawTraffic = index.totals.requests > 0;

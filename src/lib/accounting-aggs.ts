@@ -71,7 +71,9 @@ export function accountingQueryClause(
   const scopeFilters = analyticsScopeFilters(org, pipelineTag);
   if (!fromIso && !toIso) return scopedQuery(scopeFilters);
   const range = {
-    range: { '@timestamp': { ...(fromIso ? { gte: fromIso } : {}), ...(toIso ? { lte: toIso } : {}) } },
+    range: {
+      '@timestamp': { ...(fromIso ? { gte: fromIso } : {}), ...(toIso ? { lte: toIso } : {}) },
+    },
   };
   // No org/pipeline scope → keep the bare range clause (backward-compatible single-tenant shape).
   // With scope filters, AND them alongside the range under a bool.filter.
@@ -110,11 +112,21 @@ export function buildAccountingQuery(
       // Per actor (user) and per project — each with a nested per-model split for correct pricing.
       // `missing` folds docs with no value into the explicit unattributed bucket.
       by_actor: {
-        terms: { field: ACTOR_FIELD, size: TERMS_SIZE, missing: UNATTRIBUTED, order: { tokens: 'desc' } },
+        terms: {
+          field: ACTOR_FIELD,
+          size: TERMS_SIZE,
+          missing: UNATTRIBUTED,
+          order: { tokens: 'desc' },
+        },
         aggs: tokenSums(),
       },
       by_project: {
-        terms: { field: PROJECT_FIELD, size: TERMS_SIZE, missing: UNATTRIBUTED, order: { tokens: 'desc' } },
+        terms: {
+          field: PROJECT_FIELD,
+          size: TERMS_SIZE,
+          missing: UNATTRIBUTED,
+          order: { tokens: 'desc' },
+        },
         aggs: tokenSums(),
       },
     },
@@ -241,29 +253,52 @@ type AccountingRange = { from: string | null; to: string | null };
 // Shared default; frozen so a caller mutating a returned view.range can't leak back here.
 const EMPTY_RANGE: AccountingRange = Object.freeze({ from: null, to: null });
 
+/** Price a bucket list and rank it by cost, biggest spender first. PURE. */
+function rankBySpend<B, T extends { costUsd: number }>(
+  buckets: B[] | undefined,
+  price: (bucket: B) => T,
+): T[] {
+  return (buckets ?? []).map(price).sort((a, b) => b.costUsd - a.costUsd);
+}
+
+/** The three org-level token sums, each a whole number; a missing aggregation is zero, not NaN. */
+function orgTokenTotals(aggs: {
+  org_prompt_tokens?: { value?: unknown };
+  org_completion_tokens?: { value?: unknown };
+  org_tokens?: { value?: unknown };
+}): { promptTokens: number; completionTokens: number; tokens: number } {
+  return {
+    promptTokens: wholeTokens(aggs.org_prompt_tokens?.value),
+    completionTokens: wholeTokens(aggs.org_completion_tokens?.value),
+    tokens: wholeTokens(aggs.org_tokens?.value),
+  };
+}
+
+/** A token count as a whole number; a missing aggregation is zero, not NaN. */
+function wholeTokens(value: unknown): number {
+  return Math.round(num(value));
+}
+
 export function parseAccountingResponse(
   resp: OsAccountingResponse,
   range: AccountingRange = EMPTY_RANGE,
 ): Accounting {
   const aggs = resp.aggregations ?? {};
 
-  const byModel = (aggs.by_model?.buckets ?? []).map(modelSpend).sort((a, b) => b.costUsd - a.costUsd);
-  const byActor = (aggs.by_actor?.buckets ?? []).map(attributedSpend).sort((a, b) => b.costUsd - a.costUsd);
-  const byProject = (aggs.by_project?.buckets ?? [])
-    .map(attributedSpend)
-    .sort((a, b) => b.costUsd - a.costUsd);
-
-  // Org spend = Σ over the top-level per-model buckets (each priced at its own rate).
-  const costUsd = round4(byModel.reduce((a, m) => a + m.costUsd, 0));
+  // Every rollup is priced-then-sorted the same way; the terms agg orders by TOKENS, but an operator
+  // opens this to find who is costing money, so the display order is by priced cost.
+  const byModel = rankBySpend(aggs.by_model?.buckets, modelSpend);
+  const byActor = rankBySpend(aggs.by_actor?.buckets, attributedSpend);
+  const byProject = rankBySpend(aggs.by_project?.buckets, attributedSpend);
 
   return {
     range,
     totals: {
       requests: totalHits(resp),
-      promptTokens: Math.round(num(aggs.org_prompt_tokens?.value)),
-      completionTokens: Math.round(num(aggs.org_completion_tokens?.value)),
-      tokens: Math.round(num(aggs.org_tokens?.value)),
-      costUsd,
+      ...orgTokenTotals(aggs),
+      // Org spend = Σ over the top-level per-model buckets, each priced at its OWN rate. Summing a
+      // combined token count would mix a local model's zero rate with a cloud one.
+      costUsd: round4(byModel.reduce((sum, m) => sum + m.costUsd, 0)),
     },
     byActor,
     byProject,
@@ -272,9 +307,7 @@ export function parseAccountingResponse(
 }
 
 // Real-zeros fallback when OpenSearch is unreachable — identical to aggregating over no docs.
-export function emptyAccounting(
-  range: AccountingRange = EMPTY_RANGE,
-): Accounting {
+export function emptyAccounting(range: AccountingRange = EMPTY_RANGE): Accounting {
   return {
     range,
     totals: { requests: 0, promptTokens: 0, completionTokens: 0, tokens: 0, costUsd: 0 },
