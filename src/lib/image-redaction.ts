@@ -158,19 +158,16 @@ function decodeImage(value: unknown): Uint8Array {
   return bytes;
 }
 
+/** Raster signatures, as data. The BYTES decide the type — a declared media type is a claim. */
+const IMAGE_SIGNATURES: Record<ImageRedactionMediaType, readonly number[]> = {
+  'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  'image/jpeg': [0xff, 0xd8, 0xff],
+};
+
 function validateSignature(bytes: Uint8Array, type: ImageRedactionMediaType): void {
-  const png =
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47 &&
-    bytes[4] === 0x0d &&
-    bytes[5] === 0x0a &&
-    bytes[6] === 0x1a &&
-    bytes[7] === 0x0a;
-  const jpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  if ((type === 'image/png' && !png) || (type === 'image/jpeg' && !jpeg)) {
+  const magic = IMAGE_SIGNATURES[type];
+  const matches = bytes.length >= magic.length && magic.every((b, i) => bytes[i] === b);
+  if (!matches) {
     throw new ImageRedactionError(
       'unsupported-media',
       'declared media type does not match image bytes',
@@ -188,39 +185,47 @@ export function decodeImageRedactionBytes(
   return bytes;
 }
 
-function imagePolicy(entityTypes: unknown, scoreThreshold: unknown): ImageRedactionPolicy {
+/** The entity set to redact: supplied or the default, normalised and checked. Throws on junk. */
+function policyEntityTypes(entityTypes: unknown): string[] {
   const supplied = entityTypes === undefined ? [...DEFAULT_IMAGE_REDACTION_ENTITIES] : entityTypes;
-  if (
-    !Array.isArray(supplied) ||
-    supplied.length < 1 ||
-    supplied.length > IMAGE_REDACTION_LIMITS.maxEntities
-  ) {
+  const withinBounds =
+    Array.isArray(supplied) &&
+    supplied.length >= 1 &&
+    supplied.length <= IMAGE_REDACTION_LIMITS.maxEntities;
+  if (!withinBounds) {
     throw new ImageRedactionError(
       'invalid-policy',
       'entityTypes must contain between 1 and 32 values',
     );
   }
   const normalized = [
-    ...new Set(
-      supplied.map((value) => (typeof value === 'string' ? value.trim().toUpperCase() : '')),
-    ),
+    ...new Set(supplied.map((v) => (typeof v === 'string' ? v.trim().toUpperCase() : ''))),
   ].sort();
-  if (normalized.some((value) => !ENTITY_TYPE.test(value))) {
+  if (normalized.some((v) => !ENTITY_TYPE.test(v))) {
     throw new ImageRedactionError(
       'invalid-policy',
       'entityTypes contains an invalid entity identifier',
     );
   }
+  return normalized;
+}
+
+/** The confidence floor for a redaction. Defaults to 0.65; anything supplied must be a real 0–1. */
+function policyThreshold(scoreThreshold: unknown): number {
   const threshold = scoreThreshold === undefined ? 0.65 : scoreThreshold;
-  if (
-    typeof threshold !== 'number' ||
-    !Number.isFinite(threshold) ||
-    threshold < 0 ||
-    threshold > 1
-  ) {
+  const usable =
+    typeof threshold === 'number' && Number.isFinite(threshold) && threshold >= 0 && threshold <= 1;
+  if (!usable) {
     throw new ImageRedactionError('invalid-policy', 'scoreThreshold must be between 0 and 1');
   }
-  return { entityTypes: normalized, scoreThreshold: threshold };
+  return threshold;
+}
+
+function imagePolicy(entityTypes: unknown, scoreThreshold: unknown): ImageRedactionPolicy {
+  return {
+    entityTypes: policyEntityTypes(entityTypes),
+    scoreThreshold: policyThreshold(scoreThreshold),
+  };
 }
 
 /** Decode and validate a client payload before any provider I/O occurs. */
@@ -247,6 +252,36 @@ export function parseImageRedactionCommand(
 }
 
 /** Aggregate provider findings without accepting text, offsets or coordinates into evidence. */
+/**
+ * One provider detection, validated. Throws rather than skipping a bad one.
+ *
+ * A detection outside the requested entity set or below the caller's own threshold means the
+ * provider did not honour the policy — dropping it quietly would produce evidence that understates
+ * what was actually found, which is worse than refusing the whole response.
+ */
+function checkedDetection(
+  detection: { entityType: unknown; score: unknown },
+  allowed: ReadonlySet<string>,
+  threshold: number,
+): { entityType: string; score: number } {
+  const entityType =
+    typeof detection.entityType === 'string' ? detection.entityType.trim().toUpperCase() : '';
+  const score = detection.score;
+  const valid =
+    allowed.has(entityType) &&
+    typeof score === 'number' &&
+    Number.isFinite(score) &&
+    score >= threshold &&
+    score <= 1;
+  if (!valid) {
+    throw new ImageRedactionError(
+      'provider-invalid-response',
+      'provider returned invalid detection evidence',
+    );
+  }
+  return { entityType, score: score as number };
+}
+
 export function summarizeImageRedactionEntities(
   detections: ReadonlyArray<{ entityType: unknown; score: unknown }>,
   policy: ImageRedactionPolicy,
@@ -260,21 +295,7 @@ export function summarizeImageRedactionEntities(
   const allowed = new Set(policy.entityTypes);
   const grouped = new Map<string, { count: number; maxScore: number }>();
   for (const detection of detections) {
-    const entityType =
-      typeof detection.entityType === 'string' ? detection.entityType.trim().toUpperCase() : '';
-    const score = detection.score;
-    if (
-      !allowed.has(entityType) ||
-      typeof score !== 'number' ||
-      !Number.isFinite(score) ||
-      score < policy.scoreThreshold ||
-      score > 1
-    ) {
-      throw new ImageRedactionError(
-        'provider-invalid-response',
-        'provider returned invalid detection evidence',
-      );
-    }
+    const { entityType, score } = checkedDetection(detection, allowed, policy.scoreThreshold);
     const current = grouped.get(entityType) ?? { count: 0, maxScore: 0 };
     grouped.set(entityType, {
       count: current.count + 1,

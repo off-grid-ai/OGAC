@@ -1,5 +1,5 @@
-import { ingestDatabase, ingestFile, ingestImage, ingestText } from '@/lib/ingest';
 import type { BrainDoc } from '@/lib/brain';
+import { ingestDatabase, ingestFile, ingestImage, ingestText } from '@/lib/ingest';
 
 /** Tenant-scoped request contract shared by the Brain route and integration tests. */
 export interface BrainIngestBody {

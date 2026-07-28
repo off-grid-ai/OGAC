@@ -144,22 +144,25 @@ export function applyColumnRules(
  * choosing per-column. Conservative by design: unknown/blank labels default to 'detect' (scan it),
  * never 'keep' — fail toward caution.
  */
+/**
+ * How each sensitivity label is handled, as data.
+ *
+ * The DEFAULT is 'detect', not 'keep': an unrecognised or missing label means we do not know what is
+ * in the column, and scanning it is the safe reading. Defaulting to keep would silently pass unknown
+ * data through the moment someone introduces a new label.
+ */
+const SENSITIVITY_ACTIONS: Record<string, RedactionAction> = {
+  public: 'keep',
+  internal: 'keep',
+  confidential: 'mask',
+  restricted: 'drop',
+  secret: 'drop',
+  pii: 'detect',
+  sensitive: 'detect',
+};
+
 export function actionForSensitivity(label: string | undefined): RedactionAction {
-  switch ((label ?? '').trim().toLowerCase()) {
-    case 'public':
-    case 'internal':
-      return 'keep';
-    case 'confidential':
-      return 'mask';
-    case 'restricted':
-    case 'secret':
-      return 'drop';
-    case 'pii':
-    case 'sensitive':
-      return 'detect';
-    default:
-      return 'detect';
-  }
+  return SENSITIVITY_ACTIONS[(label ?? '').trim().toLowerCase()] ?? 'detect';
 }
 
 export function policyFromClassifications(
@@ -177,6 +180,81 @@ export function policyFromClassifications(
  * PII port over its free-text values and replace with the redacted text. The PiiPort is injected
  * (regex floor or Presidio) so this function is testable against the always-on regex with no network.
  */
+type DetectionStatus = NonNullable<RedactionResult['detection']>['status'];
+
+/**
+ * Merge one cell's detector status into the batch's. PURE.
+ *
+ * Severity wins, and it is one-way: once any cell reported the detector DOWN, the batch cannot climb
+ * back to "applied" because a later cell happened to scan. Reporting the best status seen would tell
+ * an operator their data was screened when part of it was not.
+ */
+const DETECTION_SEVERITY: Record<string, number> = {
+  applied: 0,
+  fallback: 1,
+  unconfigured: 2,
+  down: 3,
+};
+
+function worstDetectionStatus(
+  current: DetectionStatus,
+  incoming: string | undefined,
+): DetectionStatus {
+  const severity = DETECTION_SEVERITY[incoming ?? ''] ?? 0;
+  return severity > (DETECTION_SEVERITY[current] ?? 0) ? (incoming as DetectionStatus) : current;
+}
+
+/** The scannable text in a cell, or null when there is nothing to scan. PURE. */
+function cellText(row: Record<string, unknown>, col: string): string | null {
+  if (!(col in row)) return null;
+  const raw = row[col];
+  if (raw == null) return null;
+  const text = String(raw);
+  return text.length === 0 ? null : text;
+}
+
+/** Record one more redaction against a column. */
+function countRedaction(
+  report: Map<string, { column: string; action: RedactionAction; changed: number }>,
+  col: string,
+): void {
+  const entry = report.get(col) ?? { column: col, action: 'detect' as RedactionAction, changed: 0 };
+  entry.changed++;
+  report.set(col, entry);
+}
+
+/** What a detect pass accumulates across every scanned cell. */
+interface DetectionAccumulator {
+  engines: Set<string>;
+  reasons: Set<string>;
+  report: Map<string, { column: string; action: RedactionAction; changed: number }>;
+  status: DetectionStatus;
+}
+
+/** Scan one row's detect-columns in place, folding what was learned into the accumulator. */
+async function scanRow(
+  row: Record<string, unknown>,
+  detectCols: string[],
+  pii: PiiPort,
+  orgId: string | undefined,
+  acc: DetectionAccumulator,
+): Promise<void> {
+  for (const col of detectCols) {
+    const cell = cellText(row, col);
+    if (cell === null) continue; // absent or empty — nothing to scan
+
+    const scan = await pii.scan(cell, orgId);
+    acc.engines.add(scan.engine);
+    if (scan.reason) acc.reasons.add(scan.reason);
+    acc.status = worstDetectionStatus(acc.status, scan.status);
+    if (!scan.hits) continue;
+
+    // A hit with no redacted form still must not leave the original in place.
+    row[col] = scan.redacted ?? '[REDACTED]';
+    countRedaction(acc.report, col);
+  }
+}
+
 export async function redactBatch(
   rows: Record<string, unknown>[],
   policy: RedactionPolicy,
@@ -191,31 +269,9 @@ export async function redactBatch(
   const engines = new Set<string>();
   const reasons = new Set<string>();
   let detectionStatus: NonNullable<RedactionResult['detection']>['status'] = 'applied';
-  for (const row of base.rows) {
-    for (const col of detectCols) {
-      if (!(col in row)) continue;
-      const raw = row[col];
-      if (raw == null || String(raw).length === 0) continue;
-      const scan = await pii.scan(String(raw), orgId);
-      engines.add(scan.engine);
-      if (scan.reason) reasons.add(scan.reason);
-      if (scan.status === 'down') detectionStatus = 'down';
-      else if (scan.status === 'unconfigured' && detectionStatus !== 'down')
-        detectionStatus = 'unconfigured';
-      else if (scan.status === 'fallback' && detectionStatus === 'applied')
-        detectionStatus = 'fallback';
-      if (scan.hits) {
-        row[col] = scan.redacted ?? '[REDACTED]';
-        const e = report.get(col) ?? {
-          column: col,
-          action: 'detect' as RedactionAction,
-          changed: 0,
-        };
-        e.changed++;
-        report.set(col, e);
-      }
-    }
-  }
+  const acc: DetectionAccumulator = { engines, reasons, report, status: detectionStatus };
+  for (const row of base.rows) await scanRow(row, detectCols, pii, orgId, acc);
+  detectionStatus = acc.status;
   const reportArr = [...report.values()];
   return {
     rows: base.rows,

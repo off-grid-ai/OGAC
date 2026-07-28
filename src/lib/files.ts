@@ -32,7 +32,10 @@ const base = `${S3}/${BUCKET}`;
 // The one S3 request seam. Fetches the broker credential; if it's an S3 keypair, SigV4-signs the
 // request (adds authorization + x-amz-date + x-amz-content-sha256). If it's `none` (unprovisioned),
 // the request is issued EXACTLY as before — same URL, same method, same headers, no signing.
-async function s3Fetch(url: string, init: RequestInit & { body?: Uint8Array } = {}): Promise<Response> {
+async function s3Fetch(
+  url: string,
+  init: RequestInit & { body?: Uint8Array } = {},
+): Promise<Response> {
   const cred = await getServiceCredential('seaweedfs');
   if (cred.kind !== 's3') return fetch(url, init);
   const method = (init.method ?? 'GET').toUpperCase();
@@ -50,7 +53,10 @@ async function s3Fetch(url: string, init: RequestInit & { body?: Uint8Array } = 
   const { host: _host, ...authHeaders } = signed;
   return fetch(url, { ...init, headers: { ...callerHeaders, ...authHeaders } });
 }
-const PUBLIC_BASE = (process.env.OFFGRID_PUBLIC_BASE || 'https://gateway.getoffgridai.co').replace(/\/$/, '');
+const PUBLIC_BASE = (process.env.OFFGRID_PUBLIC_BASE || 'https://gateway.getoffgridai.co').replace(
+  /\/$/,
+  '',
+);
 
 // The internet-reachable read URL for an object — the gateway's SeaweedFS path (serves the
 // bucket read-only). Single source of truth for file URLs across the console.
@@ -76,15 +82,29 @@ export async function ensureFileSchema(): Promise<void> {
   if (ensurePromise) return ensurePromise;
   ensurePromise = (async () => {
     await s3Fetch(base, { method: 'PUT' }).catch(() => {}); // create bucket; ignore "already exists"
-  })().catch((e) => { ensurePromise = null; throw e; });
+  })().catch((e) => {
+    ensurePromise = null;
+    throw e;
+  });
   return ensurePromise;
 }
 
 const EXT_MIME: Record<string, string> = {
-  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
-  svg: 'image/svg+xml', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
-  pdf: 'application/pdf', json: 'application/json', txt: 'text/plain', csv: 'text/csv',
-  md: 'text/markdown', zip: 'application/zip',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  pdf: 'application/pdf',
+  json: 'application/json',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  md: 'text/markdown',
+  zip: 'application/zip',
 };
 function mimeFromName(name: string): string {
   return EXT_MIME[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/octet-stream';
@@ -194,7 +214,15 @@ export async function saveFile(o: {
     body: new Uint8Array(o.bytes),
   });
   if (!res.ok) throw new Error(`seaweedfs put ${res.status}`);
-  return { id, name: o.name, mime: o.mime, size: o.bytes.length, visibility, owner: o.owner, createdAt: new Date().toISOString() };
+  return {
+    id,
+    name: o.name,
+    mime: o.mime,
+    size: o.bytes.length,
+    visibility,
+    owner: o.owner,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export async function getFileMeta(id: string): Promise<FileMeta | null> {
@@ -209,7 +237,9 @@ export async function getFileMeta(id: string): Promise<FileMeta | null> {
     size: Number(h.get('content-length') || 0),
     visibility: h.get('x-amz-meta-visibility') === 'private' ? 'private' : 'public',
     owner: decodeURIComponent(h.get('x-amz-meta-owner') || ''),
-    createdAt: h.get('last-modified') ? new Date(h.get('last-modified')!).toISOString() : new Date().toISOString(),
+    createdAt: h.get('last-modified')
+      ? new Date(h.get('last-modified')!).toISOString()
+      : new Date().toISOString(),
   };
 }
 
@@ -229,7 +259,10 @@ export async function readFileBytes(id: string): Promise<Buffer | null> {
 // single-tenant org (no orgId, or 'default') lists the WHOLE bucket, unchanged (provit + erasure-
 // lake callers that pass no org keep their bucket-wide view). Belt-and-braces: even under a prefix
 // query we re-check each key with the pure isKeyInOrg rule so a mis-scoped result can't leak.
-export async function listFiles(_owner: string, opts?: { orgId?: string | null }): Promise<FileMeta[]> {
+export async function listFiles(
+  _owner: string,
+  opts?: { orgId?: string | null },
+): Promise<FileMeta[]> {
   await ensureFileSchema();
   const orgId = opts?.orgId ?? null;
   const prefix = orgFilePrefix(orgId);
@@ -239,32 +272,50 @@ export async function listFiles(_owner: string, opts?: { orgId?: string | null }
   const xml = await res.text();
   const out: FileMeta[] = [];
   for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
-    const block = m[1];
-    const key = /<Key>([\s\S]*?)<\/Key>/.exec(block)?.[1];
-    if (!key) continue;
-    // Belt-and-braces: the prefix query already scopes this, but re-apply the pure org rule so a
-    // stray out-of-prefix key can never leak into a tenant's list.
-    if (!isKeyInOrg(key, orgId)) continue;
-    const size = Number(/<Size>(\d+)<\/Size>/.exec(block)?.[1] ?? 0);
-    const lm = /<LastModified>([\s\S]*?)<\/LastModified>/.exec(block)?.[1];
-    const name = (key.split('/').pop() ?? key).replace(/^[0-9a-f-]{36}-/, '');
-    out.push({
-      id: key,
-      name,
-      mime: mimeFromName(name),
-      size,
-      visibility: 'public',
-      owner: '',
-      createdAt: lm ? new Date(lm).toISOString() : new Date().toISOString(),
-    });
+    const entry = listEntry(m[1], orgId);
+    if (entry) out.push(entry);
   }
   return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * One <Contents> block → a FileMeta, or null to skip it. PURE.
+ *
+ * The org check is belt-and-braces: the prefix query already scopes the listing, but re-applying the
+ * pure rule means a stray out-of-prefix key can never reach a tenant's list even if the query is
+ * ever changed. Tenant isolation should not depend on remembering to keep a query string right.
+ */
+function listEntry(block: string, orgId: string | null): FileMeta | null {
+  const key = xmlField(block, 'Key');
+  if (!key || !isKeyInOrg(key, orgId)) return null;
+
+  const name = (key.split('/').pop() ?? key).replace(/^[0-9a-f-]{36}-/, '');
+  const lastModified = xmlField(block, 'LastModified');
+  return {
+    id: key,
+    name,
+    mime: mimeFromName(name),
+    size: Number(xmlField(block, 'Size') ?? 0),
+    visibility: 'public',
+    owner: '',
+    createdAt: lastModified ? new Date(lastModified).toISOString() : new Date().toISOString(),
+  };
+}
+
+/** The text of one XML element in an S3 listing block, or undefined. */
+function xmlField(block: string, tag: string): string | undefined {
+  return new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(block)?.[1];
 }
 
 // Change visibility by rewriting the object's metadata in place (S3 copy-onto-self with
 // REPLACE) — no byte re-upload. NOTE: the public gateway path serves the whole bucket
 // read-only to the internet, so "private" is a console-side label, not a hard ACL.
-export async function setVisibility(id: string, visibility: string, owner: string, isAdmin: boolean): Promise<FileMeta | null> {
+export async function setVisibility(
+  id: string,
+  visibility: string,
+  owner: string,
+  isAdmin: boolean,
+): Promise<FileMeta | null> {
   const meta = await getFileMeta(id);
   if (!meta || (!isAdmin && meta.owner && meta.owner !== owner)) return null;
   const v = visibility === 'public' ? 'public' : 'private';
@@ -300,7 +351,11 @@ export async function deleteFile(id: string, owner: string, isAdmin: boolean): P
 // so the UI can be honest rather than hand out a fake "expiring" link.
 
 // The externally reachable SeaweedFS S3 endpoint (must be the host that validates the signature).
-const PUBLIC_S3 = (process.env.OFFGRID_SEAWEEDFS_PUBLIC_S3_URL || process.env.OFFGRID_SEAWEEDFS_URL || S3).replace(/\/$/, '');
+const PUBLIC_S3 = (
+  process.env.OFFGRID_SEAWEEDFS_PUBLIC_S3_URL ||
+  process.env.OFFGRID_SEAWEEDFS_URL ||
+  S3
+).replace(/\/$/, '');
 
 export interface ShareLink {
   url: string;
@@ -312,7 +367,11 @@ export interface ShareLink {
 
 /** Generate a presigned, time-limited GET URL for object `id`. `now` injectable for tests (unused in
  *  the pure signer path — that clock is injected there — but kept for a deterministic expiresAt). */
-export async function presignShareUrl(id: string, ttlSeconds: number, now: Date = new Date()): Promise<ShareLink> {
+export async function presignShareUrl(
+  id: string,
+  ttlSeconds: number,
+  now: Date = new Date(),
+): Promise<ShareLink> {
   const ttl = Math.max(1, Math.min(604800, Math.floor(ttlSeconds)));
   const cred = await getServiceCredential('seaweedfs');
   const key = id.split('/').map(encodeURIComponent).join('/');
@@ -328,7 +387,12 @@ export async function presignShareUrl(id: string, ttlSeconds: number, now: Date 
     expiresIn: ttl,
     date: now,
   });
-  return { url, signed: true, expiresAt: new Date(now.getTime() + ttl * 1000).toISOString(), ttlSeconds: ttl };
+  return {
+    url,
+    signed: true,
+    expiresAt: new Date(now.getTime() + ttl * 1000).toISOString(),
+    ttlSeconds: ttl,
+  };
 }
 
 // ── Bucket lifecycle (object expiry) ──────────────────────────────────────────────────────────────
@@ -351,7 +415,12 @@ export async function getBucketLifecycle(): Promise<LifecycleState> {
     const body = await res.text().catch(() => '');
     // NoSuchLifecycleConfiguration is "supported, just empty"; anything else = not supported here.
     if (/NoSuchLifecycleConfiguration/i.test(body)) return { supported: true, rules: [] };
-    if (res.status === 501 || res.status === 405) return { supported: false, rules: [], note: `SeaweedFS S3 returned ${res.status} for GetBucketLifecycle` };
+    if (res.status === 501 || res.status === 405)
+      return {
+        supported: false,
+        rules: [],
+        note: `SeaweedFS S3 returned ${res.status} for GetBucketLifecycle`,
+      };
     return { supported: false, rules: [], note: `lifecycle read failed (${res.status})` };
   }
   return { supported: true, rules: parseLifecycleXml(await res.text()) };
@@ -367,9 +436,18 @@ export async function setBucketLifecycle(rules: LifecycleRule[]): Promise<Lifecy
     body: new Uint8Array(Buffer.from(xml)),
   });
   if (!res.ok) {
-    if (res.status === 501 || res.status === 405) return { supported: false, rules: [], note: `SeaweedFS S3 returned ${res.status} for PutBucketLifecycle` };
+    if (res.status === 501 || res.status === 405)
+      return {
+        supported: false,
+        rules: [],
+        note: `SeaweedFS S3 returned ${res.status} for PutBucketLifecycle`,
+      };
     const body = await res.text().catch(() => '');
-    return { supported: false, rules: [], note: `lifecycle write failed (${res.status}) ${body.slice(0, 200)}` };
+    return {
+      supported: false,
+      rules: [],
+      note: `lifecycle write failed (${res.status}) ${body.slice(0, 200)}`,
+    };
   }
   return getBucketLifecycle();
 }
@@ -392,19 +470,41 @@ export async function getBucketPolicy(): Promise<BucketPolicyState> {
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     if (/NoSuchBucketPolicy/i.test(body)) return { supported: true, access: 'private' };
-    if (res.status === 501 || res.status === 405) return { supported: false, access: 'private', note: `SeaweedFS S3 returned ${res.status} for GetBucketPolicy` };
+    if (res.status === 501 || res.status === 405)
+      return {
+        supported: false,
+        access: 'private',
+        note: `SeaweedFS S3 returned ${res.status} for GetBucketPolicy`,
+      };
     return { supported: false, access: 'private', note: `policy read failed (${res.status})` };
   }
   return { supported: true, access: classifyBucketPolicy(await res.text()) };
 }
 
 /** Set the bucket to 'public' (put anonymous-read policy) or 'private' (delete policy). */
+/**
+ * Distinguish "this S3 backend does not implement bucket policies" from "the call failed". PURE.
+ *
+ * 501/405 means the operation does not exist here, which is a capability fact to report honestly —
+ * not an error to retry or an outage to alarm on. Conflating the two would have the console claim a
+ * policy failed when the backend never supported one.
+ */
+function unsupportedByBackend(status: number, operation: string): BucketPolicyState | null {
+  if (status !== 501 && status !== 405) return null;
+  return {
+    supported: false,
+    access: 'private',
+    note: `SeaweedFS S3 returned ${status} for ${operation}`,
+  };
+}
+
 export async function setBucketPolicy(access: 'public' | 'private'): Promise<BucketPolicyState> {
   await ensureFileSchema();
   if (access === 'private') {
     const res = await s3Fetch(`${base}?policy=`, { method: 'DELETE' });
     if (!res.ok && res.status !== 404) {
-      if (res.status === 501 || res.status === 405) return { supported: false, access: 'private', note: `SeaweedFS S3 returned ${res.status} for DeleteBucketPolicy` };
+      const unsupported = unsupportedByBackend(res.status, 'DeleteBucketPolicy');
+      if (unsupported) return unsupported;
       return { supported: false, access: 'private', note: `policy delete failed (${res.status})` };
     }
     return { supported: true, access: 'private' };
@@ -416,9 +516,14 @@ export async function setBucketPolicy(access: 'public' | 'private'): Promise<Buc
     body: new Uint8Array(Buffer.from(policy)),
   });
   if (!res.ok) {
-    if (res.status === 501 || res.status === 405) return { supported: false, access: 'private', note: `SeaweedFS S3 returned ${res.status} for PutBucketPolicy` };
+    const unsupported = unsupportedByBackend(res.status, 'PutBucketPolicy');
+    if (unsupported) return unsupported;
     const body = await res.text().catch(() => '');
-    return { supported: false, access: 'private', note: `policy write failed (${res.status}) ${body.slice(0, 200)}` };
+    return {
+      supported: false,
+      access: 'private',
+      note: `policy write failed (${res.status}) ${body.slice(0, 200)}`,
+    };
   }
   return { supported: true, access: 'public' };
 }
