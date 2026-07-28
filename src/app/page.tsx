@@ -21,7 +21,6 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuroraText } from '@/components/ui/aurora-text';
 import { BentoGrid, BentoTile } from '@/components/ui/bento-grid';
 import { BlurFade } from '@/components/ui/blur-fade';
-import { BorderBeam } from '@/components/ui/border-beam';
 import { Button } from '@/components/ui/button';
 import { DotPattern } from '@/components/ui/dot-pattern';
 import { MagicCard } from '@/components/ui/magic-card';
@@ -330,9 +329,6 @@ export default function LandingPage() {
                 <MagicCard
                   className={`relative flex h-full flex-col overflow-hidden rounded-2xl border bg-background p-6 ${i === 2 ? 'border-primary/50 shadow-[0_20px_80px_-30px_rgba(5,150,105,0.25)]' : 'border-border'}`}
                 >
-                  {i === 2 ? (
-                    <BorderBeam size={90} duration={7} colorFrom="#34d399" colorTo="#059669" />
-                  ) : null}
                   <p className="text-sm font-semibold text-foreground">{plan.name}</p>
                   <p className="mt-2 flex items-baseline gap-1">
                     <span className="font-mono text-3xl font-semibold tracking-tight text-foreground">{plan.price}</span>
