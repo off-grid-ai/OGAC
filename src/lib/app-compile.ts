@@ -232,54 +232,71 @@ export function heuristicDecompose(description: string, domains: DataDomain[]): 
   const cond = detectConditional(description);
   if (cond) return heuristicBranchDecompose(description, cond, domains);
 
-  const clauses = segment(description);
-  const steps: AppStep[] = [];
   const gaps: string[] = [];
-  let sawHuman = false;
-  let sawOutput = false;
-  let n = 0;
+  const steps = stepsFromClauses(segment(description), domains, gaps);
+  completeHeuristicSteps(steps, description);
+  return finishAssembly(steps, gaps, undefined, undefined, description);
+}
 
+/**
+ * The clause → step pass. PURE (gaps is the caller's accumulator).
+ *
+ * Step ids come from `steps.length`, which is exact: a clause either contributes a step or it does
+ * not, so there is no separate counter to keep in sync. The previous version tracked one by hand and
+ * had to remember to decrement it on a dropped connector-query.
+ */
+function stepsFromClauses(clauses: string[], domains: DataDomain[], gaps: string[]): AppStep[] {
+  const steps: AppStep[] = [];
   for (const clause of clauses) {
     const cls = classifyClause(clause);
-    const idBase = `s${n + 1}`;
+    const id = `s${steps.length + 1}`;
+
+    // 'data' is the one class that can DROP — an unbindable phrase must never become a fabricated
+    // connector, so it records a gap and contributes nothing.
     if (cls === 'data') {
       const phrase = extractDataPhrase(clause);
-      const bound = bindDataPhrase(phrase, domains, idBase, titleCase(phrase), gaps);
-      if (bound) {
-        steps.push(bound);
-        n += 1;
-      }
-      // else: gap already recorded, step dropped
-    } else if (cls === 'approval') {
-      steps.push({ id: idBase, label: shortLabel(clause) || 'Review / approve', kind: 'human' });
-      sawHuman = true;
-      n += 1;
-    } else if (cls === 'decision') {
-      steps.push({
-        id: idBase,
-        label: shortLabel(clause) || 'Decision',
-        kind: 'agent',
-        inlineAgent: { systemPrompt: clause.trim(), grounded: true },
-      });
-      n += 1;
-    } else if (cls === 'output') {
-      steps.push({
-        id: idBase,
-        label: shortLabel(clause) || 'Output',
-        kind: 'output',
-        sink: sinkForClause(clause),
-      });
-      sawOutput = true;
-      n += 1;
+      const bound = bindDataPhrase(phrase, domains, id, titleCase(phrase), gaps);
+      if (bound) steps.push(bound);
+      continue;
     }
-    // cls === 'skip' → filler clause, contributes no step
+    const build = CLAUSE_STEP_BUILDERS[cls];
+    if (build) steps.push(build(clause, id)); // no builder ⇒ 'skip' filler clause
   }
+  return steps;
+}
 
-  // If nothing classified as a decision/agent but we have data steps, add a synthesizing agent so the
-  // app actually reasons over what it read (a bare read→output isn't a "process").
-  if (steps.length > 0 && !steps.some((s) => s.kind === 'agent')) {
+/** How each classified clause becomes a step. A table so a new clause class is a row, not a branch. */
+const CLAUSE_STEP_BUILDERS: Record<string, (clause: string, id: string) => AppStep> = {
+  approval: (clause, id) => ({ id, label: shortLabel(clause) || 'Review / approve', kind: 'human' }),
+  decision: (clause, id) => ({
+    id,
+    label: shortLabel(clause) || 'Decision',
+    kind: 'agent',
+    inlineAgent: { systemPrompt: clause.trim(), grounded: true },
+  }),
+  output: (clause, id) => ({
+    id,
+    label: shortLabel(clause) || 'Output',
+    kind: 'output',
+    sink: sinkForClause(clause),
+  }),
+};
+
+/**
+ * The coherence rules that turn a bag of clause-steps into a runnable process. MUTATES `steps`.
+ *
+ * Each rule reads the steps built SO FAR rather than a flag captured earlier — the previous version
+ * carried sawHuman/sawOutput booleans that had to stay in sync with the array, and both were exactly
+ * equal to a `steps.some(...)` at the point they were read.
+ */
+function completeHeuristicSteps(steps: AppStep[], description: string): void {
+  const has = (kind: AppStep['kind']) => steps.some((s) => s.kind === kind);
+  const nextId = () => `s${steps.length + 1}`;
+
+  // Read → output is not a "process": if data was collected but nothing reasons over it, synthesize.
+  if (steps.length > 0 && !has('agent')) {
     steps.push({
-      id: `s${n + 1}`,
+      id: nextId(),
       label: 'Decision',
       kind: 'agent',
       inlineAgent: {
@@ -287,34 +304,38 @@ export function heuristicDecompose(description: string, domains: DataDomain[]): 
         grounded: true,
       },
     });
-    n += 1;
   }
 
-  // If the description implied approval but no explicit approval clause landed a human step, and there
-  // IS a decision, insert a review step before output (governed processes end with a person on
-  // irreversible actions — mirrors compose's "Human before Output" rule).
-  if (!sawHuman && impliesApproval(description) && steps.some((s) => s.kind === 'agent')) {
-    steps.push({ id: `s${n + 1}`, label: 'Review / approve', kind: 'human' });
-    n += 1;
+  // Governed processes end with a person on irreversible actions (mirrors compose's Human-before-
+  // Output rule) — so an implied approval that never landed a clause still gets its review step.
+  if (needsReviewStep(steps, description)) {
+    steps.push({ id: nextId(), label: 'Review / approve', kind: 'human' });
   }
 
-  // Always end with an output sink.
-  if (!sawOutput) {
-    steps.push({ id: `s${n + 1}`, label: 'Output result', kind: 'output', sink: 'console' });
-    n += 1;
+  if (!has('output')) {
+    steps.push({ id: nextId(), label: 'Output result', kind: 'output', sink: 'console' });
   }
 
   // Degenerate: nothing at all parsed → a single inline agent over the raw description.
   if (steps.length === 0) {
-    steps.push({
-      id: 's1',
-      label: 'Agent',
-      kind: 'agent',
-      inlineAgent: { systemPrompt: description.trim() || 'Assist the user.', grounded: true },
-    });
+    steps.push({ ...synthesizedAgent('s1', description, 'Assist the user.'), label: 'Agent' });
   }
+}
 
-  return finishAssembly(steps, gaps, undefined, undefined, description);
+/** A grounded inline agent over the author's own words, with a fallback when they wrote nothing. */
+function synthesizedAgent(id: string, description: string, fallback: string): AppStep {
+  return {
+    id,
+    label: 'Decision',
+    kind: 'agent',
+    inlineAgent: { systemPrompt: description.trim() || fallback, grounded: true },
+  };
+}
+
+/** A governed process that decides something needs a person before it acts. */
+function needsReviewStep(steps: AppStep[], description: string): boolean {
+  const has = (kind: AppStep['kind']) => steps.some((s) => s.kind === kind);
+  return !has('human') && impliesApproval(description) && has('agent');
 }
 
 // ─── shared assembly tail: derive title/summary ──────────────────────────────────────────────────
