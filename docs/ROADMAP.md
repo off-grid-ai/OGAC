@@ -1267,3 +1267,48 @@ unattributed.
 
 **`G-GATEWAY-ATTR-SWEEP` remains open** and still matters for traffic the console does not originate —
 but governed-run spend is no longer blocked behind it.
+
+### Phase 4.12 — alerts reach Slack and email ✅ LIVE (2026-07-27)
+
+Quality alerts spoke only webhook. Both other sinks already existed, hold their own credentials and
+are governed, so this routes to them rather than growing a third egress path. Verified live on the
+fleet, all six cases:
+
+| case | result |
+|---|---|
+| per-channel target validation | webhook rejects an email address; email rejects a URL and a malformed address |
+| Slack saved with NO target | configured — `{url:null, source:'console', channel:'slack'}` |
+| Slack test | **200, posted to Slack** |
+| Email test | **delivered via Resend** (`98b37a68-193c-4127-b3b0-eec4f678417b`) |
+| Webhook | delivered to a real receiver, correct signed payload |
+| Pause | 400 "alerts are paused", receiver not called again |
+
+**The bug the live probe caught (no unit test would have):** the *test* route asked `!url` to decide
+deliverability. Slack has no URL of its own — the sink holds the incoming-webhook URL — so a valid
+Slack destination was rejected as unconfigured, making Slack the one channel an operator could not
+verify. Same trap already solved in the sweep path (`destinationConfigured`), reproduced one floor
+down. Two regression tests now assert BOTH `Boolean(slack.url) === false` AND
+`destinationConfigured(slack) === true`, so a future bare-url check fails loudly.
+
+### Phase 4.11 — G-GATEWAY-ATTR-SWEEP closed ✅ LIVE (2026-07-27)
+
+Every inference a governed run makes is now attributed — org AND user — without the ten-signature
+refactor that was rejected (correctly) as too wide a change to public seams. All ten call sites
+already built headers via `gatewayHeaders()`, so attribution is stamped there from an ambient run
+scope (`AsyncLocalStorage`), opened once in `runAgent`, `runApp` and the durable
+`executeStepActivity`. Zero signature changes. A second producer-side defect: the aggregator derived
+`caller` from `user-agent` (`"node"` for every server-side fetch), collapsing all users into one
+bucket — it now prefers `x-offgrid-user`.
+
+| dimension | before | after |
+|---|---|---|
+| `by_caller` | `node=4` | **`service@offgrid.local=4`** |
+| `by_org` | `(unattributed)=3, default=1` | **`default=4`** |
+
+Full detail + tested properties (concurrent runs never cross-attribute) in `GAPS_BACKLOG.md`.
+
+**Deploy note for the runbook:** `push.sh` builds locally then rsyncs a ~200MB `.next` artifact, which
+a degraded cloudflared tunnel cannot sustain (`rsync failed after 5 attempts`, twice). The working
+degraded-network path is to sync only the changed source files (a few KB, retried individually with
+`scp`) and run `next build` ON the box, which has the full toolchain — then restart. That is how this
+change landed.
