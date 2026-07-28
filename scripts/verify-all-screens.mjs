@@ -138,7 +138,10 @@ for (const route of routes) {
   if (failedRequests.length) reasons.push(`req: ${failedRequests.slice(0, 2).join(', ')}`);
 
   // A redirect to signin means the sweep lost its session — report it rather than calling the page OK.
-  if (landed.startsWith('/signin')) reasons.push('bounced to signin (session lost)');
+  // /signin itself is exempt: landing on signin is that route working, not a lost session.
+  if (landed.startsWith('/signin') && !route.startsWith('/signin')) {
+    reasons.push('bounced to signin (session lost)');
+  }
 
   let verdict = reasons.length ? 'BROKEN' : 'OK';
   // Rendered, no errors, but essentially nothing painted: a real surface for a demo needs content.
