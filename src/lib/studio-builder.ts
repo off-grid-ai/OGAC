@@ -146,7 +146,10 @@ export function validateBuilderInput(
   else grounded = true;
   if (collectionIds.length > 0) grounded = true;
   const title = (input.title ?? '').trim() || deriveTitle(goal);
-  return { ok: true, value: { goal, title, templateId, toolIds, collectionIds, grounded, visibility } };
+  return {
+    ok: true,
+    value: { goal, title, templateId, toolIds, collectionIds, grounded, visibility },
+  };
 }
 
 function uniqueStrings(v: unknown): string[] {
@@ -226,7 +229,9 @@ export function composeSystemPrompt(
 // allow-list we take the first (the policy's default), otherwise we return '' meaning "let the
 // platform default apply" (agentrun falls back to ANSWER_MODEL). Honest by construction.
 export function suggestModel(allowedModels: string[] | undefined): string {
-  const list = Array.isArray(allowedModels) ? allowedModels.filter((m) => typeof m === 'string' && m) : [];
+  const list = Array.isArray(allowedModels)
+    ? allowedModels.filter((m) => typeof m === 'string' && m)
+    : [];
   return list[0] ?? '';
 }
 

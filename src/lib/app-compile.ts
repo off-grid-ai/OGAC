@@ -207,10 +207,7 @@ export function assembleFromPlan(
 //   • an approval clause ("approve", "reject", "review", "sign off") → human step.
 //   • an output/notify clause ("send", "notify", "report", "email") → output step.
 // Always ends with an output step. Mirrors compose/route.ts's fallback style (deterministic, coherent).
-export function heuristicDecompose(
-  description: string,
-  domains: DataDomain[],
-): Assembled {
+export function heuristicDecompose(description: string, domains: DataDomain[]): Assembled {
   // Branching: a plain-language conditional ("if X, A, else B") compiles to a real BRANCH (decision
   // agent + guarded edges), not a linear chain. Detected first; a non-conditional description takes
   // the linear path below unchanged.
@@ -248,7 +245,12 @@ export function heuristicDecompose(
       });
       n += 1;
     } else if (cls === 'output') {
-      steps.push({ id: idBase, label: shortLabel(clause) || 'Output', kind: 'output', sink: sinkForClause(clause) });
+      steps.push({
+        id: idBase,
+        label: shortLabel(clause) || 'Output',
+        kind: 'output',
+        sink: sinkForClause(clause),
+      });
       sawOutput = true;
       n += 1;
     }
@@ -262,7 +264,10 @@ export function heuristicDecompose(
       id: `s${n + 1}`,
       label: 'Decision',
       kind: 'agent',
-      inlineAgent: { systemPrompt: description.trim() || 'Reason over the collected inputs.', grounded: true },
+      inlineAgent: {
+        systemPrompt: description.trim() || 'Reason over the collected inputs.',
+        grounded: true,
+      },
     });
     n += 1;
   }
@@ -374,7 +379,9 @@ function bindDataPhrase(
   if (!clean) return null;
   const domain = resolveDomain(clean, domains);
   if (!domain) {
-    gaps.push(`No data source declared for "${clean}" — add a data-domain mapping to wire this step.`);
+    gaps.push(
+      `No data source declared for "${clean}" — add a data-domain mapping to wire this step.`,
+    );
     return null;
   }
   return {
@@ -389,11 +396,7 @@ function bindDataPhrase(
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // PURE — finalize: linear-chain the ordered steps into a valid one-entry graph
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-export function finalizeSpec(
-  assembled: Assembled,
-  ctx: CompileCtx,
-  description: string,
-): AppSpec {
+export function finalizeSpec(assembled: Assembled, ctx: CompileCtx, description: string): AppSpec {
   const base = {
     id: '',
     orgId: ctx.orgId,
@@ -438,7 +441,10 @@ function segment(description: string): string[] {
   let d = (description ?? '').trim();
   // Drop a leading "title — rest" / "title: rest" prefix (the em-dash / colon title form).
   const dash = /^[^—:\n]{3,60}?\s*[—:-]\s+(.*)$/s.exec(d);
-  if (dash && /\b(read|check|approve|reject|then|decide|verify|send|notify|review)\b/i.test(dash[1])) {
+  if (
+    dash &&
+    /\b(read|check|approve|reject|then|decide|verify|send|notify|review)\b/i.test(dash[1])
+  ) {
     d = dash[1].trim();
   }
   return d
@@ -450,10 +456,14 @@ function segment(description: string): string[] {
 type ClauseClass = 'data' | 'decision' | 'approval' | 'output' | 'skip';
 
 const DATA_VERBS = /\b(read|check|look ?up|fetch|pull|get|retrieve|load|find|query|verify)\b/i;
-const DATA_NOUNS = /\b(invoice|quota|balance|record|document|receipt|limit|history|transaction|account|order|policy|claim|ticket|customer|employee)s?\b/i;
-const DECISION = /\b(decide|determine|evaluate|assess|eligib|exceed|compare|calculate|reason|classif|score|flag|check if|check whether)\b/i;
-const APPROVAL = /\b(approve|reject|sign ?off|authoriz|human review|manual review|escalat|confirm)\b/i;
-const OUTPUT = /\b(send|notify|email|report|output|write|post|deliver|respond|reply|export|generate a)\b/i;
+const DATA_NOUNS =
+  /\b(invoice|quota|balance|record|document|receipt|limit|history|transaction|account|order|policy|claim|ticket|customer|employee)s?\b/i;
+const DECISION =
+  /\b(decide|determine|evaluate|assess|eligib|exceed|compare|calculate|reason|classif|score|flag|check if|check whether)\b/i;
+const APPROVAL =
+  /\b(approve|reject|sign ?off|authoriz|human review|manual review|escalat|confirm)\b/i;
+const OUTPUT =
+  /\b(send|notify|email|report|output|write|post|deliver|respond|reply|export|generate a)\b/i;
 
 function classifyClause(clause: string): ClauseClass {
   const c = clause.toLowerCase();
@@ -537,9 +547,15 @@ export function detectConditional(text: string): ConditionalClause | null {
 function branchStep(clause: string, id: string): AppStep {
   const cls = classifyClause(clause);
   if (cls === 'output') {
-    return { id, label: shortLabel(clause) || 'Output', kind: 'output', sink: sinkForClause(clause) };
+    return {
+      id,
+      label: shortLabel(clause) || 'Output',
+      kind: 'output',
+      sink: sinkForClause(clause),
+    };
   }
-  if (cls === 'approval') return { id, label: shortLabel(clause) || 'Review / approve', kind: 'human' };
+  if (cls === 'approval')
+    return { id, label: shortLabel(clause) || 'Review / approve', kind: 'human' };
   return {
     id,
     label: shortLabel(clause) || 'Action',
@@ -605,37 +621,89 @@ const SLACK_CHANNEL_RE = /#[\w-]+/;
  * fabricated; a delivery sink without a recipient reports a gap the author fixes before publishing.
  * Order = most-specific first (webhook + URL before a generic "send").
  */
+/**
+ * One delivery channel's recognition rule. Declarative so that adding a channel is a new ROW rather
+ * than another branch in a growing if-chain — the same open/closed reason the sink registry itself is
+ * data. Order in the table IS the precedence, and that precedence is behaviour (see the tests):
+ * webhook-with-a-URL outranks a generic "post to slack via <url>".
+ */
+interface OutputSinkRule {
+  sink: OutputSinkKind;
+  /** Does the author's phrasing name this channel? */
+  matches: (lower: string, raw: string) => boolean;
+  /** Pull the recipient out of the text — never fabricated, so absent means absent. */
+  recipient?: (raw: string) => { key: string; value: string } | undefined;
+  /** Reported when the channel is chosen but the recipient is missing. */
+  missingRecipientGap?: string;
+  /** Reported whenever this channel is chosen, recipient or not (an operator setting is still needed). */
+  alwaysGap?: string;
+}
+
+const OUTPUT_SINK_RULES: OutputSinkRule[] = [
+  {
+    sink: 'webhook',
+    matches: (c, raw) => /\bwebhook\b/.test(c) || (/\b(post|send|call)\b/.test(c) && URL_RE.test(raw)),
+    recipient: (raw) => {
+      const url = raw.match(URL_RE)?.[1];
+      return url ? { key: 'url', value: url } : undefined;
+    },
+    missingRecipientGap:
+      'Webhook delivery: no destination URL found — set the webhook URL before publishing.',
+  },
+  {
+    sink: 'slack',
+    matches: (c) => /\bslack\b/.test(c),
+    recipient: (raw) => {
+      const channel = raw.match(SLACK_CHANNEL_RE)?.[0];
+      return channel ? { key: 'channel', value: channel } : undefined;
+    },
+    // The incoming-webhook URL is an operator setting, so the author is told even when they named a
+    // channel — otherwise they publish something that silently cannot post.
+    alwaysGap:
+      'Slack delivery needs the incoming-webhook URL configured in Messaging → Slack before it can post.',
+  },
+  {
+    sink: 'whatsapp',
+    matches: (c) => /\bwhatsapp\b/.test(c),
+    recipient: (raw) => {
+      const to = raw.match(/\+?\d[\d\s-]{7,}\d/)?.[0]?.replace(/[\s-]/g, '');
+      return to ? { key: 'to', value: to } : undefined;
+    },
+    missingRecipientGap: 'WhatsApp delivery: no recipient number found — set it before publishing.',
+  },
+  {
+    sink: 'email',
+    matches: (c) => /\b(e-?mail)\b/.test(c),
+    recipient: (raw) => {
+      const to = raw.match(EMAIL_RE)?.[0];
+      return to ? { key: 'to', value: to } : undefined;
+    },
+    missingRecipientGap:
+      'Email delivery: no recipient address found — set the "to" address before publishing.',
+  },
+  { sink: 'report', matches: (c) => /\b(report|pdf)\b/.test(c) },
+];
+
+/**
+ * Map plain-language DELIVERY intent → the right governed output sink (+ recipient + honest gap). PURE.
+ * A non-technical author who says "post to Slack" / "send a webhook" / "email finance" gets the real
+ * channel, not a silent `console` sink. Recipients are extracted only when literally present — never
+ * fabricated; a delivery sink without a recipient reports a gap the author fixes before publishing.
+ */
 export function inferOutputSink(text: string): InferredOutputSink {
-  const c = (text ?? '').toLowerCase();
   const raw = text ?? '';
-  if (/\bwebhook\b/.test(c) || (/\b(post|send|call)\b/.test(c) && URL_RE.test(raw))) {
-    const url = raw.match(URL_RE)?.[1];
-    return url
-      ? { sink: 'webhook', config: { url } }
-      : { sink: 'webhook', gap: 'Webhook delivery: no destination URL found — set the webhook URL before publishing.' };
-  }
-  if (/\bslack\b/.test(c)) {
-    const channel = raw.match(SLACK_CHANNEL_RE)?.[0];
-    return {
-      sink: 'slack',
-      ...(channel ? { config: { channel } } : {}),
-      gap: 'Slack delivery needs the incoming-webhook URL configured in Messaging → Slack before it can post.',
-    };
-  }
-  if (/\bwhatsapp\b/.test(c)) {
-    const to = raw.match(/\+?\d[\d\s-]{7,}\d/)?.[0]?.replace(/[\s-]/g, '');
-    return to
-      ? { sink: 'whatsapp', config: { to } }
-      : { sink: 'whatsapp', gap: 'WhatsApp delivery: no recipient number found — set it before publishing.' };
-  }
-  if (/\b(e-?mail)\b/.test(c)) {
-    const to = raw.match(EMAIL_RE)?.[0];
-    return to
-      ? { sink: 'email', config: { to } }
-      : { sink: 'email', gap: 'Email delivery: no recipient address found — set the "to" address before publishing.' };
-  }
-  if (/\b(report|pdf)\b/.test(c)) return { sink: 'report' };
-  return { sink: 'console' };
+  const lower = raw.toLowerCase();
+
+  const rule = OUTPUT_SINK_RULES.find((r) => r.matches(lower, raw));
+  if (!rule) return { sink: 'console' };
+
+  const found = rule.recipient?.(raw);
+  const gap = rule.alwaysGap ?? (found ? undefined : rule.missingRecipientGap);
+  return {
+    sink: rule.sink,
+    ...(found ? { config: { [found.key]: found.value } } : {}),
+    ...(gap ? { gap } : {}),
+  };
 }
 
 function sinkForClause(clause: string): OutputSinkKind {
@@ -699,10 +767,15 @@ export const defaultDeps: CompileDeps = {
 // Ask the local gateway to decompose the description. Constrains the model to ONLY the declared
 // domain labels/aliases; we still re-resolve every returned phrase. Returns null on any failure/junk
 // so the caller falls back to the deterministic heuristic — the compiler always yields a spec.
-async function gatewayDecompose(description: string, domains: DataDomain[]): Promise<ModelPlan | null> {
+async function gatewayDecompose(
+  description: string,
+  domains: DataDomain[],
+): Promise<ModelPlan | null> {
   const domainList =
     domains.length > 0
-      ? domains.map((d) => `- ${d.label}${d.aliases?.length ? ` (aka: ${d.aliases.join(', ')})` : ''}`).join('\n')
+      ? domains
+          .map((d) => `- ${d.label}${d.aliases?.length ? ` (aka: ${d.aliases.join(', ')})` : ''}`)
+          .join('\n')
       : '(none declared)';
 
   const sys =
@@ -728,7 +801,10 @@ async function gatewayDecompose(description: string, domains: DataDomain[]): Pro
       body: JSON.stringify({
         messages: [
           { role: 'system', content: sys },
-          { role: 'user', content: `Process: ${description}\n\nDeclared data sources:\n${domainList}` },
+          {
+            role: 'user',
+            content: `Process: ${description}\n\nDeclared data sources:\n${domainList}`,
+          },
         ],
         max_tokens: 900,
         temperature: 0,
