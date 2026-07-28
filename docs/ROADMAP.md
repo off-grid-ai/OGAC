@@ -1312,3 +1312,49 @@ a degraded cloudflared tunnel cannot sustain (`rsync failed after 5 attempts`, t
 degraded-network path is to sync only the changed source files (a few KB, retried individually with
 `scp`) and run `next build` ON the box, which has the full toolchain — then restart. That is how this
 change landed.
+
+---
+
+## WHERE THINGS STAND — reconciled 2026-07-28
+
+`docs/OPEN_ITEMS.md` was last reconciled 2026-07-09 and its "28 open" tally is stale.
+`docs/GAPS_BACKLOG.md` is append-only history, so an original `OPEN` header stays in the file even
+after the resolution is appended below it — grepping it for "OPEN" overcounts. **This section is the
+current truth.** Everything listed LIVE was deployed to the fleet and verified against real services,
+not merely merged.
+
+### Closed and verified live (2026-07-26 → 28)
+
+| # | item | proof |
+|---|---|---|
+| 1 | Answer-quality regression detection | 0.90→0.42 `regressed`; judge outage → `insufficient-data`, not a false collapse |
+| 2 | App runs scored (`G-QUALITY-REGRESSION-APPS`) | verdicts retained on BOTH inline + durable paths |
+| 3 | App input reaches the agent (`G-APP-INPUT-DROPPED`) | same app+question: "no question was provided" q=0.1 → a real answer **q=1.0** |
+| 4 | Quality alerting (`G-QUALITY-REGRESSION-ALERT`) | fires once, recovers, silent while persisting, no false all-clear |
+| 5 | Operator-managed destination (`G-QUALITY-ALERT-DESTINATION`) | full CRUD + Send test; pause silences even with the env var set |
+| 6 | Slack + email channels | Slack posted, Resend delivered (`98b37a68…`), webhook signed, pause silences |
+| 7 | Langfuse credential → OpenBao (Phase 4.10-B #6) | `source` env→vault, picked up with **no restart** |
+| 8 | Audit events carry tokens + cost (Phase 4.11 DoD) | `tok=132 cost=0.000264 ATTRIBUTED` (was null) |
+| 9 | Per-user spend from the ledger | `byActor: [["service@offgrid.local",1,132,0.000264]]`, `source: ledger` |
+| 10 | `G-GATEWAY-ATTR-SWEEP` | `by_org` `(unattributed)=3` → **`default=4`**; `by_caller` `node` → **`service@offgrid.local`** |
+| 11 | Test load-sensitivity | 16/16 pass under 8 saturated cores (previously 65s/118s/timeout) |
+
+Suite 5122 → 5231 passing; coverage held ≈94.4 / 88.4 / 95.4 / 94.4 throughout.
+
+### Genuinely left
+
+**Infra / needs the box or a credential (no console-side work remains):**
+- **SeaweedFS SigV4** — signer + broker plan + provisioning all done and tested; needs
+  `identities.json` on SeaweedFS plus the keypair stored. IN PROGRESS.
+- **Fleet token** — FleetDM is live but has no token; provisioning is ready. NOT-APPLICABLE until MDM
+  is wanted (founder-deprioritised).
+- **DB test contention** — two integration tests fail under parallel execution on the single shared
+  Postgres. Fix is schema-per-worker.
+
+**Phase 4.10 remaining (identity):** Phase C edge-gating (Caddy `forward_auth` on Presidio/Marquez),
+Phase D FleetDM SSO + Superset OAuth (config ready, on-site flip), Phase E OpenBao prod mode +
+Temporal mTLS.
+
+**Larger phases not started:** 4.5 AI Studio depth, 4.6 chat parity, 4.7 real connectors, 5 unified
+API gateway, 6 module spine, 7 SDK, 8 Organizational Brain (blocked on desktop/mobile capture), 9
+public source + CI/CD, 3A hardening tracks (Nomad, HA, DR).
