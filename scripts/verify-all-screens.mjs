@@ -25,7 +25,9 @@ const BASE = process.env.BASE || 'http://localhost:3000';
 const OUT = process.env.OUT || '/tmp/sweep';
 const USER = process.env.DEMO_USER;
 const PASS = process.env.DEMO_PASS;
-const WAIT = Number(process.env.WAIT_MS || 1400);
+// Settle window after domcontentloaded: long enough for client-fetched surfaces to paint (or crash)
+// so that "nothing rendered" means the screen is empty, not that we photographed it mid-fetch.
+const WAIT = Number(process.env.WAIT_MS || 3500);
 const SHOTS = process.env.SHOTS !== '0';
 
 if (!USER || !PASS) {
@@ -52,6 +54,7 @@ const page = await ctx.newPage();
 // Collect per-navigation diagnostics that a status code cannot show.
 let pageErrors = [];
 let failedRequests = [];
+let aborted = [];
 page.on('pageerror', (e) => pageErrors.push(String(e.message).slice(0, 200)));
 page.on('requestfailed', (r) => {
   const u = r.url();
@@ -61,12 +64,27 @@ page.on('requestfailed', (r) => {
   // 'requestfailed' on every single page and mean nothing is wrong. Counting them flagged all 174
   // screens BROKEN on the first sweep — a detector that says everything is broken says nothing.
   if (/[?&]_rsc=/.test(u)) return;
-  failedRequests.push(`${r.method()} ${u.replace(BASE, '')}`);
-});
-page.on('response', (r) => {
-  if (r.url().startsWith(BASE) && r.status() >= 500) {
-    failedRequests.push(`${r.status()} ${r.url().replace(BASE, '')}`);
+  // net::ERR_ABORTED is the browser cancelling a request, not a request that failed. Every fetch the
+  // PREVIOUS screen still had in flight is aborted by this screen's goto(), and the abort event lands
+  // after the per-route counters were reset — so it gets blamed on the innocent next route. That is how
+  // /build/evals came back BROKEN for "GET /api/v1/admin/runs" which belongs to /build/apps/runs.
+  // Keep aborts as evidence only; a real failure (connection refused, DNS, ERR_FAILED) still condemns.
+  const err = r.failure()?.errorText || '';
+  if (err.includes('ERR_ABORTED')) {
+    aborted.push(`${r.method()} ${u.replace(BASE, '')}`);
+    return;
   }
+  failedRequests.push(`${r.method()} ${u.replace(BASE, '')} (${err})`);
+});
+// 4xx responses are recorded as EVIDENCE but do not by themselves condemn a screen: several surfaces
+// legitimately probe for an optional resource and render fine when it is absent. Only 5xx (the server
+// actually failed) forces a BROKEN verdict.
+let api4xx = [];
+page.on('response', (r) => {
+  const u = r.url();
+  if (!u.startsWith(BASE) || /[?&]_rsc=/.test(u)) return;
+  if (r.status() >= 500) failedRequests.push(`${r.status()} ${u.replace(BASE, '')}`);
+  else if (r.status() >= 400) api4xx.push(`${r.status()} ${u.replace(BASE, '')}`);
 });
 
 await page.goto(`${BASE}/signin?callbackUrl=%2Foverview`, { waitUntil: 'networkidle', timeout: 30000 });
@@ -82,17 +100,28 @@ for (const route of routes) {
   const name = route.replace(/^\//, '').replace(/\//g, '_') || 'root';
   pageErrors = [];
   failedRequests = [];
+  aborted = [];
+  api4xx = [];
   let status = 0;
   let text = '';
   let h1 = '';
   let landed = route;
   try {
-    const resp = await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle', timeout: 30000 });
+    // NOT 'networkidle'. The console's sidebar keeps firing RSC prefetches for the links it shows, so
+    // the network never goes idle on a data-dense screen and goto() times out — which the sweep then
+    // reported as "navigation failed". /build/studio/forge and /build/studio/new were flagged BROKEN
+    // that way while both render perfectly. domcontentloaded + the WAIT settle window is the honest
+    // signal: the document arrived, then we give the client render time to paint and crash if it will.
+    const resp = await page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     status = resp?.status() ?? 0;
     await page.waitForTimeout(WAIT);
     landed = new URL(page.url()).pathname;
     text = await page.locator('body').innerText().catch(() => '');
-    h1 = await page.locator('h1').first().innerText().catch(() => '');
+    // ':visible' matters: the small-screen gate ("Open this on a bigger screen") is an h1 that is
+    // display:none at 1440px, yet innerText on a hidden node still returns its text — so a plain
+    // locator('h1') reports a heading the operator cannot see, and the THIN rule below (which trusts
+    // "has an h1") would never fire on a page whose only real content failed to render.
+    h1 = await page.locator('h1:visible').first().innerText().catch(() => '');
     if (SHOTS) await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false });
   } catch (e) {
     report.push({ route, verdict: 'BROKEN', reason: `navigation: ${String(e.message).slice(0, 90)}`, status });
@@ -115,7 +144,17 @@ for (const route of routes) {
   // Rendered, no errors, but essentially nothing painted: a real surface for a demo needs content.
   if (verdict === 'OK' && chars < 220 && !h1) verdict = 'THIN';
 
-  report.push({ route, verdict, status, chars, h1: h1.slice(0, 60), reason: reasons.join(' | ') || undefined, landed });
+  report.push({
+    route,
+    verdict,
+    status,
+    chars,
+    h1: h1.slice(0, 60),
+    reason: reasons.join(' | ') || undefined,
+    landed,
+    api4xx: api4xx.length ? [...new Set(api4xx)].slice(0, 6) : undefined,
+    aborted: aborted.length ? [...new Set(aborted)].slice(0, 6) : undefined,
+  });
   console.log(`${verdict}\t${status}\t${route}\t${chars}\t${(h1 || '').slice(0, 42)}${reasons.length ? '\t' + reasons.join(' | ') : ''}`);
 }
 
