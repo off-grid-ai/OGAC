@@ -114,26 +114,40 @@ export const SCHEDULE_PRESETS: { cron: string; label: string }[] = [
 // what powers the builder's "next fire: …" preview — the operator sees WHEN it will run before saving,
 // so a schedule is never a silent no-op. Returns [] for an invalid cron/timezone (caller shows the
 // validity reason instead). Bounded to a ~400-day horizon so a never-matching spec can't loop forever.
+/**
+ * Walk forward minute by minute collecting the next `count` matches. PURE (given a fixed `from`).
+ *
+ * Bounded at ~400 days so an unsatisfiable-but-valid cron (Feb 30) terminates instead of spinning.
+ * 400 rather than 366 because a "1st of the month" spec evaluated late in a month still needs a full
+ * year of headroom to collect several fires.
+ */
+function walkFireTimes(
+  fields: CronFields,
+  timezone: string,
+  count: number,
+  from: Date,
+): string[] {
+  const out: string[] = [];
+  // Start at the next whole minute after `from` — a cron fires on minute boundaries.
+  const cursor = new Date(from.getTime());
+  cursor.setUTCSeconds(0, 0);
+  cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
+
+  const MAX_MINUTES = 400 * 24 * 60;
+  for (let i = 0; i < MAX_MINUTES && out.length < count; i++) {
+    const parts = zonedParts(cursor, timezone);
+    if (parts && matchesCron(fields, parts)) out.push(cursor.toISOString());
+    cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
+  }
+  return out;
+}
+
 export function nextFireTimes(cfg: ScheduleConfig, count = 3, from: Date = new Date()): string[] {
   if (validateScheduleConfig(cfg).ok !== true) return [];
   const fields = expandCron(cfg.cron);
   if (!fields) return [];
 
-  const out: string[] = [];
-  // Start at the next whole minute after `from` (a cron fires on minute boundaries).
-  const cursor = new Date(from.getTime());
-  cursor.setUTCSeconds(0, 0);
-  cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
-
-  const MAX_MINUTES = 400 * 24 * 60; // ~400 days — enough for @monthly / "1st of month" specs.
-  for (let i = 0; i < MAX_MINUTES && out.length < count; i++) {
-    const parts = zonedParts(cursor, cfg.timezone);
-    if (parts && matchesCron(fields, parts)) {
-      out.push(cursor.toISOString());
-    }
-    cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
-  }
-  return out;
+  return walkFireTimes(fields, cfg.timezone, count, from);
 }
 
 // ─── ScheduleView — everything the builder's Schedule tab + the API render (PURE) ─────────────────
@@ -199,7 +213,15 @@ const MACROS: Record<string, string> = {
 // Expand a cron string into per-field allowed-value sets. Strips an optional CRON_TZ/TZ prefix and a
 // leading seconds field (6-field cron) — the seconds granularity isn't used by the minute walker.
 // Returns null for anything the evaluator can't represent (caller falls back to []).
-export function expandCron(spec: string): CronFields | null {
+/**
+ * Normalise any accepted cron spelling down to exactly five fields, or null. PURE.
+ *
+ * Handles the three things a spec can carry before the fields themselves: a CRON_TZ/TZ prefix
+ * (stripped — the timezone is passed separately), an @macro, and an optional leading SECONDS field.
+ * The seconds field is DROPPED rather than honoured because the scheduler walks at minute
+ * granularity; pretending to support per-second firing would promise precision we do not have.
+ */
+function cronFields(spec: string): string[] | null {
   let body = (spec ?? '').trim().replace(/^(CRON_TZ|TZ)=\S+\s+/, '').trim();
   if (!body) return null;
   if (body.startsWith('@')) {
@@ -207,10 +229,14 @@ export function expandCron(spec: string): CronFields | null {
     if (!macro) return null;
     body = macro;
   }
-  let fields = body.split(/\s+/);
-  // 6-field cron: drop the leading seconds field (we walk at minute granularity).
-  if (fields.length === 6) fields = fields.slice(1);
-  if (fields.length !== 5) return null;
+  const fields = body.split(/\s+/);
+  const withoutSeconds = fields.length === 6 ? fields.slice(1) : fields;
+  return withoutSeconds.length === 5 ? withoutSeconds : null;
+}
+
+export function expandCron(spec: string): CronFields | null {
+  const fields = cronFields(spec);
+  if (!fields) return null;
 
   const minute = parseField(fields[0], 0, 59);
   const hour = parseField(fields[1], 0, 23);
@@ -224,6 +250,44 @@ export function expandCron(spec: string): CronFields | null {
   return { minute, hour, dom, month, dow, domAndDowRestricted };
 }
 
+/**
+ * One comma-separated cron part — a wildcard, a step, a single value, a range, or a stepped range —
+ * as an inclusive span plus its step. PURE.
+ *
+ * Returns null for anything malformed OR out of range, and the caller then rejects the WHOLE field.
+ * Skipping a bad part would silently produce a schedule that fires on a subset of what the operator
+ * wrote — a cron that runs at the wrong times is worse than one that is refused.
+ */
+function parseCronPart(
+  part: string,
+  min: number,
+  max: number,
+): { lo: number; hi: number; step: number } | null {
+  const [rangePart, stepPart] = part.split('/');
+  const step = stepPart === undefined ? 1 : Number(stepPart);
+  if (!Number.isInteger(step) || step < 1) return null;
+
+  const [lo, hi] = cronBounds(rangePart, min, max);
+  return inRange(lo, hi, min, max) ? { lo, hi, step } : null;
+}
+
+/** A well-formed, in-range, non-inverted span. */
+function inRange(lo: number, hi: number, min: number, max: number): boolean {
+  if (!Number.isInteger(lo) || !Number.isInteger(hi)) return false;
+  return lo >= min && hi <= max && lo <= hi;
+}
+
+/** The inclusive bounds a range expression covers: "*" is the whole field, "a-b" a range, "n" itself. */
+function cronBounds(rangePart: string, min: number, max: number): [number, number] {
+  if (rangePart === '*') return [min, max];
+  if (rangePart.includes('-')) {
+    const [a, b] = rangePart.split('-');
+    return [Number(a), Number(b)];
+  }
+  const n = Number(rangePart);
+  return [n, n];
+}
+
 // Parse one cron field ("*", "*/5", "1,2,3", "1-5", "1-10/2") into the set of matching values.
 function parseField(
   raw: string,
@@ -233,24 +297,9 @@ function parseField(
 ): Set<number> | null {
   const out = new Set<number>();
   for (const part of raw.split(',')) {
-    const [rangePart, stepPart] = part.split('/');
-    const step = stepPart === undefined ? 1 : Number(stepPart);
-    if (!Number.isInteger(step) || step < 1) return null;
-    let lo: number;
-    let hi: number;
-    if (rangePart === '*') {
-      lo = min;
-      hi = max;
-    } else if (rangePart.includes('-')) {
-      const [a, b] = rangePart.split('-');
-      lo = Number(a);
-      hi = Number(b);
-    } else {
-      lo = hi = Number(rangePart);
-    }
-    if (!Number.isInteger(lo) || !Number.isInteger(hi)) return null;
-    if (lo < min || hi > max || lo > hi) return null;
-    for (let v = lo; v <= hi; v += step) out.add(map(v));
+    const span = parseCronPart(part, min, max);
+    if (!span) return null; // ANY unparseable part invalidates the field — never a partial schedule
+    for (let v = span.lo; v <= span.hi; v += span.step) out.add(map(v));
   }
   return out.size ? out : null;
 }
