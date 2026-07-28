@@ -18,11 +18,14 @@ test('resolves the real value when the promise settles before the timeout', asyn
 
 test('resolves the fallback when the promise is slower than the timeout', async () => {
   const start = Date.now();
-  const out = await withTimeout(later('live', 1000), 30, 'fallback');
+  // A 5s "slow" promise against a 30ms deadline: the gap is what makes the assertion meaningful.
+  const out = await withTimeout(later('live', 5000), 30, 'fallback');
   const elapsed = Date.now() - start;
   assert.equal(out, 'fallback');
-  // It must return at ~the deadline, not wait for the slow promise (well under its 1000ms).
-  assert.ok(elapsed < 300, `expected to return near the 30ms deadline, took ${elapsed}ms`);
+  // The discriminator is "did NOT wait for the slow promise", not an exact wall-clock figure. A tight
+  // ceiling (this was `< 300`) fails on a loaded machine even when the timeout fired correctly, which
+  // makes the gate unreliable exactly when someone is iterating. A wide gap keeps the signal.
+  assert.ok(elapsed < 2_000, `expected to return near the 30ms deadline, took ${elapsed}ms`);
 });
 
 test('resolves the fallback (never rejects) when the promise rejects before the timeout', async () => {

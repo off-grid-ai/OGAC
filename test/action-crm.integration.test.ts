@@ -283,5 +283,15 @@ test('the real HTTP action boundary times out with a bounded useful failure', as
     assert.equal(result.code, 'unsupported-connector');
     assert.equal(result.message, 'connector is not a reachable REST source');
   }
-  assert.equal(elapsed >= 4_500 && elapsed < 7_000, true, `bounded at ${elapsed}ms`);
+  // The LOWER bound is the real signal: the call must actually wait for the five-second abort rather
+  // than failing instantly for some unrelated reason, which would make this test pass for the wrong
+  // reason. The upper bound only has to prove "bounded, not hanging forever".
+  //
+  // It used to be `< 7_000`, a wall-clock constant that silently assumed an idle machine. Under a
+  // concurrent production build this test took 65s, 118s, then timed out entirely — while passing in
+  // 11.3s idle. The abort was firing correctly every time; the event loop was just starved. A gate
+  // that fails only when the machine is busy trains people to re-run until green, which is how a real
+  // failure eventually gets waved through. A generous ceiling still distinguishes bounded from hung.
+  assert.ok(elapsed >= 4_500, `abort fired too early at ${elapsed}ms — the boundary was not exercised`);
+  assert.ok(elapsed < 60_000, `not bounded — took ${elapsed}ms, which is a hang rather than a timeout`);
 });
