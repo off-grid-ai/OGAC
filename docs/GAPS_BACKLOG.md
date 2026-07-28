@@ -1755,3 +1755,38 @@ seaweedfs`. Infra change committed to the private fleet repo (`6f2bc90`).
 
 With this, **all three Phase 4.10-B items are closed**: #5 SeaweedFS (done), #6 Langfuse (done),
 #7 Fleet (not-applicable — needs an operator-minted token, MDM deprioritised).
+
+## Roadmap item 23 — Guardrails + manageable lifecycle: E + H gates CLOSED (2026-07-28)
+
+**E (live).** The unproven half was never the scanning — it was whether the operator's rule LIFECYCLE
+actually governs anything, or whether the rules page is a list that changes nothing. Proven live
+against the real seam, using a codename no built-in scanner recognises so every verdict change is
+provably the operator's rule and not the detector:
+
+| operator action | enforcement |
+|---|---|
+| (no rule) | `pass` |
+| create `redact` rule | **`redacted`** — "The internal codename is **[INTERNAL CODENAME]** and must not leak." |
+| disable | `pass` — stops |
+| re-enable | `redacted` — resumes |
+| edit action → `block` | **`blocked`** |
+| edit action → `flag` + rename | **`warn`** |
+| delete | `pass` — stops for good |
+
+Validation refuses rules that could never fire: an uncompilable regex and a non-UPPER_SNAKE entity
+name are both rejected at write time with the reason.
+
+**Two probe errors worth recording, because both would have produced a false gap report:**
+1. The first probe called `getPii().scan()` — the RAW detector. Operator rules are applied by the
+   guardrail seam (`checks.ts` → `runChecks` → `applyGuardrailRules`), so it measured a path the
+   rules never touch and showed "enforcement never changed".
+2. The second sent a PARTIAL patch (`{action:'block'}`). PATCH is either a toggle (`{enabled}`) or a
+   FULL re-validated draft — the UI sends the whole draft, which is why editing works in product. The
+   400 was the API refusing an incomplete rule, not refusing to change an action.
+   Verify the seam the product actually uses, not the one that is convenient to call.
+
+**H (hygiene).** 3 lint errors + formatting across 4 files → zero; `guardrail-rules-runtime.ts` and
+`guardrails-rules.ts` now report "No ESLint warnings or errors". The substantive find:
+`applyGuardrailRules` treated "pattern will not compile" and "rule found nothing" as the same
+outcome — both `continue`d — so a broken regex read as a clean pass. A rule that could not be
+evaluated has not cleared the text; it is now an explicit `skipped`.
