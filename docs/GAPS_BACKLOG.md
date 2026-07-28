@@ -1722,3 +1722,36 @@ workers running — the same contention that previously produced 65s, 118s and a
 
 The DB-contention half (two integration tests failing under parallel execution on the single shared
 Postgres) is unchanged and remains the weaker point; schema-per-worker is still the fix there.
+
+## Phase 4.10-B #5 — SeaweedFS SigV4 ✅ RESOLVED + fleet-verified (2026-07-28)
+
+The S3 API is no longer anonymous. SeaweedFS ran `server -dir=/data -s3` with no `-s3.config`, so
+anyone who could reach `:8333` could read, list and write objects with no credential. The console
+already signed its requests whenever the broker held a keypair — this added the server half that makes
+the signature required.
+
+**Order mattered:** the keypair went into OpenBao FIRST (`source: vault`), so the console could
+authenticate the instant auth turned on and there was never a window where it was locked out of its
+own object store.
+
+**Consumers were checked before the flip, not after** — the point of the earlier deferral:
+- `files.ts` / `s3-object-store.ts` — sign via the broker credential
+- `erasure-lake.ts` — its only unsigned call is a reachability HEAD that already treats 403 as
+  "reachable", so DSAR erasure propagation is unaffected
+- `services-directory.ts` — the health probe already counts 401/403 as up
+
+**Verified live:**
+
+| probe | result |
+|---|---|
+| anonymous `GET /` | **403 AccessDenied** |
+| anonymous `GET /media/?list-type=2` | **403 AccessDenied** |
+| anonymous `PUT` object | **403** |
+| signed list | **99 real objects** |
+| signed write → HEAD → read → delete | bytes match, owner correct, object removed |
+
+Rollback: drop the `-s3.config` flag + mount and `docker compose -f services-extra.yml up -d
+seaweedfs`. Infra change committed to the private fleet repo (`6f2bc90`).
+
+With this, **all three Phase 4.10-B items are closed**: #5 SeaweedFS (done), #6 Langfuse (done),
+#7 Fleet (not-applicable — needs an operator-minted token, MDM deprioritised).
