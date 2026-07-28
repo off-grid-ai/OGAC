@@ -417,63 +417,48 @@ export interface HeuristicSample {
   toolsExpected?: string[];
 }
 
-export function heuristicScore(
-  metric: string,
-  s: HeuristicSample,
-): number {
-  const answer = s.answer ?? '';
-  switch (metric) {
-    case 'faithfulness':
-      return heuristicFaithfulness(answer, s.contexts ?? []);
-    case 'answer_relevancy':
-      return heuristicRelevancy(s.question ?? '', answer);
-    case 'context_recall':
-      return heuristicContextRecall(s.groundTruth ?? '', s.contexts ?? []);
-    case 'context_precision':
-      // Precision approximated by relevancy of retrieved contexts to the question.
-      return heuristicRelevancy(s.question ?? '', (s.contexts ?? []).join(' '));
-    case 'answer_correctness':
-      return clamp01(jaccard(tokenize(answer), tokenize(s.groundTruth ?? '')));
-    case 'toxicity':
-      return heuristicToxicity(answer);
-    case 'bias':
-      return heuristicBias(answer);
-    case 'refusal_rate':
-      return heuristicRefusal(answer);
-    case 'injection_resistance':
-      return heuristicInjectionResistance(answer);
-    case 'sentiment':
-      return heuristicSentiment(answer);
-    case 'summarization':
-      return heuristicSummarization(answer, s.source ?? s.contexts?.join(' ') ?? '');
-    case 'pii_entities':
-      return heuristicPiiLeakage(answer);
-    // ── extended catalog (DeepEval-family) heuristic fallbacks ──
-    case 'noise_sensitivity':
-      return heuristicNoiseSensitivity(answer, s.contexts ?? []);
-    case 'harmfulness':
-      return heuristicHarmfulness(answer);
-    case 'jailbreak_resistance':
-      return heuristicJailbreakResistance(answer);
-    case 'coherence':
-      return heuristicCoherence(answer);
-    case 'fluency':
-      return heuristicFluency(answer);
-    case 'groundedness':
-      // Same signal as faithfulness: every statement traceable to the provided context.
-      return heuristicFaithfulness(answer, s.contexts ?? []);
-    case 'turn_relevancy':
-      return heuristicTurnRelevancy(s.question ?? '', answer);
-    case 'knowledge_retention':
-      return heuristicKnowledgeRetention(answer, s.userTurns ?? []);
-    case 'conversation_completeness':
-      return heuristicConversationCompleteness(s.userTurns ?? [], answer);
-    case 'task_completion':
-      return heuristicTaskCompletion(s.goal ?? s.question ?? '', answer);
-    case 'tool_correctness':
-      return toolCorrectnessF1(s.toolsCalled ?? [], s.toolsExpected ?? []);
-    // g_eval intentionally omitted — needs an LLM judge (see eval-geval.ts); no honest heuristic.
-    default:
-      return 0;
-  }
+/**
+ * The offline fallback for each metric, as a TABLE.
+ *
+ * This was a 25-case switch: one dispatch decision repeated 25 times, where the interesting content
+ * is purely "which signal does this metric read". As data, adding a metric is a row, and the mapping
+ * can be read at a glance — including the two deliberate aliases (groundedness reuses faithfulness;
+ * context_precision approximates precision by relevancy of the retrieved contexts).
+ *
+ * g_eval is deliberately ABSENT rather than mapped to something plausible: it needs an LLM judge, and
+ * inventing an offline approximation would report a fabricated score as though it were measured.
+ */
+const HEURISTICS: Record<string, (s: HeuristicSample, answer: string) => number> = {
+  faithfulness: (s, a) => heuristicFaithfulness(a, s.contexts ?? []),
+  answer_relevancy: (s, a) => heuristicRelevancy(s.question ?? '', a),
+  context_recall: (s) => heuristicContextRecall(s.groundTruth ?? '', s.contexts ?? []),
+  // Precision approximated by relevancy of the retrieved contexts to the question.
+  context_precision: (s) => heuristicRelevancy(s.question ?? '', (s.contexts ?? []).join(' ')),
+  answer_correctness: (s, a) => clamp01(jaccard(tokenize(a), tokenize(s.groundTruth ?? ''))),
+  toxicity: (_s, a) => heuristicToxicity(a),
+  bias: (_s, a) => heuristicBias(a),
+  refusal_rate: (_s, a) => heuristicRefusal(a),
+  injection_resistance: (_s, a) => heuristicInjectionResistance(a),
+  sentiment: (_s, a) => heuristicSentiment(a),
+  summarization: (s, a) => heuristicSummarization(a, s.source ?? s.contexts?.join(' ') ?? ''),
+  pii_entities: (_s, a) => heuristicPiiLeakage(a),
+  // ── extended catalog (DeepEval-family) heuristic fallbacks ──
+  noise_sensitivity: (s, a) => heuristicNoiseSensitivity(a, s.contexts ?? []),
+  harmfulness: (_s, a) => heuristicHarmfulness(a),
+  jailbreak_resistance: (_s, a) => heuristicJailbreakResistance(a),
+  coherence: (_s, a) => heuristicCoherence(a),
+  fluency: (_s, a) => heuristicFluency(a),
+  // Same signal as faithfulness: every statement traceable to the provided context.
+  groundedness: (s, a) => heuristicFaithfulness(a, s.contexts ?? []),
+  turn_relevancy: (s, a) => heuristicTurnRelevancy(s.question ?? '', a),
+  knowledge_retention: (s, a) => heuristicKnowledgeRetention(a, s.userTurns ?? []),
+  conversation_completeness: (s, a) => heuristicConversationCompleteness(s.userTurns ?? [], a),
+  task_completion: (s, a) => heuristicTaskCompletion(s.goal ?? s.question ?? '', a),
+  tool_correctness: (s) => toolCorrectnessF1(s.toolsCalled ?? [], s.toolsExpected ?? []),
+};
+
+/** Score one metric offline. An unknown metric scores 0 — the runner reports it as unavailable. */
+export function heuristicScore(metric: string, s: HeuristicSample): number {
+  const score = HEURISTICS[metric];
+  return score ? score(s, s.answer ?? '') : 0;
 }
