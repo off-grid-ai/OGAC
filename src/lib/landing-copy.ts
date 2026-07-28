@@ -134,15 +134,8 @@ export const LANDING = {
       ],
     },
   },
-  proof: {
-    number: '07',
-    kicker: 'Proof',
-    heading: 'Judge the product before the pitch.',
-    intro: 'Explore live bank and insurer environments. Trace any use case end to end.',
-    quotePlaceholder: 'Named CIO proof belongs here: the starting problem, five deployed use cases, the 14-day result, and the agreed business outcome.',
-  },
   insights: {
-    number: '08',
+    number: '07',
     kicker: 'Insights',
     heading: 'The case for enterprise intelligence.',
     intro: 'The thesis, the operating model, and the controls that make it practical.',
@@ -154,7 +147,7 @@ export const LANDING = {
     ],
   },
   faq: {
-    number: '09',
+    number: '08',
     kicker: 'FAQ',
     heading: 'Frequently asked questions.',
     asideKicker: 'Still have questions?',

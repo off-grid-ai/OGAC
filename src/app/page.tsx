@@ -378,20 +378,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 07 Proof ───────────────────────────────────────────────────────── */}
-      <section id="proof" className="relative border-b border-border">
-        <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead number={c.proof.number} kicker={c.proof.kicker} heading={c.proof.heading} intro={c.proof.intro} />
-          <BlurFade delay={0.12} inView>
-            <figure className="mt-8 max-w-3xl rounded-2xl border border-dashed border-border bg-card/60 p-8">
-              <blockquote className="text-lg leading-relaxed text-muted-foreground">
-                {c.proof.quotePlaceholder}
-              </blockquote>
-            </figure>
-          </BlurFade>
-        </div>
-      </section>
-
       {/* ── 08 Insights ────────────────────────────────────────────────────── */}
       <section id="insights" className="relative border-b border-border bg-card/40">
         <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
