@@ -122,7 +122,12 @@ for (const route of routes) {
     // console screen paints ~545 characters of chrome (demo banner + sidebar nav + header), so a screen
     // that rendered literally nothing still reports ~700 body chars and the old `chars < 220` rule could
     // never fire — /operations/health/metrics/alerts read 760 body chars for 215 chars of content.
-    mainText = (await page.locator('main').first().innerText().catch(() => '')) || '';
+    // Fall back to the body when a route has no <main> at all (the marketing/landing and signin shells
+    // do not use one) — otherwise those screens measure 0 content chars and get condemned as THIN.
+    mainText =
+      (await page.locator('main').count().catch(() => 0)) > 0
+        ? (await page.locator('main').first().innerText().catch(() => '')) || ''
+        : text;
     // ':visible' matters: the small-screen gate ("Open this on a bigger screen") is an h1 that is
     // display:none at 1440px, yet innerText on a hidden node still returns its text — so a plain
     // locator('h1') reports a heading the operator cannot see, and the THIN rule below (which trusts
