@@ -133,14 +133,31 @@ function num(v: unknown): number {
  */
 export function parseSpendTime(v: string | number | null | undefined): number | null {
   if (v === null || v === undefined) return null;
-  if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : null;
+  if (typeof v === 'number') return positiveEpoch(v);
   const trimmed = v.trim();
-  const asNum = Number(trimmed);
-  if (trimmed !== '' && Number.isFinite(asNum) && String(asNum) === trimmed) {
-    return asNum > 0 ? asNum : null;
-  }
+  // A numeric STRING is an epoch, not a date to parse — Date.parse('1700000000') would read it as a
+  // year and silently produce a timestamp centuries off.
+  const asEpoch = epochFromNumericString(trimmed);
+  if (asEpoch !== undefined) return asEpoch;
   const parsed = Date.parse(trimmed);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+/** A usable epoch, or null. Zero and negatives mean "no timestamp", not 1970. */
+function positiveEpoch(n: number): number | null {
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * The epoch a purely-numeric string represents, or undefined when the string is not one.
+ * undefined (not null) so the caller can tell "not a number, try parsing it as a date" from
+ * "a number, but not a usable timestamp".
+ */
+function epochFromNumericString(trimmed: string): number | null | undefined {
+  if (trimmed === '') return undefined;
+  const asNum = Number(trimmed);
+  if (!Number.isFinite(asNum) || String(asNum) !== trimmed) return undefined;
+  return positiveEpoch(asNum);
 }
 
 /** Mask a key/token to `…last4`; short/empty tokens degrade to null. PURE. */
@@ -150,21 +167,26 @@ export function maskToken(token: string | null | undefined): string | null {
   return t.length <= 4 ? `…${t}` : `…${t.slice(-4)}`;
 }
 
+/** A trimmed string, or null when it is absent or blank. An empty field is missing, not "". */
+function trimmedOrNull(v: string | null | undefined): string | null {
+  return (v ?? '').trim() || null;
+}
+
 /** Normalize ONE raw /spend/logs row → the safe SpendLogRow. PURE. */
 export function normalizeSpendLog(raw: RawSpendLog): SpendLogRow {
   const meta = raw.metadata ?? {};
-  const total = num(raw.total_tokens) || num(raw.prompt_tokens) + num(raw.completion_tokens);
   return {
-    requestId: (raw.request_id ?? '').trim() || null,
+    requestId: trimmedOrNull(raw.request_id),
     keyMasked: maskToken(raw.api_key ?? meta.user_api_key ?? null),
-    keyAlias: (meta.user_api_key_alias ?? '').trim() || null,
-    model: (raw.model ?? '').trim() || 'unknown',
+    keyAlias: trimmedOrNull(meta.user_api_key_alias),
+    model: trimmedOrNull(raw.model) ?? 'unknown',
     spend: num(raw.spend),
-    tokens: total,
+    // A provider that reports only the parts still yields a usable total.
+    tokens: num(raw.total_tokens) || num(raw.prompt_tokens) + num(raw.completion_tokens),
     promptTokens: num(raw.prompt_tokens),
     completionTokens: num(raw.completion_tokens),
     ts: parseSpendTime(raw.startTime ?? raw.endTime),
-    endUser: (raw.end_user ?? raw.user ?? '').trim() || null,
+    endUser: trimmedOrNull(raw.end_user ?? raw.user),
   };
 }
 

@@ -187,10 +187,7 @@ export function assembleFinOps(events: AuditEvent[], keys: ApiKey[]): FinOps {
   };
 }
 
-export async function computeFinOps(
-  pipelineTag?: string | null,
-  orgId?: string,
-): Promise<FinOps> {
+export async function computeFinOps(pipelineTag?: string | null, orgId?: string): Promise<FinOps> {
   // Real gateway traffic (OpenSearch) for cost/usage — not the seeded Postgres audit. An optional
   // pipeline tag narrows the traffic to that pipeline's slice server-side (project.keyword filter).
   // Keys are tenant-scoped: without an orgId, listApiKeys falls back to the default org, so each

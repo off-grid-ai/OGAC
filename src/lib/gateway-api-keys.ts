@@ -14,7 +14,12 @@ import {
   sortKeyViews,
   validateKeyName,
 } from '@/lib/gateway-api-key';
-import { KeycloakError, type KeycloakAdminClient, type KcClient, keycloakAdmin } from '@/lib/keycloak-admin';
+import {
+  KeycloakError,
+  type KeycloakAdminClient,
+  type KcClient,
+  keycloakAdmin,
+} from '@/lib/keycloak-admin';
 
 // Sentinel returned when Keycloak isn't configured — the routes surface `{ configured:false }` so the
 // UI can render an honest "Keycloak not configured" state instead of a 500.
@@ -30,7 +35,9 @@ export interface CreatedKey {
 
 // List every gateway API key in the realm (clients with the `ogak-` prefix), newest first. Never
 // returns secrets. Best-effort last-used: pulled from each client's active sessions if available.
-export async function listGatewayKeys(kc: KeycloakAdminClient = requireKc()): Promise<GatewayKeyView[]> {
+export async function listGatewayKeys(
+  kc: KeycloakAdminClient = requireKc(),
+): Promise<GatewayKeyView[]> {
   // Keycloak's ?clientId= filter is an EXACT match, so we can't prefix-filter server-side; list all
   // and filter by our prefix. Realms have few clients, so this is cheap.
   const clients = await kc.listClients();
@@ -42,7 +49,14 @@ export async function listGatewayKeys(kc: KeycloakAdminClient = requireKc()): Pr
 async function toView(kc: KeycloakAdminClient, c: KcClient): Promise<GatewayKeyView> {
   const lastUsedAt = await lastUsed(kc, c.id);
   return mapKeyClient(
-    { id: c.id, clientId: c.clientId, name: c.name, description: c.description, enabled: c.enabled, attributes: c.attributes },
+    {
+      id: c.id,
+      clientId: c.clientId,
+      name: c.name,
+      description: c.description,
+      enabled: c.enabled,
+      attributes: c.attributes,
+    },
     lastUsedAt,
   );
 }
@@ -52,7 +66,9 @@ async function toView(kc: KeycloakAdminClient, c: KcClient): Promise<GatewayKeyV
 // (last-used is informational, never load-bearing).
 async function lastUsed(kc: KeycloakAdminClient, internalClientId: string): Promise<string | null> {
   try {
-    const sessions = (await kc.listClientSessions(internalClientId, 0, 50)) as Array<Record<string, unknown>>;
+    const sessions = (await kc.listClientSessions(internalClientId, 0, 50)) as Array<
+      Record<string, unknown>
+    >;
     let max = 0;
     for (const s of sessions) {
       const t = Number(s.lastAccess ?? s.start ?? 0);
@@ -90,15 +106,38 @@ export async function createGatewayKey(input: {
     description: `Gateway API key: ${name}`,
     serviceAccountsEnabled: true,
     directAccessGrantsEnabled: false,
-    attributes: { label: name, ownerOrg, scope: GATEWAY_KEY_SCOPE, createdAt, offgridGatewayKey: 'true' },
+    attributes: {
+      label: name,
+      ownerOrg,
+      scope: GATEWAY_KEY_SCOPE,
+      createdAt,
+      offgridGatewayKey: 'true',
+    },
   });
 
   const secret = await kc.getClientSecret(id);
   const client = await kc.getClient(id);
   const view = mapKeyClient(
     client
-      ? { id: client.id, clientId: client.clientId, name: client.name, enabled: client.enabled, attributes: client.attributes }
-      : { id, clientId, name, enabled: true, attributes: { label: [name], ownerOrg: [ownerOrg], scope: [GATEWAY_KEY_SCOPE], createdAt: [createdAt] } },
+      ? {
+          id: client.id,
+          clientId: client.clientId,
+          name: client.name,
+          enabled: client.enabled,
+          attributes: client.attributes,
+        }
+      : {
+          id,
+          clientId,
+          name,
+          enabled: true,
+          attributes: {
+            label: [name],
+            ownerOrg: [ownerOrg],
+            scope: [GATEWAY_KEY_SCOPE],
+            createdAt: [createdAt],
+          },
+        },
     null,
   );
   return { view, apiKey: formatApiKey(clientId, secret) };

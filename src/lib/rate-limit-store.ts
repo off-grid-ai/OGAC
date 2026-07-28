@@ -104,7 +104,10 @@ function toLimit(v: unknown): number | null {
  * Read one key's configured per-minute rate limit (null = unset). For the admin UI. Tenant-scoped:
  * a cross-org id resolves to no row → null, so org A cannot read org B's configured limit — P1 IDOR.
  */
-export async function getKeyRateLimit(id: string, orgId: string = DEFAULT_ORG): Promise<number | null> {
+export async function getKeyRateLimit(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<number | null> {
   await ensureRateLimitSchema();
   const res = await db.execute(
     sql`SELECT rate_limit FROM api_keys WHERE id = ${id} AND org_id = ${orgId} LIMIT 1;`,
