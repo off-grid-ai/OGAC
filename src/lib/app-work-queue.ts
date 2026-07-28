@@ -162,12 +162,49 @@ const SUBJECT_KEYS = ['subject', 'title', 'summary', 'name', 'description', 'que
 /** Values long enough to be a document body rather than a label are not subjects. */
 const MAX_SUBJECT = 120;
 
-function scalarText(value: unknown): string | null {
+/**
+ * Group a whole number with thousands separators, WITHOUT toLocaleString.
+ *
+ * "Amount: 361030" reads as an unfinished field; "Amount: 361,030" reads as money. toLocaleString is
+ * avoided deliberately — it formats in the server's locale during SSR and the browser's on hydration,
+ * which is exactly the mismatch that broke this page's first deploy. No currency symbol is added: this
+ * module is generic and cannot know the tenant's currency, and guessing one would be a lie on the
+ * screen.
+ */
+function groupDigits(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  const negative = value < 0;
+  const [whole, fraction] = Math.abs(value).toString().split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${negative ? '-' : ''}${grouped}${fraction ? `.${fraction}` : ''}`;
+}
+
+/**
+ * Whether a field's NAME means a quantity, so its digits should be grouped.
+ *
+ * Grouping every long number was wrong: `policy_number: 88123` became "88,123", turning an identifier
+ * into what looks like money. An account number, PAN, reference or policy number must survive
+ * verbatim — a reader who copies a mangled identifier off this screen has been actively misled.
+ */
+const QUANTITY_KEY = /(amount|value|total|price|cost|salary|balance|sum|limit|premium|payout|claim_?amt)/i;
+const IDENTIFIER_KEY = /(number|no|id|ref|code|pan|account|acct|policy|ifsc|phone|mobile|pin|otp)$/i;
+
+function isQuantityKey(key: string): boolean {
+  if (IDENTIFIER_KEY.test(key)) return false;
+  return QUANTITY_KEY.test(key);
+}
+
+function scalarText(value: unknown, key = ''): string | null {
+  const quantity = isQuantityKey(key);
   if (typeof value === 'string') {
     const t = value.trim().replace(/\s+/g, ' ');
-    return t.length > 0 ? t.slice(0, MAX_SUBJECT) : null;
+    if (t.length === 0) return null;
+    // A numeric STRING is still a number to the reader — but only group it if the field is a quantity.
+    if (quantity && /^-?\d{4,}(\.\d+)?$/.test(t)) return groupDigits(Number(t));
+    return t.slice(0, MAX_SUBJECT);
   }
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'number') return quantity ? groupDigits(value) : String(value);
+  if (typeof value === 'boolean') return String(value);
   return null;
 }
 
@@ -182,18 +219,32 @@ export function runSubject(input: unknown): string | null {
   const record = input as Record<string, unknown>;
 
   for (const key of SUBJECT_KEYS) {
-    const direct = scalarText(record[key]);
+    const direct = scalarText(record[key], key);
     if (direct) return direct;
   }
 
   // No named subject: describe the case by its first couple of fields, labelled readably.
   const parts: string[] = [];
   for (const [key, value] of Object.entries(record)) {
-    const text = scalarText(value);
+    const text = scalarText(value, key);
     if (!text) continue;
     const label = key.replace(/[_-]+/g, ' ').trim();
     parts.push(`${label.charAt(0).toUpperCase()}${label.slice(1)}: ${text}`);
     if (parts.length === 2) break;
   }
   return parts.length > 0 ? parts.join(' · ').slice(0, MAX_SUBJECT) : null;
+}
+
+/**
+ * What a row is labelled when the run's input cannot be summarised.
+ *
+ * Every such row previously read the identical word "Case", so a queue of them was indistinguishable —
+ * you could not tell two rows apart, or refer to one in a conversation. Appending a short reference
+ * from the run id fixes both without inventing content that is not there.
+ */
+export function caseLabel(subject: string | null | undefined, runId: string): string {
+  const trimmed = subject?.trim();
+  if (trimmed) return trimmed;
+  const ref = runId.replace(/^[a-z]+_/i, '').slice(0, 6);
+  return ref ? `Case ${ref}` : 'Case';
 }

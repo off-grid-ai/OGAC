@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   arrivalSentence,
   buildAppWorkQueue,
+  caseLabel,
   runSubject,
   statusLabel,
   type WorkRun,
@@ -150,7 +151,7 @@ test('an explicit subject-ish field wins', () => {
 test('with no named subject, the first fields describe the case with readable labels', () => {
   // A non-technical reader must never see a database-shaped key.
   const subject = runSubject({ claim_amount: '12400', customer_name: 'Priya Sharma' });
-  assert.equal(subject, 'Claim amount: 12400 · Customer name: Priya Sharma');
+  assert.equal(subject, 'Claim amount: 12,400 · Customer name: Priya Sharma');
   assert.doesNotMatch(subject ?? '', /_/);
 });
 
@@ -176,6 +177,38 @@ test('long text is truncated and newlines collapsed, so a row cannot break the l
   assert.equal(runSubject({ subject: 'line one\n\nline two' }), 'line one line two');
 });
 
-test('numbers and booleans are usable subjects', () => {
+test('identifiers are NEVER grouped — only quantities are', () => {
+  // Grouping an identifier turns 88123 into "88,123", which reads as money and is wrong to copy.
   assert.equal(runSubject({ policy_number: 88123 }), 'Policy number: 88123');
+  assert.equal(runSubject({ account_number: '50100234567' }), 'Account number: 50100234567');
+  assert.equal(runSubject({ pan: 'ABCDE1234F' }), 'Pan: ABCDE1234F');
+  // …while a quantity field IS grouped.
+  assert.equal(runSubject({ premium: 145000 }), 'Premium: 145,000');
+});
+
+test('large numbers are grouped so an amount reads as money, not as a raw field', () => {
+  assert.equal(runSubject({ amount: 361030 }), 'Amount: 361,030');
+  // A numeric STRING is still a number to the reader.
+  assert.equal(runSubject({ amount: '37562' }), 'Amount: 37,562');
+  assert.equal(runSubject({ amount: -1234567 }), 'Amount: -1,234,567');
+  assert.equal(runSubject({ total_value: 9876543 }), 'Total value: 9,876,543');
+  assert.equal(runSubject({ amount: 1234.56 }), 'Amount: 1,234.56');
+  // Short numbers and identifier-named fields are left alone.
+  assert.equal(runSubject({ code: 404 }), 'Code: 404');
+});
+
+test('no currency symbol is invented — this module cannot know the tenant currency', () => {
+  const subject = runSubject({ amount: 500000 }) ?? '';
+  assert.doesNotMatch(subject, /[₹$€£]/);
+});
+
+test('caseLabel distinguishes rows that have no summarisable input', () => {
+  // Every such row used to read the identical word "Case", so a queue of them was unusable.
+  assert.equal(caseLabel(null, 'apprun_9a76e76f12'), 'Case 9a76e7');
+  assert.equal(caseLabel('   ', 'apprun_c73426cc'), 'Case c73426');
+  assert.notEqual(caseLabel(null, 'apprun_aaa111'), caseLabel(null, 'apprun_bbb222'));
+});
+
+test('caseLabel prefers a real subject over the reference', () => {
+  assert.equal(caseLabel('Reimbursement for travel', 'apprun_9a76e7'), 'Reimbursement for travel');
 });

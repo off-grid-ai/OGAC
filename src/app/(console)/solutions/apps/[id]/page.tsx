@@ -4,7 +4,13 @@ import { notFound } from 'next/navigation';
 import { PageFrame } from '@/components/PageFrame';
 import { Card, CardContent } from '@/components/ui/card';
 import { listAppRuns } from '@/lib/app-run-store';
-import { buildAppWorkQueue, runSubject, statusLabel, type WorkRun } from '@/lib/app-work-queue';
+import {
+  buildAppWorkQueue,
+  caseLabel,
+  runSubject,
+  statusLabel,
+  type WorkRun,
+} from '@/lib/app-work-queue';
 import { getApp } from '@/lib/apps-store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -41,7 +47,7 @@ function Row({
       <span className="mt-0.5 shrink-0">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm text-foreground">
-          {run.subject?.trim() || 'Case'}
+          {caseLabel(run.subject, run.id)}
         </span>
         <span className="mt-0.5 block text-xs text-muted-foreground">
           {statusLabel(run.status)}
