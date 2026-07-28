@@ -9,7 +9,9 @@ test('lifecycleTabs: the lifecycle in flow order (+ Quality, Access, Schedule, S
   const tabs = lifecycleTabs('app_42');
   assert.deepEqual(
     tabs.map((t) => t.tab),
-    ['build', 'input', 'runs', 'review', 'reports', 'quality', 'access', 'schedule', 'controls'],
+    // WORK leads: an app opens on what is waiting for you, not on its own configuration
+    // (docs/APP_AS_PRODUCT.md item 3). Build moved to its own segment when Work took the base path.
+    ['work', 'build', 'input', 'runs', 'review', 'reports', 'quality', 'access', 'schedule', 'controls'],
   );
   assert.ok(
     tabs.every((t) => t.hint.length > 0),
@@ -36,14 +38,16 @@ test('activeTabForPath: the access tab resolves from its sub-path', () => {
   assert.equal(appTabHref('app_42', 'access'), '/solutions/apps/app_42/access');
 });
 
-test('appTabHref: build is the bare app path; others hang off it', () => {
-  assert.equal(appTabHref('app_42', 'build'), '/solutions/apps/app_42');
+test('appTabHref: work is the bare app path; others hang off it', () => {
+  assert.equal(appTabHref('app_42', 'work'), '/solutions/apps/app_42');
+  assert.equal(appTabHref('app_42', 'build'), '/solutions/apps/app_42/build');
   assert.equal(appTabHref('app_42', 'input'), '/solutions/apps/app_42/input');
   assert.equal(appTabHref('app_42', 'reports'), '/solutions/apps/app_42/reports');
 });
 
-test('activeTabForPath: bare app path selects Build', () => {
-  assert.equal(activeTabForPath('/solutions/apps/app_42', 'app_42'), 'build');
+test('activeTabForPath: bare app path selects Work', () => {
+  assert.equal(activeTabForPath('/solutions/apps/app_42', 'app_42'), 'work');
+  assert.equal(activeTabForPath('/solutions/apps/app_42/build', 'app_42'), 'build');
 });
 
 test('activeTabForPath: a named sub-segment selects that tab', () => {
@@ -57,8 +61,8 @@ test('activeTabForPath: a deep run path still resolves to the runs tab', () => {
   assert.equal(activeTabForPath('/solutions/apps/app_42/runs/run_9', 'app_42'), 'runs');
 });
 
-test('activeTabForPath: an unknown sub-segment falls back to Build', () => {
-  assert.equal(activeTabForPath('/solutions/apps/app_42/nonsense', 'app_42'), 'build');
+test('activeTabForPath: an unknown sub-segment falls back to Work', () => {
+  assert.equal(activeTabForPath('/solutions/apps/app_42/nonsense', 'app_42'), 'work');
 });
 
 test('activeTabForPath: a path for a different app is not claimed', () => {

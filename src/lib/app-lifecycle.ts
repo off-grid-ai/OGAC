@@ -7,6 +7,7 @@
 // test/app-lifecycle.test.ts. The AppLifecycleNav component is a thin renderer over `lifecycleTabs`.
 
 export type AppTab =
+  | 'work'
   | 'build'
   | 'input'
   | 'runs'
@@ -26,8 +27,12 @@ export interface LifecycleTab {
   hint: string;
 }
 
-// The canonical five, in flow order (Build → Input → Runs → Review → Reports).
+// Flow order, but WORK LEADS. An app automates a process the enterprise already runs, so work arrives
+// on its own and the person using it opens the app to deal with what is waiting — not to inspect the
+// app's own configuration. Landing on Build made every app read as an entry in an AI console rather
+// than the department's tool for that process (docs/APP_AS_PRODUCT.md item 3).
 const TAB_META: { tab: AppTab; label: string; hint: string }[] = [
+  { tab: 'work', label: 'Work', hint: 'What is waiting for you right now' },
   { tab: 'build', label: 'Build', hint: 'Edit the steps and how it runs' },
   { tab: 'input', label: 'Input', hint: 'Enter inputs and run it' },
   { tab: 'runs', label: 'Runs', hint: 'Watch runs execute, step by step' },
@@ -56,12 +61,12 @@ const TAB_META: { tab: AppTab; label: string; hint: string }[] = [
 ];
 
 // ─── appTabHref — the canonical URL for one app tab ──────────────────────────────────────────────
-// `build` is the app's landing (/apps/<id>); the rest hang off it (/apps/<id>/input, …). Keeping the
-// base tab at the bare path (not /apps/<id>/build) means "open an app" lands on Build without a
-// redirect, and the URL stays clean.
+// `work` is the app's landing (/apps/<id>); every other tab hangs off it (/apps/<id>/build, …).
+// Keeping the base tab at the bare path means "open an app" lands on the work waiting for you with no
+// redirect, and the URL stays clean. Build moved to its own segment when Work took the base.
 export function appTabHref(appId: string, tab: AppTab): string {
   const base = `/solutions/apps/${encodeURIComponent(appId)}`;
-  return tab === 'build' ? base : `${base}/${tab}`;
+  return tab === 'work' ? base : `${base}/${tab}`;
 }
 
 // ─── lifecycleTabs — the five tabs for a given app, with hrefs ───────────────────────────────────
@@ -78,8 +83,9 @@ export function activeTabForPath(pathname: string, appId: string): AppTab | null
   if (pathname !== base && !pathname.startsWith(`${base}/`)) return null;
   const rest = pathname.slice(base.length).replace(/^\/+/, '');
   const seg = rest.split('/')[0] ?? '';
-  if (!seg) return 'build';
+  if (!seg) return 'work';
   const known: AppTab[] = [
+    'work',
     'build',
     'input',
     'runs',
@@ -90,5 +96,5 @@ export function activeTabForPath(pathname: string, appId: string): AppTab | null
     'schedule',
     'controls',
   ];
-  return (known as string[]).includes(seg) ? (seg as AppTab) : 'build';
+  return (known as string[]).includes(seg) ? (seg as AppTab) : 'work';
 }
