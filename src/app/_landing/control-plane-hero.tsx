@@ -745,6 +745,13 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   );
   const { cam, em } = useMemo(() => frameOf(index, progress, !reduce.current), [index, progress]);
 
+  // Where the stage actually sits inside the outer box. The stage is letterboxed (contain), so the outer
+  // element's corner is NOT the artwork's corner — anchoring the controls to `bottom-3 right-3` of the
+  // outer dropped them into the empty band beside the poster, which reads as misaligned rather than as
+  // floating controls. Inset them by the letterbox margin so they always overlay the artwork.
+  const stageInsetX = Math.max(0, (box.w - STAGE_W * scale) / 2);
+  const stageInsetY = Math.max(0, (box.h - STAGE_H * scale) / 2);
+
   const label = paused ? 'Play the animation' : 'Pause the animation';
   return (
     <div
@@ -808,7 +815,8 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
               forces its own compositing pass, and it painted a blank vertical band all the way up the
               stage above the buttons. Solid backgrounds instead. */}
           <div
-            className={`absolute bottom-3 right-3 z-20 flex items-center gap-1.5 transition-opacity duration-200 ${
+            style={{ right: stageInsetX + 12, bottom: stageInsetY + 12 }}
+            className={`absolute z-20 flex items-center gap-1.5 transition-opacity duration-200 ${
               // Always visible on touch (no hover to reveal them) and whenever paused, so the state is
               // legible rather than implied by stillness.
               paused || hinted
