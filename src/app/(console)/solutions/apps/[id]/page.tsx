@@ -6,6 +6,7 @@ import { PageFrame } from '@/components/PageFrame';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { buildAppDashboard } from '@/lib/app-dashboard';
+import { isDeclinedByPerson } from '@/lib/app-run-progress';
 import { listAppRuns } from '@/lib/app-run-store';
 import {
   buildAppWorkQueue,
@@ -66,7 +67,7 @@ function Row({
             {caseLabel(run.subject, run.id)}
           </span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
-            {statusLabel(run.status)}
+            {statusLabel(run.status, { declined: run.declined })}
             {when ? ` · ${when}` : ''}
           </span>
           {/* The governed run, made visible. Derived from the run's own steps, so it never claims a check
@@ -122,6 +123,10 @@ export default async function AppWorkPage({
         ((r as { steps?: { id?: string; status?: string }[] }).steps ?? []).find(
           (st) => st.status === 'awaiting_human',
         )?.id ?? null,
+      // A person declining a case halts the run the same way a failure does; only this tells them apart.
+      declined: isDeclinedByPerson(
+        (r as { steps?: { kind?: string; status?: string; detail?: string }[] }).steps,
+      ),
     })),
   });
 

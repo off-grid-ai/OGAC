@@ -17,6 +17,8 @@ export interface DashboardRun {
   finishedAt?: string | null;
   /** True when this run paused for a person at any point. */
   neededPerson?: boolean;
+  /** True when a person DECLINED it. Counted as handled, not as a failure. */
+  declined?: boolean;
 }
 
 export interface DashboardMetric {
@@ -95,8 +97,10 @@ export function buildAppDashboard(input: AppDashboardInput): AppDashboard {
     return Number.isFinite(t) && t >= since;
   });
 
-  const completed = inWindow.filter((r) => r.status === DONE);
-  const failed = inWindow.filter((r) => FAILED.has(r.status));
+  // A case a person declined is HANDLED: someone looked at it and decided. Counting it as a failure both
+  // overstated the failure rate and understated the work the app actually got done.
+  const completed = inWindow.filter((r) => r.status === DONE || r.declined === true);
+  const failed = inWindow.filter((r) => FAILED.has(r.status) && r.declined !== true);
   // Waiting is NOT windowed. A case pending a decision is pending regardless of when it arrived, and an
   // OLD one is more urgent, not less. Windowing it produced a visible contradiction: the queue said "2
   // cases are waiting" while this metric said 1, because one had been waiting longer than the window.

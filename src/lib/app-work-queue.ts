@@ -14,6 +14,9 @@
 // understandable by READING it. Every string is therefore a statement of fact about the work, never an
 // instruction that only a privileged user could carry out.
 
+import { toCaseCandidate } from '@/lib/app-case-candidates';
+import { caseRecordFrom } from '@/lib/connector-filter';
+
 /** A run reduced to what the work screen needs. The caller maps its store rows onto this. */
 export interface WorkRun {
   id: string;
@@ -23,6 +26,8 @@ export interface WorkRun {
   startedAt: string;
   /** What the run is about, in the author's words. Blank is tolerated. */
   subject?: string | null;
+  /** True when a person DECLINED it — a decision, not a breakdown. See isDeclinedByPerson. */
+  declined?: boolean;
 }
 
 /** How work reaches this app, expressed for someone who does not know what a webhook is. */
@@ -153,8 +158,15 @@ export function buildAppWorkQueue(input: AppWorkQueueInput): AppWorkQueue {
   };
 }
 
-/** A run's status as a non-technical label. */
-export function statusLabel(status: string): string {
+/**
+ * A run's status as a non-technical label.
+ *
+ * `declined` is separated from `error` deliberately: a person rejecting a case halts the run through the
+ * same mechanism as a failure, and calling that "Could not finish" told the reader the app had broken when
+ * in fact it had done its job.
+ */
+export function statusLabel(status: string, opts: { declined?: boolean } = {}): string {
+  if (opts.declined) return 'Declined by a person';
   switch (status) {
     case AWAITING:
       return 'Waiting for you';
@@ -243,11 +255,25 @@ function scalarText(value: unknown, key = ''): string | null {
  */
 export function runSubject(input: unknown): string | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
-  const record = input as Record<string, unknown>;
+  // Unwrap the trigger envelope with the SAME rule the data steps use to find the case, rather than a
+  // second copy of that knowledge here. When the picked record moved into `case`, this function stopped
+  // finding anything and every new row in the queue read "Case 9ba6a4" — the queue lost its case names
+  // while the runs themselves were working perfectly.
+  const envelope = input as Record<string, unknown>;
+  const record = caseRecordFrom(envelope);
 
   for (const key of SUBJECT_KEYS) {
     const direct = scalarText(record[key], key);
     if (direct) return direct;
+  }
+
+  // Describing a data record so a person recognises it is exactly what the case PICKER does, and it does it
+  // well ("Meera Malhotra · submitted · 41,346.44"). Reusing that rule keeps the queue row and the row the
+  // person clicked to create it worded the same way, instead of two descriptions of one record drifting apart.
+  const described = toCaseCandidate(record, 0);
+  // Its label falls back to "Record 1" when nothing is recognisable; that is not a subject.
+  if (!/^Record \d+$/.test(described.label)) {
+    return [described.label, described.detail].filter(Boolean).join(' · ').slice(0, MAX_SUBJECT);
   }
 
   // No named subject: describe the case by its first couple of fields, labelled readably.
@@ -259,7 +285,24 @@ export function runSubject(input: unknown): string | null {
     parts.push(`${label.charAt(0).toUpperCase()}${label.slice(1)}: ${text}`);
     if (parts.length === 2) break;
   }
-  return parts.length > 0 ? parts.join(' · ').slice(0, MAX_SUBJECT) : null;
+  if (parts.length > 0) return parts.join(' · ').slice(0, MAX_SUBJECT);
+  // Last resort: the readable line the person saw when they submitted it, wherever it sits in the envelope.
+  return envelopeText(envelope) ?? null;
+}
+
+/** The primary text a trigger carried, searched one level into the envelope. Never invents a subject. */
+function envelopeText(envelope: Record<string, unknown>, depth = 0): string | null {
+  if (depth > 3) return null;
+  for (const key of ['input', 'text', 'message', 'subject', 'body']) {
+    const value = envelope[key];
+    const text = scalarText(value, key);
+    if (text) return text;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const nested = envelopeText(value as Record<string, unknown>, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return null;
 }
 
 /**

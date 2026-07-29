@@ -8,6 +8,7 @@ import { sharedSurface } from '@/lib/app-surface';
 import { runInputPrompt } from '@/lib/app-input-prompt';
 import { listAppRuns } from '@/lib/app-run-store';
 import { buildAppDashboard } from '@/lib/app-dashboard';
+import { isDeclinedByPerson } from '@/lib/app-run-progress';
 import { buildAppWorkQueue, caseLabel, caseTrail, runSubject, statusLabel } from '@/lib/app-work-queue';
 import { getAppBySlug } from '@/lib/apps-store';
 import { resolveDeployedApp } from '@/lib/deployed-app';
@@ -87,6 +88,10 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
     trail: caseTrail((r as { steps?: { kind?: string; status?: string }[] }).steps, {
       signed: Boolean((r as { provenance?: unknown }).provenance),
     }),
+    // A person declining a case halts the run the same way a failure does; only this tells them apart.
+    declined: isDeclinedByPerson(
+      (r as { steps?: { kind?: string; status?: string; detail?: string }[] }).steps,
+    ),
   }));
   const queue = buildAppWorkQueue({
     trigger: app.trigger?.kind ?? 'on-demand',
@@ -105,6 +110,7 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
             ? ((r as { finishedAt: Date }).finishedAt).toISOString()
             : ((r as { finishedAt?: string | null }).finishedAt ?? null),
         neededPerson: steps.some((st) => st.kind === 'human' && st.status !== 'queued'),
+        declined: isDeclinedByPerson(steps),
       };
     }),
   });
@@ -131,7 +137,7 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
             trail: (c as { trail?: string | null }).trail,
             label: caseLabel(c.subject, c.id),
             href: `/app/${encodeURIComponent(resolved.slug)}?view=activity`,
-            when: `${statusLabel(c.status)} · ${
+            when: `${statusLabel(c.status, { declined: c.declined })} · ${
               Number.isNaN(Date.parse(c.startedAt))
                 ? ''
                 : `${new Date(Date.parse(c.startedAt)).toISOString().slice(0, 16).replace('T', ' ')} UTC`

@@ -28,6 +28,7 @@ export interface ProgressResultStep {
   stepId?: string;
   kind?: string;
   status?: string;
+  detail?: string;
 }
 
 export type ProgressState = 'done' | 'running' | 'pending' | 'waiting' | 'failed';
@@ -110,4 +111,20 @@ export function progressHeadline(progress: readonly RunProgressStep[]): string {
   if (progress.some((step) => step.state === 'waiting')) return 'Waiting for a decision.';
   if (progress.length > 0 && progress.every((step) => step.state === 'done')) return 'Finished.';
   return 'Starting…';
+}
+
+/**
+ * Whether a run stopped because a PERSON declined it.
+ *
+ * A rejection is modelled as a step error so that it halts the run, which is right — but it was then
+ * reported as one: four rejected motor claims showed up on the Work screen under "COULD NOT FINISH", as
+ * though the app had broken. A decline is a decision, and a decision is the app working. The halt stays;
+ * only the accounting of it changes.
+ */
+export function isDeclinedByPerson(steps: readonly ProgressResultStep[] | undefined): boolean {
+  return (steps ?? []).some(
+    (step) =>
+      step.status === 'error' &&
+      (step.kind === 'human' || /human rejected/i.test(step.detail ?? '')),
+  );
 }
