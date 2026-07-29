@@ -11,9 +11,10 @@ import { ControlPlaneHero } from '@/app/_landing/control-plane-hero';
 // width it gets the closer it runs to native; at full viewport on a 16:9 display it is exact.
 //
 // The wrapper is deliberately taller than the viewport: the `sticky` child pins the stage when the
-// wrapper's top reaches the top of the screen, and the expansion plays out over the ~100vh of scroll
-// for which it stays pinned. So the stage is contained on arrival, grows while held still, and is at
-// full bleed by the time the page moves on.
+// wrapper's top reaches the top of the screen, and the growth plays out over the scroll for which it
+// stays pinned. The growth finishes EARLY in that window and then holds at full bleed, so the stage
+// dwells at 100vw x 100vh long enough to actually watch — rather than reaching full size exactly as
+// it starts scrolling away, which is the same as never getting there.
 //
 // NOT ON MOBILE. A 16:9 stage expanded into a portrait phone viewport is mostly empty bars, and pinning
 // a tall section hijacks the scroll on the device where that is most annoying. Phones keep the
@@ -54,10 +55,15 @@ export function ControlPlaneStage() {
   const startW = Math.max(0, Math.min(CONTAINER_MAX, vp.w) - CONTAINER_PAD);
   const startH = (startW * STAGE_H) / STAGE_W;
 
-  const width = useTransform(scrollYProgress, [0, 1], [startW, vp.w]);
-  const height = useTransform(scrollYProgress, [0, 1], [startH, vp.h]);
-  const radius = useTransform(scrollYProgress, [0, 1], [12, 0]);
-  const borderOpacity = useTransform(scrollYProgress, [0, 0.85, 1], [1, 1, 0]);
+  // GROW EARLY, THEN HOLD. Spreading the growth across the whole pin meant the stage only reached
+  // full bleed at the instant it started leaving — you watched it get bigger and then it was gone,
+  // which is no payoff at all. It now completes in the first ~35% of the pinned scroll and STAYS at
+  // 100vw x 100vh for the remaining ~65%, so there is a real full-screen dwell on the product.
+  const GROW_END = 0.35;
+  const width = useTransform(scrollYProgress, [0, GROW_END, 1], [startW, vp.w, vp.w]);
+  const height = useTransform(scrollYProgress, [0, GROW_END, 1], [startH, vp.h, vp.h]);
+  const radius = useTransform(scrollYProgress, [0, GROW_END, 1], [12, 0, 0]);
+  const borderOpacity = useTransform(scrollYProgress, [0, GROW_END * 0.8, GROW_END], [1, 1, 0]);
 
   // Until measured (SSR / first paint) render the plain contained stage so nothing jumps.
   const expand = vp.w >= MOBILE_BREAKPOINT && !reduce;
@@ -71,7 +77,7 @@ export function ControlPlaneStage() {
   }
 
   return (
-    <div ref={wrapRef} className="relative h-[200vh]">
+    <div ref={wrapRef} className="relative h-[260vh]">
       <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
         <motion.div
           style={{ width, height, borderRadius: radius, opacity: 1 }}
