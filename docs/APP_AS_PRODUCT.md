@@ -116,7 +116,11 @@ themselves before building anything new.
   sections renumbered; apex signin links both demo tenants.
 
 ### Open defects found while doing the above
-- **The seeded demo apps FAIL spec validation.** `updateApp` re-validates the whole spec and rejects them:
+- ~~**The seeded demo apps FAIL spec validation.**~~ **FIXED 2026-07-29** —
+  `scripts/repair-demo-app-specs.mts` bound the missing domain/agent/sink from each tenant's real context
+  (`report` sink deliberately, so a demo app can never email or post when someone presses Run). Verified:
+  **17/17 demo apps now pass the validator that save runs.** Original defect below for context.
+- **(was)** `updateApp` re-validates the whole spec and rejects them:
   `connector-query step s1/s2: needs a domain binding`, `agent step s3: needs agentId or inlineAgent`,
   `output step s5: needs a sink`. So **nobody can save an edit to these apps in the UI either** — an
   edit-then-save on any seeded demo app will fail. Worth fixing before a demo shows editing.
