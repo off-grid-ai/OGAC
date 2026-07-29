@@ -35,6 +35,11 @@ import {
 } from '@/lib/app-model';
 import { type DataDomain, resolveDomain } from '@/lib/data-domains';
 import { resolveQualifiedPhrase } from '@/lib/phrase-qualifier';
+import {
+  type DependencyStep,
+  ensureAgentDataReads,
+  insertionNote,
+} from '@/lib/agent-data-dependency';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { getOrgContext } from '@/lib/org-context';
 
@@ -108,6 +113,32 @@ export async function compileAppSpec(
   // 1. LLM path — decompose, then re-bind + gap-check EVERY step ourselves (untrusted output).
   // 2. Deterministic heuristic fallback — same binding rules, no model.
   const assembled = (await planFromModel(desc, domains, deps)) ?? heuristicDecompose(desc, domains);
+
+  // 1b. An agent step must not reason about data no earlier step reads. The model happily turns a data
+  // clause ("check that employee's remaining reimbursement quota") into a reasoning step, producing an app
+  // that runs, validates, and answers confidently from data it never fetched — with no gap reported. See
+  // lib/agent-data-dependency.ts. Only fires on phrases the org's own resolver confidently binds, so it
+  // can never fabricate a source; every insertion is reported back to the author.
+  const fixed = ensureAgentDataReads(
+    assembled.steps as unknown as DependencyStep[],
+    desc,
+    (phrase) => resolveDomain(phrase, domains),
+    (domain, id) =>
+      ({
+        id,
+        kind: 'connector-query',
+        label: `Read ${domain.label}`,
+        domain: domain.id,
+        op: 'read',
+      }) as unknown as DependencyStep,
+  );
+  if (fixed.inserted.length > 0) {
+    assembled.steps = fixed.steps as unknown as AppStep[];
+    for (const ins of fixed.inserted) {
+      const agent = assembled.steps.find((st) => st.id === ins.beforeStepId);
+      assembled.gaps.push(insertionNote(ins.domainLabel, agent?.label || ins.beforeStepId));
+    }
+  }
 
   const spec = finalizeSpec(assembled, ctx, desc);
 
