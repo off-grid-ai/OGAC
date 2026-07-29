@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { isActionableRecord, primaryDomainLabel, toCaseCandidate } from '@/lib/app-case-candidates';
 import { getApp } from '@/lib/apps-store';
 import { requireAdmin } from '@/lib/authz';
-import { execConnectorQuery } from '@/lib/connector-exec';
+import { execConnectorRead } from '@/lib/connector-exec';
+import { connectorFailureSentence, describeThrown } from '@/lib/connector-failure';
 import { listConnectors } from '@/lib/store';
 import { listDomains } from '@/lib/data-domains-store';
 import { currentOrgId } from '@/lib/tenancy';
@@ -46,16 +47,24 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ object: 'list', data: [], reason: 'connector-missing', domain: label });
   }
 
-  const result = await execConnectorQuery(
+  const outcome = await execConnectorRead(
     { type: connector.type, endpoint: connector.endpoint, id: connector.id, orgId },
     { resource: domain.resource, op: 'read', limit: 20, binding: { orgId, domainId: domain.id } },
-  ).catch(() => null);
+  ).catch((error: unknown) => ({ ok: false as const, failure: { kind: 'connection' as const, detail: describeThrown(error) } }));
 
-  if (!result) {
+  if (!outcome.ok) {
     // A source that cannot be read is reported as such — never as "no cases", which would read as an
-    // empty queue rather than a connection problem.
-    return NextResponse.json({ object: 'list', data: [], reason: 'source-unavailable', domain: label });
+    // empty queue rather than a connection problem. The reason is carried so the operator sees WHAT to
+    // fix instead of a shrug.
+    return NextResponse.json({
+      object: 'list',
+      data: [],
+      reason: 'source-unavailable',
+      domain: label,
+      detail: connectorFailureSentence(outcome.failure),
+    });
   }
+  const result = outcome.result;
 
   // Only records that still need a decision are offered. A paid invoice is not a reimbursement waiting to
   // be approved, and mixing settled rows in invites someone to act on something already done. The count of

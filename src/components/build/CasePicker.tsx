@@ -38,6 +38,7 @@ export function CasePicker({
         domain?: string;
         items: CaseCandidate[];
         reason?: string;
+        detail?: string;
         settledHidden?: number;
       }
     | { status: 'error' }
@@ -51,6 +52,7 @@ export function CasePicker({
         data?: CaseCandidate[];
         domain?: string;
         reason?: string;
+        detail?: string;
         settledHidden?: number;
       };
       if (!res.ok) {
@@ -62,6 +64,7 @@ export function CasePicker({
         domain: data.domain,
         items: data.data ?? [],
         reason: data.reason,
+        detail: data.detail,
         settledHidden: data.settledHidden ?? 0,
       });
     } catch {
@@ -91,10 +94,22 @@ export function CasePicker({
   if (state.items.length === 0) {
     // Say WHICH of the several very different "nothing here" situations this is.
     return (
-      <p className="text-xs text-muted-foreground">
-        {(state.reason && REASON_COPY[state.reason]) ??
-          'There is nothing waiting in that data source right now.'}
-      </p>
+      <div className="space-y-1">
+        <p className="text-xs text-muted-foreground">
+          {(state.reason && REASON_COPY[state.reason]) ??
+            'There is nothing waiting in that data source right now.'}
+        </p>
+        {state.detail ? (
+          // The cause, so whoever can fix the connection knows what to fix.
+          <p className="font-mono text-[11px] text-muted-foreground/80">{state.detail}</p>
+        ) : null}
+        {state.reason === 'source-unavailable' ? (
+          <Button variant="ghost" size="sm" className="h-6 gap-1 px-1.5 text-xs" onClick={() => void load()}>
+            <ArrowClockwise className="size-3" />
+            Try again
+          </Button>
+        ) : null}
+      </div>
     );
   }
 

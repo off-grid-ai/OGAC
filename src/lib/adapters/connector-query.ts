@@ -13,12 +13,13 @@
 // (recordAudit lives in store.ts, off-limits this phase). Instead every call returns a
 // `ResolutionDecision` describing the bind + outcome, and the caller (route / executor) is expected
 // to persist it via the existing audit helper. See `describeDecision` for a ready log line.
-import { execConnectorQuery } from '@/lib/connector-exec';
+import { execConnectorRead } from '@/lib/connector-exec';
 import type {
   ConnectorQueryResult,
   ConnectorQueryRuntimeDependencies,
   ConnectorTarget,
 } from '@/lib/connector-exec';
+import { type ConnectorFailure, connectorFailureSentence } from '@/lib/connector-failure';
 import type { DataDomain } from '@/lib/data-domains';
 
 export interface QueryDomainOpts {
@@ -41,6 +42,14 @@ export interface ResolutionDecision {
   ok: boolean;
   rowsReturned: number | null;
   dialect: string | null;
+  /**
+   * Why the read could not run, when it could not. Present ⇔ `ok` is false.
+   *
+   * This exists because `result === null` alone cannot tell a caller whether the source answered
+   * "nothing here" or never answered at all — and a caller that guesses will eventually report a
+   * broken connection as an empty table, which is what happened.
+   */
+  failure: ConnectorFailure | null;
 }
 
 export interface QueryDomainResult {
@@ -72,9 +81,10 @@ export async function queryDomain(
     ok: false,
     rowsReturned: null,
     dialect: null,
+    failure: null,
   };
 
-  const result = await execConnectorQuery(
+  const outcome = await execConnectorRead(
     connector,
     {
       resource: domain.resource,
@@ -86,18 +96,29 @@ export async function queryDomain(
     dependencies,
   );
 
-  if (result) {
+  if (outcome.ok) {
     decision.ok = true;
-    decision.rowsReturned = result.count;
-    decision.dialect = result.dialect;
+    decision.rowsReturned = outcome.result.count;
+    decision.dialect = outcome.result.dialect;
+    return { result: outcome.result, decision };
   }
 
-  return { result, decision };
+  decision.failure = outcome.failure;
+  return { result: null, decision };
 }
 
 // A stable, human/audit-friendly one-line description of a resolution decision — hand to the audit
 // helper as the event detail so the bind is attributable and reviewable.
 export function describeDecision(d: ResolutionDecision): string {
-  const outcome = d.ok ? `ok(${d.rowsReturned} rows via ${d.dialect})` : 'miss(no rows / unreachable)';
+  let outcome: string;
+  if (d.ok) {
+    outcome = `ok(${d.rowsReturned} rows via ${d.dialect})`;
+  } else if (d.failure) {
+    // Name the cause in the audit line. "miss" was true but useless: it read the same whether the
+    // table was empty or the credential was refused.
+    outcome = `failed(${d.failure.kind}: ${connectorFailureSentence(d.failure)})`;
+  } else {
+    outcome = 'miss(no rows)';
+  }
   return `data-domain "${d.domainLabel}" [${d.domainId}] → connector ${d.connectorId} :: ${d.resource} (${d.op}) → ${outcome}`;
 }

@@ -10,8 +10,12 @@
 //
 // Two entry points:
 //   recordCount(type, endpoint)                 — count live rows (used by syncConnector).
-//   execConnectorQuery(conn, {resource, op, …}) — run a READ against a specific resource/table
-//                                                 (used by the connector-query rule engine).
+//   execConnectorRead(conn, {resource, op, …})  — run a READ against a specific resource/table
+//                                                 (used by the connector-query rule engine),
+//                                                 returning EITHER rows or the reason it failed.
+//   execConnectorQuery(...)                     — the same read, collapsed to `result | null` for
+//                                                 callers that only need to know if rows came back.
+import { type ConnectorFailure, describeThrown } from '@/lib/connector-failure';
 
 // The minimal connector shape this module needs — just the dialect + where to reach it. Matches
 // the fields on both the DB row and the `Connector` interface in store.ts, so either can be passed.
@@ -207,16 +211,41 @@ export async function recordCount(type: string, endpoint: string): Promise<numbe
 // has resolved a phrase → {connector, resource}. Returns null on any failure (unreachable / wrong
 // dialect / unsafe identifier / bad REST response) so a wrong binding surfaces as a miss, never a
 // fabricated row. READ-only by design: op is 'read' | 'count'; no write path exists here.
+//
+// Prefer `execConnectorRead` (below) on any path a PERSON sees: null cannot distinguish "the source
+// said zero rows" from "the source could not be read", and conflating those two let a failed read be
+// reported as an empty one. This signature is kept because several internal callers only need to know
+// whether they got rows.
 export async function execConnectorQuery(
   conn: ConnectorTarget,
   query: ConnectorQuery,
   dependencies: ConnectorQueryRuntimeDependencies = {},
 ): Promise<ConnectorQueryResult | null> {
+  const outcome = await execConnectorRead(conn, query, dependencies);
+  return outcome.ok ? outcome.result : null;
+}
+
+/** A read that either produced a result (possibly zero rows) or names why it could not run. */
+export type ConnectorReadOutcome =
+  | { ok: true; result: ConnectorQueryResult }
+  | { ok: false; failure: ConnectorFailure };
+
+function readFailed(kind: ConnectorFailure['kind'], detail?: string): ConnectorReadOutcome {
+  return { ok: false, failure: detail ? { kind, detail } : { kind } };
+}
+
+export async function execConnectorRead(
+  conn: ConnectorTarget,
+  query: ConnectorQuery,
+  dependencies: ConnectorQueryRuntimeDependencies = {},
+): Promise<ConnectorReadOutcome> {
   // S3 cannot be selected from an endpoint alone: the persisted org/domain binding owns the bucket
   // and prefix, and the connector id owns the vaulted keypair. Dispatch before generic dialect
   // detection, but fail closed unless all three trusted identities are present.
   if ((conn.type ?? '').trim().toLowerCase() === 's3') {
-    if (!conn.id || !query.binding?.orgId || !query.binding.domainId) return null;
+    if (!conn.id || !query.binding?.orgId || !query.binding.domainId) {
+      return readFailed('missing-binding');
+    }
     const { queryGovernedObjectSource } = await import('@/lib/adapters/s3-object-query');
     const outcome = await queryGovernedObjectSource({
       orgId: query.binding.orgId,
@@ -226,11 +255,14 @@ export async function execConnectorQuery(
       limit: query.limit,
       params: query.params,
     });
-    if (!outcome.ok) return null;
+    if (!outcome.ok) return readFailed('source-refused', outcome.error.code);
     return {
-      rows: outcome.result.rows.map((row) => ({ ...row })),
-      count: outcome.result.count,
-      dialect: 's3',
+      ok: true,
+      result: {
+        rows: outcome.result.rows.map((row) => ({ ...row })),
+        count: outcome.result.count,
+        dialect: 's3',
+      },
     };
   }
   // Kafka source requests can name only the tenant-owned connector/domain and bounded read
@@ -238,7 +270,7 @@ export async function execConnectorQuery(
   // actor identity is supplied by the App runtime, never by step params.
   if ((conn.type ?? '').trim().toLowerCase() === 'kafka') {
     if (!conn.id || !query.binding?.orgId || !query.binding.domainId || !query.binding.actorId) {
-      return null;
+      return readFailed('missing-binding');
     }
     const { KAFKA_SOURCE_MAX_RECORDS, parseKafkaSourceReadRequest } =
       await import('@/lib/kafka-enterprise-source');
@@ -266,6 +298,8 @@ export async function execConnectorQuery(
       dependencies.kafkaSource,
     );
     return {
+      ok: true,
+      result: {
       rows: outcome.records.map((record) => ({
         value: { ...record.value },
         provenance: {
@@ -292,10 +326,11 @@ export async function execConnectorQuery(
       })),
       count: outcome.records.length,
       dialect: 'kafka',
+      },
     };
   }
   const dialect = detectDialect(conn.type, conn.endpoint);
-  if (!dialect) return null;
+  if (!dialect) return readFailed('no-dialect', `${conn.type || 'unknown type'}`);
   const op = query.op ?? 'read';
   const limit = Math.max(1, Math.min(query.limit ?? 100, 1000));
   // Inject the vaulted credential (SQL password / REST bearer) at query time. Endpoint stays
@@ -304,46 +339,61 @@ export async function execConnectorQuery(
     ...conn,
     orgId: conn.orgId ?? query.binding?.orgId,
   });
-  if (resolved.credentialError) return null;
+  if (resolved.credentialError) return readFailed('credential', resolved.credentialError);
   const endpoint = resolved.endpoint;
 
   if (dialect === 'postgres') {
     const table = safeIdentifier(query.resource);
-    if (!table) return null;
+    if (!table) return readFailed('unsafe-resource', query.resource);
     const { Pool } = await import('pg');
     const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 3000, max: 1 });
     try {
       if (op === 'count') {
         const r = await pool.query(`SELECT COUNT(*)::bigint AS n FROM ${table}`);
-        return { rows: [{ count: Number(r.rows[0]?.n ?? 0) }], count: Number(r.rows[0]?.n ?? 0), dialect };
+        const n = Number(r.rows[0]?.n ?? 0);
+        return { ok: true, result: { rows: [{ count: n }], count: n, dialect } };
       }
       const r = await pool.query(`SELECT * FROM ${table} LIMIT ${limit}`);
-      return { rows: r.rows as Record<string, unknown>[], count: r.rowCount ?? r.rows.length, dialect };
-    } catch { return null; } finally { await pool.end().catch(() => undefined); }
+      return {
+        ok: true,
+        result: {
+          rows: r.rows as Record<string, unknown>[],
+          count: r.rowCount ?? r.rows.length,
+          dialect,
+        },
+      };
+    } catch (error) {
+      return readFailed('connection', describeThrown(error));
+    } finally { await pool.end().catch(() => undefined); }
   }
 
   if (dialect === 'mysql') {
+    // Backticked below, so a schema-qualified name (`db.table`) has to be split — quoting it whole
+    // asks MySQL for a table literally named "db.table", which fails as ER_NO_SUCH_TABLE.
     const table = safeIdentifier(query.resource);
-    if (!table) return null;
+    if (!table) return readFailed('unsafe-resource', query.resource);
+    const quoted = table.split('.').map((part) => `\`${part}\``).join('.');
     try {
       const mysql = await import('mysql2/promise');
       const c = await mysql.createConnection(endpoint);
       try {
         if (op === 'count') {
-          const [rows] = await c.query(`SELECT COUNT(*) AS n FROM \`${table}\``);
+          const [rows] = await c.query(`SELECT COUNT(*) AS n FROM ${quoted}`);
           const n = Number((rows as { n: number }[])[0]?.n ?? 0);
-          return { rows: [{ count: n }], count: n, dialect };
+          return { ok: true, result: { rows: [{ count: n }], count: n, dialect } };
         }
-        const [rows] = await c.query(`SELECT * FROM \`${table}\` LIMIT ${limit}`);
+        const [rows] = await c.query(`SELECT * FROM ${quoted} LIMIT ${limit}`);
         const arr = rows as Record<string, unknown>[];
-        return { rows: arr, count: arr.length, dialect };
+        return { ok: true, result: { rows: arr, count: arr.length, dialect } };
       } finally { await c.end(); }
-    } catch { return null; }
+    } catch (error) {
+      return readFailed('connection', describeThrown(error));
+    }
   }
 
   if (dialect === 'mssql') {
     const table = safeIdentifier(query.resource);
-    if (!table) return null;
+    if (!table) return readFailed('unsafe-resource', query.resource);
     try {
       const mssqlMod = await import('mssql');
       const mssql = mssqlMod.default ?? mssqlMod;
@@ -361,13 +411,15 @@ export async function execConnectorQuery(
         if (op === 'count') {
           const res = await pool.request().query(`SELECT COUNT(*) AS n FROM ${table}`);
           const n = Number(res.recordset?.[0]?.n ?? 0);
-          return { rows: [{ count: n }], count: n, dialect };
+          return { ok: true, result: { rows: [{ count: n }], count: n, dialect } };
         }
         const res = await pool.request().query(`SELECT TOP ${limit} * FROM ${table}`);
         const arr = (res.recordset ?? []) as Record<string, unknown>[];
-        return { rows: arr, count: arr.length, dialect };
+        return { ok: true, result: { rows: arr, count: arr.length, dialect } };
       } finally { await pool.close(); }
-    } catch { return null; }
+    } catch (error) {
+      return readFailed('connection', describeThrown(error));
+    }
   }
 
   // REST: fetch the endpoint, optionally drilling into a keyed sub-array by `resource`
@@ -384,7 +436,7 @@ export async function execConnectorQuery(
         body = await r.json();
       } else {
         const rb = await fetch(base, { headers, signal: AbortSignal.timeout(3000) });
-        if (!rb.ok) return null;
+        if (!rb.ok) return readFailed('connection', `HTTP ${rb.status}`);
         const full = await rb.json();
         body = full && typeof full === 'object' && query.resource
           ? (full as Record<string, unknown>)[query.resource]
@@ -401,12 +453,16 @@ export async function execConnectorQuery(
         arr = [];
       }
       const rows = arr.slice(0, limit);
-      if (op === 'count') return { rows: [{ count: arr.length }], count: arr.length, dialect };
-      return { rows, count: arr.length, dialect };
-    } catch { return null; }
+      if (op === 'count') {
+        return { ok: true, result: { rows: [{ count: arr.length }], count: arr.length, dialect } };
+      }
+      return { ok: true, result: { rows, count: arr.length, dialect } };
+    } catch (error) {
+      return readFailed('connection', describeThrown(error));
+    }
   }
 
-  return null;
+  return readFailed('no-dialect', dialect);
 }
 
 // Credential-safe REST action seam used by typed domain adapters. Callers supply path SEGMENTS,

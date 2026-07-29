@@ -63,6 +63,10 @@ import {
   maskEmailForSend,
   selectEmailProvider,
 } from '@/lib/email-sink-governance';
+import {
+  type ConnectorFailure,
+  connectorFailureMessage,
+} from '@/lib/connector-failure';
 import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 import { auditEnforcement } from '@/lib/pipeline-contract';
 import {
@@ -213,6 +217,8 @@ export interface AppRunDeps {
   ) => Promise<{
     result: { rows: unknown[]; count: number; dialect: string } | null;
     detail: string;
+    /** Why the read could not run. Present ⇒ this was a FAILURE, not an empty source. */
+    failure?: ConnectorFailure | null;
   }>;
   /**
    * Guardrail check path (reuse of the existing runChecks + outcomeFromChecks). `orgId` is threaded
@@ -355,6 +361,7 @@ export function defaultDeps(
       return {
         result: result ? { rows: result.rows, count: result.count, dialect: result.dialect } : null,
         detail: describeDecision(decision),
+        failure: decision.failure,
       };
     },
     async runGuardrail(text, orgId) {
@@ -836,22 +843,42 @@ async function executeConnectorStep(
       `domain "${resolved.label}" binds connector ${resolved.connectorId} which is missing`,
     );
   }
-  const { result, detail } = await deps.queryDomain(resolved, connector, {
+  const { result, detail, failure } = await deps.queryDomain(resolved, connector, {
     op: step.op ?? 'read',
     params: step.params,
     orgId: ctx.orgId,
     actorId: ctx.actor?.trim() || `app-run:${ctx.runId}`,
   });
-  if (!result) {
-    // A miss (unreachable / bad binding) — recorded honestly, not fabricated. This does not error
-    // the run by default; it produces an empty read the downstream step can reason about.
-    return {
-      stepId: step.id,
-      kind: 'connector-query',
-      status: 'done',
-      output: `No rows returned from ${resolved.label} (${resolved.resource}).`,
-      refs: [{ name: `${resolved.connectorId}:${resolved.resource}` }],
+  if (failure) {
+    // The read FAILED — it did not come back empty, it did not come back at all. This HALTS the run.
+    //
+    // It used to be reported as "No rows returned", indistinguishable from an empty table, and the
+    // agent step downstream then reasoned from that silence: a refused MySQL connection became "this
+    // employee has no reimbursement quota", and the claim was declined. A governed run must never
+    // reach a decision on data it could not read, so an unreadable source is an error, and the reason
+    // is named on the step.
+    auditEnforcement(
+      { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
+      'pipeline.data.unavailable',
+      `data:${resolved.id}`,
+      'blocked',
       detail,
+    );
+    return {
+      ...errorResult(step, detail),
+      kind: 'connector-query',
+      output: connectorFailureMessage(resolved.label, resolved.resource, failure),
+      refs: [{ name: `${resolved.connectorId}:${resolved.resource}` }],
+    };
+  }
+  if (!result) {
+    // No failure and no result: the seam reported neither. Treated as unreadable rather than empty —
+    // the safe reading of an ambiguous answer is that we do not know what the source holds.
+    return {
+      ...errorResult(step, detail),
+      kind: 'connector-query',
+      output: connectorFailureMessage(resolved.label, resolved.resource, { kind: 'connection' }),
+      refs: [{ name: `${resolved.connectorId}:${resolved.resource}` }],
     };
   }
   return {
