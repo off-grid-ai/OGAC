@@ -605,6 +605,8 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   }, []);
 
   useEffect(() => {
+    // Depends on `mounted` for the same reason: the rotor does not exist on the first render, so without
+    // it this observed nothing and the fit never updated.
     const host = hostRef.current;
     if (!host) return;
     measure();
@@ -636,7 +638,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
       ro.disconnect();
       window.removeEventListener('scroll', measure);
     };
-  }, [fill, measure]);
+  }, [fill, measure, mounted]);
 
   // Don't play until the stage is actually being looked at.
   //
@@ -646,7 +648,10 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   // gone. Requiring roughly half the stage in view means playback begins at frame 0 when the reader gets
   // there. It also stops the loop when they leave, and `elapsedRef` resumes rather than restarting.
   useEffect(() => {
-    const host = hostRef.current;
+    // The OUTER element, not the rotor. `hostRef` now lives inside `{mounted ? …}`, so it is null on the
+    // first render — and this effect's [] deps meant it returned early and never observed anything, so
+    // `visible` stayed false and the animation never started at all. The outer element always exists.
+    const host = outerRef.current;
     if (!host) return;
     const io = new IntersectionObserver(
       ([e]) => setVisible(e.isIntersecting && e.intersectionRatio >= 0.45),
@@ -798,7 +803,10 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
           </div>
 
           {/* Controls. Always present for keyboard/AT; visually revealed on hover or focus, and held
-              visible while paused so the state is legible rather than implied by stillness. */}
+              visible while paused so the state is legible rather than implied by stillness.
+              NO `backdrop-blur` here: a backdrop-filter inside a transformed, overflow-hidden ancestor
+              forces its own compositing pass, and it painted a blank vertical band all the way up the
+              stage above the buttons. Solid backgrounds instead. */}
           <div
             className={`absolute bottom-3 right-3 z-20 flex items-center gap-1.5 transition-opacity duration-200 ${
               // Always visible on touch (no hover to reveal them) and whenever paused, so the state is
@@ -815,7 +823,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
                 setHinted(false);
               }}
               aria-label={label}
-              className={`inline-flex items-center gap-1.5 rounded-md border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] backdrop-blur transition-colors hover:text-foreground ${
+              className={`inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors hover:text-foreground ${
                 hinted && !paused
                   ? 'og-hint-pulse border-primary/60 text-foreground'
                   : 'border-border text-muted-foreground shadow-sm'
@@ -841,7 +849,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
                 setRunKey((k) => k + 1);
               }}
               aria-label="Restart the animation from the beginning"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm transition-colors hover:text-foreground"
             >
               <ArrowClockwise className="size-3 text-primary" weight="bold" />
               Restart
@@ -850,7 +858,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
               type="button"
               onClick={() => void toggleFullscreen()}
               aria-label={fullscreen ? 'Exit full screen' : 'View full screen'}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm backdrop-blur hover:text-foreground md:hidden"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm hover:text-foreground md:hidden"
             >
               {fullscreen ? (
                 <CornersIn className="size-3 text-primary" weight="bold" />
