@@ -527,13 +527,23 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       setBox({ w: width, h: height });
-      // Fit BOTH axes: outside fullscreen the aspect box makes these equal, but a fullscreen 16:10
-      // display would otherwise crop the stage instead of letterboxing it.
-      setScale(Math.min(width / STAGE_W, height / STAGE_H));
+      // COVER in `fill` mode, CONTAIN otherwise.
+      //
+      // `fill` is the scroll stage growing to the whole viewport, and a viewport is almost never 16:9
+      // — a 1920x940 window with CONTAIN scaled the stage to 1670 wide and centred it, leaving ~125px
+      // of page background down each side. That is not 100vw, and the gutter's edge reads as the
+      // animation being clipped. Covering means the stage genuinely fills the viewport and the
+      // overflow is cropped at the true screen edge, which is what full-bleed means.
+      //
+      // Elsewhere (the contained card, and mobile landscape fullscreen) CONTAIN is right: the card is
+      // already 16:9 so the two agree, and on a 19.5:9 phone covering would crop ~18% of the diagram's
+      // height — losing its title and its bottom band — where letterboxing shows the whole thing.
+      const fit = fill ? Math.max : Math.min;
+      setScale(fit(width / STAGE_W, height / STAGE_H));
     });
     ro.observe(host);
     return () => ro.disconnect();
-  }, []);
+  }, [fill]);
 
   // Don't burn a frame loop on a hero nobody is looking at.
   useEffect(() => {
