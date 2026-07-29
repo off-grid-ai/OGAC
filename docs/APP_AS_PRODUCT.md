@@ -243,6 +243,38 @@ The lesson worth carrying: **every one of these presented as emptiness.** An emp
 an empty answer. Fixing them meant refusing to accept "nothing there" as an explanation and asking what
 would have to be true for it to be genuinely empty.
 
+### The full loop is now proven live (2026-07-29, later)
+
+Screenshotting the BROWSER path (not the run script) found four more defects the script could not see:
+
+6. **The picker showed a raw domain id** — "From your `dom_7d17b157-0e6` — pick the one to work on". The
+   step's declared reference is not the name of anything; it now resolves to the domain's own label.
+7. **Source rows were labelled "Result"** — `aggregateOutcome` took the last step with any output, so
+   mid-run a person watched a JSON dump of twenty source rows under that heading. A data read is what the
+   decision was made FROM; it is the outcome only for an app that does nothing else.
+8. **A declined case was counted as a breakdown.** Four rejected motor claims sat under "COULD NOT
+   FINISH". A rejection halts the run through the same mechanism as a failure — correct — but reporting it
+   as one overstated failures and understated the work done. `isDeclinedByPerson` (pure) now separates
+   them; a decline counts as HANDLED and reads "Declined by a person". The bank app's failure count went
+   from 7 to 1.
+9. **The read-only demo account got dead buttons.** Approve returned 403 ("read-only demo…") into a toast
+   that faded. `ViewerModeProvider` + `ReadOnlyGuard` already existed for exactly this — the deployed app
+   just sits outside the `(console)` layout and never got the provider. Wiring it exposed a second bug:
+   `ReadOnlyGuard`'s Radix tooltip had no provider outside that layout, so its first use elsewhere crashed
+   the subtree and the buttons VANISHED. The guard now carries its own provider.
+
+**Two things now visible that were the point all along:**
+- **The governed run, as it happens.** `app-run-progress.ts` (pure) zips the app's declared steps with
+  what the run has recorded, so all five steps appear from the first second and tick over: `✓ Read the
+  expense claim · ✓ Check the employee's remaining quota · ✓ Decide eligibility · ! Approve or reject`.
+- **The human decision completes the loop.** Verified with a writer credential: `apprun_9ba6a45d` went
+  claim read → that employee's quota → decision (₹41,346.44 vs ₹137,454.12, headroom ₹96,107.68) → human
+  approved at "Approve or reject" → output → status **done**. HANDLED moved 9 → 10 on the Work screen.
+
+**Known and deliberate:** the output/report step is INTERCEPTED because live actions are globally off
+(`shouldIntercept` → `liveActionsEnabled`, fail-safe). The run records what it WOULD have sent, and
+"Send report now" works on demand. Turning on global egress is an operator decision, not a code change.
+
 ### Not built yet — in priority order
 1. ~~Input derived from the app's own definition~~ **DONE** — `app-input-prompt.ts`: label "The case to
    work on", and the example is a REAL previous case from that app. Nothing invented when there is no
