@@ -106,8 +106,11 @@ export default function LandingPage() {
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section id="hero" className="relative overflow-hidden border-b border-border">
         <Spotlight />
-        <div className="relative z-10 mx-auto max-w-[100rem] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
-          <div className="grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12">
+        <div className="relative z-10 mx-auto max-w-[100rem] px-4 pb-8 pt-12 sm:px-6 sm:pb-10 sm:pt-16 lg:pt-20">
+          {/* Headline left, the rest right. The animation needs the FULL container width below (it is
+              a 1600x900 stage), so the copy above it has to be short — stacked in one column it was
+              tall enough to push the animation off the fold, and left the right half empty besides. */}
+          <div className="grid items-start gap-x-12 gap-y-6 lg:grid-cols-2">
             <div>
               <BlurFade delay={0.05} inView>
                 <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -122,8 +125,10 @@ export default function LandingPage() {
                   entire enterprise.
                 </h1>
               </BlurFade>
+            </div>
+            <div className="lg:pt-2">
               <BlurFade delay={0.24} inView>
-                <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+                <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
                   {c.hero.supporting}
                 </p>
               </BlurFade>
@@ -153,11 +158,15 @@ export default function LandingPage() {
               </BlurFade>
             </div>
 
-            {/* The product, alive: a camera crossing the control plane while it runs. 16.3s loop. */}
-            <BlurFade delay={0.2} inView>
-              <ControlPlaneHero />
-            </BlurFade>
           </div>
+        </div>
+
+        {/* The product, alive — full container width, so the 1600x900 stage runs at native scale and
+            the camera's zoomed scenes frame whole panels instead of slicing them. 16.3s loop. */}
+        <div className="relative z-10 mx-auto max-w-[100rem] px-4 pb-12 sm:px-6 sm:pb-16 lg:pb-20">
+          <BlurFade delay={0.2} inView>
+            <ControlPlaneHero />
+          </BlurFade>
         </div>
       </section>
 

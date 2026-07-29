@@ -1,7 +1,8 @@
 'use client';
 
+import { ArrowsOut, CornersIn, Pause, Play } from '@phosphor-icons/react/dist/ssr';
 import { useTheme } from 'next-themes';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // ─── The control-plane hero animation ─────────────────────────────────────────────────────────────
 //
@@ -22,7 +23,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 // switch, because the poster depicts the console and the console has a dark mode.
 //
 // COSTS NOTHING WHEN UNSEEN: the loop is driven by one rAF that stops when the hero scrolls out of
-// view, and `prefers-reduced-motion` renders a still frame with no timer at all.
+// view or is paused, and `prefers-reduced-motion` renders a still frame with no timer at all.
+//
+// CONTROLS: click the stage (or Space) to pause, `Full screen` (or F) to fill the display. Pausing
+// resumes from where it stopped rather than restarting the 16.3s cycle, which is why `elapsedRef`
+// exists — a fresh rAF would otherwise snap the camera back to scene one.
 
 const WORLD_W = 1535;
 const WORLD_H = 1024;
@@ -476,9 +481,20 @@ export function ControlPlaneHero() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [elapsed, setElapsed] = useState(0);
   const [scale, setScale] = useState(1);
+  const [box, setBox] = useState({ w: STAGE_W, h: STAGE_H });
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const reduce = useRef(false);
+  const elapsedRef = useRef(0);
+
+  const toggleFullscreen = useCallback(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void host.requestFullscreen?.();
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -490,7 +506,11 @@ export function ControlPlaneHero() {
     const host = hostRef.current;
     if (!host) return;
     const ro = new ResizeObserver(([entry]) => {
-      setScale(entry.contentRect.width / STAGE_W);
+      const { width, height } = entry.contentRect;
+      setBox({ w: width, h: height });
+      // Fit BOTH axes: outside fullscreen the aspect box makes these equal, but a fullscreen 16:10
+      // display would otherwise crop the stage instead of letterboxing it.
+      setScale(Math.min(width / STAGE_W, height / STAGE_H));
     });
     ro.observe(host);
     return () => ro.disconnect();
@@ -505,18 +525,45 @@ export function ControlPlaneHero() {
     return () => io.disconnect();
   }, []);
 
+  // Track fullscreen so the button reflects reality even when exited with Escape or the OS chrome.
   useEffect(() => {
-    if (!visible || reduce.current) return;
+    const onChange = () => setFullscreen(document.fullscreenElement === hostRef.current);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  // Space toggles playback, F toggles fullscreen — only while the animation has focus, so the keys
+  // stay available to the rest of the page.
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        setPaused((p) => !p);
+      } else if (e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    },
+    [toggleFullscreen],
+  );
+
+  useEffect(() => {
+    if (!visible || paused || reduce.current) return;
     let raf = 0;
     let start: number | null = null;
+    // Resume from the paused position: without carrying `elapsedRef` the loop would restart the
+    // 16.3s cycle from scene one every time it was unpaused or scrolled back into view.
+    const base = elapsedRef.current;
     const tick = (now: number) => {
       start ??= now;
-      setElapsed((now - start) / 1000);
+      const next = base + (now - start) / 1000;
+      elapsedRef.current = next;
+      setElapsed(next);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [visible]);
+  }, [visible, paused]);
 
   const dark = resolvedTheme !== 'light';
   const pal = PALETTES[dark ? 'dark' : 'light'];
@@ -529,26 +576,82 @@ export function ControlPlaneHero() {
   );
   const { cam, em } = useMemo(() => frameOf(index, progress, !reduce.current), [index, progress]);
 
+  const label = paused ? 'Play the animation' : 'Pause the animation';
   return (
     <div
       ref={hostRef}
-      className="relative w-full overflow-hidden rounded-xl border border-border"
-      style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}`, background: pal.bg }}
+      className={`group relative w-full overflow-hidden border-border bg-[var(--stage-bg)] ${
+        fullscreen ? 'rounded-none border-0' : 'rounded-xl border'
+      }`}
+      style={
+        {
+          // In fullscreen the element fills the display, so a fixed aspect box would fight it.
+          ...(fullscreen ? {} : { aspectRatio: `${STAGE_W} / ${STAGE_H}` }),
+          '--stage-bg': pal.bg,
+        } as React.CSSProperties
+      }
     >
       {mounted ? (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: STAGE_W,
-            height: STAGE_H,
-            transform: `scale(${scale})`,
-            transformOrigin: '0 0',
-          }}
-        >
-          <World cam={cam} gSec={gSec} em={em} pal={pal} src={src} />
-        </div>
+        <>
+          {/* Click anywhere on the stage to pause or resume; Space does the same when focused. */}
+          <button
+            type="button"
+            onClick={() => setPaused((p) => !p)}
+            onKeyDown={onKeyDown}
+            aria-label={label}
+            aria-pressed={paused}
+            className="absolute inset-0 z-10 cursor-pointer"
+          />
+          <div
+            style={{
+              position: 'absolute',
+              // Centre the stage: fullscreen displays are rarely 16:9, so letterbox rather than crop.
+              top: (box.h - STAGE_H * scale) / 2,
+              left: (box.w - STAGE_W * scale) / 2,
+              width: STAGE_W,
+              height: STAGE_H,
+              transform: `scale(${scale})`,
+              transformOrigin: '0 0',
+            }}
+          >
+            <World cam={cam} gSec={gSec} em={em} pal={pal} src={src} />
+          </div>
+
+          {/* Controls. Always present for keyboard/AT; visually revealed on hover or focus, and held
+              visible while paused so the state is legible rather than implied by stillness. */}
+          <div
+            className={`absolute bottom-3 right-3 z-20 flex items-center gap-1.5 transition-opacity duration-200 ${
+              paused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setPaused((p) => !p)}
+              aria-label={label}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+            >
+              {paused ? (
+                <Play className="size-3 text-primary" weight="fill" />
+              ) : (
+                <Pause className="size-3 text-primary" weight="fill" />
+              )}
+              {paused ? 'Play' : 'Pause'}
+            </button>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              aria-label={fullscreen ? 'Exit full screen' : 'View full screen'}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+            >
+              {fullscreen ? (
+                <CornersIn className="size-3 text-primary" weight="bold" />
+              ) : (
+                <ArrowsOut className="size-3 text-primary" weight="bold" />
+              )}
+              {fullscreen ? 'Exit' : 'Full screen'}
+            </button>
+          </div>
+        </>
       ) : null}
     </div>
   );
