@@ -7,7 +7,8 @@ import { readBankCrossSellOpportunityBook } from '@/lib/adapters/bank-cross-sell
 import { sharedSurface } from '@/lib/app-surface';
 import { runInputPrompt } from '@/lib/app-input-prompt';
 import { listAppRuns } from '@/lib/app-run-store';
-import { runSubject } from '@/lib/app-work-queue';
+import { buildAppDashboard } from '@/lib/app-dashboard';
+import { buildAppWorkQueue, caseLabel, runSubject, statusLabel } from '@/lib/app-work-queue';
 import { getAppBySlug } from '@/lib/apps-store';
 import { resolveDeployedApp } from '@/lib/deployed-app';
 import type { FormField } from '@/lib/app-model';
@@ -71,8 +72,35 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
     runs.map((r) => runSubject((r as { input?: unknown }).input)).find((x): x is string => Boolean(x)) ??
     null;
   const prompt = runInputPrompt({ trigger: app.trigger?.kind, exampleSubject });
-  // TODO(next): AppUseShell has no slot for a headline or stat band yet, so the deployed app still has
-  // no dashboard of its own. Adding those props is the next real piece of work on this surface.
+  // The numbers and the waiting queue, from the SAME pure rules the console uses — so the deployed app
+  // and the management view can never tell a different story about the same process.
+  const nowMs = Math.floor(Date.now() / 60_000) * 60_000;
+  const asWorkRuns = runs.map((r) => ({
+    id: r.id,
+    status: String(r.status),
+    startedAt: r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? ''),
+    subject: runSubject((r as { input?: unknown }).input),
+  }));
+  const queue = buildAppWorkQueue({
+    trigger: app.trigger?.kind ?? 'on-demand',
+    pausesForHuman: (app.steps ?? []).some((st) => st.kind === 'human'),
+    runs: asWorkRuns,
+  });
+  const dashboard = buildAppDashboard({
+    nowMs,
+    runs: runs.map((r) => {
+      const steps = (r as { steps?: { kind?: string; status?: string }[] }).steps ?? [];
+      return {
+        status: String(r.status),
+        startedAt: r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? ''),
+        finishedAt:
+          (r as { finishedAt?: Date | string | null }).finishedAt instanceof Date
+            ? ((r as { finishedAt: Date }).finishedAt).toISOString()
+            : ((r as { finishedAt?: string | null }).finishedAt ?? null),
+        neededPerson: steps.some((st) => st.kind === 'human' && st.status !== 'queued'),
+      };
+    }),
+  });
   const fields = deriveRunFields(app.inputForm, prompt);
   const surface = sharedSurface(resolved.slug);
 
@@ -87,6 +115,18 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           trend={[]}
           fields={fields}
           surface={surface}
+          workHeadline={queue.headline}
+          stats={dashboard.metrics.map((m) => ({ label: m.label, value: m.value, tone: m.tone }))}
+          waiting={queue.waiting.map((c) => ({
+            id: c.id,
+            label: caseLabel(c.subject, c.id),
+            href: `/app/${encodeURIComponent(resolved.slug)}?view=activity`,
+            when: `${statusLabel(c.status)} · ${
+              Number.isNaN(Date.parse(c.startedAt))
+                ? ''
+                : `${new Date(Date.parse(c.startedAt)).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+            }`,
+          }))}
         />
       </div>
     </div>

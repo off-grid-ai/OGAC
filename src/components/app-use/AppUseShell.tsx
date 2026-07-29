@@ -10,7 +10,20 @@ import { RunPanel, type RunField } from '@/components/app-use/RunPanel';
 import type { AppSurface } from '@/lib/app-surface';
 import type { CockpitMetrics, TrendPoint } from '@/lib/cockpit-metrics';
 
-type UseView = 'dashboard' | 'run' | 'activity';
+type UseView = 'work' | 'dashboard' | 'run' | 'activity';
+
+/** A case waiting on a person, and a headline stat — both computed by the pure rules on the server. */
+export interface UseWaitingCase {
+  id: string;
+  label: string;
+  href: string;
+  when: string;
+}
+export interface UseStat {
+  label: string;
+  value: string;
+  tone: 'neutral' | 'attention';
+}
 
 // ─── AppUseShell — the USE surface (the "deployed app you actually use") ───────────────────────────
 // Distinct from the Studio BUILD surface (where you author the app). This is the Lovable/Bolt-style
@@ -26,6 +39,9 @@ export function AppUseShell({
   fields,
   surface,
   editHref,
+  waiting,
+  workHeadline,
+  stats,
 }: Readonly<{
   title: string;
   summary: string;
@@ -35,16 +51,30 @@ export function AppUseShell({
   fields: RunField[];
   surface: AppSurface;
   editHref?: string;
+  /**
+   * WORK — the cases waiting on a person. This is the most important screen for the person who USES the
+   * app, and the deployed surface had no equivalent: the queue existed only on the console side, so the
+   * thing a team opens never said "here is what needs your decision".
+   */
+  waiting?: UseWaitingCase[];
+  /** Headline sentence for the work view. */
+  workHeadline?: string;
+  /** The process's numbers, in the department's language. */
+  stats?: UseStat[];
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
   const hasDashboard = Boolean(metrics);
+  const hasWork = Boolean(stats?.length || waiting?.length);
   const views: { key: UseView; label: string }[] = [
+    // Work LEADS when there is anything to show: what is waiting for you comes before how to start
+    // something new.
+    ...(hasWork ? [{ key: 'work' as UseView, label: 'Work' }] : []),
     ...(hasDashboard ? [{ key: 'dashboard' as UseView, label: 'Dashboard' }] : []),
     { key: 'run', label: 'Run' },
     { key: 'activity', label: 'Activity' },
   ];
-  const fallback: UseView = hasDashboard ? 'dashboard' : 'run';
+  const fallback: UseView = hasWork ? 'work' : hasDashboard ? 'dashboard' : 'run';
   const requested = (params.get('view') as UseView) || fallback;
   const view = views.some((v) => v.key === requested) ? requested : fallback;
   const hrefFor = (v: UseView) => (v === fallback ? pathname : `${pathname}?view=${v}`);
@@ -104,7 +134,57 @@ export function AppUseShell({
         </div>
       </div>
 
-      {view === 'dashboard' && metrics ? (
+      {view === 'work' ? (
+        <div className="space-y-5">
+          {workHeadline ? (
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">{workHeadline}</h2>
+          ) : null}
+
+          {stats?.length ? (
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
+              {stats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className={`min-w-0 rounded-lg border p-4 ${
+                    stat.tone === 'attention' ? 'border-primary/40' : 'border-border'
+                  }`}
+                >
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                    {stat.label}
+                  </p>
+                  <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-foreground">
+                    {stat.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <section>
+            <h3 className="mb-2 text-sm font-medium text-foreground">Waiting for you</h3>
+            <div className="overflow-hidden rounded-lg border border-border">
+              {waiting?.length ? (
+                waiting.map((c) => (
+                  <a
+                    key={c.id}
+                    href={c.href}
+                    className="flex items-start justify-between gap-3 border-b border-border px-4 py-3 no-underline last:border-b-0 hover:bg-muted/40"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm text-foreground">{c.label}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">{c.when}</span>
+                    </span>
+                  </a>
+                ))
+              ) : (
+                <p className="px-4 py-6 text-sm text-muted-foreground">
+                  Nothing is waiting on a decision right now.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : view === 'dashboard' && metrics ? (
         <CockpitDashboard metrics={metrics} trend={trend ?? []} live={live} customerHrefBase={surface.customerHrefBase} />
       ) : view === 'run' ? (
         <RunPanel fields={fields} surface={surface} />
