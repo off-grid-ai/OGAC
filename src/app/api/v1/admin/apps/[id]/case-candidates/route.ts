@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isActionableRecord, primaryDomainLabel, toCaseCandidate } from '@/lib/app-case-candidates';
+import { resolveDomainByIdOrLabel } from '@/lib/app-run';
+import { resolveDomain } from '@/lib/data-domains';
 import { getApp } from '@/lib/apps-store';
 import { requireAdmin } from '@/lib/authz';
 import { execConnectorRead } from '@/lib/connector-exec';
@@ -34,8 +36,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ object: 'list', data: [], reason: 'no-data-domain' });
   }
 
+  // Resolve exactly the way the RUN does — by domain id first (which is what a compiled spec emits),
+  // then by label/alias. Matching on label alone made the picker report "not connected yet" for every
+  // app whose spec was compiled, while the run itself read the same domain fine.
   const domains = await listDomains(orgId).catch(() => []);
-  const domain = domains.find((d) => d.label.trim().toLowerCase() === label.toLowerCase());
+  const domain = resolveDomainByIdOrLabel(label, domains, resolveDomain);
   if (!domain?.connectorId || !domain.resource) {
     return NextResponse.json({ object: 'list', data: [], reason: 'domain-not-bound', domain: label });
   }
