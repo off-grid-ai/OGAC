@@ -36,9 +36,10 @@ const STAGE_H = 900;
 /**
  * The largest camera scale at which the whole poster still fits the stage vertically.
  *
- * 900 / 1024 = 0.8789. Above it the world is taller than the stage and `World`'s overflow:hidden cuts
+ * (900 - 2*PAD) / 1024. Above it the world is taller than the stage and `World`'s overflow:hidden cuts
  * the difference — and because the camera centres the world, the cut lands half on the poster's TOP,
- * which is its title and logo.
+ * which is its title and logo. The PAD also gives the logo and title actual breathing room instead of
+ * sitting flush against the top edge of the frame.
  *
  * The opening scene pushes in from 0.879 to 0.9, so it crossed this line by ~22px and the title was
  * trimmed. In the original full-screen prototype that was an invisible hairline; at full bleed it reads
@@ -46,7 +47,9 @@ const STAGE_H = 900;
  * push-in and makes over-cropping structurally impossible. Zoomed poses (1.5–1.95) are left alone —
  * cropping is the entire point of a close-up.
  */
-const MAX_WIDE_CAM = STAGE_H / WORLD_H;
+/** Breathing room, in stage px, kept between the poster and the frame edge at the wide poses. */
+const STAGE_PAD = 26;
+const MAX_WIDE_CAM = (STAGE_H - 2 * STAGE_PAD) / WORLD_H;
 
 // ── scenes (from the prototype's OM_SCENES) — 16.3s total ──────────────────────────────────────
 const SCENES = [
