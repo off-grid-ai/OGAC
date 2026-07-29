@@ -20,12 +20,15 @@ export type AppTab =
   | 'controls';
 
 /**
- * `primary` = what you DO with an app day to day. `settings` = what you configure once.
+ * `primary`  — a real destination in the nav. THREE of them, deliberately.
+ * `settings`  — configured once, tucked under a quiet Settings label.
+ * `inline`    — a real route, but reached FROM the Work screen, never listed as a peer.
  *
- * Ten equal-weight tabs presented as one flat rail is why this surface read as overwhelming: nothing
- * told the reader that Work and Safety are not the same kind of thing.
+ * Eleven tabs made this unusable. The counts, the queue, the results and the run button all answer the
+ * same question — "what is happening with this process" — so they belong on ONE screen, not scattered
+ * across five equal-weight tabs the reader has to assemble in their head.
  */
-export type AppTabGroup = 'primary' | 'settings';
+export type AppTabGroup = 'primary' | 'settings' | 'inline';
 
 export interface LifecycleTab {
   tab: AppTab;
@@ -47,12 +50,12 @@ const TAB_META: { tab: AppTab; label: string; hint: string; group: AppTabGroup }
     tab: 'dashboard',
     label: 'Dashboard',
     hint: 'How this process is doing — throughput, what is stuck, how long it takes',
-    group: 'primary',
+    group: 'inline',
   },
   { tab: 'build', label: 'Build', hint: 'Edit the steps and how it runs', group: 'primary' },
-  { tab: 'input', label: 'Start a case', hint: 'Enter the details and run it', group: 'primary' },
-  { tab: 'runs', label: 'Runs', hint: 'Watch runs execute, step by step', group: 'primary' },
-  { tab: 'review', label: 'Review', hint: 'Approve or reject runs paused for a human', group: 'primary' },
+  { tab: 'input', label: 'Start a case', hint: 'Enter the details and run it', group: 'inline' },
+  { tab: 'runs', label: 'Runs', hint: 'Watch runs execute, step by step', group: 'inline' },
+  { tab: 'review', label: 'Review', hint: 'Approve or reject runs paused for a human', group: 'inline' },
   { tab: 'reports', label: 'Reports', hint: 'Outcomes over time', group: 'primary' },
   {
     tab: 'quality',

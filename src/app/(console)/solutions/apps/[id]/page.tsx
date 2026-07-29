@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { PageFrame } from '@/components/PageFrame';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { buildAppDashboard } from '@/lib/app-dashboard';
 import { listAppRuns } from '@/lib/app-run-store';
 import {
   buildAppWorkQueue,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/app-work-queue';
 import { getApp } from '@/lib/apps-store';
 import { currentOrgId } from '@/lib/tenancy';
+import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +88,26 @@ export default async function AppWorkPage({
     })),
   });
 
+  // The NUMBERS live here too. They answer the same question as the queue — "what is happening with this
+  // process" — so putting them on a separate Dashboard tab forced the reader to assemble one picture from
+  // two screens. Same pure rule, rendered inline.
+  const dashboard = buildAppDashboard({
+    nowMs: Date.now(),
+    runs: rows.map((r) => {
+      const steps = (r as { steps?: { kind?: string; status?: string }[] }).steps ?? [];
+      return {
+        status: String(r.status),
+        startedAt:
+          r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? ''),
+        finishedAt:
+          (r as { finishedAt?: Date | string | null }).finishedAt instanceof Date
+            ? ((r as { finishedAt: Date }).finishedAt).toISOString()
+            : ((r as { finishedAt?: string | null }).finishedAt ?? null),
+        neededPerson: steps.some((s) => s.kind === 'human' && s.status !== 'queued'),
+      };
+    }),
+  });
+
   const base = `/solutions/apps/${encodeURIComponent(id)}`;
 
   return (
@@ -95,6 +117,30 @@ export default async function AppWorkPage({
           <h2 className="text-xl font-semibold tracking-tight">{queue.headline}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{queue.howWorkArrives}</p>
         </header>
+
+        {/* The numbers, then the work. One screen. */}
+        {!queue.isEmpty ? (
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
+            {dashboard.metrics.map((metric) => (
+              <Card
+                key={metric.label}
+                className={cn(
+                  'min-w-0 shadow-none',
+                  metric.tone === 'attention' ? 'border-primary/40' : 'border-border',
+                )}
+              >
+                <CardContent className="space-y-1 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                    {metric.label}
+                  </p>
+                  <p className="font-mono text-xl font-semibold tabular-nums text-foreground">
+                    {metric.value}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : null}
 
         {queue.isEmpty ? (
           <Card>

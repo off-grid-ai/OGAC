@@ -45,7 +45,9 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
   const openAppId = /^\/solutions\/apps\/([^/]+)/.exec(pathname)?.[1];
   const appTabs =
     openAppId && !['new', 'forge', 'runs', 'reports'].includes(openAppId)
-      ? lifecycleTabs(decodeURIComponent(openAppId))
+      ? // `inline` tabs are real routes reached FROM the Work screen; listing them here as peers is
+        // what made an app look like eleven separate places instead of one process.
+        lifecycleTabs(decodeURIComponent(openAppId)).filter((t) => t.group !== 'inline')
       : [];
   const activeAppTab = openAppId ? activeTabForPath(pathname, decodeURIComponent(openAppId)) : null;
   // Inactive domains start collapsed. Deep links expose their active ancestors, and both levels can

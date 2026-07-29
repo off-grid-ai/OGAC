@@ -102,3 +102,23 @@ test('the app shell renders the app name as the page h1', () => {
   const nav = readFileSync('src/components/build/AppLifecycleNav.tsx', 'utf8');
   assert.match(nav, /<h1[^>]*>\s*\{title\}/, 'AppLifecycleNav must render {title} as an h1');
 });
+
+test('an app presents THREE destinations, not eleven', () => {
+  // Eleven tabs made this unusable. Everything that answers "what is happening with this process" — the
+  // counts, the queue, the results, the run button — belongs on ONE screen, so those routes are `inline`:
+  // real and deep-linkable, reached from Work, never listed as peers.
+  const tabs = lifecycleTabs('app_1');
+  assert.deepEqual(
+    tabs.filter((t) => t.group === 'primary').map((t) => t.label),
+    ['Work', 'Build', 'Reports'],
+  );
+  assert.deepEqual(
+    tabs.filter((t) => t.group === 'inline').map((t) => t.label),
+    ['Dashboard', 'Start a case', 'Runs', 'Review'],
+  );
+  // Every inline tab must still resolve to a real route, or "reached from Work" would be a lie.
+  for (const tab of tabs.filter((t) => t.group === 'inline')) {
+    assert.match(tab.href, /^\/solutions\/apps\/app_1\//);
+    assert.equal(activeTabForPath(tab.href, 'app_1'), tab.tab);
+  }
+});
