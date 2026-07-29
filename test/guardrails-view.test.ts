@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildGuardrailsView,
-  demoScan,
   PRESIDIO_ENTITY_TYPES,
+  FLOOR_ENTITY_TYPES,
   REGEX_ENTITY_TYPES,
 } from '../src/lib/guardrails-view.ts';
 
@@ -11,38 +11,6 @@ import {
 // scans in, asserted display model out. Covers Presidio active, the regex fallback, and
 // empty/malformed inputs.
 
-// ── demoScan (the pure regex floor) ─────────────────────────────────────────
-
-test('demoScan: detects and redacts email + phone', () => {
-  const r = demoScan('reach jane@acme.com or +1 202 555 0143 today');
-  assert.equal(r.hits, true);
-  assert.deepEqual(r.entities, ['EMAIL_ADDRESS', 'PHONE_NUMBER']);
-  assert.match(r.redacted, /\[EMAIL\]/);
-  assert.match(r.redacted, /\[PHONE\]/);
-  assert.equal(r.engine, 'regex');
-});
-
-test('demoScan: clean text → no hits', () => {
-  const r = demoScan('nothing sensitive here');
-  assert.equal(r.hits, false);
-  assert.deepEqual(r.entities, []);
-  assert.equal(r.redacted, 'nothing sensitive here');
-});
-
-test('demoScan: is reusable across calls (global regex lastIndex safety)', () => {
-  // A second scan of a matching string must still detect — regressions here mean lastIndex leaked.
-  demoScan('a@b.com');
-  const r = demoScan('c@d.com');
-  assert.equal(r.hits, true);
-  assert.deepEqual(r.entities, ['EMAIL_ADDRESS']);
-});
-
-test('demoScan: non-string input degrades to empty scan, never throws', () => {
-  const r = demoScan(undefined as unknown as string);
-  assert.equal(r.hits, false);
-  assert.deepEqual(r.entities, []);
-  assert.equal(r.redacted, '');
-});
 
 // ── buildGuardrailsView: Presidio active ────────────────────────────────────
 
@@ -61,7 +29,9 @@ test('buildGuardrailsView: presidio configured + reachable', () => {
   assert.equal(v.adapterId, 'presidio');
   assert.equal(v.reachable, true);
   assert.equal(v.configured, true);
-  assert.deepEqual(v.entityTypes, [...PRESIDIO_ENTITY_TYPES]);
+  // The domestic floor runs on EVERY engine, so its guaranteed types are always reported alongside
+  // the engine's own catalog (G-F2). Reporting only the engine's list understated what is masked.
+  assert.deepEqual(v.entityTypes, [...PRESIDIO_ENTITY_TYPES, ...FLOOR_ENTITY_TYPES]);
   assert.equal(v.demo, undefined);
 });
 
@@ -90,7 +60,16 @@ test('buildGuardrailsView: checks spine → regex engine, always reachable + con
   assert.equal(v.adapterId, 'checks');
   assert.equal(v.reachable, true);
   assert.equal(v.configured, true);
-  assert.deepEqual(v.entityTypes, [...REGEX_ENTITY_TYPES]);
+  assert.deepEqual(v.entityTypes, [...REGEX_ENTITY_TYPES, ...FLOOR_ENTITY_TYPES]);
+});
+
+test('buildGuardrailsView: a scanner-based remote still reports the floor types', () => {
+  // The live regression: llm-guard enumerates no fixed entity list, so this reported `[]` — telling
+  // an operator the platform recognized no Indian PII while it was masking all four itself.
+  const v = buildGuardrailsView({ id: 'llm-guard', embedUrl: 'http://guard:8000' }, true);
+  assert.equal(v.engine, 'llm-guard');
+  assert.deepEqual(v.entityTypes, [...FLOOR_ENTITY_TYPES]);
+  assert.ok(v.entityTypes.includes('IN_PAN'));
 });
 
 test('buildGuardrailsView: unknown adapter id normalizes to regex', () => {
@@ -126,7 +105,9 @@ test('buildGuardrailsView: malformed meta fields fall back to defaults', () => {
 // ── buildGuardrailsView: demo threading ─────────────────────────────────────
 
 test('buildGuardrailsView: threads a demo scan result through', () => {
-  const scan = demoScan('jane@acme.com');
+  // A real adapter PiiResult shape — the route now passes the engine's own verdict here, not a
+  // locally-computed one (demoScan is gone; see G-F2 in src/lib/guardrails-view.ts).
+  const scan = { hits: true, entities: ['EMAIL_ADDRESS'], redacted: '[EMAIL]', engine: 'regex' };
   const v = buildGuardrailsView({ id: 'checks' }, true, scan, 'jane@acme.com');
   assert.ok(v.demo);
   assert.equal(v.demo?.input, 'jane@acme.com');
