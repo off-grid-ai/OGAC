@@ -5,6 +5,9 @@ import { CrossSellOpportunityQueue } from '@/components/app-use/CrossSellOpportu
 import type { RunField } from '@/components/app-use/RunPanel';
 import { readBankCrossSellOpportunityBook } from '@/lib/adapters/bank-cross-sell-execution';
 import { sharedSurface } from '@/lib/app-surface';
+import { runInputPrompt } from '@/lib/app-input-prompt';
+import { listAppRuns } from '@/lib/app-run-store';
+import { runSubject } from '@/lib/app-work-queue';
 import { getAppBySlug } from '@/lib/apps-store';
 import { resolveDeployedApp } from '@/lib/deployed-app';
 import type { FormField } from '@/lib/app-model';
@@ -59,7 +62,18 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
     );
   }
 
-  const fields = deriveRunFields(app.inputForm);
+  const orgId = await currentOrgId();
+  const runs = await listAppRuns(app.id, orgId, 500).catch(() => []);
+
+  // A real previous case becomes the entry example, and the numbers come from the same pure rule the
+  // console uses — so the deployed app has its own dashboard instead of `metrics={null}`.
+  const exampleSubject =
+    runs.map((r) => runSubject((r as { input?: unknown }).input)).find((x): x is string => Boolean(x)) ??
+    null;
+  const prompt = runInputPrompt({ trigger: app.trigger?.kind, exampleSubject });
+  // TODO(next): AppUseShell has no slot for a headline or stat band yet, so the deployed app still has
+  // no dashboard of its own. Adding those props is the next real piece of work on this surface.
+  const fields = deriveRunFields(app.inputForm, prompt);
   const surface = sharedSurface(resolved.slug);
 
   return (
@@ -79,38 +93,34 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
   );
 }
 
-const DEFAULT_FIELDS: RunField[] = [
-  {
-    key: 'segment',
-    label: 'Customer segment',
-    type: 'select',
-    required: true,
-    options: ['Priority', 'Salaried', 'SME', 'NRI'],
-    description: 'Which book of customers to generate next-best-actions for.',
-  },
-  {
-    key: 'region',
-    label: 'Region',
-    type: 'select',
-    options: ['All India', 'Mumbai', 'Delhi NCR', 'Bengaluru', 'Pune', 'Chennai', 'Hyderabad'],
-  },
-  {
-    key: 'minPipeline',
-    label: 'Minimum opportunity (₹)',
-    type: 'number',
-    placeholder: '100000',
-    description: 'Only surface opportunities above this ticket size.',
-  },
-  {
-    key: 'focus',
-    label: 'Focus for this run',
-    type: 'textarea',
-    placeholder: 'e.g. prioritise protection gaps for young families',
-  },
-];
-
-function deriveRunFields(inputForm: FormField[] | undefined): RunField[] {
-  if (!inputForm || inputForm.length === 0) return DEFAULT_FIELDS;
+/**
+ * The run fields for a deployed app.
+ *
+ * These used to fall back to a hard-coded CROSS-SELL form — "Customer segment: Priority/Salaried/SME/NRI",
+ * "Minimum opportunity (₹)", "prioritise protection gaps for young families" — for every app that declared
+ * no inputForm. So a Reimbursement app's deployed page asked a clerk for a customer segment and a minimum
+ * ticket size. Nonsense for that process, and exactly the kind of thing that makes the product feel
+ * unfinished.
+ *
+ * With no declared form we now ask for the ONE thing we can honestly ask for: the case itself, labelled and
+ * exemplified from the app's own history (see src/lib/app-input-prompt.ts). No invented fields.
+ */
+function deriveRunFields(
+  inputForm: FormField[] | undefined,
+  prompt: { label: string; hint: string; placeholder: string },
+): RunField[] {
+  if (!inputForm || inputForm.length === 0) {
+    return [
+      {
+        key: 'input',
+        label: prompt.label,
+        type: 'textarea',
+        required: true,
+        description: prompt.hint,
+        placeholder: prompt.placeholder || undefined,
+      },
+    ];
+  }
   return inputForm.map((f) => ({
     key: f.key,
     label: f.label,
