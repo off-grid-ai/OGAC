@@ -512,7 +512,9 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   const [scale, setScale] = useState(1);
   const [box, setBox] = useState({ w: STAGE_W, h: STAGE_H });
   const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(true);
+  // Starts false: the observer decides. Defaulting to true meant one frame of playback before it
+  // reported, which is the same bug in miniature.
+  const [visible, setVisible] = useState(false);
   const [paused, setPaused] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const reduce = useRef(false);
@@ -574,11 +576,22 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
     return () => ro.disconnect();
   }, [fill]);
 
-  // Don't burn a frame loop on a hero nobody is looking at.
+  // Don't play until the stage is actually being looked at.
+  //
+  // The threshold is 0.45, not a hair above zero. At 0.05 a few pixels peeking past the fold was enough
+  // to start the clock, so the 16.3s loop ran while effectively unseen and you arrived somewhere in the
+  // middle of it — the establishing wide shot, which is the whole point of the opening beat, was already
+  // gone. Requiring roughly half the stage in view means playback begins at frame 0 when the reader gets
+  // there. It also stops the loop when they leave, and `elapsedRef` resumes rather than restarting.
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.05 });
+    const io = new IntersectionObserver(
+      ([e]) => setVisible(e.isIntersecting && e.intersectionRatio >= 0.45),
+      // Several thresholds so the callback fires across the range rather than only at the boundary —
+      // with a single threshold a fast scroll can skip straight past it and never report.
+      { threshold: [0, 0.25, 0.45, 0.7, 1] },
+    );
     io.observe(host);
     return () => io.disconnect();
   }, []);
