@@ -356,7 +356,6 @@ function Packets({ gSec, pal }: Readonly<{ gSec: number; pal: Palette }>) {
 
 function Ambient({ gSec, pal }: Readonly<{ gSec: number; pal: Palette }>) {
   const lockOsc = 0.5 + 0.5 * Math.sin(2 * Math.PI * gSec * (4 / TOTAL));
-  const blink = Math.sin(2 * Math.PI * gSec * (17 / TOTAL)) > 0 ? 1 : 0.25;
   const lock = (x: number, y: number) => (
     <div
       key={x}
@@ -405,20 +404,10 @@ function Ambient({ gSec, pal }: Readonly<{ gSec: number; pal: Palette }>) {
           strokeLinejoin="round"
         />
       </svg>
-      {/* The "Running" dot inside the OGAM phone. */}
-      <div
-        style={{
-          position: 'absolute',
-          left: 201.5 - 4.4,
-          top: 394.5 - 4.4,
-          width: 8.8,
-          height: 8.8,
-          borderRadius: '50%',
-          background: pal.accent,
-          opacity: blink,
-          boxShadow: blink > 0.5 ? `0 0 7px rgba(${pal.accentRgb},0.7)` : 'none',
-        }}
-      />
+      {/* The prototype's blinking "Running" status dot is deliberately NOT ported. Its coordinates were
+          pinned to a different phone capture; the SVG in this repo shows the Sync/pairing screen, so the
+          dot landed on the "Discoverable" row where it signified nothing — a pulsing indicator attached to
+          unrelated text reads as a glitch, not as life. The rest of Ambient (the gate pulses) is intact. */}
     </>
   );
 }
