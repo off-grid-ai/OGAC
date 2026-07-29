@@ -516,6 +516,11 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   // reported, which is the same bug in miniature.
   const [visible, setVisible] = useState(false);
   const [paused, setPaused] = useState(false);
+  // The poster is ~400KB and is applied as a CSS background-image, so it has no load event and the
+  // overlay layers (packets, glows, pulsing gates) would happily animate over empty space for the first
+  // moment — which read as "a blank screen with some pulsating stuff". Preload it and hold the whole
+  // world back until it has decoded.
+  const [bgReady, setBgReady] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const reduce = useRef(false);
   const elapsedRef = useRef(0);
@@ -619,7 +624,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   );
 
   useEffect(() => {
-    if (!visible || paused || reduce.current) return;
+    if (!visible || paused || !bgReady || reduce.current) return;
     let raf = 0;
     let start: number | null = null;
     // Resume from the paused position: without carrying `elapsedRef` the loop would restart the
@@ -634,11 +639,32 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [visible, paused]);
+  }, [visible, paused, bgReady]);
 
   const dark = resolvedTheme !== 'light';
   const pal = PALETTES[dark ? 'dark' : 'light'];
   const src = dark ? '/hero/control-plane-dark.svg' : '/hero/control-plane-light.svg';
+
+  useEffect(() => {
+    if (!mounted) return;
+    let live = true;
+    setBgReady(false);
+    const img = new Image();
+    img.src = src;
+    const done = () => {
+      if (live) setBgReady(true);
+    };
+    // `decode()` waits for the raster to be ready to paint, not merely downloaded — without it the
+    // first painted frame can still be blank. Falls back to the load event where decode is missing.
+    if (img.decode) img.decode().then(done, done);
+    else {
+      img.onload = done;
+      img.onerror = done;
+    }
+    return () => {
+      live = false;
+    };
+  }, [src, mounted]);
 
   // Reduced motion holds the loop at a composed wide frame rather than a random one.
   const { index, progress, gSec } = useMemo(
@@ -686,7 +712,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
               transformOrigin: '0 0',
             }}
           >
-            <World cam={cam} gSec={gSec} em={em} pal={pal} src={src} />
+            {bgReady ? <World cam={cam} gSec={gSec} em={em} pal={pal} src={src} /> : null}
           </div>
 
           {/* Controls. Always present for keyboard/AT; visually revealed on hover or focus, and held

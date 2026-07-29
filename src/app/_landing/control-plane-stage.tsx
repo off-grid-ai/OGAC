@@ -92,9 +92,16 @@ export function ControlPlaneStage() {
 
   // ── Resistance ──────────────────────────────────────────────────────────────────────────────────
   //
-  // Native proximity snap (the marker below) settles the stage into full bleed. This is the other half:
-  // once settled, small scrolls are absorbed so it does not immediately roll back off, and a deliberate
-  // scroll leaves.
+  // Native proximity snap (the marker below) settles the stage into full bleed. This adds two things on
+  // top:
+  //
+  //   ASSIST — once the reader is close and has stopped, the stage glides itself into the exact
+  //   position, so nobody has to land the scroll precisely to see it framed properly. It arms on
+  //   APPROACH as well as on hold, which is the difference between "it snaps if you get it right" and
+  //   "it finishes the job for you".
+  //
+  //   RESISTANCE — once settled, small scrolls are absorbed so it does not immediately roll back off,
+  //   and a deliberate scroll leaves.
   //
   // It ACCUMULATES INTENT rather than blocking events. Deltas are summed while immersed; under the
   // budget the stage eases back to the snap point, and once the sum crosses it the resistance
@@ -104,27 +111,43 @@ export function ControlPlaneStage() {
   useEffect(() => {
     if (!expand || reduce) return;
     const RELEASE_PX = 220;
+    // How close counts as "close enough to help". Generous on approach (you are heading here) and a
+    // little tighter on the far side (you may be leaving on purpose).
+    const ASSIST_BEFORE = 0.24;
+    const ASSIST_AFTER = 0.30;
     let intent = 0;
     let released = false;
     let timer: number | undefined;
 
+    /** Near enough that finishing the job for the reader is a help rather than a hijack. */
+    const inAssistBand = () => {
+      const p = scrollYProgress.get();
+      return p > GROW_END - ASSIST_BEFORE && p < Math.min(0.99, GROW_END + ASSIST_AFTER);
+    };
+
     const settle = () => {
-      if (released || !immersedRef.current) return;
+      if (released || !inAssistBand()) return;
       const target = snapOffset();
       if (target === null || Math.abs(window.scrollY - target) < 4) return;
       window.scrollTo({ top: target, behavior: 'smooth' });
     };
 
     const onDelta = (dy: number) => {
-      if (!immersedRef.current) {
+      // Outside the band nothing is armed, and the release budget resets — so leaving and coming back
+      // gets the assist again rather than being permanently opted out.
+      if (!inAssistBand()) {
         intent = 0;
         released = false;
         return;
       }
-      intent += Math.abs(dy);
-      if (intent >= RELEASE_PX) {
-        released = true;
-        return;
+      // Only the HOLD costs intent. Approaching the snap point should not spend the budget that exists
+      // to let someone leave, otherwise arriving would immediately disarm the assist.
+      if (immersedRef.current) {
+        intent += Math.abs(dy);
+        if (intent >= RELEASE_PX) {
+          released = true;
+          return;
+        }
       }
       window.clearTimeout(timer);
       // Only act once the reader has paused, so this never fights an in-flight gesture.
@@ -151,7 +174,7 @@ export function ControlPlaneStage() {
       window.removeEventListener('touchstart', onTouchStart);
       window.removeEventListener('touchmove', onTouchMove);
     };
-  }, [expand, reduce, snapOffset]);
+  }, [expand, reduce, snapOffset, scrollYProgress]);
 
   // Until measured (SSR / first paint), and on mobile, render the plain contained stage.
   if (!expand) {
