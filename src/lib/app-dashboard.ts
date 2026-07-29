@@ -97,7 +97,10 @@ export function buildAppDashboard(input: AppDashboardInput): AppDashboard {
 
   const completed = inWindow.filter((r) => r.status === DONE);
   const failed = inWindow.filter((r) => FAILED.has(r.status));
-  const waiting = inWindow.filter((r) => r.status === WAITING);
+  // Waiting is NOT windowed. A case pending a decision is pending regardless of when it arrived, and an
+  // OLD one is more urgent, not less. Windowing it produced a visible contradiction: the queue said "2
+  // cases are waiting" while this metric said 1, because one had been waiting longer than the window.
+  const waiting = input.runs.filter((r) => r.status === WAITING);
   const neededPerson = inWindow.filter((r) => r.neededPerson === true);
 
   const durations = completed
@@ -122,7 +125,7 @@ export function buildAppDashboard(input: AppDashboardInput): AppDashboard {
       value: String(waiting.length),
       detail:
         waiting.length > 0
-          ? 'These are paused until someone decides.'
+          ? 'Paused until someone decides — however long ago they arrived.'
           : 'Nothing is currently paused for a decision.',
       tone: waiting.length > 0 ? 'attention' : 'neutral',
     },

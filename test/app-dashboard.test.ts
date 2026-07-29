@@ -91,3 +91,19 @@ test('a finished run with no finish time does not corrupt the typical duration',
   const d = dash([run({ finishedAt: null }), run()]);
   assert.equal(d.metrics.find((m) => m.label === 'Usually takes')?.value, '2 minutes');
 });
+
+test('waiting is NOT windowed — it must agree with the queue on the same screen', () => {
+  // The bug this locks: the work screen said "2 cases are waiting" while the metric said 1, because one
+  // had been pending longer than the 30-day window. A case pending a decision is pending regardless of
+  // age, and an older one is MORE urgent.
+  const d = dash([
+    run({ status: 'awaiting_human', startedAt: ago(2) }),
+    run({ status: 'awaiting_human', startedAt: ago(45) }),
+  ]);
+  assert.equal(d.metrics.find((m) => m.label === 'Waiting on a person')?.value, '2');
+});
+
+test('handled and could-not-finish REMAIN windowed — they describe a period', () => {
+  const d = dash([run({ startedAt: ago(2) }), run({ startedAt: ago(45) })]);
+  assert.equal(d.metrics.find((m) => m.label === 'Handled')?.value, '1');
+});
