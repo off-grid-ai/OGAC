@@ -46,6 +46,32 @@ describe('G-F2 — the domestic floor detects what the engine missed', () => {
     assert.ok(!floor.redacted.includes('2345 6789 0123'));
   });
 
+  // ── The collision the first version of this fix INTRODUCED, pinned so it cannot come back. ──
+  test('a payment card is labelled CARD, not partially eaten by the Aadhaar rule', () => {
+    // LIVE BUG: `card 4111 1111 1111 1111` → `card [AADHAAR] 1111`. Aadhaar's spaced 4-4-4 form
+    // matched the card's first twelve digits (a following space satisfies \\b), so the card was
+    // mislabelled AND left partly in the clear.
+    const floor = floorPass('card 4111 1111 1111 1111 on file');
+    assert.ok(floor.entities.includes('CREDIT_CARD'), JSON.stringify(floor.entities));
+    assert.ok(!floor.entities.includes('IN_AADHAAR'), 'a card must not be reported as Aadhaar');
+    assert.equal(floor.redacted, 'card [CARD] on file');
+    assert.ok(!/\d{4}/.test(floor.redacted), 'no four-digit run of the card may survive');
+  });
+
+  test('an Amex 4-6-5 card and an unspaced RuPay are both caught', () => {
+    const amex = floorPass('3782 822463 10005');
+    assert.ok(amex.entities.includes('CREDIT_CARD'));
+    assert.equal(amex.redacted, '[CARD]');
+    const rupay = floorPass('6521123412341234');
+    assert.ok(rupay.entities.includes('CREDIT_CARD'), JSON.stringify(rupay.entities));
+  });
+
+  test('a genuine Aadhaar still matches when no digit group follows it', () => {
+    const floor = floorPass('Aadhaar 2345 6789 0123 verified');
+    assert.ok(floor.entities.includes('IN_AADHAAR'));
+    assert.equal(floor.redacted, 'Aadhaar [AADHAAR] verified');
+  });
+
   test('clean text stays untouched — the floor must not invent findings', () => {
     const floor = floorPass('The claim was approved within the remaining quota.');
     assert.deepEqual(floor.entities, []);

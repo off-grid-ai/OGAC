@@ -23,15 +23,33 @@ export const IN_PAN = /\b[A-Z]{5}[0-9]{4}[A-Z]\b/g;
 // accident.
 export const IN_IFSC = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
 
+// CARD — a payment card number in its printed forms. This rule MUST run BEFORE Aadhaar.
+//
+// LIVE BUG (2026-07-29): `card 4111 1111 1111 1111` came back as `card [AADHAAR] 1111`. The Aadhaar
+// rule's spaced 4-4-4 alternative matched the card's FIRST TWELVE digits — `4111 1111 1111` — and the
+// trailing \b was satisfied because a space follows. So a card was both mislabelled as Aadhaar and
+// left partly in the clear, and the engine's own card scanner never saw it because the floor had
+// already rewritten the text. Consuming the card shape first removes the collision at the source.
+//
+// Matched forms: 4-4-4-4 and 4-6-5 (Amex) with a CONSISTENT separator (backreference, so `1111 2222`
+// mixed with `-` doesn't match), plus unspaced runs carrying a known major-issuer prefix — Visa,
+// Mastercard (both 5x and 2x ranges), Amex, Discover, and RuPay (60/65/81/82), which matters here
+// because the tenants are Indian. Requiring a real prefix keeps a 16-digit order id from matching.
+export const CARD =
+  /\b(?:\d{4}([ -])\d{4}\1\d{4}\1\d{1,4}|\d{4}([ -])\d{6}\2\d{5}|4\d{12}(?:\d{3})?|5[1-5]\d{14}|2[2-7]\d{14}|3[47]\d{13}|6(?:011|5\d{2})\d{12}|(?:60|65|81|82)\d{14})\b/g;
+
 // Aadhaar — 12-digit UIDAI number, printed as 4-4-4 groups (`2345 6789 0123`) or unspaced
-// (`234567890123`). Two precision guards keep it off arbitrary 12-digit order/txn ids:
+// (`234567890123`). Three precision guards keep it off other digit runs:
 //   1. The leading digit of a real Aadhaar is 2–9 (UIDAI never issues numbers starting 0 or 1),
 //      so a leading-0/1 twelve-digit id won't match.
-//   2. We only fire on the CANONICAL forms: 4-4-4 with a single space/hyphen between groups, OR a
-//      bare 12-digit run standing on its own word boundary. A longer digit run (a 16-digit card,
-//      an 18-digit order id) fails the \b on the trailing side and is left alone.
-// The spaced 4-4-4 form is by itself an extremely strong Aadhaar signal.
-export const IN_AADHAAR = /\b[2-9][0-9]{3}[ -][0-9]{4}[ -][0-9]{4}\b|\b[2-9][0-9]{11}\b/g;
+//   2. Only the CANONICAL forms fire: 4-4-4 with a single space/hyphen between groups, or a bare
+//      12-digit run on its own word boundaries.
+//   3. A trailing negative lookahead rejects a match FOLLOWED BY another digit group. \b alone was
+//      not enough for the spaced form — a space satisfies it — which is exactly how a 16-digit card
+//      got eaten. The CARD rule above already consumes cards; this is the second line of defence,
+//      so an unusual grouping (a 20-digit reference in 4-4-4-4-4) can't resurface the same bug.
+export const IN_AADHAAR =
+  /\b[2-9][0-9]{3}[ -][0-9]{4}[ -][0-9]{4}\b(?![ -]?[0-9])|\b[2-9][0-9]{11}\b/g;
 
 // UPI VPA — Virtual Payment Address: `handle@psp` (e.g. ramesh@okhdfc, 98765@paytm). The PSP side
 // is letters-only (2+), which is what separates a VPA from an email: an email's domain has a dotted
@@ -57,10 +75,14 @@ function applyRule(
   return after;
 }
 
-// Order is load-bearing. EMAIL runs before UPI so a real email (dotted TLD) is consumed as EMAIL
-// and never reaches the UPI rule. IFSC runs before PAN is irrelevant (disjoint shapes) but IFSC
-// and PAN both run before the numeric Aadhaar rule so a labelled `[IFSC]` token can't be re-scanned
-// as digits. Each rule redacts in place, so later rules scan already-redacted text.
+// Order is load-bearing — most specific shape first, because each rule redacts in place and later
+// rules only ever see already-redacted text:
+//   • EMAIL before UPI      — a real email (dotted TLD) is consumed as EMAIL, never mislabelled UPI.
+//   • IFSC and PAN before the numeric rules — a labelled `[IFSC]` token can't be re-scanned as digits.
+//   • CARD before AADHAAR   — a 16-digit card's first 12 digits otherwise match Aadhaar's spaced
+//                             4-4-4 form (the live bug: `4111 1111 1111 1111` → `[AADHAAR] 1111`).
+//   • AADHAAR before PHONE  — a 12-digit Aadhaar also satisfies the loose PHONE shape, and Aadhaar is
+//                             the more specific (and more sensitive) claim.
 export function regexScan(text: string): PiiResult {
   const entities: string[] = [];
   let redacted = text;
@@ -69,6 +91,7 @@ export function regexScan(text: string): PiiResult {
   redacted = applyRule(redacted, entities, IN_UPI, '[UPI]', 'UPI_ID');
   redacted = applyRule(redacted, entities, IN_IFSC, '[IFSC]', 'IN_IFSC');
   redacted = applyRule(redacted, entities, IN_PAN, '[PAN]', 'IN_PAN');
+  redacted = applyRule(redacted, entities, CARD, '[CARD]', 'CREDIT_CARD');
   redacted = applyRule(redacted, entities, IN_AADHAAR, '[AADHAAR]', 'IN_AADHAAR');
   redacted = applyRule(redacted, entities, PHONE, '[PHONE]', 'PHONE_NUMBER');
 
