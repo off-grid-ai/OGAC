@@ -793,9 +793,10 @@ function DescribePhase({
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
       <div className="space-y-4 xl:col-span-2">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">
+          {/* h2: the page shell owns the h1, so both builder modes sit under one page title. */}
+          <h2 className="text-lg font-semibold text-foreground">
             Describe what this app should do
-          </h1>
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Write it in plain language — the outcome you want and the steps it should take. We turn
             it into a governed, runnable app. An agent is just the simplest app: one step.

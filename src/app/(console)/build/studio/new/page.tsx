@@ -54,6 +54,16 @@ export default async function StudioNewPage() {
               Studio
             </Link>
           </div>
+          {/* The page owns the h1 so BOTH modes have a heading. Chat mode (which /solutions/apps/forge
+            redirects into) rendered none at all, so a visitor landing there had no idea what the screen
+            was — and the mode components disagreed about who owned the title. */}
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">Build a new app</h1>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+              Describe the process you want automated in plain language. It inherits your organisation&apos;s
+              data, rules and approvals automatically, and you can edit every step afterwards.
+            </p>
+          </div>
           <Suspense fallback={null}>
             <StudioModes
               summary={summary}
