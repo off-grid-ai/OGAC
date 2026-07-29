@@ -57,6 +57,26 @@ const DATE_KEYS = [
 /** Words that tell a person whether a record still needs work. */
 const STATUS_KEYS = ['status', 'state', 'stage'];
 
+/**
+ * Statuses meaning the record is FINISHED, so it is not work.
+ *
+ * A paid invoice is not a reimbursement decision waiting to be made. Offering settled records alongside open
+ * ones invites someone to "approve" something already done — and it is exactly the kind of thing that falls
+ * apart under the first real question in a demo.
+ */
+const SETTLED = /^(paid|settled|closed|done|complete[d]?|approved|rejected|cancelled|canceled|void)$/i;
+
+/** Whether a record still needs a decision. Unknown or absent status counts as actionable — we do not */
+/** hide work on a guess; only an explicitly finished status is filtered out. */
+export function isActionableRecord(row: Record<string, unknown>): boolean {
+  const status = firstStringIn(row, STATUS_KEYS);
+  return !status || !SETTLED.test(status.trim());
+}
+
+function firstStringIn(row: Record<string, unknown>, keys: readonly string[]): string | null {
+  return firstString(row, keys);
+}
+
 function firstString(row: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const key of keys) {
     const value = row[key];

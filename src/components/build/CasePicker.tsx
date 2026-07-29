@@ -33,7 +33,13 @@ export function CasePicker({
 }>) {
   const [state, setState] = useState<
     | { status: 'loading' }
-    | { status: 'ready'; domain?: string; items: CaseCandidate[]; reason?: string }
+    | {
+        status: 'ready';
+        domain?: string;
+        items: CaseCandidate[];
+        reason?: string;
+        settledHidden?: number;
+      }
     | { status: 'error' }
   >({ status: 'loading' });
 
@@ -45,12 +51,19 @@ export function CasePicker({
         data?: CaseCandidate[];
         domain?: string;
         reason?: string;
+        settledHidden?: number;
       };
       if (!res.ok) {
         setState({ status: 'error' });
         return;
       }
-      setState({ status: 'ready', domain: data.domain, items: data.data ?? [], reason: data.reason });
+      setState({
+        status: 'ready',
+        domain: data.domain,
+        items: data.data ?? [],
+        reason: data.reason,
+        settledHidden: data.settledHidden ?? 0,
+      });
     } catch {
       setState({ status: 'error' });
     }
@@ -91,6 +104,12 @@ export function CasePicker({
         <Database className="size-3.5 text-primary" />
         {state.domain ? `From your ${state.domain}` : 'From your data'} — pick the one to work on
       </p>
+      {state.settledHidden ? (
+        // Said out loud, because a silently shorter list looks like missing data.
+        <p className="text-[11px] text-muted-foreground">
+          {state.settledHidden} already settled and not shown.
+        </p>
+      ) : null}
       <div className="max-h-64 divide-y divide-border overflow-y-auto rounded-md border border-border">
         {state.items.map((item) => {
           const chosen = selectedId === item.id;

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { primaryDomainLabel, toCaseCandidate } from '@/lib/app-case-candidates';
+import { isActionableRecord, primaryDomainLabel, toCaseCandidate } from '@/lib/app-case-candidates';
 import { getApp } from '@/lib/apps-store';
 import { requireAdmin } from '@/lib/authz';
 import { execConnectorQuery } from '@/lib/connector-exec';
@@ -57,9 +57,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ object: 'list', data: [], reason: 'source-unavailable', domain: label });
   }
 
+  // Only records that still need a decision are offered. A paid invoice is not a reimbursement waiting to
+  // be approved, and mixing settled rows in invites someone to act on something already done. The count of
+  // what was filtered is returned so the UI can say so rather than silently showing a shorter list.
+  const rows = result.rows as Record<string, unknown>[];
+  const actionable = rows.filter(isActionableRecord);
   return NextResponse.json({
     object: 'list',
     domain: label,
-    data: result.rows.map((row, i) => toCaseCandidate(row as Record<string, unknown>, i)),
+    settledHidden: rows.length - actionable.length,
+    data: actionable.map((row, i) => toCaseCandidate(row, i)),
   });
 }
