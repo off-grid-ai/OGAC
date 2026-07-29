@@ -995,16 +995,22 @@ function HowThisWorks({ text }: Readonly<{ text: string }>) {
   );
 }
 
+// The selected segment used to differ only in TEXT COLOUR, so this never read as a toggle at all. A
+// segmented control needs a filled, raised selected state to look pressed.
 function ViewToggle({ view, onChange }: Readonly<{ view: View; onChange: (v: View) => void }>) {
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-md border border-border p-0.5">
+    <div
+      role="group"
+      aria-label="Builder view"
+      className="inline-flex items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5"
+    >
       <button
         type="button"
         onClick={() => onChange('guided')}
         className={
           view === 'guided'
-            ? 'inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-primary md:min-h-0'
-            : 'inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground md:min-h-0'
+            ? 'inline-flex min-h-11 items-center gap-1 rounded border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary shadow-sm md:min-h-0'
+            : 'inline-flex min-h-11 items-center gap-1 rounded border border-transparent px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground md:min-h-0'
         }
         aria-pressed={view === 'guided'}
       >
@@ -1016,8 +1022,8 @@ function ViewToggle({ view, onChange }: Readonly<{ view: View; onChange: (v: Vie
         onClick={() => onChange('visual')}
         className={
           view === 'visual'
-            ? 'inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-xs font-medium text-primary md:min-h-0'
-            : 'inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground md:min-h-0'
+            ? 'inline-flex min-h-11 items-center gap-1 rounded border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary shadow-sm md:min-h-0'
+            : 'inline-flex min-h-11 items-center gap-1 rounded border border-transparent px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground md:min-h-0'
         }
         aria-pressed={view === 'visual'}
       >

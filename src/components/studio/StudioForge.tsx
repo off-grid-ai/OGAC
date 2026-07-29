@@ -75,11 +75,13 @@ interface ChatTurn {
 }
 
 const STEP_META: Record<AppStep['kind'], { icon: typeof Robot; tint: string; label: string }> = {
+  // One accent, per the brand: the ICON and LABEL distinguish a step, not a hue. A five-colour legend is
+  // something a reader has to learn; "Human approval" next to a person icon is something they can read.
   agent: { icon: Robot, tint: 'text-primary', label: 'Agent' },
-  'connector-query': { icon: Database, tint: 'text-sky-500', label: 'Data query' },
-  guardrail: { icon: ShieldCheck, tint: 'text-amber-500', label: 'Guardrail' },
-  human: { icon: User, tint: 'text-violet-500', label: 'Human approval' },
-  output: { icon: Export, tint: 'text-emerald-500', label: 'Output' },
+  'connector-query': { icon: Database, tint: 'text-primary', label: 'Data query' },
+  guardrail: { icon: ShieldCheck, tint: 'text-primary', label: 'Guardrail' },
+  human: { icon: User, tint: 'text-primary', label: 'Human approval' },
+  output: { icon: Export, tint: 'text-primary', label: 'Output' },
 };
 
 const EXAMPLES = [

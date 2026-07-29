@@ -58,14 +58,25 @@ export interface CanvasGraph {
   edges: CanvasEdge[];
 }
 
-// ─── Per-kind accent color (brutalist/terminal palette; emerald = agent, the primary path) ───────
+// ─── Per-kind accent — ONE accent, per the brand ─────────────────────────────────────────────────
+//
+// This was a six-hue rainbow: violet for a data read, red for a guardrail, amber for a human step, pink
+// for an output, blue for an action. It made the flow diagram look like a generic node editor rather than
+// Off Grid AI, and it broke the design philosophy twice over: emerald is the ONLY accent, and information
+// is not colour-coded. A reader also cannot learn five arbitrary hue-to-meaning mappings, whereas the node
+// already carries its KIND_LABEL and icon — which say what the step is, in words.
+//
+// Kept as a map rather than collapsed to a constant so a deliberate future exception (a genuinely
+// destructive step, say) has an obvious place to live.
+const OG_ACCENT = '#059669'; // --og-primary (light). The one accent.
+
 export const KIND_COLOR: Record<AppStepKind, string> = {
-  agent: '#059669', // emerald — the governed decision (the primary path)
-  'connector-query': '#7c3aed', // violet — reads a bound data domain
-  guardrail: '#dc2626', // red — a governance check
-  human: '#ca8a04', // amber — a person pauses the run (HITL)
-  output: '#db2777', // pink — emits to a sink
-  action: '#2563eb', // blue — a governed external mutation
+  agent: OG_ACCENT,
+  'connector-query': OG_ACCENT,
+  guardrail: OG_ACCENT,
+  human: OG_ACCENT,
+  output: OG_ACCENT,
+  action: OG_ACCENT,
 };
 
 export const KIND_LABEL: Record<AppStepKind, string> = {

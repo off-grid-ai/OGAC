@@ -35,7 +35,12 @@ export default async function AppShellLayout({
 
   return (
     <PageFrame className="space-y-6">
-      <AppLifecycleNav appId={app.id} title={app.title} pipeline={pipeline} />
+      <AppLifecycleNav
+        appId={app.id}
+        title={app.title}
+        pipeline={pipeline}
+        openHref={app.published && app.slug ? `/app/${encodeURIComponent(app.slug)}` : null}
+      />
       <div className="flex justify-end">
         <AppReuseActions
           appId={app.id}

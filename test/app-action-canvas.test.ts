@@ -27,7 +27,15 @@ const ACTION: ActionStep = {
 
 test('canvas gives governed actions an exhaustive nontechnical presentation', () => {
   assert.equal(KIND_LABEL.action, 'Action');
-  assert.equal(KIND_COLOR.action, '#2563eb');
+  // ONE accent, per the brand: the label and icon distinguish a step, not a hue. The canvas used to be a
+  // six-colour rainbow, which made it look like a generic node editor rather than Off Grid AI and broke
+  // the design philosophy's "do not colour-code information".
+  assert.equal(KIND_COLOR.action, '#059669');
+  assert.equal(
+    new Set(Object.values(KIND_COLOR)).size,
+    1,
+    'every step kind shares the single brand accent',
+  );
   assert.equal(describeBinding(ACTION), 'create follow-up · approval');
   assert.equal(isStepIncomplete(ACTION), false);
   assert.equal(isStepIncomplete({ ...ACTION, connectorId: '' }), true);
