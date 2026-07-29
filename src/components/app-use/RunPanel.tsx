@@ -52,6 +52,10 @@ export function RunPanel({
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(null);
+  // The picked record is kept as a RECORD, not flattened into the text form: the run's data steps filter
+  // on its fields (`{{case.employee_id}}`), so squeezing it through a string form would lose exactly the
+  // structure they need.
+  const [pickedRecord, setPickedRecord] = useState<Record<string, unknown> | null>(null);
   // The single free-text field is the fallback shape. When that is what we have, offer the org's own records
   // FIRST — this is the surface a team actually opens, so it matters more here than in the console.
   const offerPicker = Boolean(appId) && fields.length === 1 && fields[0]?.key === 'input';
@@ -93,7 +97,7 @@ export function RunPanel({
       const res = await fetch(surface.runUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ input: values }),
+        body: JSON.stringify(pickedRecord ? { input: values, case: pickedRecord } : { input: values }),
       });
       const data = (await res.json().catch(() => ({}))) as RunResult & { error?: string };
 
@@ -150,10 +154,12 @@ export function RunPanel({
                   onPick={(candidate) => {
                     setPickedId(candidate.id);
                     // The whole record goes to the run; the readable label is only the case subject.
+                    // `case` is the canonical field — the run's steps filter their data reads on it
+                    // (`{{case.employee_id}}`), so it has to arrive as the record, not as prose.
+                    setPickedRecord(candidate.record);
                     setValues((v) => ({
                       ...v,
                       input: [candidate.label, candidate.detail].filter(Boolean).join(' · '),
-                      case_record: JSON.stringify(candidate.record),
                     }));
                   }}
                 />

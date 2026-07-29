@@ -43,10 +43,18 @@ if (open.length === 0) throw new Error('no open records to work on');
 const candidate = toCaseCandidate(open[0], 0);
 console.log(`case: ${candidate.label} ${candidate.detail ?? ''}`);
 
-const outcome = await runApp(app, JSON.stringify(candidate.record), {
+// Submit the case exactly as the browser does: the readable label as the text, the RECORD as the case.
+const { buildTriggerInput } = await import('../src/lib/trigger-dispatch.ts');
+const input = buildTriggerInput('webhook', {
+  input: { input: [candidate.label, candidate.detail].filter(Boolean).join(' · ') },
+  case: candidate.record,
+});
+const actor = orgId === 'org_suraksha' ? 'demo-insurer@getoffgridai.co' : 'demo-bank@getoffgridai.co';
+const outcome = await runApp(app, input, {
   orgId,
-  actor: 'demo-bank@getoffgridai.co',
-  asker: { id: 'demo-bank@getoffgridai.co', groups: [], clearance: 'internal' },
+  actor,
+  input,
+  asker: { id: actor, groups: [], clearance: 'internal' },
 });
 
 console.log(`\nrun ${outcome.runId} → ${outcome.status}`);

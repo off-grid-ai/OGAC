@@ -16,6 +16,7 @@
 //   execConnectorQuery(...)                     — the same read, collapsed to `result | null` for
 //                                                 callers that only need to know if rows came back.
 import { type ConnectorFailure, describeThrown } from '@/lib/connector-failure';
+import { type FilterValue, buildEqualityFilter, filterRows } from '@/lib/connector-filter';
 
 // The minimal connector shape this module needs — just the dialect + where to reach it. Matches
 // the fields on both the DB row and the `Connector` interface in store.ts, so either can be passed.
@@ -342,18 +343,33 @@ export async function execConnectorRead(
   if (resolved.credentialError) return readFailed('credential', resolved.credentialError);
   const endpoint = resolved.endpoint;
 
+  // Scope the read to the case, when the step declared which record it wants. Values are BOUND, never
+  // interpolated (buildEqualityFilter). An empty declaration leaves the query exactly as it was.
+  const scalarParams = Object.fromEntries(
+    Object.entries(query.params ?? {}).filter((entry): entry is [string, FilterValue] =>
+      typeof entry[1] === 'string' || typeof entry[1] === 'number' || typeof entry[1] === 'boolean',
+    ),
+  );
+
   if (dialect === 'postgres') {
     const table = safeIdentifier(query.resource);
     if (!table) return readFailed('unsafe-resource', query.resource);
+    const filter = buildEqualityFilter(scalarParams, 'postgres');
     const { Pool } = await import('pg');
     const pool = new Pool({ connectionString: endpoint, connectionTimeoutMillis: 3000, max: 1 });
     try {
       if (op === 'count') {
-        const r = await pool.query(`SELECT COUNT(*)::bigint AS n FROM ${table}`);
+        const r = await pool.query(
+          `SELECT COUNT(*)::bigint AS n FROM ${table}${filter.where}`,
+          filter.values,
+        );
         const n = Number(r.rows[0]?.n ?? 0);
         return { ok: true, result: { rows: [{ count: n }], count: n, dialect } };
       }
-      const r = await pool.query(`SELECT * FROM ${table} LIMIT ${limit}`);
+      const r = await pool.query(
+        `SELECT * FROM ${table}${filter.where} LIMIT ${limit}`,
+        filter.values,
+      );
       return {
         ok: true,
         result: {
@@ -373,16 +389,20 @@ export async function execConnectorRead(
     const table = safeIdentifier(query.resource);
     if (!table) return readFailed('unsafe-resource', query.resource);
     const quoted = table.split('.').map((part) => `\`${part}\``).join('.');
+    const filter = buildEqualityFilter(scalarParams, 'mysql');
     try {
       const mysql = await import('mysql2/promise');
       const c = await mysql.createConnection(endpoint);
       try {
         if (op === 'count') {
-          const [rows] = await c.query(`SELECT COUNT(*) AS n FROM ${quoted}`);
+          const [rows] = await c.query(`SELECT COUNT(*) AS n FROM ${quoted}${filter.where}`, filter.values);
           const n = Number((rows as { n: number }[])[0]?.n ?? 0);
           return { ok: true, result: { rows: [{ count: n }], count: n, dialect } };
         }
-        const [rows] = await c.query(`SELECT * FROM ${quoted} LIMIT ${limit}`);
+        const [rows] = await c.query(
+          `SELECT * FROM ${quoted}${filter.where} LIMIT ${limit}`,
+          filter.values,
+        );
         const arr = rows as Record<string, unknown>[];
         return { ok: true, result: { rows: arr, count: arr.length, dialect } };
       } finally { await c.end(); }
@@ -407,13 +427,19 @@ export async function execConnectorRead(
         options: { encrypt: false, trustServerCertificate: true },
         connectionTimeout: 4000,
       });
+      const filter = buildEqualityFilter(scalarParams, 'mssql');
+      const request = () => {
+        const r = pool.request();
+        filter.values.forEach((value, index) => r.input(`p${index + 1}`, value));
+        return r;
+      };
       try {
         if (op === 'count') {
-          const res = await pool.request().query(`SELECT COUNT(*) AS n FROM ${table}`);
+          const res = await request().query(`SELECT COUNT(*) AS n FROM ${table}${filter.where}`);
           const n = Number(res.recordset?.[0]?.n ?? 0);
           return { ok: true, result: { rows: [{ count: n }], count: n, dialect } };
         }
-        const res = await pool.request().query(`SELECT TOP ${limit} * FROM ${table}`);
+        const res = await request().query(`SELECT TOP ${limit} * FROM ${table}${filter.where}`);
         const arr = (res.recordset ?? []) as Record<string, unknown>[];
         return { ok: true, result: { rows: arr, count: arr.length, dialect } };
       } finally { await pool.close(); }
@@ -452,11 +478,14 @@ export async function execConnectorRead(
       } else {
         arr = [];
       }
-      const rows = arr.slice(0, limit);
+      // No predicate to push into an arbitrary REST endpoint, so the same filters are applied to the
+      // fetched rows. Same visible behaviour as SQL: a case-scoped step returns that case's records.
+      const matched = filterRows(arr, scalarParams);
+      const rows = matched.slice(0, limit);
       if (op === 'count') {
-        return { ok: true, result: { rows: [{ count: arr.length }], count: arr.length, dialect } };
+        return { ok: true, result: { rows: [{ count: matched.length }], count: matched.length, dialect } };
       }
-      return { ok: true, result: { rows, count: arr.length, dialect } };
+      return { ok: true, result: { rows, count: matched.length, dialect } };
     } catch (error) {
       return readFailed('connection', describeThrown(error));
     }

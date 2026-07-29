@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
 import { apps, customAgents, type App } from '@/db/schema';
-import { materializedAgentIds } from '@/lib/app-agent-ownership';
+import { materializedAgentBindings, materializedAgentIds } from '@/lib/app-agent-ownership';
 import {
   type AppSpec,
   type AppStep,
@@ -454,8 +454,10 @@ export async function updateApp(
     if (!check.ok) throw new AppValidationError(check.errors);
 
     const previousOwnedIds = new Set(materializedAgentIds(current));
-    const nextOwnedIds = new Set(materializedAgentIds(merged));
-    for (const agentId of nextOwnedIds) {
+    const nextBindings = materializedAgentBindings(merged);
+    const nextOwnedIds = new Set(nextBindings.map((binding) => binding.agentId));
+    for (const binding of nextBindings) {
+      const agentId = binding.agentId;
       const [agent] = await tx
         .select({ id: customAgents.id, ownerAppId: customAgents.ownerAppId })
         .from(customAgents)
@@ -472,9 +474,22 @@ export async function updateApp(
           `Runtime agent '${agentId}' is already owned by App '${agent.ownerAppId}'.`,
         );
       }
+      // Re-sync the INSTRUCTIONS, not just the binding. The agent row is where the step's instructions
+      // actually execute from; materialization copied them there once, at first run, and nothing ever
+      // updated them again. So editing a step's instructions changed the App row and left the running
+      // behaviour untouched — a silent no-op on the one path the builder exists for.
       await tx
         .update(customAgents)
-        .set({ ownerAppId: id, pipelineId: merged.pipelineId ?? null })
+        .set({
+          ownerAppId: id,
+          pipelineId: merged.pipelineId ?? null,
+          systemPrompt: binding.inlineAgent.systemPrompt,
+          ...(binding.inlineAgent.model !== undefined ? { model: binding.inlineAgent.model } : {}),
+          ...(binding.inlineAgent.tools !== undefined ? { tools: binding.inlineAgent.tools } : {}),
+          ...(binding.inlineAgent.grounded !== undefined
+            ? { grounded: binding.inlineAgent.grounded }
+            : {}),
+        })
         .where(and(eq(customAgents.id, agentId), eq(customAgents.orgId, scopedOrgId)));
     }
     const removedIds = [...previousOwnedIds].filter((agentId) => !nextOwnedIds.has(agentId));

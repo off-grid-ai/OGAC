@@ -67,6 +67,7 @@ import {
   type ConnectorFailure,
   connectorFailureMessage,
 } from '@/lib/connector-failure';
+import { resolveStepParams, unresolvedFilterMessage } from '@/lib/connector-filter';
 import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 import { auditEnforcement } from '@/lib/pipeline-contract';
 import {
@@ -843,9 +844,22 @@ async function executeConnectorStep(
       `domain "${resolved.label}" binds connector ${resolved.connectorId} which is missing`,
     );
   }
+  // Scope the read to THIS case. A step may declare `params: { employee_id: '{{case.employee_id}}' }`;
+  // the placeholder resolves against the record the person picked. A placeholder the case cannot satisfy
+  // fails the step: reading unfiltered would quietly return other people's records under a step labelled
+  // "check THIS employee's quota", which is how the unscoped reads produced an undecidable case.
+  const params = resolveStepParams(step.params, ctx.input);
+  if (params.unresolved.length > 0) {
+    return {
+      ...errorResult(step, `case cannot satisfy filter(s): ${params.unresolved.join('; ')}`),
+      kind: 'connector-query',
+      output: unresolvedFilterMessage(resolved.label, params.unresolved),
+      refs: [{ name: `${resolved.connectorId}:${resolved.resource}` }],
+    };
+  }
   const { result, detail, failure } = await deps.queryDomain(resolved, connector, {
     op: step.op ?? 'read',
-    params: step.params,
+    params: params.filters,
     orgId: ctx.orgId,
     actorId: ctx.actor?.trim() || `app-run:${ctx.runId}`,
   });
