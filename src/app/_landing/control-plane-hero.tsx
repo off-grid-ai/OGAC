@@ -476,7 +476,7 @@ function World({
   );
 }
 
-export function ControlPlaneHero() {
+export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> = {}) {
   const { resolvedTheme } = useTheme();
   const hostRef = useRef<HTMLDivElement>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -489,11 +489,30 @@ export function ControlPlaneHero() {
   const reduce = useRef(false);
   const elapsedRef = useRef(0);
 
-  const toggleFullscreen = useCallback(() => {
+  const toggleFullscreen = useCallback(async () => {
     const host = hostRef.current;
     if (!host) return;
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void host.requestFullscreen?.();
+    if (document.fullscreenElement) {
+      // Release the orientation lock before leaving, or the phone can stay stuck landscape.
+      try {
+        (screen.orientation as { unlock?: () => void } | undefined)?.unlock?.();
+      } catch {
+        /* not supported — nothing to release */
+      }
+      await document.exitFullscreen().catch(() => undefined);
+      return;
+    }
+    await host.requestFullscreen?.().catch(() => undefined);
+    // The stage is 16:9, so on a phone fullscreen is only useful in landscape. Orientation lock
+    // REQUIRES fullscreen first, hence the ordering. iOS Safari does not implement it — there the
+    // fullscreen still works and the user rotates the device themselves, so this must not throw.
+    try {
+      await (
+        screen.orientation as unknown as { lock?: (o: string) => Promise<void> }
+      )?.lock?.('landscape');
+    } catch {
+      /* unsupported or refused — fullscreen is still correct, just not auto-rotated */
+    }
   }, []);
 
   useEffect(() => {
@@ -541,7 +560,7 @@ export function ControlPlaneHero() {
         setPaused((p) => !p);
       } else if (e.key.toLowerCase() === 'f') {
         e.preventDefault();
-        toggleFullscreen();
+        void toggleFullscreen();
       }
     },
     [toggleFullscreen],
@@ -581,12 +600,13 @@ export function ControlPlaneHero() {
     <div
       ref={hostRef}
       className={`group relative w-full overflow-hidden border-border bg-[var(--stage-bg)] ${
-        fullscreen ? 'rounded-none border-0' : 'rounded-xl border'
-      }`}
+        fullscreen || fill ? 'rounded-none border-0' : 'rounded-xl border'
+      } ${fill ? 'h-full' : ''}`}
       style={
         {
-          // In fullscreen the element fills the display, so a fixed aspect box would fight it.
-          ...(fullscreen ? {} : { aspectRatio: `${STAGE_W} / ${STAGE_H}` }),
+          // In fullscreen the element fills the display, and in `fill` mode the scroll wrapper owns
+          // the box — a fixed aspect ratio would fight both.
+          ...(fullscreen || fill ? {} : { aspectRatio: `${STAGE_W} / ${STAGE_H}` }),
           '--stage-bg': pal.bg,
         } as React.CSSProperties
       }
@@ -621,7 +641,11 @@ export function ControlPlaneHero() {
               visible while paused so the state is legible rather than implied by stillness. */}
           <div
             className={`absolute bottom-3 right-3 z-20 flex items-center gap-1.5 transition-opacity duration-200 ${
-              paused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+              // Always visible on touch (no hover to reveal them) and whenever paused, so the state is
+              // legible rather than implied by stillness.
+              paused
+                ? 'opacity-100'
+                : 'opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'
             }`}
           >
             <button
@@ -639,9 +663,9 @@ export function ControlPlaneHero() {
             </button>
             <button
               type="button"
-              onClick={toggleFullscreen}
+              onClick={() => void toggleFullscreen()}
               aria-label={fullscreen ? 'Exit full screen' : 'View full screen'}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm backdrop-blur hover:text-foreground md:hidden"
             >
               {fullscreen ? (
                 <CornersIn className="size-3 text-primary" weight="bold" />

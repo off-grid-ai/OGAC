@@ -12,7 +12,7 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { ControlPlaneHero } from '@/app/_landing/control-plane-hero';
+import { ControlPlaneStage } from '@/app/_landing/control-plane-stage';
 import { CtaButtons } from '@/app/_landing/cta-buttons';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
 import { ProductTour } from '@/app/_landing/product-tour';
@@ -161,12 +161,11 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* The product, alive — full container width, so the 1600x900 stage runs at native scale and
-            the camera's zoomed scenes frame whole panels instead of slicing them. 16.3s loop. */}
-        <div className="relative z-10 mx-auto max-w-[100rem] px-4 pb-12 sm:px-6 sm:pb-16 lg:pb-20">
-          <BlurFade delay={0.2} inView>
-            <ControlPlaneHero />
-          </BlurFade>
+        {/* The product, alive. Starts at container width and GROWS on scroll until it is pinned at the
+            full viewport — the camera was authored for 1600x900, so more width means closer to native.
+            Phones keep it contained and get a landscape full-screen button instead. 16.3s loop. */}
+        <div className="relative z-10">
+          <ControlPlaneStage />
         </div>
       </section>
 
