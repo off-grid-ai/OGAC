@@ -110,7 +110,7 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 
 | # | Claim | Surface | Gate | Evidence / what's missing |
 |---|---|---|---|---|
-| B3.1 | **Describe it in plain words → working software** | Solutions → Studio / builder | 🔶 WIRED | The builder compiles a prompt into a real spec (`app-compile.ts`) and 17/17 seeded specs validate. **Not verified live this cycle**: type a sentence, get a runnable app, run it. This is the single most important row in the file — it is the sentence on screen. |
+| B3.1 | **Describe it in plain words → working software** | Solutions → Studio / builder | 🔶 WIRED | **Compile verified live 2026-07-30** — the reimbursement sentence produces a 5-step governed spec, binds `expense claims` (not the org's *insurance* `claims` table — see `phrase-qualifier.ts`), and titles itself "Expense Claim Approval Process". Compiling exposed a worse defect than the earlier ones, now fixed: the model turned "check that employee's remaining quota" into an AGENT step with **no read of the quota**, so the app validated, ran, and answered confidently about a number it never fetched — with `gaps: []`. `agent-data-dependency.ts` now inserts the missing read (before the agent, since a later read cannot inform it) or leaves it alone if the phrase resolves to nothing, and reports every insertion. **Still to promote to ✅:** save the compiled spec and run it end to end. |
 | B3.2 | It **inherits your data** | Connector-query steps bound to data domains | ✅ VERIFIED | 2026-07-29: case-scoped reads live — 1 claim row + that employee's 1 quota row, `{{case.employee_id}}` resolved, on both tenants. |
 | B3.3 | It **inherits your rules** (data ceiling) | Pipeline data allowlist, enforced pre-connector | ✅ VERIFIED | A read outside the allowlist is denied before the connector is touched, audited as `pipeline.data.deny`. Observed live. |
 | B3.4 | **People review what matters** | Human step + review/approve | ✅ VERIFIED | 2026-07-29: `apprun_9ba6a45d` — read → quota → decision (₹41,346.44 vs ₹137,454.12, headroom ₹96,107.68) → **human approved** → output → `done`. Work screen HANDLED 9 → 10. |
@@ -183,3 +183,7 @@ green, which makes proving B3.1 both cheap and the single biggest credibility wi
 - A new claim in the script (or the deck, or the landing page) gets a row **before** it ships.
 - Contradiction between this file and a gaps doc: **this file wins**, because it is keyed to claims we
   are actively making to buyers.
+- **A defect is only a defect against a route the router actually serves.** I carried
+  `/solutions/apps/[id]/safety` as a 404 for most of a session; it was a URL I typed myself from the
+  lifecycle tab's *label* ("Safety" — the tab is `controls`). Generate sweep routes from the router or
+  from real nav hrefs. An invented URL returning 404 is the router working.

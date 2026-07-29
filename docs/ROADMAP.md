@@ -46,8 +46,14 @@ sentence in the loop. Ordering by claim surfaces that class of defect first.
 
 **Standing rules for every item:** pure logic isolated in `src/lib` with real tests, thin handlers,
 DRY, typecheck + production build clean, then **deploy and verify live and paste the evidence into the
-ledger row**. Nothing is done because it merged. Also fix the small known breakages found by the screen
-sweep as they are touched — e.g. `/solutions/apps/[id]/safety` returns 404 from the app nav.
+ledger row**. Nothing is done because it merged.
+
+**A retracted "defect", kept as a warning about test data.** I reported
+`/solutions/apps/[id]/safety` as a 404 in the app nav for most of a session. It is not a route and
+nothing links to it: the lifecycle tab is `controls`, whose *label* is "Safety". I hand-appended
+`/safety` to the screen-sweep route list from the label and then treated my own invented URL as a
+product bug. **Sweep route lists must be generated from the router or from real nav hrefs — never
+typed from what a tab is called.**
 
 ---
 
