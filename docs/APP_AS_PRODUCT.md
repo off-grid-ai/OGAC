@@ -127,6 +127,29 @@ themselves before building anything new.
   (Discovered 2026-07-29 while correcting currency copy; that script writes the `summary` column directly
   and says why in its header.)
 
+### GAP 0 — starting a case must PICK from enterprise data, not accept free text
+
+Founder, on the Run screen: *"why is this free text? all of the data is already in the organization right?
+I dont understand this?"*
+
+He is right, and I got this wrong twice: first I hand-authored form fields (ruled out — §3), then I improved
+the LABEL and the example and left the interaction as a text box. Free text is still free text. Typing
+"Training course reimbursement — Vikram Desai, ₹16,107" is re-entering data the organisation already holds,
+which the agent then has to parse back out of prose.
+
+**What it must be:** the app's steps already declare the data domains they read — `invoices`,
+`reimbursement quota` for reimbursement; claim documents for FNOL; grievances for grievance handling. So
+starting a case is **selecting a record that already exists**: a list of pending invoices with employee,
+amount and date, and you pick one. A grievance app picks a grievance. An FNOL app picks a claim intimation.
+The picker is populated from the bound domain — nothing typed, nothing invented, no custom UI authored.
+
+**Why it is not a quick fix:** it needs an endpoint that lists records from a bound data domain for an app
+(the connector-query step executes a query today, but nothing exposes "show me the candidate records"), plus
+the picker, plus passing the chosen record's identity as the run input. That is the single highest-value
+piece of work left on this surface, and it should come before any further polish.
+
+Free text should survive only as an explicit escape hatch, clearly secondary.
+
 ### The experience gap — read this before adding any more features (2026-07-29)
 
 Founder, shown the Work screen after everything below was live: *"this is what you're calling done is it?"*

@@ -53,23 +53,31 @@ function Row({
   return (
     <Link
       href={href}
-      className="flex items-start gap-3 border-b border-border px-4 py-3 no-underline last:border-b-0 hover:bg-muted/40"
+      className="block border-b border-border px-4 py-3 no-underline last:border-b-0 hover:bg-muted/40"
     >
-      <span className="mt-0.5 shrink-0">{icon}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm text-foreground">
-          {caseLabel(run.subject, run.id)}
+      <span className="flex items-start gap-3">
+        <span className="mt-0.5 shrink-0">{icon}</span>
+        <span className="min-w-0 flex-1">
+          {/* The subject gets the full row width and WRAPS. Putting the actions beside it truncated the
+            case to "Training course reimbursement — V…", so you could not read what you were approving —
+            a bad trade on the one screen where that matters most. Actions sit underneath instead. */}
+          <span className="block text-sm leading-snug text-foreground">
+            {caseLabel(run.subject, run.id)}
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {statusLabel(run.status)}
+            {when ? ` · ${when}` : ''}
+          </span>
         </span>
-        <span className="mt-0.5 block text-xs text-muted-foreground">
-          {statusLabel(run.status)}
-          {when ? ` · ${when}` : ''}
-        </span>
+        {pendingStepId ? null : (
+          <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+        )}
       </span>
       {pendingStepId ? (
-        <CaseDecision runId={run.id} stepId={pendingStepId} />
-      ) : (
-        <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
-      )}
+        <span className="mt-2.5 flex justify-end">
+          <CaseDecision runId={run.id} stepId={pendingStepId} />
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -133,9 +141,14 @@ export default async function AppWorkPage({
   return (
     <PageFrame>
       <div className="w-full space-y-6">
+        {/* The headline DOMINATES. Everything else on this screen is context for it: what is waiting for
+          you is the reason you opened the app, and it previously shared visual billing with "Needed a
+          person 100%" — a number nobody acts on. */}
         <header>
-          <h2 className="text-xl font-semibold tracking-tight">{queue.headline}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{queue.howWorkArrives}</p>
+          <h2 className="max-w-4xl text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+            {queue.headline}
+          </h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">{queue.howWorkArrives}</p>
         </header>
 
         {/* The numbers, then the work. One screen. */}
@@ -146,14 +159,26 @@ export default async function AppWorkPage({
                 key={metric.label}
                 className={cn(
                   'min-w-0 shadow-none',
-                  metric.tone === 'attention' ? 'border-primary/40' : 'border-border',
+                  // Only a number worth ACTING on gets weight. The rest recede — five equally loud stat
+                  // boxes told the reader everything mattered the same, which is the same as telling them
+                  // nothing does.
+                  metric.tone === 'attention'
+                    ? 'border-primary/40 bg-primary/[0.04]'
+                    : 'border-border/60 bg-transparent',
                 )}
               >
                 <CardContent className="space-y-1 p-4">
                   <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                     {metric.label}
                   </p>
-                  <p className="font-mono text-xl font-semibold tabular-nums text-foreground">
+                  <p
+                    className={cn(
+                      'font-mono font-semibold tabular-nums',
+                      metric.tone === 'attention'
+                        ? 'text-2xl text-foreground'
+                        : 'text-lg text-muted-foreground',
+                    )}
+                  >
                     {metric.value}
                   </p>
                 </CardContent>
