@@ -60,7 +60,11 @@ for (const orgId of ORGS) {
           return step;
         }
         changed = true;
-        return { ...step, domain: domain.label };
+        // The domain ID, not the label. resolveDomainByIdOrLabel matches an exact id FIRST and only then
+        // falls back to a phrase rule engine for labels — and that engine matches human phrases, not bare
+        // table names, so "invoices" resolved to null and the read step errored at run time. Ids are stable
+        // and unambiguous; this is what the compiler itself emits.
+        return { ...step, domain: domain.id };
       }
       if (
         step.kind === 'agent' &&
