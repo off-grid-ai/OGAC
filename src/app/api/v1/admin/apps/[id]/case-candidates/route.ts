@@ -29,8 +29,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const app = await getApp(id, orgId);
   if (!app) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const label = primaryDomainLabel(app.steps as { kind?: string; domain?: string }[]);
-  if (!label) {
+  // What the STEP declares — an id on a compiled spec, a phrase on a hand-written one. Never shown to a
+  // person: `dom_7d17b157-0e6` is not the name of anything. The resolved domain's own label is.
+  const declared = primaryDomainLabel(app.steps as { kind?: string; domain?: string }[]);
+  if (!declared) {
     // Honest: this app reads no data domain, so there is nothing to pick from. The caller shows manual
     // entry rather than an empty picker that looks broken.
     return NextResponse.json({ object: 'list', data: [], reason: 'no-data-domain' });
@@ -40,10 +42,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // then by label/alias. Matching on label alone made the picker report "not connected yet" for every
   // app whose spec was compiled, while the run itself read the same domain fine.
   const domains = await listDomains(orgId).catch(() => []);
-  const domain = resolveDomainByIdOrLabel(label, domains, resolveDomain);
+  const domain = resolveDomainByIdOrLabel(declared, domains, resolveDomain);
   if (!domain?.connectorId || !domain.resource) {
-    return NextResponse.json({ object: 'list', data: [], reason: 'domain-not-bound', domain: label });
+    // Unresolved: there is no human label to give, so say which reference failed rather than inventing one.
+    return NextResponse.json({ object: 'list', data: [], reason: 'domain-not-bound' });
   }
+  const label = domain.label?.trim() || declared;
 
   const connector = (await listConnectors(orgId).catch(() => [])).find(
     (c) => c.id === domain.connectorId,

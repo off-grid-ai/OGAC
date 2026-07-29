@@ -8,8 +8,10 @@ test('a clerk can land, pick a case, run it, and be told what happened', async (
   await signIn(page);
   await page.goto('/app/bh-reimbursement?view=run', { waitUntil: 'networkidle' });
 
-  // A real record from the org's own data, not a text box.
-  const firstCase = page.getByRole('button', { name: /Vendor \d+/ }).first();
+  // A real record from the org's own data, not a text box. Matched on the picker's own affordance
+  // (aria-pressed) rather than on a name pattern: the cases are whatever the org's data holds, and a test
+  // that hard-codes "Vendor 255" starts asserting the seed data instead of the behaviour.
+  const firstCase = page.locator('button[aria-pressed]').first();
   await expect(firstCase).toBeVisible();
   await firstCase.click();
 
@@ -25,5 +27,8 @@ test('a clerk can land, pick a case, run it, and be told what happened', async (
   expect(body, 'a run must never end in "(no output)"').not.toContain('(no output)');
   // It must say what happened AND where to look next.
   expect(body).toMatch(/view-only access|waiting for you under Work|appear under Activity|step-by-step trail|Completed|approved|rejected/i);
+  // A per-case app must have decided about THAT case: a real recommendation, in rupees. This is the
+  // assertion that would have failed for weeks while the reads returned twenty unrelated rows.
+  expect(body, 'the run must reach a decision, not a shrug').toMatch(/within quota|within pool|exceeds remaining|partially approve|Waiting for you/i);
   await page.screenshot({ path: 'test-results/walk-run.png', fullPage: false });
 });

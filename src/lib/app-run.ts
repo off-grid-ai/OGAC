@@ -1362,6 +1362,14 @@ function finalize(state: AppRunState, results: StepResult[]): AppRunOutcome {
 // The aggregate outcome = the LAST non-empty output produced (the tail of the pipeline), so an
 // output/agent step's answer is the app's result. Falls back to the empty string.
 function aggregateOutcome(results: StepResult[]): string {
+  // A data read is what the decision was made FROM, not the outcome. Taking the last step with any output
+  // meant a person watching a run saw a JSON dump of twenty source rows labelled "Result" until the next
+  // step finished. So prefer the last step that actually produced a RESULT, and fall back to a read only
+  // when that is genuinely all the app does (a "look this up" app).
+  for (let i = results.length - 1; i >= 0; i--) {
+    const result = results[i];
+    if (result.kind !== 'connector-query' && result.output?.trim()) return result.output;
+  }
   for (let i = results.length - 1; i >= 0; i--) {
     const o = results[i].output;
     if (o?.trim()) return o;

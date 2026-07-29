@@ -152,7 +152,13 @@ for (const w of WIRINGS) {
   // so writing a five-step spec against its old edge list left the report step with no inbound edge — the
   // validator called it a second entry point, which is exactly what it was.
   const edges = steps.slice(0, -1).map((step, index) => ({ from: step.id, to: steps[index + 1].id }));
-  await updateApp(w.appId, w.orgId, { steps, edges });
+  // The summary is what a person reads at the top of the app — it still described reading "the invoice".
+  await updateApp(w.appId, w.orgId, {
+    steps,
+    edges,
+    summary:
+      "Check one employee expense claim against that employee's remaining reimbursement quota, then approve or reject it. Amounts in rupees (₹).",
+  });
   console.log(`${w.orgId}: rewired ${w.appId} — claim ${claims.id} + quota ${w.quotaDomainId}, case-scoped`);
 
   // ── The HARD ceiling: the bound pipeline must admit both domains, or the run is denied before the

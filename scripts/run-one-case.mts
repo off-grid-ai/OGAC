@@ -40,7 +40,10 @@ const read = await execConnectorRead(
 if (!read.ok) throw new Error(`could not list cases: ${JSON.stringify(read.failure)}`);
 const open = (read.ok ? read.result.rows : []).filter(isActionableRecord);
 if (open.length === 0) throw new Error('no open records to work on');
-const candidate = toCaseCandidate(open[0], 0);
+// Optional 3rd arg: which open case to run. Needed to exercise a REJECTION as well as an approval —
+// a demo where every case passes proves nothing about the decision.
+const which = Math.min(Math.max(Number(process.argv[4] ?? 0) || 0, 0), open.length - 1);
+const candidate = toCaseCandidate(open[which], which);
 console.log(`case: ${candidate.label} ${candidate.detail ?? ''}`);
 
 // Submit the case exactly as the browser does: the readable label as the text, the RECORD as the case.
