@@ -134,8 +134,17 @@ themselves before building anything new.
 2. **Adapt the front door to the app's shape** (see §3b) — a job-shaped app must lead with "run it now"
    and its latest results, not with an empty decision queue.
 3. **The dashboard** — the only item on the founder's list with no component behind it at all.
-4. **Org-tree RBAC** (`#102`) — creator grants access, managers above inherit. The `access` tab exists
-   but carries no hierarchy logic.
+4. **Org-tree RBAC** (`#102`) — **PARTLY DONE.** App RBAC/ABAC already existed
+   (`src/lib/app-access-policy.ts`, 380 lines: role/department rules, ABAC predicates, approval authority).
+   The missing half was inheritance, and the DECISION is now in place: `AppAccessCaller.manages` admits a
+   caller who manages the app's owner at any depth, skip-level included, without an explicit grant.
+   **It is inert until something populates that chain.** There is no reporting relationship in the schema —
+   no `managerId` on `user`, no parent on `teams` — so there is no tree to walk. To activate:
+   (a) add `managerId` to `user` (self-migrating DDL, as `ensureAppsSchema` does),
+   (b) let Access pick a manager,
+   (c) resolve the chain in the route that builds `AppAccessCaller`.
+   Absent is deliberate: an access rule that fails OPEN is worse than one that is missing, because it looks
+   enforced.
 5. **Slack and Telegram as INPUTS** — currently outputs only. WhatsApp is done (was a valid
    `TriggerKind` handled in `triggers.ts` but missing from the builder's picker).
 6. **Visual feedback while building** — steps/flow appearing as Forge composes them.

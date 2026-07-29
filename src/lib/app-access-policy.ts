@@ -36,6 +36,19 @@ export interface AppAccessCaller {
   department?: string | null;
   orgId: string;
   userId: string; // the acting principal's stable id (email or machine client-id)
+  /**
+   * The people ABOVE this caller in the reporting tree, nearest first.
+   *
+   * The founder's rule: "as app creator I can decide who has access. whoever is on top of me in the tree
+   * obviously has access by default." So a caller who manages the app's owner — at ANY depth, a skip-level
+   * manager included — is admitted without an explicit grant.
+   *
+   * The CALLER supplies the chain, so this rule never assumes how the org models hierarchy. Today nothing
+   * populates it (there is no managerId on `user`, no parent on `teams`), so it is always empty and
+   * inheritance is inert — see docs/APP_AS_PRODUCT.md. Absent is the honest default: an access rule that
+   * fails OPEN is worse than one that is merely missing, because it looks enforced.
+   */
+  manages?: readonly string[];
 }
 
 // An ABAC predicate over the request attributes. `attribute` names a key in requestAttrs; the
@@ -241,10 +254,17 @@ export function evaluateAppAccess(
 
   const isAdmin = caller.role === 'admin';
   const isOwner = !!caller.userId && caller.userId === policy.ownerId;
+  // Inherited access: this caller manages the app's owner, so they see it by default. Compared
+  // case-insensitively because these are human-typed emails.
+  const ownsViaTree =
+    !!policy.ownerId &&
+    (caller.manages ?? []).some(
+      (managed) => managed.trim().toLowerCase() === policy.ownerId.trim().toLowerCase(),
+    );
   const rule = policy.actions[action];
 
   // RBAC/ABAC gate — admin and owner bypass it; everyone else must be admitted by the action rule.
-  if (!isAdmin && !isOwner) {
+  if (!isAdmin && !isOwner && !ownsViaTree) {
     const byRole = roleAllowed(rule, caller.role);
     const byDept = departmentAllowed(rule, caller.department);
     if (!byRole && !byDept) {
