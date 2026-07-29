@@ -110,8 +110,18 @@ themselves before building anything new.
   layout chunk failing to load.
 - **a11y** — exactly one `h1` per app page, enforced by tests. The mobile gate had been claiming every
   page's `h1`, which silently satisfied the `h1` assertions in the e2e suite and screen sweep.
+- **Demo currency copy corrected** — 8 apps said "Amounts in USD ($)" while every case reads in rupees
+  (`scripts/fix-demo-currency-copy.mts`).
 - **Landing** — misaligned pricing beam removed; unfilled "Proof" placeholder section removed and
   sections renumbered; apex signin links both demo tenants.
+
+### Open defects found while doing the above
+- **The seeded demo apps FAIL spec validation.** `updateApp` re-validates the whole spec and rejects them:
+  `connector-query step s1/s2: needs a domain binding`, `agent step s3: needs agentId or inlineAgent`,
+  `output step s5: needs a sink`. So **nobody can save an edit to these apps in the UI either** — an
+  edit-then-save on any seeded demo app will fail. Worth fixing before a demo shows editing.
+  (Discovered 2026-07-29 while correcting currency copy; that script writes the `summary` column directly
+  and says why in its header.)
 
 ### Not built yet — in priority order
 1. ~~Input derived from the app's own definition~~ **DONE** — `app-input-prompt.ts`: label "The case to
