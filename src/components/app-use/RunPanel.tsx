@@ -28,7 +28,13 @@ interface RunResult {
   output?: string;
   outcome?: string;
   error?: string;
+  runId?: string;
+  /** The governed trail behind the answer, so a result never arrives without its provenance. */
+  trail?: string | null;
 }
+
+/** Statuses that will not change again — polling stops here. */
+const TERMINAL = new Set(['done', 'error', 'cancelled', 'awaiting_human']);
 
 export function RunPanel({
   fields,
@@ -51,6 +57,33 @@ export function RunPanel({
   const offerPicker = Boolean(appId) && fields.length === 1 && fields[0]?.key === 'input';
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
   const missing = fields.filter((f) => f.required && !values[f.key]?.trim());
+
+  /**
+   * Follow a run until it settles, updating the result in place.
+   *
+   * Bounded rather than indefinite: a run that has not settled inside the window is reported as still working
+   * with a pointer to Activity — the honest answer — instead of spinning forever or falsely claiming failure.
+   */
+  async function pollToOutcome(runId: string, started: RunResult) {
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 2_000));
+      try {
+        const res = await fetch(`${surface.runStatusBase}${encodeURIComponent(runId)}`);
+        if (!res.ok) break; // no status endpoint or no access — fall back to what the run already told us
+        const next = (await res.json()) as RunResult;
+        setResult({ ...started, ...next });
+        if (TERMINAL.has(String(next.status))) {
+          if (next.status === 'error') toast.error('The run hit an error — see below.');
+          else if (next.status === 'awaiting_human') toast.success('Needs a decision.');
+          else toast.success('Done.');
+          return;
+        }
+      } catch {
+        break;
+      }
+    }
+  }
 
   async function run() {
     if (running || missing.length > 0) return;
@@ -78,9 +111,18 @@ export function RunPanel({
       }
 
       setResult(data);
-      if (data.status === 'error' || data.error) toast.error('The run hit an error — see below.');
-      else if (data.status === 'awaiting_human') toast.success('Started — it now needs a decision.');
-      else toast.success('Run complete.');
+      if (data.status === 'error' || data.error) {
+        toast.error('The run hit an error — see below.');
+      } else if (TERMINAL.has(String(data.status))) {
+        toast.success(data.status === 'awaiting_human' ? 'Started — it now needs a decision.' : 'Run complete.');
+      } else if (data.runId) {
+        // POLL to the answer. "It is running, look under Activity" made the person do the work and then go
+        // hunting for the result. Value has to arrive where they are standing.
+        toast.success('Started — working on it.');
+        await pollToOutcome(data.runId, data);
+      } else {
+        toast.success('Started.');
+      }
     } catch {
       setResult({ error: 'The app is unreachable — try again.' });
       toast.error('Run failed');
@@ -191,6 +233,10 @@ export function RunPanel({
                         ? `Finished with status "${result.status}" and produced no text. See Activity for the step-by-step trail.`
                         : 'Started. See Activity for the step-by-step trail.')}
               </pre>
+              {/* The provenance arrives WITH the answer, not on another screen. */}
+              {result.trail ? (
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{result.trail}</p>
+              ) : null}
             </div>
           ) : null}
         </CardContent>
