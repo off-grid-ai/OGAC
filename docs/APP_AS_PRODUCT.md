@@ -161,6 +161,20 @@ polish.
 
 Free text should survive only as an explicit escape hatch, clearly secondary.
 
+### The mistake I made most often — GREP BEFORE DECLARING SOMETHING MISSING
+
+Three times in one session I reported a capability as absent when it was already built, and each time the
+founder's question — not my own checking — caught it:
+  - "where is the deployed app?" → `/app/<slug>` existed, with AppUseShell, a queue and a run panel.
+  - "there is some team mapping somewhere right?" → the whole management-chain RBAC existed, tested AND wired
+    into production routes; only `team_members` was empty.
+  - the cross-sell copy leaks → I fixed the instance on screen instead of grepping `components/app-use` for the
+    rest, so the founder found the next two.
+
+The failure is trusting a read of the code over verifying it. Before writing "not built" about anything in this
+repo: grep for the concept, check who imports it, and look for empty DATA as the explanation first. This repo is
+much further along than a surface reading suggests, and the usual defect is unpopulated or unwired, not absent.
+
 ### The experience gap — read this before adding any more features (2026-07-29)
 
 Founder, shown the Work screen after everything below was live: *"this is what you're calling done is it?"*
@@ -187,19 +201,21 @@ Fix these before adding features, in this order — they are what changes the im
 2. **Adapt the front door to the app's shape** (see §3b) — a job-shaped app must lead with "run it now"
    and its latest results, not with an empty decision queue.
 3. **The dashboard** — the only item on the founder's list with no component behind it at all.
-4. **Org-tree RBAC** — **CORRECTION: it is already implemented.** I previously wrote that no reporting
-   relationship existed in the schema. Wrong — grep before declaring something missing.
-   `resolveManagementChain` in `src/lib/app-sharing-policy.ts` implements the founder's rule exactly: a team
-   `lead` is a manager to that team's members, climbing TRANSITIVELY with cycle guards, creator excluded,
-   nearest-first. `HIERARCHY_INHERITED_ROLE = 'approver'` — a manager can view/run/trigger/approve but NOT
-   edit, since editing someone's app stays with its owner. Unit-tested in `test/app-sharing-policy.test.ts`.
-   The tree is the **teams** table.
-   Two narrow gaps remained, one now closed:
-   - ~~`team_members` was EMPTY in both demo tenants~~ **FIXED** — `scripts/seed-demo-org-chart.mts` seeds 12
-     memberships per tenant, rotating the lead per team so the transitive climb has more than one level.
-   - **`resolveManagementChain` is called from NO production path.** It is tested but unwired. Remaining work:
-     resolve the app owner's chain (`listAllMemberships`) where `AppAccessCaller` is built, and admit a caller
-     found in it. `AppAccessCaller.manages` already exists for this and is honoured by `evaluateAppAccess`.
+4. **Org-tree RBAC** — **DONE. It was already built, tested AND wired; only the DATA was missing.**
+   I declared this missing twice. Both times the code was there and I had not looked.
+   - `resolveManagementChain` (`app-sharing-policy.ts`) treats a team `lead` as a manager to that team's
+     members and climbs TRANSITIVELY, cycle-guarded, creator excluded, nearest-first. Unit-tested.
+   - `evaluateShareAccess` calls it (line ~207) and admits with `HIERARCHY_INHERITED_ROLE = 'approver'` —
+     view/run/trigger/approve but NOT edit, because editing someone's app stays with its owner.
+   - `enforceAppAccessWithSharing` (`app-sharing.ts`) UNIONS that with the RBAC/ABAC decision and is imported
+     by real routes: trigger dispatch, agent runs, action outcomes, the deployed app's endpoints.
+   - The only gap was that `team_members` was EMPTY, so every chain resolved to `[]`. Seeded by
+     `scripts/seed-demo-org-chart.mts` (12 memberships per tenant, leads rotated so the transitive climb has
+     more than one level).
+
+   **The founder's requirement is met:** the creator grants access explicitly, and anyone above them in the
+   team tree inherits by default.
+
 5. **Slack and Telegram as INPUTS** — currently outputs only. WhatsApp is done (was a valid
    `TriggerKind` handled in `triggers.ts` but missing from the builder's picker).
 6. **Visual feedback while building** — steps/flow appearing as Forge composes them.
