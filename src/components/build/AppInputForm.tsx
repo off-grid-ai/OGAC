@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { runInputPrompt } from '@/lib/app-input-prompt';
 import type { AppSpec, FormField } from '@/lib/app-model';
 
 // ─── AppInputForm (Builder Epic Phase 3A) — the INPUT screen (screen 2 of 5) ─────────────────────
@@ -29,8 +30,23 @@ type RunStep = {
 };
 type RunOutcome = { runId: string; status: string; steps: RunStep[]; outcome: string };
 
-export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
-  const fields: FormField[] = app.inputForm && app.inputForm.length > 0 ? app.inputForm : FALLBACK_FIELDS;
+export function AppInputForm({
+  app,
+  exampleSubject,
+}: Readonly<{
+  app: AppSpec;
+  /** A subject line from a REAL previous run of this app, used as the entry example. */
+  exampleSubject?: string | null;
+}>) {
+  // With no declared inputForm the fallback used to be a lone required field labelled "Input", which
+  // told the reader nothing about what to type. The prompt is now derived from the app itself and quotes
+  // a real previous case — see src/lib/app-input-prompt.ts and docs/APP_AS_PRODUCT.md §3 (hand-authored
+  // per-app form fields are explicitly NOT the answer).
+  const prompt = runInputPrompt({ trigger: app.trigger?.kind, exampleSubject });
+  const fields: FormField[] =
+    app.inputForm && app.inputForm.length > 0
+      ? app.inputForm
+      : [{ key: 'input', label: prompt.label, type: 'text', required: true }];
   const [values, setValues] = useState<Record<string, string>>({});
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<RunOutcome | null>(null);
@@ -64,9 +80,11 @@ export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
     <div className="space-y-5">
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Run inputs</CardTitle>
+          <CardTitle className="text-sm">Start a case</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Fill in what this run needs, then run it through the governed pipeline.
+            {app.inputForm && app.inputForm.length > 0
+              ? 'Fill in the details for this case, then start it.'
+              : prompt.hint}
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -94,7 +112,12 @@ export function AppInputForm({ app }: Readonly<{ app: AppSpec }>) {
                   type={htmlInputType(f.type)}
                   value={values[f.key] ?? ''}
                   onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  placeholder={f.type === 'file' ? 'File reference / path' : undefined}
+                  placeholder={
+                    f.type === 'file'
+                      ? 'File reference / path'
+                      : // Only the derived single field carries the real-case example.
+                        (f.key === 'input' && prompt.placeholder) || undefined
+                  }
                 />
               )}
             </div>
@@ -181,6 +204,3 @@ function StatusBadge({ status, small }: Readonly<{ status: string; small?: boole
   );
 }
 
-const FALLBACK_FIELDS: FormField[] = [
-  { key: 'input', label: 'Input', type: 'text', required: true },
-];

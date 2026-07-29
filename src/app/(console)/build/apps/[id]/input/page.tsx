@@ -3,6 +3,8 @@ import { AppInputForm } from '@/components/build/AppInputForm';
 import { NeedsDataSourceBanner } from '@/components/build/NeedsDataSourceBanner';
 import { Badge } from '@/components/ui/badge';
 import { isSimpleAgent, unboundConnectorSteps, type AppStep } from '@/lib/app-model';
+import { listAppRuns } from '@/lib/app-run-store';
+import { runSubject } from '@/lib/app-work-queue';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
@@ -38,8 +40,15 @@ function describeStep(step: AppStep): string {
 export default async function AppInputTab({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('studio');
   const { id } = await params;
-  const app = await getApp(id, await currentOrgId());
+  const orgId = await currentOrgId();
+  const app = await getApp(id, orgId);
   if (!app) notFound();
+  // A REAL previous case from this app becomes the entry example. Derived, never invented:
+  // with no prior run the prompt stays generic rather than teaching a made-up format.
+  const exampleSubject =
+    (await listAppRuns(id, orgId, 10).catch(() => []))
+      .map((r) => runSubject((r as { input?: unknown }).input))
+      .find((s): s is string => Boolean(s)) ?? null;
 
   const hasHumanStep = app.steps.some((s) => s.kind === 'human');
   const unboundSteps = unboundConnectorSteps(app);
@@ -64,7 +73,7 @@ export default async function AppInputTab({ params }: Readonly<{ params: Promise
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
         {/* Left: the form, capped to a readable input measure inside the full-width grid cell. */}
         <div className="max-w-2xl">
-          <AppInputForm app={app} />
+          <AppInputForm app={app} exampleSubject={exampleSubject} />
         </div>
 
         {/* Right: plain-language walkthrough — uses the width, orients a non-technical operator. */}
