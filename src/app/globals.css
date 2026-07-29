@@ -288,6 +288,30 @@
    the stage releases. `pointer-events: none` matters as much as the opacity: an invisible-but-present
    header would still swallow clicks along the top edge of the animation.
    The attribute is set by ControlPlaneStage; nothing else should key off it. */
+/* The hero stage's PAUSE control. It is the only hint that the animation is clickable, so until the
+   reader has used it once it carries an emerald glow that breathes — enough to read as "this does
+   something", not enough to compete with the animation itself. The pulse stops permanently after the
+   first interaction: an attention cue that keeps demanding attention after it has been answered is just
+   noise. Held still under reduced motion by the global block below, where the glow remains as a static
+   ring so the affordance survives without the movement. */
+@keyframes og-hint-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--og-primary) 45%, transparent),
+      0 0 10px 0 color-mix(in oklab, var(--og-primary) 30%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--og-primary) 70%, transparent),
+      0 0 20px 4px color-mix(in oklab, var(--og-primary) 45%, transparent);
+  }
+}
+.og-hint-pulse {
+  animation: og-hint-pulse 2.4s ease-in-out infinite;
+  border-color: color-mix(in oklab, var(--og-primary) 55%, transparent) !important;
+}
+
 /* Scroll-snapping for the hero stage. `proximity` is deliberate over `mandatory`: it settles the stage
    into full bleed when the reader comes to rest near it, but never prevents scrolling past — a mandatory
    snap on a tall pinned section is how pages end up feeling broken. The only snap target on the page is

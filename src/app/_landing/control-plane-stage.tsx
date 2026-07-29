@@ -29,7 +29,13 @@ const STAGE_H = 900;
 const CONTAINER_MAX = 1600;
 const CONTAINER_PAD = 48;
 const MOBILE_BREAKPOINT = 768;
-/** Wrapper height in vh. The sticky child is 100vh, so the pinned scroll range is this minus 100. */
+/**
+ * Wrapper height, in dvh. The sticky child is 100dvh, so the pinned scroll range is this minus 100.
+ *
+ * dvh rather than vh throughout: `100vh` ignores a mobile browser's dynamic toolbar, so the DECLARED box
+ * disagreed with the box actually measured at runtime — and every offset here (including the snap marker)
+ * is derived from this number, so the disagreement propagated.
+ */
 const WRAP_VH = 260;
 /** Fraction of the pinned scroll over which the stage grows; it holds at full bleed after this. */
 const GROW_END = 0.35;
@@ -186,7 +192,7 @@ export function ControlPlaneStage() {
   }
 
   return (
-    <div ref={wrapRef} className="relative" style={{ height: `${WRAP_VH}vh` }}>
+    <div ref={wrapRef} className="relative" style={{ height: `${WRAP_VH}dvh` }}>
       {/* The snap point, at exactly the offset where the stage reaches full bleed. Native CSS
           scroll-snap does the settling — `proximity` (not `mandatory`) means the browser eases into it
           when the reader comes to rest nearby and NEVER blocks scrolling past. It clicks into place; it
@@ -194,9 +200,9 @@ export function ControlPlaneStage() {
       <span
         aria-hidden
         className="pointer-events-none absolute left-0 h-px w-px"
-        style={{ top: `${GROW_END * (WRAP_VH - 100)}vh`, scrollSnapAlign: 'start' }}
+        style={{ top: `${GROW_END * (WRAP_VH - 100)}dvh`, scrollSnapAlign: 'start' }}
       />
-      <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
+      <div className="sticky top-0 flex h-[100dvh] items-center justify-center overflow-hidden">
         <motion.div style={{ width, height, borderRadius: radius }} className="relative overflow-hidden">
           {/* The border fades out as the stage reaches full bleed — a 1px frame around the whole
               viewport reads as a rendering artifact rather than a frame. */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowsOut, CornersIn, Pause, Play } from '@phosphor-icons/react/dist/ssr';
+import { ArrowClockwise, ArrowsOut, CornersIn, Pause, Play } from '@phosphor-icons/react/dist/ssr';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -33,6 +33,20 @@ const WORLD_W = 1535;
 const WORLD_H = 1024;
 const STAGE_W = 1600;
 const STAGE_H = 900;
+/**
+ * The largest camera scale at which the whole poster still fits the stage vertically.
+ *
+ * 900 / 1024 = 0.8789. Above it the world is taller than the stage and `World`'s overflow:hidden cuts
+ * the difference — and because the camera centres the world, the cut lands half on the poster's TOP,
+ * which is its title and logo.
+ *
+ * The opening scene pushes in from 0.879 to 0.9, so it crossed this line by ~22px and the title was
+ * trimmed. In the original full-screen prototype that was an invisible hairline; at full bleed it reads
+ * as the title being chopped. Clamping the WIDE poses to this value costs an imperceptible amount of
+ * push-in and makes over-cropping structurally impossible. Zoomed poses (1.5–1.95) are left alone —
+ * cropping is the entire point of a close-up.
+ */
+const MAX_WIDE_CAM = STAGE_H / WORLD_H;
 
 // ── scenes (from the prototype's OM_SCENES) — 16.3s total ──────────────────────────────────────
 const SCENES = [
@@ -407,12 +421,16 @@ function Ambient({ gSec, pal }: Readonly<{ gSec: number; pal: Palette }>) {
 }
 
 function World({
-  cam,
+  cam: rawCam,
   gSec,
   em,
   pal,
   src,
 }: Readonly<{ cam: Pose; gSec: number; em: Emphasis; pal: Palette; src: string }>) {
+  // Clamp only the WIDE end. See MAX_WIDE_CAM: above it the poster is taller than the stage and the
+  // overflow is cut half off its title.
+  const cam =
+    rawCam.s <= 1 && rawCam.s > MAX_WIDE_CAM ? { ...rawCam, s: MAX_WIDE_CAM } : rawCam;
   const tx = STAGE_W / 2 - cam.x * cam.s;
   const ty = STAGE_H / 2 - cam.y * cam.s;
   const chipXY = (i: number) => ({
@@ -521,6 +539,13 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   // moment — which read as "a blank screen with some pulsating stuff". Preload it and hold the whole
   // world back until it has decoded.
   const [bgReady, setBgReady] = useState(false);
+  // The pause control is the only signal that the stage responds to a click, so it glows until the
+  // reader has used it once — then the hint retires for good.
+  const [hinted, setHinted] = useState(true);
+  // Bumped by Restart to force the frame loop's effect to re-run. Without it, resetting elapsedRef while
+  // the loop is ALREADY RUNNING does nothing: the running effect captured `base` when it started, so the
+  // next tick recomputes elapsed from the old base and stamps the reset straight back out.
+  const [runKey, setRunKey] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const reduce = useRef(false);
   const elapsedRef = useRef(0);
@@ -556,30 +581,55 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
     reduce.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }, []);
 
-  // Scale the 1600x900 stage to whatever width the hero column gives us.
+  // Scale the 1600x900 stage to whatever box the parent gives us.
+  //
+  // MEASURED EVERY FRAME, not only on resize. The scroll stage animates the parent's width/height via
+  // motion values, and a ResizeObserver's delivery lagged that badly enough to matter: at full bleed the
+  // stage was still being scaled for the pre-expansion 873px box (scale 0.947 instead of 1.02), which is
+  // where the "title is cut off" clipping actually came from. Reading the live rect each frame is one
+  // getBoundingClientRect per tick and cannot go stale.
+  const measure = useCallback(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const { width, height } = host.getBoundingClientRect();
+    if (!width || !height) return;
+    setBox((prev) => (Math.abs(prev.w - width) < 0.5 && Math.abs(prev.h - height) < 0.5 ? prev : { w: width, h: height }));
+    const next = Math.min(width / STAGE_W, height / STAGE_H);
+    setScale((prev) => (Math.abs(prev - next) < 0.0005 ? prev : next));
+  }, []);
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    measure();
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       setBox({ w: width, h: height });
-      // COVER in `fill` mode, CONTAIN otherwise.
+      // ALWAYS CONTAIN. Never crop the poster.
       //
-      // `fill` is the scroll stage growing to the whole viewport, and a viewport is almost never 16:9
-      // — a 1920x940 window with CONTAIN scaled the stage to 1670 wide and centred it, leaving ~125px
-      // of page background down each side. That is not 100vw, and the gutter's edge reads as the
-      // animation being clipped. Covering means the stage genuinely fills the viewport and the
-      // overflow is cropped at the true screen edge, which is what full-bleed means.
+      // This went the other way first. The stage was being letterboxed INSIDE a box that was itself
+      // smaller than the viewport, so the page background showed through down both sides and it wasn't
+      // 100vw. The fix for that was to make the host fill the viewport — not to switch to COVER, which
+      // is what I did. Covering a 3:2 poster into a ~2:1 viewport crops ~70px off the top and bottom,
+      // and the top of this poster is its title and logo. Losing those is far worse than any band.
       //
-      // Elsewhere (the contained card, and mobile landscape fullscreen) CONTAIN is right: the card is
-      // already 16:9 so the two agree, and on a 19.5:9 phone covering would crop ~18% of the diagram's
-      // height — losing its title and its bottom band — where letterboxing shows the whole thing.
-      const fit = fill ? Math.max : Math.min;
-      setScale(fit(width / STAGE_W, height / STAGE_H));
+      // With the host filling the viewport and painting the poster's OWN background colour, contain
+      // leaves no seam: the area beside the artwork is the same near-black (or near-white) the poster
+      // itself sits on, so it reads as one continuous surface rather than a letterbox. That is why the
+      // gutters were visible before and are not now — the difference was the host, not the fit.
+      // Fit against WIDE_FIT_H, not STAGE_H — see that constant. These are the box's REAL measured
+      // pixels, so browser chrome, a bookmarks bar or a mobile toolbar are already accounted for; that is
+      // why the sizing is measured rather than expressed in vh.
+      setScale(Math.min(width / STAGE_W, height / STAGE_H));
     });
     ro.observe(host);
-    return () => ro.disconnect();
-  }, [fill]);
+    // Scroll drives the expansion, and the loop may be paused while it happens.
+    window.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('scroll', measure);
+    };
+  }, [fill, measure]);
 
   // Don't play until the stage is actually being looked at.
   //
@@ -635,11 +685,12 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
       const next = base + (now - start) / 1000;
       elapsedRef.current = next;
       setElapsed(next);
+      measure();
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [visible, paused, bgReady]);
+  }, [visible, paused, bgReady, measure, runKey]);
 
   const dark = resolvedTheme !== 'light';
   const pal = PALETTES[dark ? 'dark' : 'light'];
@@ -694,7 +745,10 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
           {/* Click anywhere on the stage to pause or resume; Space does the same when focused. */}
           <button
             type="button"
-            onClick={() => setPaused((p) => !p)}
+            onClick={() => {
+              setPaused((p) => !p);
+              setHinted(false);
+            }}
             onKeyDown={onKeyDown}
             aria-label={label}
             aria-pressed={paused}
@@ -721,16 +775,23 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
             className={`absolute bottom-3 right-3 z-20 flex items-center gap-1.5 transition-opacity duration-200 ${
               // Always visible on touch (no hover to reveal them) and whenever paused, so the state is
               // legible rather than implied by stillness.
-              paused
+              paused || hinted
                 ? 'opacity-100'
                 : 'opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'
             }`}
           >
             <button
               type="button"
-              onClick={() => setPaused((p) => !p)}
+              onClick={() => {
+                setPaused((p) => !p);
+                setHinted(false);
+              }}
               aria-label={label}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+              className={`inline-flex items-center gap-1.5 rounded-md border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] backdrop-blur transition-colors hover:text-foreground ${
+                hinted && !paused
+                  ? 'og-hint-pulse border-primary/60 text-foreground'
+                  : 'border-border text-muted-foreground shadow-sm'
+              }`}
             >
               {paused ? (
                 <Play className="size-3 text-primary" weight="fill" />
@@ -738,6 +799,24 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
                 <Pause className="size-3 text-primary" weight="fill" />
               )}
               {paused ? 'Play' : 'Pause'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                // Back to frame 0 and playing. All four matter: the ref (what the loop resumes from), the
+                // state (what renders now), unpausing, and runKey — which restarts the loop's effect so it
+                // re-reads the reset base instead of overwriting it on the next tick.
+                elapsedRef.current = 0;
+                setElapsed(0);
+                setPaused(false);
+                setHinted(false);
+                setRunKey((k) => k + 1);
+              }}
+              aria-label="Restart the animation from the beginning"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
+            >
+              <ArrowClockwise className="size-3 text-primary" weight="bold" />
+              Restart
             </button>
             <button
               type="button"
