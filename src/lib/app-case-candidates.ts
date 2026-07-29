@@ -25,16 +25,37 @@ export interface CaseCandidate {
 
 /** Field names likely to identify a record, in preference order. */
 const ID_KEYS = ['id', 'claim_id', 'invoice_id', 'application_id', 'policy_number', 'reference', 'ref'];
+// Widened after testing against the real `invoices` domain, which keys the party as `vendor` — so every
+// row labelled itself "1", "2", "3" (its id) and the picker was unreadable. The label is the ONLY thing a
+// person chooses by, so this list has to cover how real sources actually name the party.
 const NAME_KEYS = [
   'customer_name',
   'employee_name',
   'applicant_name',
   'policyholder_name',
   'claimant_name',
+  'vendor',
+  'supplier',
+  'merchant',
+  'party',
+  'counterparty',
   'name',
 ];
 const AMOUNT_KEYS = ['amount', 'claim_amount', 'invoice_amount', 'loan_amount', 'sum_assured', 'premium'];
-const DATE_KEYS = ['created_at', 'received_at', 'submitted_at', 'date', 'raised_at'];
+const DATE_KEYS = [
+  'created_at',
+  'received_at',
+  'submitted_at',
+  'booked',
+  'booked_at',
+  'invoice_date',
+  'txn_date',
+  'date',
+  'raised_at',
+];
+
+/** Words that tell a person whether a record still needs work. */
+const STATUS_KEYS = ['status', 'state', 'stage'];
 
 function firstString(row: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const key of keys) {
@@ -67,7 +88,9 @@ export function toCaseCandidate(row: Record<string, unknown>, index: number): Ca
   const when = firstString(row, DATE_KEYS);
 
   const label = name ?? firstString(row, ID_KEYS) ?? `Record ${index + 1}`;
-  const detail = [amount !== null ? group(amount) : null, when ? when.slice(0, 10) : null]
+  // Status first: whether a record is open is the thing that decides if it is worth picking.
+  const status = firstString(row, STATUS_KEYS);
+  const detail = [status, amount !== null ? group(amount) : null, when ? when.slice(0, 10) : null]
     .filter(Boolean)
     .join(' · ');
 
