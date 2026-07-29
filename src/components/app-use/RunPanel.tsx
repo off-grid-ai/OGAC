@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CasePicker } from '@/components/build/CasePicker';
+import { progressHeadline, type RunProgressStep } from '@/lib/app-run-progress';
 import { Label } from '@/components/ui/label';
 import type { AppSurface } from '@/lib/app-surface';
 
@@ -31,6 +32,8 @@ interface RunResult {
   runId?: string;
   /** The governed trail behind the answer, so a result never arrives without its provenance. */
   trail?: string | null;
+  /** Which step is underway — so a minute-long governed run reads as working, not stuck. */
+  progress?: RunProgressStep[];
 }
 
 /** Statuses that will not change again — polling stops here. */
@@ -222,8 +225,29 @@ export function RunPanel({
                 ) : (
                   <CheckCircle className="size-4 text-primary" />
                 )}
-                <span className="text-xs font-medium text-foreground">Result</span>
+                <span className="text-xs font-medium text-foreground">
+                  {result.progress?.some((step) => step.state === 'running')
+                    ? progressHeadline(result.progress)
+                    : 'Result'}
+                </span>
               </div>
+              {/* The steps of the run, in the app's own words. Visible from the first second — the shape of
+                the work should not materialise line by line while someone waits. */}
+              {result.progress?.length ? (
+                <ol className="mb-2 space-y-1">
+                  {result.progress.map((step, index) => (
+                    <li
+                      key={`${index}-${step.label}`}
+                      className="flex items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <ProgressMark state={step.state} />
+                      <span className={step.state === 'pending' ? 'opacity-60' : 'text-foreground'}>
+                        {step.label}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
               {/* NEVER "(no output)". A run that produced no text still did something, and saying nothing
                 makes a working app look broken. A run paused for a person is the NORMAL outcome for an app
                 with a human step — it belongs in Work now, and the reader needs telling. */}
@@ -251,6 +275,19 @@ export function RunPanel({
       <SendReportCard surface={surface} />
     </div>
   );
+}
+
+/** One step's state, as a mark a person can read at a glance rather than a colour alone. */
+function ProgressMark({ state }: Readonly<{ state: RunProgressStep['state'] }>) {
+  if (state === 'done') return <CheckCircle className="size-3.5 shrink-0 text-primary" />;
+  if (state === 'failed') return <Warning className="size-3.5 shrink-0 text-destructive" />;
+  if (state === 'waiting') return <span className="w-3.5 shrink-0 text-center text-primary">!</span>;
+  if (state === 'running') {
+    return (
+      <span className="size-3.5 shrink-0 animate-pulse rounded-full border-2 border-primary bg-primary/30" />
+    );
+  }
+  return <span className="size-3.5 shrink-0 rounded-full border border-border" />;
 }
 
 function SendReportCard({ surface }: Readonly<{ surface: AppSurface }>) {

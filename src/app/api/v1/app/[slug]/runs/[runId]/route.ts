@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAppRun } from '@/lib/app-run-store';
 import { caseTrail } from '@/lib/app-work-queue';
+import { runProgress } from '@/lib/app-run-progress';
 import { getAppBySlug } from '@/lib/apps-store';
 
 export const dynamic = 'force-dynamic';
@@ -28,12 +29,17 @@ export async function GET(
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
 
-  const steps = (run as { steps?: { kind?: string; status?: string }[] }).steps ?? [];
+  const steps =
+    (run as { steps?: { stepId?: string; kind?: string; status?: string }[] }).steps ?? [];
+  const status = String(run.status);
   return NextResponse.json({
     object: 'app_run',
     runId: run.id,
-    status: String(run.status),
+    status,
     outcome: (run as { outcome?: string | null }).outcome ?? null,
+    // Which step is underway. A governed run takes a minute or two; without this the person who submitted
+    // the case watches the word "Running…" and cannot tell working from stuck.
+    progress: runProgress(app.steps, steps, { live: status === 'queued' || status === 'running' }),
     // The governed trail, so the answer arrives with its provenance rather than as a bare string.
     trail: caseTrail(steps, { signed: Boolean((run as { provenance?: unknown }).provenance) }),
   });
