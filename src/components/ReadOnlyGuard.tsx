@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsViewer } from '@/components/ViewerModeProvider';
 
 // Wraps a WRITE control (a create/edit/delete/trigger button, a form) so that, for the read-only
@@ -11,6 +11,11 @@ import { useIsViewer } from '@/components/ViewerModeProvider';
 //
 // It intercepts pointer + keyboard activation at the wrapper (pointer-events off + a blocking overlay)
 // rather than reaching into the child, so it works for any control without prop coupling.
+//
+// It carries its OWN TooltipProvider. Radix requires one above every Tooltip, and only the (console)
+// layout had one — so the first use of this guard outside that layout (the deployed app's decision
+// buttons) crashed the client subtree and the buttons disappeared altogether. A guard whose failure mode
+// is "the control vanishes" is not a guard. Nesting providers is supported, so the console is unaffected.
 
 export const READ_ONLY_TOOLTIP = 'Read-only demo. Sign in with a full account to make changes.';
 
@@ -25,6 +30,7 @@ export function ReadOnlyGuard({
   if (!viewer) return children;
 
   return (
+    <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
         <span
@@ -41,5 +47,6 @@ export function ReadOnlyGuard({
       </TooltipTrigger>
       <TooltipContent>{READ_ONLY_TOOLTIP}</TooltipContent>
     </Tooltip>
+    </TooltipProvider>
   );
 }
