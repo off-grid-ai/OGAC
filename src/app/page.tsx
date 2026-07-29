@@ -161,12 +161,18 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* The product, alive. Starts at container width and GROWS on scroll until it is pinned at the
-            full viewport — the camera was authored for 1600x900, so more width means closer to native.
-            Phones keep it contained and get a landscape full-screen button instead. 16.3s loop. */}
-        <div className="relative z-10">
-          <ControlPlaneStage />
-        </div>
+      </section>
+
+      {/* The product, alive. Starts at container width and GROWS on scroll until it is pinned at the
+          full viewport — the camera was authored for 1600x900, so more width means closer to native.
+          Phones keep it contained and get a landscape full-screen button instead. 16.3s loop.
+
+          ITS OWN SECTION, DELIBERATELY: the hero above carries `overflow-hidden` (it clips the
+          Spotlight), and an overflow-clipping ANCESTOR silently disables `position: sticky` in its
+          subtree. Inside the hero the stage grew correctly but never pinned — it just scrolled up off
+          the screen while expanding. Nothing here may reintroduce overflow clipping. */}
+      <section className="relative border-b border-border">
+        <ControlPlaneStage />
       </section>
 
       {/* ── The four layers: Learn → Remember → Act → Control ─────────────── */}
