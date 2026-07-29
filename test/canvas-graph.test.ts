@@ -4,7 +4,7 @@ import { type AppSpec, validateAppSpec } from '../src/lib/app-model.ts';
 import { addStep, moveStep, rebindDomain, removeStep } from '../src/lib/app-builder.ts';
 import {
   KIND_COLOR,
-  NODE_GAP,
+  nodePosition,
   NODE_TOP,
   NODE_X,
   describeBinding,
@@ -65,7 +65,9 @@ test('specToGraph: nodes are laid out in a vertical column at the fixed geometry
   const g = specToGraph(threeStepApp());
   g.nodes.forEach((n, i) => {
     assert.equal(n.position.x, NODE_X);
-    assert.equal(n.position.y, NODE_TOP + i * NODE_GAP);
+    // The layout serpentines now, so assert against the SAME pure geometry the component renders
+    // rather than a hand-rolled formula that would drift from it.
+    assert.deepEqual(n.position, nodePosition(i));
   });
 });
 
@@ -135,7 +137,7 @@ test('graph re-derives correctly after app-builder edits (canvas === text, one s
   spec = moveStep(spec, gid, -1);
   g = specToGraph(spec);
   assert.equal(g.nodes[2].id, gid);
-  assert.equal(g.nodes[2].position.y, NODE_TOP + 2 * NODE_GAP);
+  assert.deepEqual(g.nodes[2].position, nodePosition(2));
 
   // Remove it — back to 3 nodes / 2 edges.
   spec = removeStep(spec, gid);

@@ -112,34 +112,22 @@ export function AppStepEditor({
 
   return (
     <div className="rounded-md border border-border bg-background">
-      {/* Header: order number, kind icon, editable label, reorder + delete */}
-      <div className="flex items-start gap-3 border-b border-border/60 px-3 py-2.5">
-        <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
-          {index + 1}
-        </span>
-        <span className="mt-1 shrink-0 text-primary" title={meta.noun}>
-          {meta.icon}
-        </span>
-        <div className="min-w-0 flex-1">
-          <Input
-            aria-label={`Step ${index + 1} label`}
-            value={step.label}
-            onChange={(e) => handlers.onRelabel(e.target.value)}
-            placeholder={meta.noun}
-            className="h-8 text-sm"
-          />
-          <p
-            className={
-              unbound
-                ? 'mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-500'
-                : 'mt-1 text-[11px] text-muted-foreground'
-            }
-          >
-            {unbound ? <Warning className="size-3" /> : null}
-            {binding}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-0.5">
+      {/* Header: identity + actions on one line, then the label on its OWN full-width line.
+          They used to share a row, so in the canvas's side panel the input was squeezed to about
+          40px — it showed "Reac" of "Read data" — and the binding line below it wrapped one word per
+          line. A control that only works at one container width is broken at every other one. */}
+      <div className="border-b border-border/60 px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
+            {index + 1}
+          </span>
+          <span className="shrink-0 text-primary" title={meta.noun}>
+            {meta.icon}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[11px] uppercase tracking-wide text-muted-foreground">
+            {meta.noun}
+          </span>
+          <span className="flex shrink-0 items-center gap-0.5">
           <Button
             type="button"
             variant="ghost"
@@ -173,7 +161,25 @@ export function AppStepEditor({
           >
             <Trash className="size-4" />
           </Button>
+          </span>
         </div>
+        <Input
+          aria-label={`Step ${index + 1} label`}
+          value={step.label}
+          onChange={(e) => handlers.onRelabel(e.target.value)}
+          placeholder={meta.noun}
+          className="mt-2 h-8 w-full text-sm"
+        />
+        <p
+          className={
+            unbound
+              ? 'mt-1 flex items-start gap-1 text-[11px] leading-relaxed text-amber-600 dark:text-amber-500'
+              : 'mt-1 text-[11px] leading-relaxed text-muted-foreground'
+          }
+        >
+          {unbound ? <Warning className="mt-0.5 size-3 shrink-0" /> : null}
+          <span className="min-w-0">{binding}</span>
+        </p>
       </div>
 
       {/* Per-kind binding editor */}

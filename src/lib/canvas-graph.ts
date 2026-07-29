@@ -88,11 +88,42 @@ export const KIND_LABEL: Record<AppStepKind, string> = {
   action: 'Action',
 };
 
-// Layout geometry — a single vertical column (the flow is a linear chain in the 3B/3A model). Kept as
-// constants so tests can assert exact coordinates and the component + tests agree.
+// ─── Layout geometry — a SERPENTINE flow, not one tall column ─────────────────────────────────────
+//
+// The layout used to stack every step in a single vertical column. On a wide canvas that wasted the
+// whole right-hand side, and — worse — it grew downward faster than the canvas is tall, so `fitView`
+// zoomed out to fit: a five-step app was readable, and adding a sixth collapsed every node into an
+// unreadable sliver. The graph got HARDER to read the more the person built, which is exactly backwards.
+//
+// So the flow runs left→right and wraps, alternating direction each row (boustrophedon): row 1 reads
+// left→right, row 2 right→left, so the step after the last one in a row sits directly beneath it and
+// the connection stays short instead of flying back across the canvas.
 export const NODE_X = 40;
 export const NODE_TOP = 24;
-export const NODE_GAP = 108; // vertical spacing between successive step nodes
+/** Node box width, matching the node component's own width so spacing is not guesswork. */
+export const NODE_W = 188;
+/** Horizontal gap between adjacent nodes in a row — enough for the arrow to read as a step. */
+export const NODE_GAP_X = 92;
+/** Vertical gap between rows. */
+export const NODE_GAP_Y = 116;
+/**
+ * Steps per row. Four 188px nodes plus their gaps span ~1,080px, which fits the canvas column on a
+ * desktop console at 100% zoom — the point being that a typical app (4–8 steps) needs one or two rows
+ * and never triggers a zoom-out.
+ */
+export const NODES_PER_ROW = 4;
+
+/** Where step `i` sits. Pure and exported so tests assert the exact geometry the component renders. */
+export function nodePosition(index: number): { x: number; y: number } {
+  const row = Math.floor(index / NODES_PER_ROW);
+  const withinRow = index % NODES_PER_ROW;
+  // Odd rows run right→left, so the chain snakes instead of jumping back to the left edge.
+  const column = row % 2 === 0 ? withinRow : NODES_PER_ROW - 1 - withinRow;
+  return {
+    x: NODE_X + column * (NODE_W + NODE_GAP_X),
+    y: NODE_TOP + row * NODE_GAP_Y,
+  };
+}
 
 // ─── describeBinding — a short "what this step binds to" line (mirrors app-builder) ──────────────
 // A PURE presenter so the node body reads like the text builder's skeleton line. Duplicated in spirit
@@ -164,7 +195,7 @@ export function specToGraph(spec: AppSpec, look: BindingLookups = {}): CanvasGra
   const nodes: CanvasNode[] = spec.steps.map((step, i) => ({
     id: step.id,
     type: 'step',
-    position: { x: NODE_X, y: NODE_TOP + i * NODE_GAP },
+    position: nodePosition(i),
     data: {
       stepId: step.id,
       kind: step.kind,

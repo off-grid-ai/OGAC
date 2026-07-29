@@ -732,8 +732,10 @@ export function StudioCanvas({
             edges={edges}
             nodeTypes={NODE_TYPES}
             fitView
-            fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
-            minZoom={0.3}
+            fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+            // A floor, not 0.3: below about half size the node text is unreadable, and "fit everything
+            // in" is worth nothing if what fits cannot be read. Past the floor the canvas pans instead.
+            minZoom={0.55}
             proOptions={{ hideAttribution: true }}
             nodesDraggable={editTopology}
             nodesConnectable={editTopology}
@@ -784,7 +786,7 @@ export function StudioCanvas({
 
       {/* ── Right: the selected node's config (the SAME AppStepEditor the text builder uses) ── */}
       {spec && selectedStep && selectedIndex >= 0 ? (
-        <div className="w-[320px] shrink-0 overflow-y-auto rounded-xl border border-border bg-card p-3">
+        <div className="w-[340px] shrink-0 overflow-y-auto rounded-xl border border-border bg-card p-3 xl:w-[400px]">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-medium text-foreground">Configure step</p>
             <button
