@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { ReadOnlyGuard } from '@/components/ReadOnlyGuard';
+import { useIsViewer } from '@/components/ViewerModeProvider';
 
 // ─── Approve or reject a case WITHOUT leaving the queue ──────────────────────────────────────────────
 //
@@ -24,6 +26,10 @@ export function CaseDecision({
 }: Readonly<{ runId: string; stepId: string; compact?: boolean }>) {
   const router = useRouter();
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  // A read-only demo account is refused server-side (403). Reporting that in a toast AFTER the click meant
+  // the button looked live, did nothing, and explained itself in a message that then faded. The constraint
+  // is known before the click, so it is stated before the click.
+  const viewer = useIsViewer();
 
   async function decide(decision: 'approve' | 'reject') {
     setBusy(decision);
@@ -50,7 +56,7 @@ export function CaseDecision({
     }
   }
 
-  return (
+  const controls = (
     <span className="flex shrink-0 items-center gap-1.5">
       <Button
         size="sm"
@@ -84,4 +90,7 @@ export function CaseDecision({
       </Button>
     </span>
   );
+
+  // ReadOnlyGuard renders the child untouched for every other role, so this costs a writer nothing.
+  return viewer ? <ReadOnlyGuard>{controls}</ReadOnlyGuard> : controls;
 }

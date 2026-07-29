@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
+import { auth } from '@/auth';
 import { AppUseShell } from '@/components/app-use/AppUseShell';
+import { ViewerModeProvider } from '@/components/ViewerModeProvider';
 import { CrossSellSourceUnavailable } from '@/components/app-use/CrossSellCustomerJourney';
 import { CrossSellOpportunityQueue } from '@/components/app-use/CrossSellOpportunityQueue';
 import type { RunField } from '@/components/app-use/RunPanel';
@@ -116,8 +118,14 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
   });
   const fields = deriveRunFields(app.inputForm, prompt);
   const surface = sharedSurface(resolved.slug);
+  // The read-only viewer's write controls must annotate themselves — that is the documented half of the
+  // viewer policy ("the UI reads the role to disable/annotate write controls"). This surface sits OUTSIDE
+  // the (console) layout, so it never got the provider, and the demo viewer was shown a full-strength
+  // Approve button that answered 403 into a toast which then faded. A dead button is worse than no button.
+  const session = await auth();
 
   return (
+    <ViewerModeProvider role={session?.user?.role}>
     <div className="min-h-screen w-full bg-background px-4 py-6 md:px-8">
       <div className="mx-auto w-full max-w-[100rem]">
         <AppUseShell
@@ -146,6 +154,7 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
         />
       </div>
     </div>
+    </ViewerModeProvider>
   );
 }
 
