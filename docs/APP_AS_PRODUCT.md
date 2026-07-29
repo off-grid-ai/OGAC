@@ -143,10 +143,21 @@ starting a case is **selecting a record that already exists**: a list of pending
 amount and date, and you pick one. A grievance app picks a grievance. An FNOL app picks a claim intimation.
 The picker is populated from the bound domain — nothing typed, nothing invented, no custom UI authored.
 
-**Why it is not a quick fix:** it needs an endpoint that lists records from a bound data domain for an app
-(the connector-query step executes a query today, but nothing exposes "show me the candidate records"), plus
-the picker, plus passing the chosen record's identity as the run input. That is the single highest-value
-piece of work left on this surface, and it should come before any further polish.
+**The hard part is already solved** (checked 2026-07-29, so do not re-derive it):
+- `execConnectorQuery` in `src/lib/connector-exec.ts` runs a query against a resolved connector, and
+  `listResources` / `recordCount` are there too.
+- A data domain carries `connectorId` + `resource`, and `listDomains(orgId)` returns them — the builder
+  already filters on exactly `d.connectorId && d.resource` to decide a domain is usable.
+- An app's `connector-query` steps carry `domain` (the domain LABEL), which is how a step binds to one.
+
+So the remaining work is assembly, not discovery: (a) a route that takes an app id, resolves its
+connector-query step's domain to a connector + resource, and returns the first N candidate records; (b) a
+picker on the Run screen listing them with the fields that identify a case (employee, amount, date); (c) pass
+the chosen record as the run input instead of a typed string. Free text survives only as an explicit,
+clearly-secondary escape hatch.
+
+This is the single highest-value piece of work left on this surface and should come before any further
+polish.
 
 Free text should survive only as an explicit escape hatch, clearly secondary.
 
