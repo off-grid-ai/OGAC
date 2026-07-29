@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CasePicker } from '@/components/build/CasePicker';
 import { runInputPrompt } from '@/lib/app-input-prompt';
 import type { AppSpec, FormField } from '@/lib/app-model';
 
@@ -43,6 +44,9 @@ export function AppInputForm({
   // a real previous case — see src/lib/app-input-prompt.ts and docs/APP_AS_PRODUCT.md §3 (hand-authored
   // per-app form fields are explicitly NOT the answer).
   const prompt = runInputPrompt({ trigger: app.trigger?.kind, exampleSubject });
+  // GAP 0: pick a real record instead of typing a description of one. Only offered when the app declares no
+  // form of its own — an app WITH declared fields already knows exactly what it needs.
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const fields: FormField[] =
     app.inputForm && app.inputForm.length > 0
       ? app.inputForm
@@ -85,11 +89,32 @@ export function AppInputForm({
         <CardContent className="space-y-3">
           {/* The guidance sits in the CONTENT, not the header: CardHeader lays its children out in a
             grid, so a sibling paragraph landed in the title's cell and overlapped it. */}
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {app.inputForm && app.inputForm.length > 0
-              ? 'Fill in the details for this case, then start it.'
-              : prompt.hint}
-          </p>
+          {!app.inputForm || app.inputForm.length === 0 ? (
+            <>
+              {/* The org's own records come FIRST. Typing is the fallback beneath them, not the front door. */}
+              <CasePicker
+                appId={app.id}
+                selectedId={pickedId}
+                onPick={(candidate) => {
+                  setPickedId(candidate.id);
+                  // The run receives the WHOLE record, so nothing is re-typed and nothing must be parsed
+                  // back out of prose. The readable label goes in `input` for the case subject.
+                  setValues((v) => ({
+                    ...v,
+                    input: [candidate.label, candidate.detail].filter(Boolean).join(' · '),
+                    case_record: JSON.stringify(candidate.record),
+                  }));
+                }}
+              />
+              <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
+                Or describe it by hand: {prompt.hint}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Fill in the details for this case, then start it.
+            </p>
+          )}
           {fields.map((f) => (
             <div key={f.key} className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">
