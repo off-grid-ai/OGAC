@@ -8,7 +8,7 @@ import { sharedSurface } from '@/lib/app-surface';
 import { runInputPrompt } from '@/lib/app-input-prompt';
 import { listAppRuns } from '@/lib/app-run-store';
 import { buildAppDashboard } from '@/lib/app-dashboard';
-import { buildAppWorkQueue, caseLabel, runSubject, statusLabel } from '@/lib/app-work-queue';
+import { buildAppWorkQueue, caseLabel, caseTrail, runSubject, statusLabel } from '@/lib/app-work-queue';
 import { getAppBySlug } from '@/lib/apps-store';
 import { resolveDeployedApp } from '@/lib/deployed-app';
 import type { FormField } from '@/lib/app-model';
@@ -80,6 +80,13 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
     status: String(r.status),
     startedAt: r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? ''),
     subject: runSubject((r as { input?: unknown }).input),
+    pendingStepId:
+      ((r as { steps?: { id?: string; status?: string }[] }).steps ?? []).find(
+        (st) => st.status === 'awaiting_human',
+      )?.id ?? null,
+    trail: caseTrail((r as { steps?: { kind?: string; status?: string }[] }).steps, {
+      signed: Boolean((r as { provenance?: unknown }).provenance),
+    }),
   }));
   const queue = buildAppWorkQueue({
     trigger: app.trigger?.kind ?? 'on-demand',
@@ -115,10 +122,13 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           trend={[]}
           fields={fields}
           surface={surface}
+          appId={app.id}
           workHeadline={queue.headline}
           stats={dashboard.metrics.map((m) => ({ label: m.label, value: m.value, tone: m.tone }))}
           waiting={queue.waiting.map((c) => ({
             id: c.id,
+            pendingStepId: (c as { pendingStepId?: string | null }).pendingStepId,
+            trail: (c as { trail?: string | null }).trail,
             label: caseLabel(c.subject, c.id),
             href: `/app/${encodeURIComponent(resolved.slug)}?view=activity`,
             when: `${statusLabel(c.status)} · ${

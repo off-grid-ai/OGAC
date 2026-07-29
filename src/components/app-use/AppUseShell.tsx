@@ -4,6 +4,7 @@ import { Lightning, PencilSimple, ShareNetwork } from '@phosphor-icons/react/dis
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { CaseDecision } from '@/components/build/CaseDecision';
 import { Button } from '@/components/ui/button';
 import { CockpitDashboard } from '@/components/app-use/CockpitDashboard';
 import { RunPanel, type RunField } from '@/components/app-use/RunPanel';
@@ -18,6 +19,10 @@ export interface UseWaitingCase {
   label: string;
   href: string;
   when: string;
+  /** The step awaiting a person. Present ⇒ the case is decidable right here. */
+  pendingStepId?: string | null;
+  /** One line describing what already happened to this case — the governed run, made visible. */
+  trail?: string | null;
 }
 export interface UseStat {
   label: string;
@@ -42,7 +47,10 @@ export function AppUseShell({
   waiting,
   workHeadline,
   stats,
+  appId,
 }: Readonly<{
+  /** Passed to the run panel so a case can be picked from the app's bound data. */
+  appId?: string;
   title: string;
   summary: string;
   live: boolean;
@@ -165,16 +173,25 @@ export function AppUseShell({
             <div className="overflow-hidden rounded-lg border border-border">
               {waiting?.length ? (
                 waiting.map((c) => (
-                  <a
-                    key={c.id}
-                    href={c.href}
-                    className="flex items-start justify-between gap-3 border-b border-border px-4 py-3 no-underline last:border-b-0 hover:bg-muted/40"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm text-foreground">{c.label}</span>
+                  <div key={c.id} className="border-b border-border px-4 py-3 last:border-b-0">
+                    <a href={c.href} className="block no-underline hover:opacity-80">
+                      {/* Full width, wrapping: you must be able to read the case you are deciding. */}
+                      <span className="block text-sm leading-snug text-foreground">{c.label}</span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">{c.when}</span>
-                    </span>
-                  </a>
+                      {c.trail ? (
+                        <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground/80">
+                          {c.trail}
+                        </span>
+                      ) : null}
+                    </a>
+                    {/* THE QUEUE LIVES HERE. This is the surface a team opens, so deciding happens here
+                      rather than in the console — see docs/APP_AS_PRODUCT.md on the duplicate Work screens. */}
+                    {c.pendingStepId ? (
+                      <div className="mt-2.5 flex justify-end">
+                        <CaseDecision runId={c.id} stepId={c.pendingStepId} />
+                      </div>
+                    ) : null}
+                  </div>
                 ))
               ) : (
                 <p className="px-4 py-6 text-sm text-muted-foreground">
@@ -187,7 +204,7 @@ export function AppUseShell({
       ) : view === 'dashboard' && metrics ? (
         <CockpitDashboard metrics={metrics} trend={trend ?? []} live={live} customerHrefBase={surface.customerHrefBase} />
       ) : view === 'run' ? (
-        <RunPanel fields={fields} surface={surface} />
+        <RunPanel fields={fields} surface={surface} appId={appId} />
       ) : (
         <ActivityEmpty />
       )}

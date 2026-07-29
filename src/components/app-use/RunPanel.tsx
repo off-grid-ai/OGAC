@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { CasePicker } from '@/components/build/CasePicker';
 import { Label } from '@/components/ui/label';
 import type { AppSurface } from '@/lib/app-surface';
 
@@ -32,12 +33,22 @@ interface RunResult {
 export function RunPanel({
   fields,
   surface,
-}: Readonly<{ fields: RunField[]; surface: AppSurface }>) {
+  appId,
+}: Readonly<{
+  fields: RunField[];
+  surface: AppSurface;
+  /** The app, so a case can be PICKED from its bound data instead of typed. */
+  appId?: string;
+}>) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.filter((f) => f.type === 'select' && f.options?.[0]).map((f) => [f.key, ''])),
   );
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  // The single free-text field is the fallback shape. When that is what we have, offer the org's own records
+  // FIRST — this is the surface a team actually opens, so it matters more here than in the console.
+  const offerPicker = Boolean(appId) && fields.length === 1 && fields[0]?.key === 'input';
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
   const missing = fields.filter((f) => f.required && !values[f.key]?.trim());
 
@@ -67,13 +78,31 @@ export function RunPanel({
     <div className="grid gap-5 lg:grid-cols-3">
       <Card className="shadow-sm lg:col-span-2">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Run this app</CardTitle>
+          <CardTitle className="text-sm">Start a case</CardTitle>
           <p className="text-xs text-muted-foreground">
             Fill in what this run needs — every run goes through the governed pipeline.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
+            {offerPicker && appId ? (
+              <div className="space-y-2">
+                <CasePicker
+                  appId={appId}
+                  selectedId={pickedId}
+                  onPick={(candidate) => {
+                    setPickedId(candidate.id);
+                    // The whole record goes to the run; the readable label is only the case subject.
+                    setValues((v) => ({
+                      ...v,
+                      input: [candidate.label, candidate.detail].filter(Boolean).join(' · '),
+                      case_record: JSON.stringify(candidate.record),
+                    }));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">Or describe one by hand below.</p>
+              </div>
+            ) : null}
             {fields.map((f) => (
               <div key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
                 <Label className="text-xs text-muted-foreground">
