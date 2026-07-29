@@ -606,7 +606,10 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
     const height = host.offsetHeight;
     if (!width || !height) return;
     setBox((prev) => (Math.abs(prev.w - width) < 0.5 && Math.abs(prev.h - height) < 0.5 ? prev : { w: width, h: height }));
-    const next = Math.min(width / STAGE_W, height / STAGE_H);
+    // HEIGHT-DRIVEN ONLY. The stage widens to match the box's aspect (see `stageW`), so there is nothing
+    // to fit horizontally. Keeping the old min(width/1600, height/900) here is what left a band on every
+    // aspect narrower than 16:9 — it clamped the scale to the width of a stage that no longer exists.
+    const next = height / STAGE_H;
     setScale((prev) => (Math.abs(prev - next) < 0.0005 ? prev : next));
   }, []);
 
@@ -758,7 +761,9 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   // window is what produced ~178px of empty margin down each side — at EVERY camera pose, including the
   // zoomed ones where the artwork is far wider than the screen and should be spilling off both edges.
   // The stage is now as wide as the viewport requires, so it never needs letterboxing horizontally.
-  const stageW = Math.max(STAGE_W, (box.w / Math.max(1, box.h)) * STAGE_H);
+  // EXACTLY the viewport aspect — no floor. Flooring at 1600 meant a narrow or portrait box (1.6:1, or a
+  // phone) kept a 16:9 stage and went back to banding; the floor only ever helped wide screens.
+  const stageW = (box.w / Math.max(1, box.h)) * STAGE_H;
   const stageInsetX = Math.max(0, (box.w - stageW * scale) / 2);
   const stageInsetY = Math.max(0, (box.h - STAGE_H * scale) / 2);
 
