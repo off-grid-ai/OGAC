@@ -424,17 +424,20 @@ function Ambient({ gSec, pal }: Readonly<{ gSec: number; pal: Palette }>) {
 }
 
 function World({
+  stageW,
   cam: rawCam,
   gSec,
   em,
   pal,
   src,
-}: Readonly<{ cam: Pose; gSec: number; em: Emphasis; pal: Palette; src: string }>) {
+}: Readonly<{ stageW: number; cam: Pose; gSec: number; em: Emphasis; pal: Palette; src: string }>) {
   // Clamp only the WIDE end. See MAX_WIDE_CAM: above it the poster is taller than the stage and the
   // overflow is cut half off its title.
   const cam =
     rawCam.s <= 1 && rawCam.s > MAX_WIDE_CAM ? { ...rawCam, s: MAX_WIDE_CAM } : rawCam;
-  const tx = STAGE_W / 2 - cam.x * cam.s;
+  // Centre on the ACTUAL stage width, not the nominal 1600. The stage is as wide as the viewport now, so
+  // this is what keeps the artwork centred while the extra width simply becomes room.
+  const tx = stageW / 2 - cam.x * cam.s;
   const ty = STAGE_H / 2 - cam.y * cam.s;
   const chipXY = (i: number) => ({
     x: i % 2 ? 1367 : 1231,
@@ -631,7 +634,6 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
       // Fit against WIDE_FIT_H, not STAGE_H — see that constant. These are the box's REAL measured
       // pixels, so browser chrome, a bookmarks bar or a mobile toolbar are already accounted for; that is
       // why the sizing is measured rather than expressed in vh.
-      setScale(Math.min(width / STAGE_W, height / STAGE_H));
       measure();
     });
     ro.observe(host);
@@ -752,7 +754,12 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   // element's corner is NOT the artwork's corner — anchoring the controls to `bottom-3 right-3` of the
   // outer dropped them into the empty band beside the poster, which reads as misaligned rather than as
   // floating controls. Inset them by the letterbox margin so they always overlay the artwork.
-  const stageInsetX = Math.max(0, (box.w - STAGE_W * scale) / 2);
+  // THE FIX FOR THE SIDE BANDS. The stage was a fixed 1600x900; letterboxing that 16:9 box into a 2.18:1
+  // window is what produced ~178px of empty margin down each side — at EVERY camera pose, including the
+  // zoomed ones where the artwork is far wider than the screen and should be spilling off both edges.
+  // The stage is now as wide as the viewport requires, so it never needs letterboxing horizontally.
+  const stageW = Math.max(STAGE_W, (box.w / Math.max(1, box.h)) * STAGE_H);
+  const stageInsetX = Math.max(0, (box.w - stageW * scale) / 2);
   const stageInsetY = Math.max(0, (box.h - STAGE_H * scale) / 2);
 
   const label = paused ? 'Play the animation' : 'Pause the animation';
@@ -801,14 +808,14 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
                 position: 'absolute',
                 // Centre the stage: a display is rarely 16:9, so letterbox rather than crop.
                 top: (box.h - STAGE_H * scale) / 2,
-                left: (box.w - STAGE_W * scale) / 2,
-                width: STAGE_W,
+                left: (box.w - stageW * scale) / 2,
+                width: stageW,
                 height: STAGE_H,
                 transform: `scale(${scale})`,
                 transformOrigin: '0 0',
               }}
             >
-              {bgReady ? <World cam={cam} gSec={gSec} em={em} pal={pal} src={src} /> : null}
+              {bgReady ? <World stageW={stageW} cam={cam} gSec={gSec} em={em} pal={pal} src={src} /> : null}
             </div>
           </div>
 
