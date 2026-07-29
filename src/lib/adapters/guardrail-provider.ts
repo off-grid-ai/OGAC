@@ -22,6 +22,7 @@
 
 import type { PiiPort, PiiResult } from './types';
 import { GUARDRAIL_REQUEST_TIMEOUT_MS } from '@/lib/guardrail-timeout';
+import { floorPass, mergeFloor } from '@/lib/pii-floor';
 
 const env = process.env;
 
@@ -268,19 +269,24 @@ export const llmGuardPii: PiiPort = {
     if (!url) return guardrailNotConfigured();
 
     try {
+      // The domestic-PII floor runs FIRST, on the original text (see lib/pii-floor.ts). The engine's
+      // India recognizers were not firing — PAN/IFSC/UPI came back undetected and Aadhaar was
+      // mislabelled PHONE_NUMBER — so the precise rules label them correctly before the engine sees
+      // the text, and the engine screens the remainder. Additive only: it can never grant a pass.
+      const floor = floorPass(text);
       // An operator's DISABLED scanners are suppressed per-request — this is what makes a console
       // toggle actually change what the engine enforces (0.3.16 has no scanner CRUD API).
       const suppress = await resolveSuppressed(orgId);
       const response = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, {
         phase: 'input',
-        prompt: text,
+        prompt: floor.redacted,
         ...(suppress ? { scanners_suppress: suppress } : {}),
       });
-      return {
-        ...normalizeLlmGuardResponse(text, response.body),
+      return mergeFloor(floor, {
+        ...normalizeLlmGuardResponse(floor.redacted, response.body),
         answeredBy: response.answeredBy,
         degraded: response.degraded,
-      };
+      });
     } catch (err) {
       // FAIL CLOSED — configured but the engine could not screen. Block the run with a clear reason;
       // log the concrete cause so "why blocked?" is answerable from the logs, not guessed at.
@@ -293,18 +299,21 @@ export const llmGuardPii: PiiPort = {
     const url = env.OFFGRID_HTTP_GUARDRAIL_URL;
     if (!url) return guardrailNotConfigured();
     try {
+      // Output is the phase the "Mask PAN in every output" policy is actually about — a PAN that
+      // reaches a customer-facing answer is the failure that matters. Floored the same way.
+      const floor = floorPass(output);
       const suppress = await resolveSuppressed(orgId);
       const response = await postLlmGuard(url, env.OFFGRID_HTTP_GUARDRAIL_API_KEY, {
         phase: 'output',
         prompt,
-        output,
+        output: floor.redacted,
         ...(suppress ? { scanners_suppress: suppress } : {}),
       });
-      return {
-        ...normalizeLlmGuardResponse(output, response.body),
+      return mergeFloor(floor, {
+        ...normalizeLlmGuardResponse(floor.redacted, response.body),
         answeredBy: response.answeredBy,
         degraded: response.degraded,
-      };
+      });
     } catch (err) {
       const reason = describeError(err);
       console.error('[llm-guard] output engine unreachable — FAILING CLOSED (run blocked):', reason);

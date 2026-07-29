@@ -61,7 +61,13 @@ page.on('requestfailed', (r) => {
   // 'requestfailed' on every single page and mean nothing is wrong. Counting them flagged all 174
   // screens BROKEN on the first sweep — a detector that says everything is broken says nothing.
   if (/[?&]_rsc=/.test(u)) return;
-  failedRequests.push(`${r.method()} ${u.replace(BASE, '')}`);
+  // Same trap, one level deeper: `requestfailed` fires for ABORTED requests too, and a page whose
+  // client component polls (the runs monitor, the gateway node list) always has a fetch in flight when
+  // the sweep navigates on. Those aborts flagged three working screens BROKEN. A 4xx/5xx never appears
+  // here anyway — it arrives on `response` — so an abort carries no information about the page.
+  const errorText = r.failure()?.errorText ?? '';
+  if (/ERR_ABORTED|context or browser has been closed/i.test(errorText)) return;
+  failedRequests.push(`${r.method()} ${u.replace(BASE, '')} (${errorText})`);
 });
 page.on('response', (r) => {
   if (r.url().startsWith(BASE) && r.status() >= 500) {
