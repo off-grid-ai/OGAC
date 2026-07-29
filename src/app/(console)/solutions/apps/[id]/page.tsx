@@ -1,6 +1,7 @@
 import { ArrowRight, CheckCircle, Clock, Hourglass } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { CaseDecision } from '@/components/build/CaseDecision';
 import { PageFrame } from '@/components/PageFrame';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,7 +35,14 @@ function Row({
   run,
   href,
   icon,
-}: Readonly<{ run: WorkRun; href: string; icon: React.ReactNode }>) {
+  pendingStepId,
+}: Readonly<{
+  run: WorkRun;
+  href: string;
+  icon: React.ReactNode;
+  /** Present on a waiting case: enables Approve / Reject without leaving the queue. */
+  pendingStepId?: string | null;
+}>) {
   // Formatted DETERMINISTICALLY, never with toLocaleString: that renders in the server's locale and
   // timezone and then again in the browser's, and the two disagree — which is exactly the hydration
   // mismatch (React #418) this page shipped with on first deploy.
@@ -57,7 +65,11 @@ function Row({
           {when ? ` · ${when}` : ''}
         </span>
       </span>
-      <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+      {pendingStepId ? (
+        <CaseDecision runId={run.id} stepId={pendingStepId} />
+      ) : (
+        <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+      )}
     </Link>
   );
 }
@@ -85,6 +97,11 @@ export default async function AppWorkPage({
       // The run's own input IS the case, so the subject is derived from it. Without this every row
       // rendered the literal word "Case" and a queue of eight identical rows told the reader nothing.
       subject: runSubject((r as { input?: unknown }).input),
+      // The step awaiting a person — what an in-place decision has to target.
+      pendingStepId:
+        ((r as { steps?: { id?: string; status?: string }[] }).steps ?? []).find(
+          (st) => st.status === 'awaiting_human',
+        )?.id ?? null,
     })),
   });
 
@@ -192,6 +209,7 @@ export default async function AppWorkPage({
                       run={run}
                       href={`${base}/review`}
                       icon={<Clock className="size-4 text-primary" />}
+                      pendingStepId={(run as { pendingStepId?: string | null }).pendingStepId}
                     />
                   ))
                 )}

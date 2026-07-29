@@ -177,8 +177,11 @@ function SendReportCard({ surface }: Readonly<{ surface: AppSurface }>) {
           <EnvelopeSimple size={16} className="shrink-0 text-primary" weight="duotone" />
           <span>Send report now</span>
         </CardTitle>
+        {/* Was "Email this cockpit as a governed report. It also goes out weekly on Monday 9:00 IST." —
+          cross-sell cockpit copy, shown on EVERY app. A reimbursement app told a clerk about a Monday
+          9:00 IST cockpit digest that does not exist for it. Nothing here may assume one app. */}
         <CardDescription className="text-xs">
-          Email this cockpit as a governed report. It also goes out weekly on Monday 9:00 IST.
+          Email these results as a governed report. PII is masked before it leaves.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -188,13 +191,13 @@ function SendReportCard({ surface }: Readonly<{ surface: AppSurface }>) {
             type="email"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            placeholder="rm.team@bharatunion.co.in"
+            placeholder="name@yourcompany.com"
             className="mt-1"
           />
         </div>
         <div>
           <Label className="text-xs text-muted-foreground">Note (optional)</Label>
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Focus for this week…" className="mt-1" />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note (optional)" className="mt-1" />
         </div>
         <Button onClick={send} disabled={sending || !to.trim()} variant="outline" className="w-full gap-1.5">
           <EnvelopeSimple className="size-4" />
