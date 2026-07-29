@@ -187,17 +187,19 @@ Fix these before adding features, in this order — they are what changes the im
 2. **Adapt the front door to the app's shape** (see §3b) — a job-shaped app must lead with "run it now"
    and its latest results, not with an empty decision queue.
 3. **The dashboard** — the only item on the founder's list with no component behind it at all.
-4. **Org-tree RBAC** (`#102`) — **PARTLY DONE.** App RBAC/ABAC already existed
-   (`src/lib/app-access-policy.ts`, 380 lines: role/department rules, ABAC predicates, approval authority).
-   The missing half was inheritance, and the DECISION is now in place: `AppAccessCaller.manages` admits a
-   caller who manages the app's owner at any depth, skip-level included, without an explicit grant.
-   **It is inert until something populates that chain.** There is no reporting relationship in the schema —
-   no `managerId` on `user`, no parent on `teams` — so there is no tree to walk. To activate:
-   (a) add `managerId` to `user` (self-migrating DDL, as `ensureAppsSchema` does),
-   (b) let Access pick a manager,
-   (c) resolve the chain in the route that builds `AppAccessCaller`.
-   Absent is deliberate: an access rule that fails OPEN is worse than one that is missing, because it looks
-   enforced.
+4. **Org-tree RBAC** — **CORRECTION: it is already implemented.** I previously wrote that no reporting
+   relationship existed in the schema. Wrong — grep before declaring something missing.
+   `resolveManagementChain` in `src/lib/app-sharing-policy.ts` implements the founder's rule exactly: a team
+   `lead` is a manager to that team's members, climbing TRANSITIVELY with cycle guards, creator excluded,
+   nearest-first. `HIERARCHY_INHERITED_ROLE = 'approver'` — a manager can view/run/trigger/approve but NOT
+   edit, since editing someone's app stays with its owner. Unit-tested in `test/app-sharing-policy.test.ts`.
+   The tree is the **teams** table.
+   Two narrow gaps remained, one now closed:
+   - ~~`team_members` was EMPTY in both demo tenants~~ **FIXED** — `scripts/seed-demo-org-chart.mts` seeds 12
+     memberships per tenant, rotating the lead per team so the transitive climb has more than one level.
+   - **`resolveManagementChain` is called from NO production path.** It is tested but unwired. Remaining work:
+     resolve the app owner's chain (`listAllMemberships`) where `AppAccessCaller` is built, and admit a caller
+     found in it. `AppAccessCaller.manages` already exists for this and is honoured by `evaluateAppAccess`.
 5. **Slack and Telegram as INPUTS** — currently outputs only. WhatsApp is done (was a valid
    `TriggerKind` handled in `triggers.ts` but missing from the builder's picker).
 6. **Visual feedback while building** — steps/flow appearing as Forge composes them.
