@@ -34,6 +34,7 @@ import {
   validateAppSpec,
 } from '@/lib/app-model';
 import { type DataDomain, resolveDomain } from '@/lib/data-domains';
+import { resolveQualifiedPhrase } from '@/lib/phrase-qualifier';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { getOrgContext } from '@/lib/org-context';
 
@@ -173,7 +174,7 @@ export function assembleFromPlan(
     // never become a fabricated domain), so it keeps its own branch rather than pretending to be a
     // plain builder that always returns a step.
     if (kind === 'connector-query') {
-      const bound = bindDataPhrase(planDataPhrase(ps), domains, idBase, ps.label, gaps);
+      const bound = bindDataPhrase(planDataPhrase(ps), domains, idBase, ps.label, gaps, description);
       if (bound) steps.push(bound);
       else n -= 1; // dropped — don't consume a step number
       continue;
@@ -251,7 +252,7 @@ export function heuristicDecompose(description: string, domains: DataDomain[]): 
   if (cond) return heuristicBranchDecompose(description, cond, domains);
 
   const gaps: string[] = [];
-  const steps = stepsFromClauses(segment(description), domains, gaps);
+  const steps = stepsFromClauses(segment(description), domains, gaps, description);
   completeHeuristicSteps(steps, description);
   return finishAssembly(steps, gaps, undefined, undefined, description);
 }
@@ -263,7 +264,15 @@ export function heuristicDecompose(description: string, domains: DataDomain[]): 
  * not, so there is no separate counter to keep in sync. The previous version tracked one by hand and
  * had to remember to decrement it on a dropped connector-query.
  */
-function stepsFromClauses(clauses: string[], domains: DataDomain[], gaps: string[]): AppStep[] {
+function stepsFromClauses(
+  clauses: string[],
+  domains: DataDomain[],
+  gaps: string[],
+  // The WHOLE description, so a bare data phrase can be resolved with the qualifier the author wrote
+  // elsewhere in the sentence (lib/phrase-qualifier.ts). Clause-local text is not enough: "read the
+  // claim" loses the "expense" that appeared one clause earlier.
+  description = '',
+): AppStep[] {
   const steps: AppStep[] = [];
   for (const clause of clauses) {
     const cls = classifyClause(clause);
@@ -273,7 +282,7 @@ function stepsFromClauses(clauses: string[], domains: DataDomain[], gaps: string
     // connector, so it records a gap and contributes nothing.
     if (cls === 'data') {
       const phrase = extractDataPhrase(clause);
-      const bound = bindDataPhrase(phrase, domains, id, titleCase(phrase), gaps);
+      const bound = bindDataPhrase(phrase, domains, id, titleCase(phrase), gaps, description);
       if (bound) steps.push(bound);
       continue;
     }
@@ -388,7 +397,7 @@ function leadInDataSteps(description: string, domains: DataDomain[], gaps: strin
   for (const clause of segment(ifAt > 0 ? description.slice(0, ifAt) : '')) {
     if (classifyClause(clause) !== 'data') continue;
     const phrase = extractDataPhrase(clause);
-    const bound = bindDataPhrase(phrase, domains, `s${steps.length + 1}`, titleCase(phrase), gaps);
+    const bound = bindDataPhrase(phrase, domains, `s${steps.length + 1}`, titleCase(phrase), gaps, description);
     if (bound) steps.push(bound);
   }
   return steps;
@@ -439,16 +448,24 @@ function bindDataPhrase(
   idBase: string,
   label: string | undefined,
   gaps: string[],
+  description = '',
 ): ConnectorQueryStep | null {
   const clean = (phrase ?? '').trim();
   if (!clean) return null;
-  const domain = resolveDomain(clean, domains);
+  // Resolve the QUALIFIED reading first. "read the claim" in a description about an *expense claim*
+  // bound to the org's insurance `claims` table — both domains are real, and the bare phrase "claim"
+  // is a near-exact match for "claims", so the resolver bound it correctly on the input it was given.
+  // The qualifier was in the sentence and was being discarded. See lib/phrase-qualifier.ts.
+  const { resolved: domain, matchedPhrase } = resolveQualifiedPhrase(clean, description, (candidate) =>
+    resolveDomain(candidate, domains),
+  );
   if (!domain) {
     gaps.push(
       `No data source declared for "${clean}" — add a data-domain mapping to wire this step.`,
     );
     return null;
   }
+  void matchedPhrase;
   return {
     id: idBase,
     label: label?.trim() || `Read ${domain.label}`,

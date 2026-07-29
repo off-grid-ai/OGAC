@@ -12,6 +12,7 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { ControlPlanePoster } from '@/app/_landing/control-plane-poster';
 import { CtaButtons } from '@/app/_landing/cta-buttons';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
 import { ProductTour } from '@/app/_landing/product-tour';
@@ -106,7 +107,7 @@ export default function LandingPage() {
       <section id="hero" className="relative overflow-hidden border-b border-border">
         <Spotlight />
         <div className="relative z-10 mx-auto max-w-[100rem] px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
-          <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr] lg:gap-12">
+          <div className="grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12">
             <div>
               <BlurFade delay={0.05} inView>
                 <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -152,27 +153,38 @@ export default function LandingPage() {
               </BlurFade>
             </div>
 
-            {/* The four layers: Learn → Remember → Act → Control */}
+            {/* The product itself, as one drawing. Themed vector — see control-plane-poster.tsx. */}
             <BlurFade delay={0.2} inView>
-              <ol className="grid gap-3 sm:grid-cols-2">
-                {c.hero.layers.map((layer) => (
-                  <li key={layer.number} className="rounded-2xl border border-border bg-card p-5">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-mono text-xs text-primary">{layer.number}</span>
-                      <span className="text-sm font-semibold text-foreground">{layer.name}</span>
-                    </div>
-                    <ul className="mt-3 grid gap-1.5">
-                      {layer.points.map((p) => (
-                        <li key={p} className="text-xs leading-relaxed text-muted-foreground">
-                          {p}
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ol>
+              <ControlPlanePoster />
             </BlurFade>
           </div>
+        </div>
+      </section>
+
+      {/* ── The four layers: Learn → Remember → Act → Control ─────────────── */}
+      {/* Moved out of the hero's right column so the poster can sit there. Across the full width they
+          also read better than a 2x2 stack squeezed into half the hero. */}
+      <section className="relative border-b border-border bg-card/30">
+        <div className="mx-auto max-w-[100rem] px-4 py-10 sm:px-6 sm:py-12">
+          <BlurFade delay={0.1} inView>
+            <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {c.hero.layers.map((layer) => (
+                <li key={layer.number} className="rounded-2xl border border-border bg-card p-5">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-xs text-primary">{layer.number}</span>
+                    <span className="text-sm font-semibold text-foreground">{layer.name}</span>
+                  </div>
+                  <ul className="mt-3 grid gap-1.5">
+                    {layer.points.map((p) => (
+                      <li key={p} className="text-xs leading-relaxed text-muted-foreground">
+                        {p}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          </BlurFade>
         </div>
       </section>
 

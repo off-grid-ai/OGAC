@@ -233,8 +233,13 @@ export default auth(async (req) => {
   return withCors(pass(), pathname);
 });
 
+// `hero` holds the landing poster. Static asset directories are excluded outright rather than
+// allowlisted as public paths: they are files, not routes, so the auth/tenant/rate-limit chain is pure
+// cost — and without this the request 307s to /signin and the browser just shows a broken image.
+// (`/docs-shots` is only served because it happens to start with the public `/docs` prefix. That is an
+// accident, not a rule — do not rely on it for a new asset directory.)
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|logo.png|diagrams).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|logo.png|diagrams|hero).*)',
   ],
 };
