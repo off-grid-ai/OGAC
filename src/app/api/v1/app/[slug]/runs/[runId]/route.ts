@@ -30,7 +30,7 @@ export async function GET(
   }
 
   const steps =
-    (run as { steps?: { stepId?: string; kind?: string; status?: string }[] }).steps ?? [];
+    (run as { steps?: { id?: string; stepId?: string; kind?: string; status?: string }[] }).steps ?? [];
   const status = String(run.status);
   return NextResponse.json({
     object: 'app_run',

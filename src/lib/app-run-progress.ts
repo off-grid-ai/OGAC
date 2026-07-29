@@ -16,8 +16,15 @@ export interface ProgressSpecStep {
   label?: string;
 }
 
-/** A step as the run recorded it. Absent from the run ⇒ not started. */
+/**
+ * A step as the run recorded it. Absent from the run ⇒ not started.
+ *
+ * Both id spellings are accepted deliberately: the executor returns `stepId` on a StepResult, and the
+ * persisted run row carries the folded state's `id`. Reading only one of them silently matched nothing on
+ * the live path, and every step of a finished run rendered as "not started yet".
+ */
 export interface ProgressResultStep {
+  id?: string;
   stepId?: string;
   kind?: string;
   status?: string;
@@ -75,7 +82,8 @@ export function runProgress(
 ): RunProgressStep[] {
   const byId = new Map<string, ProgressResultStep>();
   for (const result of resultSteps) {
-    if (result.stepId) byId.set(result.stepId, result);
+    const id = result.stepId ?? result.id;
+    if (id) byId.set(id, result);
   }
 
   let assignedRunning = false;
