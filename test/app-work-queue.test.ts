@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   arrivalSentence,
+  appShape,
   buildAppWorkQueue,
   caseLabel,
   runSubject,
@@ -64,8 +65,10 @@ test('the headline states what is on the plate, in whole sentences', () => {
 });
 
 test('nothing waiting reports the work already handled rather than looking dead', () => {
+  // Queue-shaped: this app DOES pause for a person, it just has nothing pending right now.
   const q = buildAppWorkQueue({
     trigger: 'email',
+    pausesForHuman: true,
     runs: [run({ id: 'a' }), run({ id: 'b' }), run({ id: 'c' })],
   });
   assert.equal(q.headline, 'Nothing is waiting. 3 cases have been handled.');
@@ -73,7 +76,7 @@ test('nothing waiting reports the work already handled rather than looking dead'
 });
 
 test('a genuinely new app says so, and is flagged empty', () => {
-  const q = buildAppWorkQueue({ trigger: 'on-demand', runs: [] });
+  const q = buildAppWorkQueue({ trigger: 'on-demand', pausesForHuman: true, runs: [] });
   assert.equal(q.headline, 'No cases yet.');
   assert.equal(q.isEmpty, true);
 });
@@ -211,4 +214,58 @@ test('caseLabel distinguishes rows that have no summarisable input', () => {
 
 test('caseLabel prefers a real subject over the reference', () => {
   assert.equal(caseLabel('Reimbursement for travel', 'apprun_9a76e7'), 'Reimbursement for travel');
+});
+
+// ─── App SHAPE: a job is not a decision queue (docs/APP_AS_PRODUCT.md §3b) ────────────────────────
+
+test('a JOB-shaped app never reports cases waiting on a person', () => {
+  // "0 cases are waiting for a person to decide" answers a question nobody asked about a job.
+  const f = buildAppWorkQueue({
+    trigger: 'schedule',
+    pausesForHuman: false,
+    runs: [run({ id: 'a' }), run({ id: 'b' }), run({ id: 'c' })],
+  });
+  assert.equal(f.shape, 'job');
+  assert.doesNotMatch(f.headline, /waiting/i);
+  assert.match(f.headline, /Run 3 times so far/i);
+  assert.match(f.headline, /Run it again/i);
+});
+
+test('a job that has never run says exactly that', () => {
+  const f = buildAppWorkQueue({ trigger: 'on-demand', pausesForHuman: false, runs: [] });
+  assert.equal(f.shape, 'job');
+  assert.equal(f.headline, 'This has not been run yet.');
+});
+
+test('run once reads in the singular', () => {
+  const f = buildAppWorkQueue({ trigger: 'on-demand', pausesForHuman: false, runs: [run({ id: 'a' })] });
+  assert.match(f.headline, /^Run once so far/);
+});
+
+test('a QUEUE-shaped app still leads with what is waiting', () => {
+  const f = buildAppWorkQueue({
+    trigger: 'email',
+    pausesForHuman: true,
+    runs: [run({ id: 'a', status: 'awaiting_human' })],
+  });
+  assert.equal(f.shape, 'queue');
+  assert.equal(f.headline, '1 case is waiting for a person to decide.');
+});
+
+test('shape is DERIVED from whether a step pauses for a human, not configured', () => {
+  assert.equal(appShape(true), 'queue');
+  assert.equal(appShape(false), 'job');
+  // Defaulting to job when unspecified is the safe direction: it never invents a waiting case.
+  assert.equal(buildAppWorkQueue({ trigger: 'on-demand', runs: [] }).shape, 'job');
+});
+
+test('a job with cases genuinely awaiting a human still surfaces them', () => {
+  // Belt and braces: if the data says a run is paused, never hide it because of a shape guess.
+  const f = buildAppWorkQueue({
+    trigger: 'schedule',
+    pausesForHuman: false,
+    runs: [run({ id: 'a', status: 'awaiting_human' })],
+  });
+  assert.equal(f.waiting.length, 1);
+  assert.match(f.headline, /waiting for a person/i);
 });

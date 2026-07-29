@@ -53,6 +53,26 @@ action it performs), because the app knows its own process.
 
 Purpose-built, not free-flowing. A single generic `Input *` textbox is the defect this replaces.
 
+## 3b. There is MORE THAN ONE shape of app — do not force them all into a queue
+
+An app is not always a decision queue. A second, equally valuable shape (founder, 2026-07-29): **a job
+people come and run to get results** — like a scheduled or set job. No case waits for a human; someone
+opens it, runs it, and reads the output. `Replay`, `Re-run`, `Watch` and `New run` are all legitimate,
+first-class verbs for this shape.
+
+So the app's front door must ADAPT to what kind of app it is, rather than assuming cases arrive:
+
+| Shape | Front door should lead with |
+| --- | --- |
+| **Decision queue** (has a human step; work arrives by email/WhatsApp/connector) | cases waiting for a person |
+| **Job / report** (no human step; on-demand or scheduled) | run it now, and the latest results |
+
+Presenting a job-shaped app with "0 cases are waiting for a person to decide" is as wrong as presenting a
+decision queue with a Build editor. Both mislead the reader about what the app is for.
+
+Consequence for the work screen: `buildAppWorkQueue` currently assumes the queue shape. It needs an app
+shape input, derived from the spec (does any step pause for a human?) and the trigger.
+
 ## 4. Orientation, not capability
 
 `BUILDER_EPIC_PLAN.md` §7 already specifies the right five screens (BUILD → INPUT → RUNNING → REVIEW →
@@ -94,15 +114,18 @@ themselves before building anything new.
   sections renumbered; apex signin links both demo tenants.
 
 ### Not built yet — in priority order
-1. **Input derived from the app's own definition** (see §3). No app may present an unlabelled generic
-   box. Do NOT author custom form fields.
-2. **The dashboard** — the only item on the founder's list with no component behind it at all.
-3. **Org-tree RBAC** (`#102`) — creator grants access, managers above inherit. The `access` tab exists
+1. ~~Input derived from the app's own definition~~ **DONE** — `app-input-prompt.ts`: label "The case to
+   work on", and the example is a REAL previous case from that app. Nothing invented when there is no
+   prior run.
+2. **Adapt the front door to the app's shape** (see §3b) — a job-shaped app must lead with "run it now"
+   and its latest results, not with an empty decision queue.
+3. **The dashboard** — the only item on the founder's list with no component behind it at all.
+4. **Org-tree RBAC** (`#102`) — creator grants access, managers above inherit. The `access` tab exists
    but carries no hierarchy logic.
-4. **Slack and Telegram as INPUTS** — currently outputs only. WhatsApp is done (was a valid
+5. **Slack and Telegram as INPUTS** — currently outputs only. WhatsApp is done (was a valid
    `TriggerKind` handled in `triggers.ts` but missing from the builder's picker).
-5. **Visual feedback while building** — steps/flow appearing as Forge composes them.
-6. **Language pass** — pipeline / guardrail / eval / provenance / policy overlay must not reach a
+6. **Visual feedback while building** — steps/flow appearing as Forge composes them.
+7. **Language pass** — pipeline / guardrail / eval / provenance / policy overlay must not reach a
    department reader. Never name the OSS engines.
 
 ## 6. How to work here

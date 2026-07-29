@@ -35,6 +35,8 @@ export type ArrivalTrigger =
   | (string & {});
 
 export interface AppWorkQueue {
+  /** Which shape of app this is — the caller lays the screen out accordingly. */
+  shape: AppShape;
   /** Cases paused for a person to decide, newest first. */
   waiting: WorkRun[];
   /** Recently finished cases, newest first. */
@@ -85,9 +87,17 @@ export function arrivalSentence(trigger: ArrivalTrigger): string {
 }
 
 /** The headline: what is on this person's plate, stated as fact so a read-only viewer can follow it. */
-function headlineFor(waiting: number, recent: number): string {
+function headlineFor(waiting: number, recent: number, shape: AppShape): string {
   if (waiting === 1) return '1 case is waiting for a person to decide.';
   if (waiting > 1) return `${waiting} cases are waiting for a person to decide.`;
+
+  // A JOB never waits on anybody, so "nothing is waiting" would answer a question nobody asked. What
+  // matters is whether it has produced results and that you can run it now.
+  if (shape === 'job') {
+    if (recent === 0) return 'This has not been run yet.';
+    return recent === 1 ? 'Run once so far. Run it again any time.' : `Run ${recent} times so far. Run it again any time.`;
+  }
+
   if (recent > 0) {
     return recent === 1
       ? 'Nothing is waiting. 1 case has been handled.'
@@ -96,9 +106,23 @@ function headlineFor(waiting: number, recent: number): string {
   return 'No cases yet.';
 }
 
+/**
+ * What KIND of app this is. An app is not always a decision queue: a second, equally valid shape is a job
+ * people come and run to get results (docs/APP_AS_PRODUCT.md §3b). Telling a job-shaped app's user that
+ * "0 cases are waiting for a person to decide" is as wrong as opening a decision queue on a step editor.
+ */
+export type AppShape = 'queue' | 'job';
+
+/** A job has no step that pauses for a person; a queue does. Derived, never configured. */
+export function appShape(pausesForHuman: boolean): AppShape {
+  return pausesForHuman ? 'queue' : 'job';
+}
+
 export interface AppWorkQueueInput {
   runs: readonly WorkRun[];
   trigger: ArrivalTrigger;
+  /** Whether any step of this app pauses for a human decision. */
+  pausesForHuman?: boolean;
   /** How many finished cases to show. */
   recentLimit?: number;
 }
@@ -115,10 +139,13 @@ export function buildAppWorkQueue(input: AppWorkQueueInput): AppWorkQueue {
   const finished = runs.filter((r) => FINISHED.has(r.status)).sort(byNewest);
   const recent = finished.slice(0, input.recentLimit ?? 8);
 
+  const shape = appShape(input.pausesForHuman === true);
+
   return {
+    shape,
     waiting,
     recent,
-    headline: headlineFor(waiting.length, finished.length),
+    headline: headlineFor(waiting.length, finished.length, shape),
     howWorkArrives: arrivalSentence(input.trigger),
     // In-flight runs (queued/running) count as activity: the app is working, so this is not a
     // first-run empty state even though nothing is waiting or finished yet.

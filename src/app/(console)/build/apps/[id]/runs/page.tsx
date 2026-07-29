@@ -5,6 +5,7 @@ import { AppRunControl } from '@/components/build/AppRunControl';
 import { StatusBadge } from '@/components/build/AppRunStatus';
 import { progress } from '@/lib/app-runs-view';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
+import { caseLabel, runSubject } from '@/lib/app-work-queue';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
@@ -69,7 +70,17 @@ export default async function AppRunsTab({ params }: Readonly<{ params: Promise<
               const p = progress(r.steps);
               return (
                 <tr key={r.id} className="border-b border-border/60 last:border-0">
-                  <td className="px-3 py-2 font-mono text-xs text-foreground">{r.id}</td>
+                  {/* The CASE, not the row id. "apprun_71da60a4" tells a department person nothing
+                    about which result they are looking at; the run's own input does. The short
+                    reference is kept underneath so a run can still be quoted precisely. */}
+                  <td className="px-3 py-2 text-xs text-foreground">
+                    <span className="block max-w-[28rem] truncate">
+                      {caseLabel(runSubject((r as { input?: unknown }).input), r.id)}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                      {r.id}
+                    </span>
+                  </td>
                   <td className="px-3 py-2">
                     <StatusBadge status={r.status} small />
                   </td>

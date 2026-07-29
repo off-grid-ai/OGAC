@@ -2,6 +2,7 @@ import { ArrowRight, CheckCircle, Clock, Hourglass } from '@phosphor-icons/react
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PageFrame } from '@/components/PageFrame';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { listAppRuns } from '@/lib/app-run-store';
 import {
@@ -68,8 +69,12 @@ export default async function AppWorkPage({
   if (!app) notFound();
 
   const rows = await listAppRuns(id, orgId, 50).catch(() => []);
+  // Shape is DERIVED from the spec: does any step pause for a person? A job-shaped app must not be told
+  // that nothing is waiting for it (docs/APP_AS_PRODUCT.md §3b).
+  const pausesForHuman = (app.steps ?? []).some((step) => step.kind === 'human');
   const queue = buildAppWorkQueue({
     trigger: app.trigger?.kind ?? 'on-demand',
+    pausesForHuman,
     runs: rows.map((r) => ({
       id: r.id,
       status: String(r.status),
@@ -103,6 +108,24 @@ export default async function AppWorkPage({
           </Card>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
+            {queue.shape === 'job' && queue.waiting.length === 0 ? (
+              <section>
+                <h3 className="mb-2 text-sm font-medium text-foreground">Run it</h3>
+                <Card>
+                  <CardContent className="space-y-3 p-5">
+                    <p className="text-sm text-muted-foreground">
+                      Nobody has to approve anything here. Run it and read the result.
+                    </p>
+                    <Button asChild size="sm">
+                      <Link href={`${base}/input`}>
+                        Run it now
+                        <ArrowRight className="size-3.5" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </section>
+            ) : (
             <section>
               <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
                 <Hourglass className="size-4 text-primary" />
@@ -125,11 +148,12 @@ export default async function AppWorkPage({
                 )}
               </Card>
             </section>
+            )}
 
             <section>
               <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
                 <CheckCircle className="size-4 text-muted-foreground" />
-                Recently handled
+                {queue.shape === 'job' ? 'Latest results' : 'Recently handled'}
               </h3>
               <Card className="overflow-hidden p-0">
                 {queue.recent.length === 0 ? (

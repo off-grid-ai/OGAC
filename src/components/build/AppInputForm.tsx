@@ -81,13 +81,15 @@ export function AppInputForm({
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Start a case</CardTitle>
-          <p className="text-xs text-muted-foreground">
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* The guidance sits in the CONTENT, not the header: CardHeader lays its children out in a
+            grid, so a sibling paragraph landed in the title's cell and overlapped it. */}
+          <p className="text-xs leading-relaxed text-muted-foreground">
             {app.inputForm && app.inputForm.length > 0
               ? 'Fill in the details for this case, then start it.'
               : prompt.hint}
           </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
           {fields.map((f) => (
             <div key={f.key} className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">
