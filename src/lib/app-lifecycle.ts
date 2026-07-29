@@ -8,6 +8,7 @@
 
 export type AppTab =
   | 'work'
+  | 'dashboard'
   | 'build'
   | 'input'
   | 'runs'
@@ -42,6 +43,12 @@ export interface LifecycleTab {
 // than the department's tool for that process (docs/APP_AS_PRODUCT.md item 3).
 const TAB_META: { tab: AppTab; label: string; hint: string; group: AppTabGroup }[] = [
   { tab: 'work', label: 'Work', hint: 'What is waiting for you right now', group: 'primary' },
+  {
+    tab: 'dashboard',
+    label: 'Dashboard',
+    hint: 'How this process is doing — throughput, what is stuck, how long it takes',
+    group: 'primary',
+  },
   { tab: 'build', label: 'Build', hint: 'Edit the steps and how it runs', group: 'primary' },
   { tab: 'input', label: 'Start a case', hint: 'Enter the details and run it', group: 'primary' },
   { tab: 'runs', label: 'Runs', hint: 'Watch runs execute, step by step', group: 'primary' },
@@ -99,6 +106,7 @@ export function activeTabForPath(pathname: string, appId: string): AppTab | null
   if (!seg) return 'work';
   const known: AppTab[] = [
     'work',
+    'dashboard',
     'build',
     'input',
     'runs',

@@ -12,7 +12,8 @@ test('lifecycleTabs: the lifecycle in flow order (+ Quality, Access, Schedule, S
     tabs.map((t) => t.tab),
     // WORK leads: an app opens on what is waiting for you, not on its own configuration
     // (docs/APP_AS_PRODUCT.md item 3). Build moved to its own segment when Work took the base path.
-    ['work', 'build', 'input', 'runs', 'review', 'reports', 'quality', 'access', 'schedule', 'controls'],
+    // Dashboard sits beside Work: both answer "how is this process doing", before you touch the build.
+    ['work', 'dashboard', 'build', 'input', 'runs', 'review', 'reports', 'quality', 'access', 'schedule', 'controls'],
   );
   assert.ok(
     tabs.every((t) => t.hint.length > 0),
