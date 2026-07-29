@@ -267,6 +267,48 @@
   will-change: stroke-dashoffset;
 }
 
+/* The landing's control-plane stage grows to fill the viewport as it is scrolled. While it does, the
+   sticky site header sits on top of the artwork and obscures it — so it slides out of the way and comes
+   back the moment the stage releases. `pointer-events: none` matters too: an invisible-but-present
+   header would still swallow clicks along the top edge of the animation.
+   The attribute is set by ControlPlaneStage; nothing else should key off it. */
+:root[data-stage-immersed='true'] .og-site-header {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.og-site-header {
+  transition:
+    transform var(--og-dur) var(--og-ease),
+    opacity var(--og-dur) var(--og-ease);
+}
+
+/* The landing's control-plane stage grows to fill the viewport as you scroll. While it does, the sticky
+   site header sits over the artwork and obscures it, so it slides out of the way and returns the moment
+   the stage releases. `pointer-events: none` matters as much as the opacity: an invisible-but-present
+   header would still swallow clicks along the top edge of the animation.
+   The attribute is set by ControlPlaneStage; nothing else should key off it. */
+/* Scroll-snapping for the hero stage. `proximity` is deliberate over `mandatory`: it settles the stage
+   into full bleed when the reader comes to rest near it, but never prevents scrolling past — a mandatory
+   snap on a tall pinned section is how pages end up feeling broken. The only snap target on the page is
+   the stage's marker, so nothing else changes behaviour.
+   Note Safari applies proximity thresholds differently from Chromium; the effect is a softer settle
+   there, not a different outcome. */
+html {
+  scroll-snap-type: y proximity;
+}
+
+:root[data-stage-immersed] .og-site-header {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.og-site-header {
+  transition:
+    transform var(--og-dur) var(--og-ease),
+    opacity var(--og-dur) var(--og-ease);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

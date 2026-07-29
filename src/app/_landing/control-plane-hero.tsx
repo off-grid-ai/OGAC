@@ -359,6 +359,35 @@ function Ambient({ gSec, pal }: Readonly<{ gSec: number; pal: Palette }>) {
     <>
       {lock(342.5, 464)}
       {lock(1160, 464)}
+      {/* The connector from OTHER DATA SOURCES up into the feedback list (Usage Patterns), with its
+          arrowhead. The poster SVG does not contain this run — the prototype drew it by hand in the
+          SVG's own dashed style, and I dropped it when porting out of a misplaced worry about
+          double-drawing. It is not a decoration: it is the line that closes the loop, showing enterprise
+          data feeding back into what the edge learns. Themed via the palette's wire colours (which
+          existed for this and were otherwise unused). */}
+      <svg
+        width={WORLD_W}
+        height={WORLD_H}
+        style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
+      >
+        <circle cx="298" cy="774" r="3.2" fill={pal.wireInk} />
+        <path
+          d="M302 774 H332 A10 10 0 0 0 342.5 763.5 V664"
+          fill="none"
+          stroke={pal.wire}
+          strokeWidth="1.2"
+          strokeDasharray="2.4 2.6"
+          strokeLinecap="round"
+        />
+        <path
+          d="M338.1 666 L342.5 660 L346.9 666"
+          fill="none"
+          stroke={pal.wireInk}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
       {/* The "Running" dot inside the OGAM phone. */}
       <div
         style={{
