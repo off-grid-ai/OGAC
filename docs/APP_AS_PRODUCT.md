@@ -127,6 +127,25 @@ themselves before building anything new.
   (Discovered 2026-07-29 while correcting currency copy; that script writes the `summary` column directly
   and says why in its header.)
 
+### The experience gap — read this before adding any more features (2026-07-29)
+
+Founder, shown the Work screen after everything below was live: *"this is what you're calling done is it?"*
+The honest assessment: **it is legible, but it is not a product.** It reads like an admin list view — two
+columns of rows, five plain stat boxes, no hierarchy of importance, nothing that makes a clerk feel the app
+is theirs. Correctness and legibility were fixed; the EXPERIENCE was mistaken for having been fixed with
+them. The repo's component depth (the 397-component library, motion, the design system) is barely used.
+
+Fix these before adding features, in this order — they are what changes the impression:
+
+1. **Make a waiting case actionable IN PLACE.** Approve / reject on the row itself. Deciding is the whole
+   job; today the row navigates you elsewhere to do it. This is the single biggest one.
+2. **Stop showing the same screen twice.** The console Work screen and the deployed app's Work view are
+   near-duplicates with different chrome. Pick which surface owns the queue.
+3. **Give the important thing visual weight.** "2 cases waiting for you" should dominate; "Needed a person
+   100%" should not have equal billing with it.
+4. **Show the governed run happening.** What makes this different from a spreadsheet is currently invisible
+   — no sense of the pipeline, the checks, or the provenance behind a decision.
+
 ### Not built yet — in priority order
 1. ~~Input derived from the app's own definition~~ **DONE** — `app-input-prompt.ts`: label "The case to
    work on", and the example is a REAL previous case from that app. Nothing invented when there is no
