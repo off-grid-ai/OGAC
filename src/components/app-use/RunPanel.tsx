@@ -62,9 +62,24 @@ export function RunPanel({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ input: values }),
       });
-      const data = (await res.json()) as RunResult;
+      const data = (await res.json().catch(() => ({}))) as RunResult & { error?: string };
+
+      // The response STATUS was previously ignored, so a refused run fell through to the body renderer and
+      // displayed "(no output)" — the app looked broken when it was working exactly as governed.
+      if (!res.ok) {
+        setResult({
+          error:
+            res.status === 403
+              ? 'You have view-only access to this app, so it cannot be run from here. Everything else on this page is live.'
+              : (data.error ?? `The run was refused (${res.status}).`),
+        });
+        toast.error(res.status === 403 ? 'View-only access' : 'The run was refused');
+        return;
+      }
+
       setResult(data);
       if (data.status === 'error' || data.error) toast.error('The run hit an error — see below.');
+      else if (data.status === 'awaiting_human') toast.success('Started — it now needs a decision.');
       else toast.success('Run complete.');
     } catch {
       setResult({ error: 'The app is unreachable — try again.' });
@@ -161,8 +176,20 @@ export function RunPanel({
                 )}
                 <span className="text-xs font-medium text-foreground">Result</span>
               </div>
+              {/* NEVER "(no output)". A run that produced no text still did something, and saying nothing
+                makes a working app look broken. A run paused for a person is the NORMAL outcome for an app
+                with a human step — it belongs in Work now, and the reader needs telling. */}
               <pre className="whitespace-pre-wrap text-sm text-foreground">
-                {result.outcome || result.output || result.error || '(no output)'}
+                {result.outcome ||
+                  result.output ||
+                  result.error ||
+                  (result.status === 'awaiting_human'
+                    ? 'Started. This case now needs a decision — it is waiting for you under Work.'
+                    : result.status === 'queued' || result.status === 'running'
+                      ? 'Started. It is running now; the result will appear under Activity.'
+                      : result.status
+                        ? `Finished with status "${result.status}" and produced no text. See Activity for the step-by-step trail.`
+                        : 'Started. See Activity for the step-by-step trail.')}
               </pre>
             </div>
           ) : null}
