@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ScrollableTabs } from '@/components/build/ScrollableTabs';
 import { SubNav } from '@/components/nav/SubNav';
 import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { activeTabForPath, lifecycleTabs } from '@/lib/app-lifecycle';
@@ -26,7 +25,7 @@ export function AppLifecycleNav({
 }>) {
   const pathname = usePathname();
   const tabs = lifecycleTabs(appId);
-  const active = activeTabForPath(pathname, appId) ?? 'build';
+  const active = activeTabForPath(pathname, appId) ?? 'work';
   const activeHint = tabs.find((t) => t.tab === active)?.hint ?? '';
 
   return (
@@ -49,14 +48,10 @@ export function AppLifecycleNav({
             {title}
           </h1>
           {pipeline ? <PipelineChip pipeline={pipeline} size="xs" /> : null}
-          {/* On mobile the rail takes a full row and scrolls sideways; on desktop (md+) it keeps its
-              original inline-right position (ml-auto, wrapping) so wide screens are unchanged. */}
-          <ScrollableTabs
-            aria-label="App lifecycle"
-            tabs={tabs.map((t) => ({ key: t.tab, label: t.label, href: t.href }))}
-            active={active}
-            className="w-full md:ml-auto md:w-auto"
-          />
+          {/* The lifecycle tabs used to render as a horizontal rail HERE, alongside the left sidebar —
+            two competing navigations on one screen, and the reason this surface was hard to place
+            yourself in. They now nest inside the sidebar under Apps, so there is exactly one place to
+            navigate from. This band keeps only identity: where you are, and what governs it. */}
         </div>
         {activeHint ? <p className="text-[11px] text-muted-foreground">{activeHint}</p> : null}
       </div>

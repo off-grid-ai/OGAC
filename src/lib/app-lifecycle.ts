@@ -18,9 +18,18 @@ export type AppTab =
   | 'schedule'
   | 'controls';
 
+/**
+ * `primary` = what you DO with an app day to day. `settings` = what you configure once.
+ *
+ * Ten equal-weight tabs presented as one flat rail is why this surface read as overwhelming: nothing
+ * told the reader that Work and Safety are not the same kind of thing.
+ */
+export type AppTabGroup = 'primary' | 'settings';
+
 export interface LifecycleTab {
   tab: AppTab;
   label: string;
+  group: AppTabGroup;
   /** Absolute route for this app's tab. */
   href: string;
   /** One-line "what this screen is" helper (screens 1–5 of the canonical flow). */
@@ -31,30 +40,34 @@ export interface LifecycleTab {
 // on its own and the person using it opens the app to deal with what is waiting — not to inspect the
 // app's own configuration. Landing on Build made every app read as an entry in an AI console rather
 // than the department's tool for that process (docs/APP_AS_PRODUCT.md item 3).
-const TAB_META: { tab: AppTab; label: string; hint: string }[] = [
-  { tab: 'work', label: 'Work', hint: 'What is waiting for you right now' },
-  { tab: 'build', label: 'Build', hint: 'Edit the steps and how it runs' },
-  { tab: 'input', label: 'Input', hint: 'Enter inputs and run it' },
-  { tab: 'runs', label: 'Runs', hint: 'Watch runs execute, step by step' },
-  { tab: 'review', label: 'Review', hint: 'Approve or reject runs paused for a human' },
-  { tab: 'reports', label: 'Reports', hint: 'Outcomes over time' },
+const TAB_META: { tab: AppTab; label: string; hint: string; group: AppTabGroup }[] = [
+  { tab: 'work', label: 'Work', hint: 'What is waiting for you right now', group: 'primary' },
+  { tab: 'build', label: 'Build', hint: 'Edit the steps and how it runs', group: 'primary' },
+  { tab: 'input', label: 'Start a case', hint: 'Enter the details and run it', group: 'primary' },
+  { tab: 'runs', label: 'Runs', hint: 'Watch runs execute, step by step', group: 'primary' },
+  { tab: 'review', label: 'Review', hint: 'Approve or reject runs paused for a human', group: 'primary' },
+  { tab: 'reports', label: 'Reports', hint: 'Outcomes over time', group: 'primary' },
   {
     tab: 'quality',
+    group: 'settings',
     label: 'Quality',
     hint: "This pipeline's evals, golden set, and drift — run and gate on them",
   },
   {
     tab: 'access',
+    group: 'settings',
     label: 'Access',
     hint: 'Who may run, trigger, and approve this — and to what limit',
   },
   {
     tab: 'schedule',
+    group: 'settings',
     label: 'Schedule',
     hint: 'Set when this runs on its own — a recurring time, timezone, and the next fire',
   },
   {
     tab: 'controls',
+    group: 'settings',
     label: 'Safety',
     hint: 'Shadow-mode dry-runs, daily run + spend caps, and the kill-switch — run it safely before it acts',
   },

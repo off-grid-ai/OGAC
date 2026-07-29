@@ -4,7 +4,7 @@ import { BookOpen, CaretRight } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure';
 import { getEnabledModules } from '@/lib/modules';
@@ -17,6 +17,7 @@ import {
 } from '@/modules/contextual-navigation';
 import { sidebarActiveIdForPath, sidebarSectionIdForPath, sidebarSections } from '@/modules/groups';
 import { MODULE_ICONS } from '@/modules/icons';
+import { activeTabForPath, lifecycleTabs } from '@/lib/app-lifecycle';
 
 const ACTIVE_NAV_ITEM = 'border-primary/30 bg-primary/10 font-medium text-foreground';
 const INACTIVE_NAV_ITEM =
@@ -37,6 +38,16 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
   const activeId = sidebarActiveIdForPath(pathname);
   const activeSectionId = sidebarSectionIdForPath(sections, pathname);
   const activeContextualModule = contextualModuleForPath(pathname);
+
+  // When an app is open, ITS tabs belong in this sidebar, nested under Apps. They used to render as a
+  // separate horizontal rail in the content area — two navigations competing on one screen, with no
+  // single place to orient from. URL-derived, so Back still walks the tabs.
+  const openAppId = /^\/solutions\/apps\/([^/]+)/.exec(pathname)?.[1];
+  const appTabs =
+    openAppId && !['new', 'forge', 'runs', 'reports'].includes(openAppId)
+      ? lifecycleTabs(decodeURIComponent(openAppId))
+      : [];
+  const activeAppTab = openAppId ? activeTabForPath(pathname, decodeURIComponent(openAppId)) : null;
   // Inactive domains start collapsed. Deep links expose their active ancestors, and both levels can
   // still be collapsed manually after that reveal.
   const [openSectionId, setOpenSectionId] = useState<string | null>(activeSectionId ?? null);
@@ -248,9 +259,10 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                       </Disclosure>
                     );
                   }
+                  const nested = item.id === 'apps' && appTabs.length > 0 ? appTabs : [];
                   return (
+                    <Fragment key={item.id}>
                     <Link
-                      key={item.id}
                       href={item.route}
                       data-og-interactive
                       data-og-surface={active ? 'raised' : undefined}
@@ -283,6 +295,41 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                         </span>
                       ) : null}
                     </Link>
+                    {/* The open app's own tabs, nested under Apps. Split by purpose: what you DO with
+                      the app, then a quieter Settings group for what you configure once. Ten
+                      equal-weight tabs in one flat rail is what made this overwhelming. */}
+                    {nested.length > 0 ? (
+                      <div className="ml-3 mt-0.5 space-y-0.5 border-l border-border/80 pl-3">
+                        {nested.map((t, i) => {
+                          const first = nested[i - 1];
+                          const startsSettings =
+                            t.group === 'settings' && (!first || first.group !== 'settings');
+                          const tabActive = activeAppTab === t.tab;
+                          return (
+                            <Fragment key={t.tab}>
+                              {startsSettings ? (
+                                <p className="px-2 pb-0.5 pt-2 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                                  Settings
+                                </p>
+                              ) : null}
+                              <Link
+                                href={t.href}
+                                onClick={onNavigate}
+                                data-og-interactive
+                                aria-current={tabActive ? 'page' : undefined}
+                                className={cn(
+                                  'flex min-h-8 items-center rounded-md border px-2 py-1 text-[12px] transition-colors',
+                                  tabActive ? ACTIVE_NAV_ITEM : INACTIVE_NAV_ITEM,
+                                )}
+                              >
+                                <span className="truncate">{t.label}</span>
+                              </Link>
+                            </Fragment>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    </Fragment>
                   );
                 })}
               </div>
