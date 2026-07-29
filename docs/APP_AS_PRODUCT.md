@@ -194,6 +194,55 @@ Fix these before adding features, in this order — they are what changes the im
 4. **Show the governed run happening.** What makes this different from a spreadsheet is currently invisible
    — no sense of the pipeline, the checks, or the provenance behind a decision.
 
+### The run now REACHES A DECISION (2026-07-29) — and what it took
+
+Founder, on seeing `Result: (no output)`: *"goal is not met. goal should be successful creation of the
+right UX… you haven't done that. in fact you are far from it."* Chasing that one case end to end
+uncovered a chain of five defects, each of which had been presenting as something else:
+
+1. **A failed read reported itself as an empty one.** `"No rows returned from reimbursement quota
+   (employee_quota)"` — while the table held 500 rows. `execConnectorQuery` returns `null` on failure,
+   and the step turned `null` into a `done` step with an empty-source message. The agent then reasoned
+   from that silence ("no defined reimbursement quota"), and declined the claim. Same defect class as
+   `(no output)`: **a failure wearing the costume of an empty answer.** Fixed at the seam —
+   `connector-failure.ts` (pure taxonomy + sentences), `execConnectorRead` returns rows OR a named
+   reason, and an unreadable source is now an **error that halts the run**. A governed run must not
+   decide on data it could not read.
+2. **The credential was missing, not the data.** `con_f5c959` carried `mysql://policyadmin@…` — no
+   password — while its sibling in the same org had one. `scripts/fix-demo-connector-credentials.mts`
+   vaults a credential for any demo SQL connector lacking one and then PROBES it. That probe also found
+   `surcon_coreins` pointing at a Postgres role that **did not exist** on the insurer DB — a second
+   source that would have reported "no rows" forever. All six demo connectors now connect.
+3. **The case picker resolved domains differently from the run.** A compiled spec emits the domain
+   **id**; the route matched on **label** only, so the picker said "not connected yet" for apps whose
+   runs read that domain fine. Both now use `resolveDomainByIdOrLabel` — one rule, one place.
+4. **The app read the whole table, not the case.** `ConnectorQuery.params` was documented as "reserved
+   for equality filters"; nothing applied it. So "Read the invoice" returned 20 unrelated invoices and
+   "Check the employee's quota" returned 20 unrelated employees, and the agent — correctly — said it
+   could not decide. `connector-filter.ts` (pure) adds `{{case.employee_id}}` placeholders, bound
+   equality filters per dialect, and `caseRecordFrom()` which finds the record in any of the three
+   envelopes a case can arrive in. **An unsatisfiable placeholder is an ERROR**, because reading
+   unfiltered would return other people's records under a step labelled "check THIS employee's quota".
+5. **Editing an app's instructions was a silent no-op.** A step's instructions are materialized into a
+   runtime-agent row at first run, and nothing ever updated them again — so the App row changed and the
+   running behaviour did not. `updateApp` now re-syncs the instructions of agents the app OWNS (never a
+   shared library agent). This was broken on the one path the builder exists for.
+
+**The data was also incoherent, and that is a product defect too.** "Reimbursement Approval" read the
+ERP's VENDOR invoices — a table with no employee column — so no scoped join was even possible. The
+missing entity was the claim itself. `gen-expense-claims-sql.mts` emits the roster, the per-category
+quota AND the claims from ONE source, so a claim can never be checked against a different person's
+quota; `seed-insurer-expense-claims.sql` derives the insurer's claims from its own richer roster
+in-database. Every 5th claim deliberately exceeds quota, so an approval is a real decision.
+
+**Verified live, both tenants:** claim ₹41,346.44 · remaining ₹137,454.12 · headroom ₹96,107.68 →
+"Recommendation: within quota — approve" → pauses for a human. The insurer's app decides the same way
+against its single pool.
+
+The lesson worth carrying: **every one of these presented as emptiness.** An empty list, an empty read,
+an empty answer. Fixing them meant refusing to accept "nothing there" as an explanation and asking what
+would have to be true for it to be genuinely empty.
+
 ### Not built yet — in priority order
 1. ~~Input derived from the app's own definition~~ **DONE** — `app-input-prompt.ts`: label "The case to
    work on", and the example is a REAL previous case from that app. Nothing invented when there is no
@@ -234,3 +283,10 @@ Fix these before adding features, in this order — they are what changes the im
   detector.
 - Never wait on a deploy in a tool call that can time out — killing `push.sh` mid-`.next`-sync leaves a
   torn artifact that renders as unstyled HTML. See the memory note `feedback-never-kill-deploy-midsync`.
+- **Read the step's `detail`, not its `outcome`.** `errorResult(step, reason)` writes the reason to
+  `detail`. A diagnostic that printed `outcome` cost a previous session two wrong theories about a run
+  failure whose cause was sitting in `detail` the whole time. `scripts/run-one-case.mts` prints both.
+- **`tsx` on the box runs `src/`, not `.next`.** A script verifying new behaviour needs `rsync src/`
+  first, or it silently exercises the previously deployed source and you conclude the fix did not work.
+- **When a read returns nothing, prove the source is genuinely empty** before believing it. Two hours
+  went into a "missing quota" that was a password-less connection, and the table had 500 rows all along.
