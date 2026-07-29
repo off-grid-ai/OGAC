@@ -12,7 +12,7 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { ControlPlanePoster } from '@/app/_landing/control-plane-poster';
+import { ControlPlaneHero } from '@/app/_landing/control-plane-hero';
 import { CtaButtons } from '@/app/_landing/cta-buttons';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
 import { ProductTour } from '@/app/_landing/product-tour';
@@ -153,9 +153,9 @@ export default function LandingPage() {
               </BlurFade>
             </div>
 
-            {/* The product itself, as one drawing. Themed vector — see control-plane-poster.tsx. */}
+            {/* The product, alive: a camera crossing the control plane while it runs. 16.3s loop. */}
             <BlurFade delay={0.2} inView>
-              <ControlPlanePoster />
+              <ControlPlaneHero />
             </BlurFade>
           </div>
         </div>
