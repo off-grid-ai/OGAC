@@ -525,6 +525,7 @@ function World({
 
 export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> = {}) {
   const { resolvedTheme } = useTheme();
+  const outerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const [elapsed, setElapsed] = useState(0);
   const [scale, setScale] = useState(1);
@@ -551,7 +552,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   const elapsedRef = useRef(0);
 
   const toggleFullscreen = useCallback(async () => {
-    const host = hostRef.current;
+    const host = outerRef.current;
     if (!host) return;
     if (document.fullscreenElement) {
       // Release the orientation lock before leaving, or the phone can stay stuck landscape.
@@ -591,7 +592,12 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   const measure = useCallback(() => {
     const host = hostRef.current;
     if (!host) return;
-    const { width, height } = host.getBoundingClientRect();
+    // offsetWidth/Height, NOT getBoundingClientRect: the rotor is rotated 90° in portrait fullscreen, and
+    // getBoundingClientRect returns the TRANSFORMED bounding box — so a 664x390 landscape rotor measured
+    // as 390x664 and the stage got fitted to the portrait dimensions it only appears to occupy. The layout
+    // box is what the stage actually lives in.
+    const width = host.offsetWidth;
+    const height = host.offsetHeight;
     if (!width || !height) return;
     setBox((prev) => (Math.abs(prev.w - width) < 0.5 && Math.abs(prev.h - height) < 0.5 ? prev : { w: width, h: height }));
     const next = Math.min(width / STAGE_W, height / STAGE_H);
@@ -621,6 +627,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
       // pixels, so browser chrome, a bookmarks bar or a mobile toolbar are already accounted for; that is
       // why the sizing is measured rather than expressed in vh.
       setScale(Math.min(width / STAGE_W, height / STAGE_H));
+      measure();
     });
     ro.observe(host);
     // Scroll drives the expansion, and the loop may be paused while it happens.
@@ -653,10 +660,19 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
 
   // Track fullscreen so the button reflects reality even when exited with Escape or the OS chrome.
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === hostRef.current);
+    const onChange = () => {
+      setFullscreen(document.fullscreenElement === outerRef.current);
+      // The box changes shape on entering/leaving fullscreen and on rotation; refit immediately rather
+      // than waiting for the next frame, so there is no flash at the wrong size.
+      requestAnimationFrame(measure);
+    };
     document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+    window.addEventListener('orientationchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      window.removeEventListener('orientationchange', onChange);
+    };
+  }, [measure]);
 
   // Space toggles playback, F toggles fullscreen — only while the animation has focus, so the keys
   // stay available to the rest of the page.
@@ -727,7 +743,7 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
   const label = paused ? 'Play the animation' : 'Pause the animation';
   return (
     <div
-      ref={hostRef}
+      ref={outerRef}
       className={`group relative w-full overflow-hidden border-border bg-[var(--stage-bg)] ${
         fullscreen || fill ? 'rounded-none border-0' : 'rounded-xl border'
       } ${fill ? 'h-full' : ''}`}
@@ -754,19 +770,31 @@ export function ControlPlaneHero({ fill = false }: Readonly<{ fill?: boolean }> 
             aria-pressed={paused}
             className="absolute inset-0 z-10 cursor-pointer"
           />
-          <div
-            style={{
-              position: 'absolute',
-              // Centre the stage: fullscreen displays are rarely 16:9, so letterbox rather than crop.
-              top: (box.h - STAGE_H * scale) / 2,
-              left: (box.w - STAGE_W * scale) / 2,
-              width: STAGE_W,
-              height: STAGE_H,
-              transform: `scale(${scale})`,
-              transformOrigin: '0 0',
-            }}
-          >
-            {bgReady ? <World cam={cam} gSec={gSec} em={em} pal={pal} src={src} /> : null}
+          {/* THE ROTOR. In portrait fullscreen, CSS sizes this to the screen's LANDSCAPE dimensions
+              (100vh x 100vw) and turns it 90° — see `.og-stage-rotor` in globals.css. That is the fallback
+              for `screen.orientation.lock('landscape')`, which is the correct API and which iOS Safari
+              does not implement: without it, fullscreen on a phone stayed portrait and fitted a 16:9 stage
+              to the phone's WIDTH, leaving most of the screen empty.
+              An earlier attempt did the rotation in JS off React state and silently never engaged — the
+              state depended on a `fullscreenchange` event and a measurement arriving in an assumed order,
+              and neither did. CSS keyed off `:fullscreen` cannot miss.
+              `hostRef` is HERE, on the element that actually contains the stage, so the fit maths measures
+              the rotated box and needs no rotation awareness of its own. */}
+          <div ref={hostRef} className="og-stage-rotor absolute inset-0">
+            <div
+              style={{
+                position: 'absolute',
+                // Centre the stage: a display is rarely 16:9, so letterbox rather than crop.
+                top: (box.h - STAGE_H * scale) / 2,
+                left: (box.w - STAGE_W * scale) / 2,
+                width: STAGE_W,
+                height: STAGE_H,
+                transform: `scale(${scale})`,
+                transformOrigin: '0 0',
+              }}
+            >
+              {bgReady ? <World cam={cam} gSec={gSec} em={em} pal={pal} src={src} /> : null}
+            </div>
           </div>
 
           {/* Controls. Always present for keyboard/AT; visually revealed on hover or focus, and held

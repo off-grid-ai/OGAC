@@ -312,6 +312,26 @@
   border-color: color-mix(in oklab, var(--og-primary) 55%, transparent) !important;
 }
 
+/* PORTRAIT-FULLSCREEN ROTATION for the hero stage.
+   The stage is 16:9, so fullscreen on a phone is only worth anything in landscape.
+   `screen.orientation.lock('landscape')` is the right API and iOS Safari simply does not implement it, so
+   when the lock is refused we rotate the stage ourselves: size the rotor to the screen's LANDSCAPE
+   dimensions (100vh x 100vw) and turn it 90°. The reader gets a full landscape view without turning the
+   phone, and if they do turn it the portrait media query stops matching and this unwinds by itself.
+   Done in CSS rather than JS deliberately — the JS version keyed off React state that depended on events
+   and measurements arriving in an assumed order, and silently never engaged. `:fullscreen` cannot miss. */
+@media (orientation: portrait) {
+  :fullscreen .og-stage-rotor {
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: 100vh;
+    height: 100vw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+  }
+}
+
 /* Scroll-snapping for the hero stage. `proximity` is deliberate over `mandatory`: it settles the stage
    into full bleed when the reader comes to rest near it, but never prevents scrolling past — a mandatory
    snap on a tall pinned section is how pages end up feeling broken. The only snap target on the page is

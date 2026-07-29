@@ -183,9 +183,13 @@ export function ControlPlaneStage() {
   }, [expand, reduce, snapOffset, scrollYProgress]);
 
   // Until measured (SSR / first paint), and on mobile, render the plain contained stage.
+  //
+  // `wrapRef` is attached HERE TOO, even though nothing scroll-driven happens in this branch. Returning
+  // early without it left useScroll's target ref permanently unhydrated, which motion reports as
+  // "Target ref is defined but not hydrated" — on every mobile visit and on every desktop first paint.
   if (!expand) {
     return (
-      <div className="mx-auto max-w-[100rem] px-4 pb-12 sm:px-6 sm:pb-16 lg:pb-20">
+      <div ref={wrapRef} className="mx-auto max-w-[100rem] px-4 pb-12 sm:px-6 sm:pb-16 lg:pb-20">
         <ControlPlaneHero />
       </div>
     );
