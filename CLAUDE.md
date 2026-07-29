@@ -12,6 +12,17 @@ Next.js 15 app. The AI gateway runs separately (the LiteLLM proxy at `<control-p
 - **Navigation must live in the URL / history stack.** Every screen change or in-page navigation (opening a folder, a tab, a detail view, a modal that's a "place") MUST push a corresponding history entry — drive it from the route/`searchParams` (`useRouter`/`useSearchParams`), not local `useState`. This keeps the browser Back button coherent (Back steps out of a folder/tab, doesn't dump you off the page) and makes views deep-linkable/shareable. Client-only state for a navigational position is a bug.
 - **Every module is a full CRUD management surface — not a read-only dashboard.** The console is how operators **run and maintain their systems**, so each module must let them **create, read, update, AND delete** the entities it covers, and **trigger the actions** that manage the underlying system (run an eval, run/schedule a backup, re-run/cancel an agent run, push/reload a policy, create/delete a collection, write a secret, edit a masking rule). A page that only lists/aggregates data is **the bare minimum and NOT a finished feature.** For each entity: create/edit forms with validation, delete with confirmation, proper error handling, and the write routes (POST/PATCH/DELETE) behind them — console-owned entities in the DB, external-service entities pushed through the service's API. Keep the SOLID split (pure rules in `src/lib`, thin routes, tests), but the deliverable is a working management console, end-to-end usable.
 
+## READ FIRST when touching Solutions / Apps / the builder
+
+**[`docs/APP_AS_PRODUCT.md`](docs/APP_AS_PRODUCT.md)** is the direction, the acceptance bar and the
+running progress log for the app-as-product work. Read it before writing code on those surfaces, and
+update its Progress log before finishing. It also records the one correction that is easy to get wrong:
+input is NOT solved by authoring per-app form fields — work arrives from existing enterprise data flows,
+and any entry fields must be derived from what the app already knows.
+
+The acceptance bar there overrides "tests pass": done means a non-technical person in a department can
+use the surface unaided.
+
 ## Systems of record — READ THESE (don't keep infra knowledge in your head)
 
 > **On-prem / fleet deployment orchestration now lives in the PRIVATE repo

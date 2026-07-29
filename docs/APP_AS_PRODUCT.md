@@ -1,82 +1,119 @@
-# The app is the department's product, not an entry in an AI console
+# READ THIS FIRST — the app is the department's product, not an entry in an AI console
 
-**Status:** specification + work plan. Written 2026-07-28 from the founder's spec, to be executed one
-item at a time with live verification against the persona bar below.
+**Every session working on Solutions / Apps / the builder MUST read this file before writing code, and
+MUST update the Progress log at the bottom before finishing.** It is the direction, the acceptance bar,
+and the running state. Referenced from `CLAUDE.md` so it cannot be missed.
 
-## The acceptance bar
+---
 
-From `founder-freehand.md` (the founder's own words — quoted, never paraphrased):
+## 1. The acceptance bar
+
+From `docs/founder-freehand.md` (the founder's own words — quoted, never paraphrased):
 
 > Empower non-technical people to build. A person describes a workflow or process in plain English,
 > and the system is smart enough to inherit the org's rules, workflows, data, connectors, policies,
 > and guardrails automatically, and hand them their own lovable ecosystem, with human-in-the-loop,
 > review, and reports, so they do their job better.
 
-A change is done when a **non-technical person in a department** (tax, accounting, claims, grievance
-handling) can use it without help. Not when tests pass.
+**Done means a non-technical person in a department — tax, accounting, claims, grievance handling — can
+use it unaided. Not that tests pass.** The public demo is READ-ONLY, so every surface must also be
+understandable by *reading* it, without acting.
 
-## What an app IS
+## 2. What the founder asked for, verbatim in substance
 
-An app automates a process the enterprise **already runs**. Because the process already exists, its
-data already arrives — by email, WhatsApp, Slack, Telegram, a webhook, a schedule, or a connector.
-The app plugs into those existing flows; it never asks anyone to invent custom form fields, and it
-only ever processes **enterprise data from configured sources** — never ad-hoc uploads.
+- Write a prompt → get an app or an agent.
+- Reuse a previous app / agent.
+- Select from templates.
+- Edit what was built.
+- **Visual feedback of what gets built.**
+- What gets built is based on the **pipelines, data sources and UI components that already exist** for
+  this user — never invented capabilities.
+- Once built, the app has:
+  - **its own RBAC** — the creator decides access; anyone above them in the org tree inherits it
+  - a **built-in HITL screen and process**, always, not optional
+  - **reports**
+  - a **dashboard**
+  - **varied inputs** — email, Slack, WhatsApp, Telegram, webhook, schedule, connectors: whatever is
+    already configured as an enterprise data source
+  - **varied outputs** — on screen, API call, Slack, email — through integrations that already exist
 
-Agents do the work on that data. Results leave through the integrations the org already has: a
-report, an email, a Slack message, a CRM write, an API call.
+## 3. THE CORRECTION THAT MATTERS MOST
 
-Every app ships with these as standard, not as options:
+> *"It's a web app, but **not with customUI fields**, but a web app specifically built to automate some
+> process, that already happens in the enterprise. which means that data already flows in somehow."*
 
-- **A work queue** — the cases waiting on this person, because work arrives on its own.
-- **Human-in-the-loop** — the decision screen IS the app's main surface.
-- **A dashboard** — the process's health in the department's language.
-- **Reports** — outcomes over time.
-- **Its own RBAC** — the creator grants access; anyone above them in the org tree inherits it.
+**Do NOT solve input by authoring per-app form fields.** That is building custom UI, which is explicitly
+ruled out. I started down that road and it was wrong.
 
-## The orientation defect (why current app pages miss it)
+The correct model: **work arrives; it is not typed in.** The process already runs, so its data already
+flows from email, Slack, WhatsApp, Telegram or a connector. The app's front door is the **queue of
+arriving cases**. A manual entry screen is a fallback, not the main event — and where entry *is* needed,
+the fields must be **derived from what the app already knows** (the data domains its steps read, the
+action it performs), because the app knows its own process.
 
-`BUILDER_EPIC_PLAN.md` §7 already specifies the right five screens (BUILD → INPUT → RUNNING →
-REVIEW → REPORTS). The implementation drifted: an app today opens on **Build**, and its shell
-(Build / Input / Runs / Review / Reports / Quality / Access / Schedule / Safety) is a set of facts
-*about* the app. To use it you press Run and fill a form.
+Purpose-built, not free-flowing. A single generic `Input *` textbox is the defect this replaces.
 
-The machinery is largely built — `app-compile.ts` (plain language → steps), `org-context.ts` (org
+## 4. Orientation, not capability
+
+`BUILDER_EPIC_PLAN.md` §7 already specifies the right five screens (BUILD → INPUT → RUNNING → REVIEW →
+REPORTS) and most machinery exists: `app-compile.ts` (plain language → steps), `org-context.ts` (org
 inheritance), `triggers.ts`, `AppRunStatus.tsx` (live per-step status), the review route, the output
-sinks. **What is missing is orientation, not capability.** The app must present itself as the
-department's tool for that process.
+sinks, `TemplateAdoptForm`, `AppReuseActions`. **What drifted is ORIENTATION.** Fix how surfaces present
+themselves before building anything new.
 
-## Work plan
+## 5. Progress log
 
-Ordered. One at a time, each through the full gates (pure logic isolated, real tests, typecheck,
-coverage, clean production build) and verified live by screenshot against the persona bar.
+### Live and verified (2026-07-28 → 29)
+- **Solutions consolidated** — sidebar 7 rows → 5; `Library` → `Blueprints`; the orphan
+  `/solutions/catalogue` duplicate collapsed into one blueprint detail carrying BOTH the live
+  requirements checklist and the contract editor (the good page had been unreachable from the nav).
+- **Solutions hub explains the chain** — Blueprint → App → Deployment, and names the missing
+  precondition when a stage cannot proceed instead of showing a blank list.
+- **Apps open on the WORK**, not on Build. `work` is the base tab; Build moved to `./build`.
+  Waiting cases lead and are never truncated; plain language throughout (`awaiting_human` → "Waiting
+  for you", webhook → "arrives automatically from a connected system").
+- **Cases say what they are about** — subjects derived from the run's own input, amounts grouped
+  (`361,030`), identifiers never grouped (a mangled policy number misleads whoever copies it).
+- **108 empty demo runs backfilled** with realistic Indian-BFSI cases (INR, PAN/IFSC-shaped, Indian
+  names) — `scripts/backfill-demo-run-input.mts`, idempotent.
+- **Templates seeded** — six real processes across the two tenants via the real
+  `publishAppAsTemplate` path (`scripts/seed-app-templates.mts`).
+- **Demo junk purged** — 7 `[autotest]` apps + probe residue; reference-guarded so no audit trail was
+  destroyed (`scripts/purge-demo-junk-apps.mts`).
+- **Deployed is no longer a dead end** — bank tenant shows an ACTIVE adoption
+  (`scripts/seed-solution-deployment.mts`). The insurer has NO compatible pair and the script reports
+  why per blueprint; nothing was forced past the compatibility check.
+- **One navigation** — the app's horizontal tab rail is gone; tabs nest in the left sidebar under Apps,
+  split `primary` (what you do) vs `settings` (what you configure once). "Input" → "Start a case".
+- **Stale-tab recovery** — a deploy used to break every open tab with `ChunkLoadError`. Handled in the
+  console error boundary AND by an inline root-layout listener, because a boundary cannot catch its own
+  layout chunk failing to load.
+- **a11y** — exactly one `h1` per app page, enforced by tests. The mobile gate had been claiming every
+  page's `h1`, which silently satisfied the `h1` assertions in the e2e suite and screen sweep.
+- **Landing** — misaligned pricing beam removed; unfilled "Proof" placeholder section removed and
+  sections renumbered; apex signin links both demo tenants.
 
-1. **Templates seeded from real processes.** Publish the genuine BFSI apps already in each tenant as
-   templates via `publishAppAsTemplate` with `{{var}}` schemas — KYC & Re-KYC, Personal Loan
-   Underwriting, Reimbursement Approval (bank); Motor-Claim FNOL Intake, Death-Claim Assessment,
-   Grievance Resolution Assist (insurer). The persona must never meet a blank prompt or an empty
-   library. The adopt components (`TemplateAdoptForm.tsx`, `AppReuseActions.tsx`) already exist; this
-   is a data gap, not a build gap.
-2. **Purge demo junk.** 7 `[autotest] …` apps in the insurer tenant; `Actions-out webhook proof` ×3,
-   `Cross-Sell Advisor` ×2 and `Governed CRM follow-up — live verification 2026-07-22` in the bank.
-   Check run-history references before deleting — never destroy an audit trail to tidy a list.
-3. **The app opens on the work, not on its own configuration.** Default view becomes the work queue
-   of cases waiting on this person. This is the item that makes the vision visible.
-4. **HITL becomes the primary surface.** Case + drafted answer + the evidence used → approve / edit /
-   reject → next case. Reuses the existing per-step human signal and review route.
-5. **The process dashboard.** Resolved this period, past SLA, stuck, exceptions, value — from run and
-   outcome data already retained. The only item on this list with no component behind it today.
-6. **Complete the inputs.** WhatsApp is already a valid `TriggerKind` handled in `triggers.ts` but
-   missing from the builder's picker (only 4 of 5 offered) — expose it, then add Slack and Telegram
-   bound to configured integrations.
-7. **Org-tree RBAC** (`#102`). Creator grants access; managers above inherit by default. The `access`
-   tab exists but carries no hierarchy logic — genuinely unbuilt.
-8. **Language pass on every persona-facing surface.** Pipeline, guardrail, eval, provenance, policy
-   overlay leave the view and become "this was checked" / "a person approved it". The machinery keeps
-   running underneath, and per the docs rule the OSS engine names never surface.
+### Not built yet — in priority order
+1. **Input derived from the app's own definition** (see §3). No app may present an unlabelled generic
+   box. Do NOT author custom form fields.
+2. **The dashboard** — the only item on the founder's list with no component behind it at all.
+3. **Org-tree RBAC** (`#102`) — creator grants access, managers above inherit. The `access` tab exists
+   but carries no hierarchy logic.
+4. **Slack and Telegram as INPUTS** — currently outputs only. WhatsApp is done (was a valid
+   `TriggerKind` handled in `triggers.ts` but missing from the builder's picker).
+5. **Visual feedback while building** — steps/flow appearing as Forge composes them.
+6. **Language pass** — pipeline / guardrail / eval / provenance / policy overlay must not reach a
+   department reader. Never name the OSS engines.
 
-## Notes
+## 6. How to work here
 
-- Items 1 and 3 are interchangeable in priority; 3 is where the vision becomes visible, 1 is where
-  the persona can first get in.
-- Related: `BUILDER_EPIC_PLAN.md` (the 5 screens, org inheritance `#102`, triggers `#103`),
-  `VISION.md` §the plain-language builder, `GAPS_BACKLOG.md`.
+- One item at a time, through the full gates (pure logic isolated in `src/lib`, real tests, typecheck,
+  coverage, clean production build), then **deploy and verify live by screenshot**.
+- `scripts/verify-all-screens.mjs` sweeps every screen and classifies BROKEN / THIN / OK from the DOM.
+  Use it — it caught a hydration mismatch, the `h1` blind spot, and eight identical "Case" rows.
+- **Verify before believing.** Repeatedly this session an apparent product defect was my own probe:
+  RSC prefetch aborts flagged all 174 screens, a deleted credentials file looked like 14 broken tests,
+  reversed arguments looked like a store bug. If a huge fraction fails for one reason, suspect the
+  detector.
+- Never wait on a deploy in a tool call that can time out — killing `push.sh` mid-`.next`-sync leaves a
+  torn artifact that renders as unstyled HTML. See the memory note `feedback-never-kill-deploy-midsync`.
