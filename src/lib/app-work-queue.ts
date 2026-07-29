@@ -275,3 +275,52 @@ export function caseLabel(subject: string | null | undefined, runId: string): st
   const ref = runId.replace(/^[a-z]+_/i, '').slice(0, 6);
   return ref ? `Case ${ref}` : 'Case';
 }
+
+// ─── caseTrail — what actually happened to a case, in the person's language ───────────────────────────
+//
+// The governed run was invisible: a finished case showed a status and a time, and nothing about the machinery
+// that produced it. That is the thing which distinguishes this from a spreadsheet, and it left no trace for
+// the person relying on the decision.
+//
+// This describes ONLY what the run's own steps record. The demo runs carry no provenance signature and no
+// guardrail steps, so nothing here claims a signature or a guardrail verdict — asserting governance that did
+// not happen would be far worse than showing none. When those steps DO run, they appear, because the summary
+// is derived from the steps rather than written by hand.
+
+export interface TrailStep {
+  kind?: string;
+  status?: string;
+}
+
+/**
+ * A one-line account of a case: "Read 2 sources · AI assessed it · a person approved · report produced".
+ *
+ * Returns null when the run records no completed steps — an empty trail is better than a fabricated one.
+ */
+export function caseTrail(
+  steps: readonly TrailStep[] | undefined,
+  opts: { signed?: boolean } = {},
+): string | null {
+  const done = (steps ?? []).filter((s) => s.status === 'done');
+  if (done.length === 0) return null;
+
+  const count = (kind: string) => done.filter((s) => s.kind === kind).length;
+  const reads = count('connector-query');
+  const agents = count('agent');
+  const humans = count('human');
+  const guardrails = count('guardrail');
+  const outputs = count('output');
+  const actions = count('action');
+
+  const parts: string[] = [];
+  if (reads > 0) parts.push(reads === 1 ? 'read 1 source' : `read ${reads} sources`);
+  if (guardrails > 0) parts.push(guardrails === 1 ? 'passed a safety check' : `passed ${guardrails} safety checks`);
+  if (agents > 0) parts.push('AI assessed it');
+  if (humans > 0) parts.push('a person decided');
+  if (actions > 0) parts.push(actions === 1 ? 'took 1 action' : `took ${actions} actions`);
+  if (outputs > 0) parts.push('produced a result');
+  // Provenance last: it is the seal over everything above it, not another step in the sequence.
+  if (opts.signed) parts.push('signed and tamper-evident');
+
+  return parts.length > 0 ? parts.join(' · ') : null;
+}

@@ -10,6 +10,7 @@ import { listAppRuns } from '@/lib/app-run-store';
 import {
   buildAppWorkQueue,
   caseLabel,
+  caseTrail,
   runSubject,
   statusLabel,
   type WorkRun,
@@ -68,6 +69,13 @@ function Row({
             {statusLabel(run.status)}
             {when ? ` · ${when}` : ''}
           </span>
+          {/* The governed run, made visible. Derived from the run's own steps, so it never claims a check
+            that did not happen. */}
+          {(run as { trail?: string | null }).trail ? (
+            <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground/80">
+              {(run as { trail?: string | null }).trail}
+            </span>
+          ) : null}
         </span>
         {pendingStepId ? null : (
           <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
@@ -105,6 +113,10 @@ export default async function AppWorkPage({
       // The run's own input IS the case, so the subject is derived from it. Without this every row
       // rendered the literal word "Case" and a queue of eight identical rows told the reader nothing.
       subject: runSubject((r as { input?: unknown }).input),
+      // What actually happened to this case — the governed run made visible.
+      trail: caseTrail((r as { steps?: { kind?: string; status?: string }[] }).steps, {
+        signed: Boolean((r as { provenance?: unknown }).provenance),
+      }),
       // The step awaiting a person — what an in-place decision has to target.
       pendingStepId:
         ((r as { steps?: { id?: string; status?: string }[] }).steps ?? []).find(
