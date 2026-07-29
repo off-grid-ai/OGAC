@@ -26,7 +26,10 @@ export default async function AppDashboardTab({
 
   const rows = await listAppRuns(id, orgId, 500).catch(() => []);
   const dashboard = buildAppDashboard({
-    nowMs: Date.now(),
+    // Floored to the minute: a raw Date.now() can differ between the SSR pass and the RSC payload, and a
+    // count or duration that lands either side of a boundary then renders two different strings — the
+    // hydration mismatch (React #418) this screen hit on deploy. A minute is far finer than any figure here.
+    nowMs: Math.floor(Date.now() / 60_000) * 60_000,
     runs: rows.map((r) => {
       const steps = (r as { steps?: { kind?: string; status?: string }[] }).steps ?? [];
       return {
