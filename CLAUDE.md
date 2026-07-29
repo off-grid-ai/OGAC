@@ -37,7 +37,25 @@ private repo), in the same commit that makes the change — otherwise it's lost 
 Generic self-host tooling that stays in THIS repo: `deploy/docker-compose*.yml`, `deploy/Makefile`,
 `deploy/keycloak/`, `deploy/openbao/`, `deploy/sidecars/`, `deploy/README.md`.
 
-**`docs/ROADMAP.md`** — phases + milestones. **`docs/ENGINEERING.md`** — SOLID / ports-and-adapters rules.
+## What to work on next — READ THESE TWO FIRST
+
+**[`docs/HERO_CLAIMS.md`](docs/HERO_CLAIMS.md)** is the ledger of every promise the hero animation /
+deck / one-pager makes to a buyer, the console surface that must prove it, and a gate
+(`VERIFIED` / `WIRED` / `GAP`) backed by **live evidence**. We raise on "the product works" and the
+animation is bound to product planes "so it provably covers the whole product" — so a claim we cannot
+prove is the highest-priority defect there is, ahead of new features.
+
+**[`docs/ROADMAP.md`](docs/ROADMAP.md)** opens with **THE ACTIVE QUEUE**, derived from that ledger —
+work it top to bottom. The phase plan below it is the platform backlog, pulled from when the queue is
+empty. If the ledger and any other doc disagree, **the ledger wins.**
+
+Two rules that keep this honest:
+- **Verify before building.** Backlog entries go stale — two of the first items picked up on
+  2026-07-29 were already fixed. Reproduce the defect live first.
+- **A gate is promoted only by someone who ran it and read the artifact,** and the evidence goes in the
+  ledger row in the same commit. "Tests pass" is not evidence that a claim is true.
+
+**`docs/ENGINEERING.md`** — SOLID / ports-and-adapters rules.
 
 ## Dev
 

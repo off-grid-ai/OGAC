@@ -1,10 +1,61 @@
-# Off Grid Console — Phased Roadmap
+# Off Grid Console — Roadmap
 
 > From ops dashboard to the control plane for the AI age.
 
-**Read [`VISION.md`](./VISION.md) first — it is the strategy ("make enterprises intelligent":
-harness internal + external intelligence under the org's own governance, on-prem) that this phase
-plan executes against.** This document is the authoritative phase plan. Each phase has a clear goal, a definition of done, and the critical decisions that unlock the next phase. Phases within a tier can overlap; a later tier cannot start until its predecessor's critical path item is complete.
+**Read [`VISION.md`](./VISION.md) first** — the strategy this plan executes against.
+
+---
+
+# ⇢ THE ACTIVE QUEUE (claim-driven) — work this, top to bottom
+
+**This section decides what gets built next. The phase plan below it is the platform backlog.**
+
+We are raising on the claim *"the product works,"* and the hero animation binds its four beats to
+product planes **"so the animation provably covers the whole product."** A CIO watches 22 seconds,
+then opens the seeded bank and insurer from the one-pager. So the unit of work is **a claim we are
+making to buyers that the console cannot yet prove.**
+
+**[`HERO_CLAIMS.md`](./HERO_CLAIMS.md) is the ledger** — every on-screen promise, the surface that
+must prove it, and a gate (`VERIFIED` / `WIRED` / `GAP`) backed by live evidence. This queue is
+derived from it. When they disagree, the ledger wins.
+
+Why this replaced phase-ordering as the driver: three demo-fatal defects (`Result: (no output)`, two
+reads returning 20 unrelated rows, and PAN passing a guardrail while the console displayed "Mask PAN
+in every output") all sat live for weeks while phase work continued elsewhere. Each broke a specific
+sentence in the loop. Ordering by claim surfaces that class of defect first.
+
+### Ordering rule
+
+1. **🔴 GAP on a claim that is literally on screen** — we are saying it out loud and it is not true.
+2. **🔶 WIRED on a headline claim** — cheap to prove, and proving it is the credibility.
+3. Everything else: the phase backlog below.
+
+### The queue
+
+| # | Item | Claim | Why now |
+|---|---|---|---|
+| **1** | **Prove plain-language → working software, live, end to end.** Type a sentence in the builder, get a runnable app, run it, read the result. Fix whatever that exposes. | B3.1 🔶 | The sentence on screen in Beat 3 and the founder's north star. B3.2–B3.4 (inherits data, inherits rules, human review) are now ✅, so the expensive half is already done — this is the single biggest credibility win left, and the cheapest to reach. |
+| **2** | **Vocabulary check + sweep.** `scripts/check-hero-vocabulary.mjs` failing the build on KILL-list terms in customer-facing surfaces, then clear them. | P3 🔴 GAP V1 | The script's governing rule "overrides everything on screen" and applies to the console — same CIO, ninety seconds later. Measured: `ABAC` 11 files, `langfuse` 20, `opensearch` 13, `evidently` 9, `presidio` 8. Systemic, so it needs a check that cannot regress, not a one-off pass. |
+| **3** | **Real provenance on a real run.** Verify a newly executed run is signed; if it is not, sign it. Stop showing "signed and tamper-evident" off a seeded value. | B4.7 🔴 | We display tamper-evidence. If a live run carries no signature while a seeded one does, that is exactly the overclaim the ledger exists to catch — and it is trivially testable by a buyer. |
+| **4** | **Entailment-grade grounding.** Move off the lexical fallback so a paraphrase of a source reads as supported. | B2.4 🔴 (G-F3) | *"Answers you can verify"* is an on-screen chip in Beat 2. Today an exact overlap passes and a paraphrase scores 0 — i.e. the feature fails on normal language. |
+| **5** | **Let a sink actually fire in the demo.** Decide the live-actions posture for the demo tenants and make a report/email delivery real, or change what the loop shows. | B3.10 🔴 | Beat 3 shows a result going out; the output step is currently intercepted because global live actions are off (fail-safe, by design). Either the demo lands the artifact or the animation should not imply it. |
+| **6** | **Data quality off the stub.** Real expectations evaluated against the seeded catalog. | B2.3 🔴 (G-F4) | Beat 2 shows memory as *"quality-gated"*; the engine currently evaluates 0 expectations. |
+| **7** | **Outcome + cost view.** An org-level view that earns `FASTER · CHEAPER · HIGHER QUALITY · NEW CAPABILITY`, including a usable cost model. | B4.10 🔴 / B4.13 🔶 (PA-6) | Those four chips are the payoff of the whole loop and the deck's ROI story. "Cheaper" has no cost model behind it, and dollar budgets are $0 no-ops on free models. |
+| **8** | **Promote the remaining 🔶 with live evidence** — B3.5 scheduled run unattended, B3.6 template adoption, B2.2 masked column, B2.6 lineage trace, B4.9 drift alert, B4.11 evidence pack, B1.3 device round-trip. | various 🔶 | Each is a claim we make that nobody has watched work. Cheap individually; together they are most of the ledger's uncertainty. |
+| **9** | **B1.4 — "nothing private ever leaves the device."** An artifact in the console showing raw-vs-derived at the capture boundary. | B1.4 🔶 | The strongest claim in the loop and the least proven *here*. Spans `mobile`/`desktop`, so it is scoped last of the claim work — but it is the moat sentence. |
+
+**Standing rules for every item:** pure logic isolated in `src/lib` with real tests, thin handlers,
+DRY, typecheck + production build clean, then **deploy and verify live and paste the evidence into the
+ledger row**. Nothing is done because it merged. Also fix the small known breakages found by the screen
+sweep as they are touched — e.g. `/solutions/apps/[id]/safety` returns 404 from the app nav.
+
+---
+
+# The platform backlog (phase plan)
+
+Each phase has a goal, a definition of done, and the decisions that unlock the next. Phases within a
+tier can overlap; a later tier cannot start until its predecessor's critical path item is complete.
+**Pull from here when the active queue above is empty, or when a queue item requires it.**
 
 ---
 
