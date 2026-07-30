@@ -2,6 +2,7 @@ import {
   buildCheckpoint,
   failureVerdict,
   parseCheckpointResult,
+  rejectedVerdict,
   type CheckpointVerdict,
   type Expectation,
   type RawCheckpointResult,
@@ -107,10 +108,17 @@ export const geDataQuality: DataQualityPort = {
       });
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
-        return failureVerdict(exps, `HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+        const reason = `HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`;
+        // A 4xx means the engine ANSWERED and refused the request — it is not unreachable. Reporting a
+        // rejected checkpoint as an outage sent an operator hunting a downed sidecar when the real
+        // problem was an empty expectation list. 5xx stays an engine failure.
+        return res.status >= 400 && res.status < 500
+          ? rejectedVerdict(exps, reason)
+          : failureVerdict(exps, reason);
       }
       const raw = (await res.json()) as RawCheckpointResult;
-      return parseCheckpointResult(raw);
+      // Pass the requested list so a GREEN gate can name the rules it verified, not "passed_expectation_1".
+      return parseCheckpointResult(raw, exps);
     } catch (err) {
       return failureVerdict(exps, describeError(err));
     }

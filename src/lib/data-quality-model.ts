@@ -156,7 +156,11 @@ function label(type: string, column?: string): string {
 // exact, which is what the rollup and UI need. `unexpected_count === -1` marks an expectation the
 // running engine couldn't evaluate (the sidecar's honest "unsupported type" signal); it is
 // counted as a FAIL so nothing is silently green.
-export function parseCheckpointResult(raw: RawCheckpointResult): CheckpointVerdict {
+export function parseCheckpointResult(
+  raw: RawCheckpointResult,
+  /** What the caller ASKED for, so passing expectations can be named by elimination. */
+  requested?: readonly Expectation[],
+): CheckpointVerdict {
   const failedRaw = Array.isArray(raw.failed) ? raw.failed : [];
   const total = typeof raw.evaluated === 'number' ? raw.evaluated : failedRaw.length;
 
@@ -178,14 +182,35 @@ export function parseCheckpointResult(raw: RawCheckpointResult): CheckpointVerdi
   const failed = failedResults.length;
   const passed = Math.max(0, total - failed);
 
-  // Synthesize the passing entries (identities aren't in the response; counts are exact).
-  const passedResults: ExpectationResult[] = Array.from({ length: passed }, (_, i) => ({
-    expectation: `passed_expectation_${i + 1}`,
-    type: 'passed',
-    success: true,
-    unexpectedCount: 0,
-    detail: 'no unexpected values',
-  }));
+  // Name the PASSING expectations. The sidecar reports only the failures plus an evaluated count, so
+  // these used to be synthesized as `passed_expectation_1/2/3` with type 'passed' — which threw away
+  // the one fact an auditor needs from a green gate: WHAT was checked. "3/3 passed" is not evidence if
+  // it cannot say which three rules ran.
+  //
+  // The caller knows what it asked for, so the identities are recoverable by ELIMINATION: requested
+  // minus failed = passed. Exact, not inferred. Without the requested list (older callers) it falls
+  // back to the synthesized labels, so this is additive.
+  const failedKeys = new Set(failedResults.map((r) => `${r.type}|${r.column ?? ''}`));
+  const passedFromRequest = (requested ?? []).filter(
+    (e) => !failedKeys.has(`${e.type}|${e.column ?? ''}`),
+  );
+  const passedResults: ExpectationResult[] =
+    passedFromRequest.length === passed
+      ? passedFromRequest.map((e) => ({
+          expectation: label(e.type, e.column),
+          type: e.type,
+          column: e.column,
+          success: true,
+          unexpectedCount: 0,
+          detail: 'no unexpected values',
+        }))
+      : Array.from({ length: passed }, (_, i) => ({
+          expectation: `passed_expectation_${i + 1}`,
+          type: 'passed',
+          success: true,
+          unexpectedCount: 0,
+          detail: 'no unexpected values',
+        }));
 
   // Success = the sidecar's own flag when present, else no failures.
   const success = typeof raw.success === 'boolean' ? raw.success : failed === 0;
@@ -198,6 +223,37 @@ export function parseCheckpointResult(raw: RawCheckpointResult): CheckpointVerdi
     results: [...failedResults, ...passedResults],
     engineReachable: true,
     engine: typeof raw.engine === 'string' ? raw.engine : undefined,
+  };
+}
+
+/**
+ * The honest verdict when the engine ANSWERED and refused the request (a 4xx).
+ *
+ * Live finding: posting a checkpoint with no expectations returned
+ * `{"engineReachable":false,"note":"data-quality engine unreachable: HTTP 400: expectations must contain
+ * 1-200 entries."}`. The engine was perfectly healthy — it had just rejected a malformed request — and the
+ * verdict sent an operator hunting for a downed sidecar. Same defect class as a failed read presenting as
+ * "no rows": the WHY was wrong, not just the wording.
+ *
+ * So a refusal keeps `engineReachable: true`, because it is true, and says who refused and why.
+ */
+export function rejectedVerdict(expectations: Expectation[], reason: string): CheckpointVerdict {
+  const total = expectations.length;
+  return {
+    success: false,
+    total,
+    passed: 0,
+    failed: total,
+    results: expectations.map((e) => ({
+      expectation: label(e.type, e.column),
+      type: e.type,
+      column: e.column,
+      success: false,
+      unexpectedCount: -1,
+      detail: `not evaluated — the data-quality engine rejected the request (${reason})`,
+    })),
+    engineReachable: true,
+    note: `data-quality engine rejected the request: ${reason}`,
   };
 }
 
@@ -225,6 +281,11 @@ export function failureVerdict(expectations: Expectation[], reason: string): Che
 // ─── summarize — a one-line pass/fail rollup for the UI / logs ──────────────────────────────────
 export function summarize(v: CheckpointVerdict): string {
   if (!v.engineReachable) return v.note ?? 'data-quality engine unreachable';
+  // A refusal carries its own note and IS reachable — surface the reason rather than a pass/fail count
+  // over expectations that were never evaluated.
+  if (v.note && v.total > 0 && v.failed === v.total && v.results.every((r) => r.unexpectedCount === -1)) {
+    return v.note;
+  }
   if (v.total === 0) return 'no expectations evaluated';
   const verdict = v.success ? 'PASS' : 'FAIL';
   return `${verdict} — ${v.passed}/${v.total} expectations passed, ${v.failed} failed`;
