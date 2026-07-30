@@ -67,7 +67,8 @@ import {
   type ConnectorFailure,
   connectorFailureMessage,
 } from '@/lib/connector-failure';
-import { resolveStepParams, unresolvedFilterMessage } from '@/lib/connector-filter';
+import { caseRecordFrom, resolveStepParams, unresolvedFilterMessage } from '@/lib/connector-filter';
+import { type CaseScope, columnsOfRow, inferCaseScope, scopeDetail } from '@/lib/case-scope';
 import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 import { auditEnforcement } from '@/lib/pipeline-contract';
 import {
@@ -857,11 +858,31 @@ async function executeConnectorStep(
       refs: [{ name: `${resolved.connectorId}:${resolved.resource}` }],
     };
   }
+  // A step the COMPILER inserted has no author to write `{{case.employee_id}}`, so it arrives with no
+  // filters at all and reads twenty arbitrary rows — which is how "no reimbursement quota data is
+  // provided in the sources for Meera Malhotra" happened on a table that held her quota. Run time can
+  // fix what compile time cannot: probe the resource for its columns, intersect them with the case
+  // record on QUALIFIED identifiers only, and scope the real read. See case-scope.ts for why a bare
+  // `id` must never be matched. Author-written filters are left exactly as they are.
+  const trustedActor = ctx.actor?.trim() || `app-run:${ctx.runId}`;
+  let inferred: CaseScope = { filters: {}, keys: [] };
+  const inferredScope = Object.keys(params.filters).length === 0 && !!ctx.input;
+  if (inferredScope) {
+    const probe = await deps.queryDomain(resolved, connector, {
+      op: 'read',
+      limit: 1,
+      orgId: ctx.orgId,
+      actorId: trustedActor,
+    });
+    // A failed or empty probe teaches us nothing about the columns; fall through to the unscoped read,
+    // which will report the failure or the emptiness on its own terms.
+    inferred = inferCaseScope(columnsOfRow(probe.result?.rows?.[0]), caseRecordFrom(ctx.input));
+  }
   const { result, detail, failure } = await deps.queryDomain(resolved, connector, {
     op: step.op ?? 'read',
-    params: params.filters,
+    params: { ...params.filters, ...inferred.filters },
     orgId: ctx.orgId,
-    actorId: ctx.actor?.trim() || `app-run:${ctx.runId}`,
+    actorId: trustedActor,
   });
   if (failure) {
     // The read FAILED — it did not come back empty, it did not come back at all. This HALTS the run.
@@ -901,7 +922,9 @@ async function executeConnectorStep(
     status: 'done',
     output: summarizeRows(resolved.label, resolved.resource, result.rows, result.count),
     refs: [{ name: `${resolved.connectorId}:${resolved.resource}` }],
-    detail,
+    // An inferred filter changed what this step read, so it is stated on the step — including when
+    // nothing could be inferred, because "read unscoped" is what a reviewer needs to judge the answer.
+    detail: inferredScope ? `${detail} — ${scopeDetail(inferred)}` : detail,
   };
 }
 
