@@ -417,6 +417,19 @@ export function defaultDeps(
       };
     },
     async sendEmail(msg, provider = 'smtp') {
+      // DELIVERABLE-RECIPIENT GATE, before any provider is called. An address on a reserved domain
+      // (ops@bharatunion.example — `.example` can never resolve, RFC 2606) fails AT the provider, after the
+      // run has already decided to send, and surfaces only as an error in the Resend dashboard. So it is
+      // refused here, or redirected to the operator inbox when one is configured
+      // (OFFGRID_DEMO_EMAIL_REDIRECT) so demo flows still complete end to end.
+      const { resolveRecipient } = await import('@/lib/email-recipient-policy');
+      const decision = resolveRecipient(String(msg.to ?? ''), process.env.OFFGRID_DEMO_EMAIL_REDIRECT);
+      if (decision.blocked || !decision.to) {
+        // Reported as NOT ok with the reason — never as a silent success. A sink that swallows a send claims
+        // mail was delivered that never existed.
+        return { ok: false, configured: true, reason: decision.reason };
+      }
+      if (decision.redirected) msg = { ...msg, to: decision.to };
       if (provider === 'resend') {
         const { sendViaResend } = await import('@/lib/adapters/sinks/email-resend');
         // The run path already masked the body + cleared the egress leash; shape as HTML + tag the send.
