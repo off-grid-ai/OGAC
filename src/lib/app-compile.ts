@@ -43,6 +43,7 @@ import {
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { getOrgContext } from '@/lib/org-context';
 import { withSourceFidelityRule } from '@/lib/agent-prompt-rules';
+import { type ClarifyingQuestion, clarifyingQuestions } from '@/lib/compile-clarify';
 
 // ─── Result contract ───────────────────────────────────────────────────────────────────────────
 export interface CompileResult {
@@ -50,6 +51,13 @@ export interface CompileResult {
   /** Honest report of what could NOT be wired: unbindable data phrases, missing tools, validation
    *  issues. Never hidden — a gap is surfaced, never faked into a fabricated connector. */
   gaps: string[];
+  /**
+   * What the author should be ASKED before publishing (roadmap-real.md Flow 3 step 2). `gaps` states
+   * what could not be wired; these turn the consequential ones into a question with a resolvable field,
+   * so the author has a next move instead of rewriting their sentence and guessing what changed. Every
+   * question derives from a fact about this spec — never model-invented, so it is deterministic.
+   */
+  questions: ClarifyingQuestion[];
 }
 
 // The intermediate a decompose pass produces, before finalizeSpec turns it into an AppSpec. `edges`
@@ -148,7 +156,7 @@ export async function compileAppSpec(
   const gaps = [...assembled.gaps];
   if (!v.ok) gaps.push(...v.errors.map((e) => `Spec did not validate: ${e}`));
 
-  return { spec, gaps };
+  return { questions: clarifyingQuestions(desc, spec.steps, gaps), spec, gaps };
 }
 
 /**
