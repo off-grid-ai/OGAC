@@ -25,6 +25,7 @@ import {
   statusLabel,
   statusTone,
 } from '@/lib/app-runs-view';
+import { displayCell, humanizeColumn, parseRowsOutput } from '@/lib/step-output-view';
 
 // ─── AppRunStatus (Builder Epic Phase 4A) — the RUNNING screen (screen 3 of 5) ────────────────────
 //
@@ -40,6 +41,61 @@ import {
 // URL — the page route owns the /apps/runs/[id] address; a resume re-fetches in place.
 
 const POLL_MS = 2000;
+
+/**
+ * A step's evidence, rendered for a REVIEWER.
+ *
+ * Flow 6 in `docs/roadmap-real.md` requires that the reviewer "understands the action and evidence". A
+ * data read arrives as `label (resource): 6 row(s).` followed by a JSON payload, and showing that raw
+ * made approving a claim a rubber stamp — nobody can check a decision against a positional array.
+ *
+ * When the payload parses into rows it becomes a table with the source's OWN column names (their
+ * vocabulary, not ours). Anything else — a failure sentence, a prose outcome, an empty read — is already
+ * legible and is shown exactly as written. So the fallback is never worse than before.
+ */
+function StepEvidence({ outcome }: { outcome: string }) {
+  const view = parseRowsOutput(outcome);
+  if (!view) {
+    return (
+      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] text-foreground">
+        {outcome}
+      </pre>
+    );
+  }
+  return (
+    <div className="mt-1 rounded border border-border bg-muted/20">
+      <div className="flex flex-wrap items-baseline gap-x-2 border-b border-border px-2 py-1">
+        <span className="text-[11px] font-medium text-foreground">{view.head}</span>
+        {view.coverage ? <span className="text-[10px] text-muted-foreground">{view.coverage}</span> : null}
+      </div>
+      {/* Wide reads scroll inside their own container; the page body never scrolls sideways. */}
+      <div className="max-h-56 overflow-auto">
+        <table className="w-full border-collapse text-[11px]">
+          <thead className="sticky top-0 bg-muted/60">
+            <tr>
+              {view.columns.map((c) => (
+                <th key={c} className="whitespace-nowrap px-2 py-1 text-left font-medium text-muted-foreground">
+                  {humanizeColumn(c)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {view.rows.map((row, i) => (
+              <tr key={i} className="border-t border-border/60">
+                {view.columns.map((c) => (
+                  <td key={c} className="whitespace-nowrap px-2 py-1 text-foreground">
+                    {displayCell(row[c])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function toneClasses(tone: StatusTone): string {
   switch (tone) {
@@ -205,11 +261,7 @@ function StepRow({ step, index }: Readonly<{ step: AppRunStepRow; index: number 
             <span className="text-muted-foreground"> (not sent — dry run)</span>
           </div>
         ) : null}
-        {step.outcome ? (
-          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] text-foreground">
-            {step.outcome}
-          </pre>
-        ) : null}
+        {step.outcome ? <StepEvidence outcome={step.outcome} /> : null}
         {step.detail ? <p className="mt-1 text-[11px] text-muted-foreground">{step.detail}</p> : null}
         {step.refs && step.refs.length > 0 ? (
           <div className="mt-1 flex flex-wrap gap-1">
