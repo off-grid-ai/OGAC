@@ -119,7 +119,7 @@ export function AuditSearch({ configured }: Readonly<{ configured: boolean }>) {
       </form>
 
       {result?.error ? (
-        <p className="text-xs text-destructive">OpenSearch error: {result.error}</p>
+        <p className="text-xs text-destructive">Search error: {result.error}</p>
       ) : null}
 
       {result && result.hits.length > 0 ? (

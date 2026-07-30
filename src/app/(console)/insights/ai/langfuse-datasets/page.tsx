@@ -10,7 +10,7 @@ export default async function LangfuseDatasetsPage() {
   return (
     <div className="w-full space-y-4">
       <div>
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Insights · AI · Langfuse</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">Insights · AI · Test datasets</p>
         <h1 className="text-lg font-semibold">Datasets</h1>
         <p className="text-sm text-muted-foreground">
           Curated input / expected-output pairs for evaluating your prompts and agents. Build a

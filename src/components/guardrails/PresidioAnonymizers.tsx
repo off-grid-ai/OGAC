@@ -38,7 +38,7 @@ import {
 // surface; this only decides the replacement.
 
 const OP_HELP: Record<AnonymizeOperator, string> = {
-  replace: 'Substitute a fixed token (e.g. <PAN>). Blank uses Presidio’s default <ENTITY> tag.',
+  replace: 'Substitute a fixed token (e.g. <PAN>). Blank uses the default <ENTITY> tag.',
   redact: 'Remove the value entirely.',
   mask: 'Replace part of the value with a character, revealing the rest.',
   hash: 'Irreversibly hash the value (join-able, never readable).',

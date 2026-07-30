@@ -95,7 +95,7 @@ export function LangfuseTraces({
       </p>
     );
   }
-  if (error) return <p className="text-xs text-destructive">Langfuse error: {error}</p>;
+  if (error) return <p className="text-xs text-destructive">Trace error: {error}</p>;
   if (!traces.length)
     return <p className="text-xs text-muted-foreground">No traces yet — run an agent to emit spans.</p>;
 

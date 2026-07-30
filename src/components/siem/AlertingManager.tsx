@@ -374,7 +374,7 @@ function MonitorsTab() {
             <DialogTitle>Delete monitor?</DialogTitle>
             <DialogDescription>
               This permanently removes the monitor{' '}
-              <span className="font-mono">{confirmDelete?.name}</span> from OpenSearch. It will no
+              <span className="font-mono">{confirmDelete?.name}</span> from the alert store. It will no
               longer fire alerts.
             </DialogDescription>
           </DialogHeader>

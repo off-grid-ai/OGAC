@@ -258,7 +258,7 @@ export default async function DataPage() {
 
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle className="text-sm">Vector index (Qdrant)</CardTitle>
+              <CardTitle className="text-sm">Meaning-based search</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
                 Push the Brain&apos;s documents into Qdrant so switching the retrieval backend to
                 Qdrant lands on a populated store, not an empty one.

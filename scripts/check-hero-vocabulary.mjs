@@ -95,14 +95,63 @@ export function regressions(counts, baseline) {
   return out.sort((a, b) => b.count - a.count - (b.allowed - a.allowed));
 }
 
+
+/**
+ * Occurrences in text a USER CAN READ — JSX text nodes and label/title/description/placeholder strings.
+ *
+ * WHY A SECOND METRIC. The file-level count above prevents the leak GROWING, but it cannot see a copy fix:
+ * `LangfuseTraces.tsx` still contains "langfuse" in its component name and fetch path long after the
+ * on-screen string is gone, so clearing "Langfuse error:" moved the file count by zero. Claim P3 is about
+ * what reaches a customer's SCREEN, so it needs a metric that measures exactly that — otherwise the gate
+ * says "no regression" while the claim stays unprovable either way.
+ *
+ * Deliberately narrower than the file scan and NOT a replacement for it: an engine name in a component
+ * name is fine, in a heading it is not. Both counts ratchet independently.
+ */
+export function countVisible(files, read = (f) => readFileSync(f, 'utf8')) {
+  const counts = {};
+  const hits = {};
+  for (const term of TERMS) {
+    counts[term] = 0;
+    hits[term] = [];
+  }
+  for (const file of files) {
+    let text;
+    try {
+      text = read(file);
+    } catch {
+      continue;
+    }
+    for (const term of TERMS) {
+      const esc = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const bound = term.includes(' ') ? esc : `\\b${esc}\\b`;
+      // JSX text between tags, and the common label-ish string props.
+      const patterns = [
+        new RegExp(`>[^<>{}]*${bound}`, 'i'),
+        new RegExp(`(?:label|title|heading|description|placeholder|summary|caption)["']?\\s*[:=]\\s*["'\`][^"'\`]*${bound}`, 'i'),
+      ];
+      const n = patterns.filter((re) => re.test(text)).length;
+      if (n > 0) {
+        counts[term] += 1;
+        hits[term].push(relative(ROOT, file));
+      }
+    }
+  }
+  return { counts, hits };
+}
+
 const files = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
 const { counts, hits } = countTerms(files);
+const visible = countVisible(files);
 const update = process.argv.includes('--update');
+const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
 
 if (update) {
-  writeFileSync(BASELINE, `${JSON.stringify(counts, null, 2)}\n`);
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  console.log(`baseline written: ${Object.keys(counts).length} terms, ${total} flagged files across ${files.length} scanned`);
+  writeFileSync(BASELINE, `${JSON.stringify({ files: counts, visible: visible.counts }, null, 2)}\n`);
+  console.log(
+    `baseline written: ${Object.keys(counts).length} terms · ${sum(counts)} flagged files · ` +
+      `${sum(visible.counts)} with the term in VISIBLE text · ${files.length} scanned`,
+  );
   process.exit(0);
 }
 
@@ -110,8 +159,13 @@ if (!existsSync(BASELINE)) {
   console.error('No baseline. Run: node scripts/check-hero-vocabulary.mjs --update');
   process.exit(1);
 }
-const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'));
+const raw = JSON.parse(readFileSync(BASELINE, 'utf8'));
+// Older baselines are a flat term→count map of the FILE metric; read them as such so an existing
+// baseline keeps working instead of silently comparing against zeros (which would fail every term).
+const baseline = raw.files ?? raw;
+const visibleBaseline = raw.visible ?? null;
 const bad = regressions(counts, baseline);
+const badVisible = visibleBaseline ? regressions(visible.counts, visibleBaseline) : [];
 
 const improved = Object.entries(counts).filter(([t, c]) => c < (baseline[t] ?? 0));
 if (improved.length > 0) {
@@ -119,14 +173,30 @@ if (improved.length > 0) {
   for (const [term, count] of improved) console.log(`  ${term}: ${baseline[term]} → ${count}`);
 }
 
-if (bad.length === 0) {
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  console.log(`✓ no new customer-facing vocabulary leaks (${total} flagged files, ${files.length} scanned)`);
+const improvedVisible = visibleBaseline
+  ? Object.entries(visible.counts).filter(([t, c]) => c < (visibleBaseline[t] ?? 0))
+  : [];
+if (improvedVisible.length > 0) {
+  console.log('Improved ON SCREEN (lower the baseline with --update to lock these in):');
+  for (const [term, count] of improvedVisible) {
+    console.log(`  ${term}: ${visibleBaseline[term]} → ${count} files with it in visible text`);
+  }
+}
+
+if (bad.length === 0 && badVisible.length === 0) {
+  console.log(
+    `✓ no new customer-facing vocabulary leaks (${sum(counts)} flagged files, ` +
+      `${sum(visible.counts)} with the term ON SCREEN, ${files.length} scanned)`,
+  );
   process.exit(0);
 }
 
 console.error('\n✗ Our engineering vocabulary reached a customer-facing surface.\n');
 console.error('   docs/HERO_CLAIMS.md claim P3: the hero script\'s rule applies to the console too.\n');
+for (const { term, count, allowed } of badVisible) {
+  console.error(`  ON SCREEN — ${term}: ${count} files (baseline ${allowed})`);
+  for (const f of visible.hits[term].slice(0, 6)) console.error(`      ${f}`);
+}
 for (const { term, count, allowed } of bad) {
   console.error(`  ${term}: ${count} files (baseline ${allowed})`);
   for (const f of hits[term].slice(0, 6)) console.error(`      ${f}`);
