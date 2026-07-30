@@ -83,7 +83,7 @@ export default async function PipelineObservabilityPage({
       {!configured ? (
         <Card className="shadow-sm">
           <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Tracing isn&apos;t configured on this deployment yet — no Langfuse endpoint. Governed runs
+            Tracing isn&apos;t configured on this deployment yet — no tracing service is connected. Governed runs
             will appear here once tracing is wired.
           </CardContent>
         </Card>

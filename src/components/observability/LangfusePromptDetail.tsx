@@ -84,7 +84,7 @@ export function LangfusePromptDetail({ name }: { name: string }) {
   }
 
   if (!configured) {
-    return <Card className="shadow-sm"><CardContent className="py-6 text-center text-sm text-muted-foreground">Langfuse isn&apos;t configured on this deployment.</CardContent></Card>;
+    return <Card className="shadow-sm"><CardContent className="py-6 text-center text-sm text-muted-foreground">The prompt library isn&apos;t configured on this deployment.</CardContent></Card>;
   }
   if (!detail) {
     return <Card className="shadow-sm"><CardContent className="py-6 text-center text-sm text-muted-foreground">{error || 'Prompt not found.'}</CardContent></Card>;

@@ -112,7 +112,7 @@ export async function AuditLogSurface({
 
           {!configured && (
             <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-              OpenSearch isn&apos;t connected yet — connect it in Settings. No audit events to show.
+              The audit index isn&apos;t connected yet — connect it in Settings. No audit events to show.
             </p>
           )}
           {error && (

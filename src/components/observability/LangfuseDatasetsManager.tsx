@@ -68,7 +68,7 @@ export function LangfuseDatasetsManager() {
     return (
       <Card className="shadow-sm">
         <CardContent className="py-6 text-center text-sm text-muted-foreground">
-          Langfuse isn&apos;t configured on this deployment yet (no Langfuse endpoint / project keys).
+          Test datasets aren&apos;t configured on this deployment yet (no tracing service / project keys).
         </CardContent>
       </Card>
     );

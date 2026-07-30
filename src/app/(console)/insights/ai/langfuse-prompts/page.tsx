@@ -13,7 +13,7 @@ export default async function LangfusePromptsPage() {
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Insights · AI · Prompt library</p>
         <h1 className="text-lg font-semibold">Prompt registry</h1>
         <p className="text-sm text-muted-foreground">
-          Version-controlled prompts stored in Langfuse — create text or chat prompts, cut new
+          Version-controlled prompts, stored on your infrastructure — create text or chat prompts, cut new
           versions, and move the <span className="font-mono text-emerald-600">production</span> label
           to control which version your apps fetch at runtime.
         </p>

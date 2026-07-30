@@ -90,7 +90,7 @@ export function LangfuseTraces({
   if (!configured) {
     return (
       <p className="text-xs text-muted-foreground">
-        Langfuse read-back isn&apos;t connected yet — connect Langfuse in Settings to pull traces
+        Trace read-back isn&apos;t connected yet — connect a tracing service in Settings to pull traces
         back.
       </p>
     );

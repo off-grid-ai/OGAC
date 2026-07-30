@@ -18,7 +18,7 @@ export default async function LangfuseDatasetDetailPage({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Insights · AI · Langfuse · Dataset
+            Insights · AI · Test datasets
           </p>
           <h1 className="font-mono text-lg font-semibold">{decoded}</h1>
         </div>

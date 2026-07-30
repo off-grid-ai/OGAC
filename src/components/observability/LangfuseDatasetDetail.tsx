@@ -119,7 +119,7 @@ export function LangfuseDatasetDetail({ name }: { name: string }) {
   }
 
   if (!configured) {
-    return <Card className="shadow-sm"><CardContent className="py-6 text-center text-sm text-muted-foreground">Langfuse isn&apos;t configured on this deployment.</CardContent></Card>;
+    return <Card className="shadow-sm"><CardContent className="py-6 text-center text-sm text-muted-foreground">Test datasets aren&apos;t configured on this deployment.</CardContent></Card>;
   }
   if (!detail) {
     return <Card className="shadow-sm"><CardContent className="py-6 text-center text-sm text-muted-foreground">{error || 'Dataset not found.'}</CardContent></Card>;

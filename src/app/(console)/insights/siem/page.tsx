@@ -74,7 +74,7 @@ export async function SiemSurface({
                 <div className="flex-1">
                   <h1 className="text-lg font-semibold text-foreground">Security Events</h1>
                   <p className="text-sm text-muted-foreground">
-                    SIEM read-back — the security/audit event stream indexed in OpenSearch. Actor,
+                    SIEM read-back — the security and audit event stream, indexed on your infrastructure. Actor,
                     action, outcome, and source IP for every event. Read on-prem.
                     {facetName ? (
                       <span className="text-foreground"> Filtered to pipeline “{facetName}”.</span>
@@ -93,7 +93,7 @@ export async function SiemSurface({
 
           {!configured && (
             <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-              OpenSearch isn&apos;t connected yet — connect it in Settings. No security events to
+              The audit index isn&apos;t connected yet — connect it in Settings. No security events to
               show.
             </p>
           )}
