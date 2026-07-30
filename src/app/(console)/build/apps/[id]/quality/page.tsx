@@ -20,9 +20,23 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
   const app = await getApp(id, orgId);
   if (!app) notFound();
 
+  // RESOLVE THE PIPELINE ONCE, then query BOTH panels by it.
+  //
+  // This screen is titled "Evals for this pipeline" and "Golden set for this pipeline", and it was querying
+  // both by APP id — so an app showed "0 attached" and "Golden set (0)" while the pipeline it runs on had
+  // evals and golden cases sitting right there. Golden cases already existed for pipelines nobody had
+  // touched and still displayed 0, which is how it was caught: the data was never missing, the filter was
+  // asking the wrong question. A heading that says "pipeline" and a query that says "app" is the bug stated
+  // in the UI.
+  //
+  // Falling back to the app id keeps an UNBOUND app working (it has no pipeline to ask about) and keeps any
+  // app-scoped rows authored before this visible, so nothing already attached disappears.
+  const scope = app.pipelineId?.trim()
+    ? { pipelineId: app.pipelineId, appId: undefined }
+    : { appId: id, pipelineId: undefined };
   const [evals, golden, libraryEvals] = await Promise.all([
-    listEvalDefs(id),
-    listGoldenCases(id),
+    listEvalDefs(scope),
+    listGoldenCases(scope),
     listEvalDefs(null), // org-wide library (unattached) — attachable to this pipeline
   ]);
 
