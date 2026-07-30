@@ -1804,7 +1804,13 @@ con_f5c959 :: expense_claims (read) → ok(1 rows via mysql)`) and the step chip
 
 Still open, in the order they hurt the Beat 3 demo:
 
-- **G-UX1 — step OUTPUT is a raw JSON dump.** The read steps render
+- **G-UX1 — HALF CLOSED 2026-07-30.** The data-CORRUPTING half is fixed: `summarizeRows` switched to
+  columnar JSON above five rows (`{"columns":[...],"rows":[[7,2,"Meera Malhotra","150000.00",...]]}`) to
+  save tokens, and stripped of their field names those numeric tuples were classified as IP addresses and a
+  date as a phone number — so the masker replaced the very quota figures the agent needed
+  (`apprun_3f045e0b`). Every value is labelled again; payload is bounded by the row cap instead. The
+  READABILITY half remains, below.
+- **G-UX1b — step output is still raw JSON.** The read steps render
   `{"columns":["id","employee_id",…],"rows":[[7,2,"Meera Malhotra","Travel","150000.00",…]]}` and
   `[{"id":1,"claim_no":"EXP-2025-00001",…}]` straight onto the page. This is the single biggest gap
   against the `docs/APP_AS_PRODUCT.md` bar ("a non-technical person in a department can use the surface
@@ -1818,8 +1824,15 @@ Still open, in the order they hurt the Beat 3 demo:
 - **G-UX4 — `/insights/ai/langfuse-datasets/` puts an OSS product name in a customer-facing URL.**
   Surfaced by `scripts/check-hero-vocabulary.mjs`. A route rename is a nav change, so it wants its own
   slice.
-- **G-UX5 — currency renders as `$`** in the compiled agent prompt and its answer (`$41,346.44`) for an
-  Indian BFSI tenant. Must be ₹.
+- **G-UX5 — PARTLY CLOSED 2026-07-30.** The invented `$` is gone: compiled reasoning prompts now carry a
+  SOURCE_FIDELITY_RULE (`src/lib/agent-prompt-rules.ts`) telling the agent to report values exactly as the
+  sources state them and add no currency symbol — the rule `app-work-queue.ts:209` already applied to every
+  display surface, which the agent alone was never told. Verified live on a FRESH compile
+  (`app_5803e04b` / `apprun_2da37694`): "The request amount is **41,346.44** … the Training quota is
+  **200,000.00** (from row `id:11` in `employee_quota`) … within quota" — faithful figures, correct
+  decision, and it now cites the source row.
+  **Still open:** showing an actual ₹ needs a per-org currency setting that the prompt and the UI both
+  read. Until it exists, stating the figure exactly as the record does is the truthful option.
 
 The vocabulary ratchet is now a real gate: `scripts/check-hero-vocabulary.mjs` with
 `scripts/hero-vocabulary-baseline.json` (28 terms, 300 flagged files of 777 scanned). It fails only when
