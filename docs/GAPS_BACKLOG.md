@@ -1862,38 +1862,33 @@ currently reads as a product failure. It makes a correctly-governed system look 
 
 **Find them:** `grep -rn "if (!res.ok) throw" src/`
 
-## G-195 — the read-only demo account may be unable to send a chat message at all, and is not told why
+## G-195 — WITHDRAWN: my test harness, not the product
 
-**Found:** 2026-07-30, while trying to generate a grounded answer to verify the citation footer.
+**Raised and withdrawn 2026-07-30.** I reported that pressing Enter in the chat composer sent nothing and
+fired no network request, first inferring a server-side read-only refusal, then "confirming" a silent
+client-side guard by capturing zero POSTs.
 
-**Observed, live:** signed in as `demo-bank@getoffgridai.co` on `/work/chat`, typed a question, pressed
-Enter. The text stayed in the composer and no answer appeared. Screenshot: `scratchpad/cite-full.png`.
+**Both readings were wrong, and the cause was my harness.** Playwright's `fill()` sets the DOM value
+directly; the composer is a React-controlled textarea, so `input` state stayed empty and `send()`'s
+`if (!text || streaming) return` guard fired correctly. Re-run with real keystrokes
+(`pressSequentially`) and `POST /api/v1/chat/conversations` fires as it should. The guard was right; the
+test was lying.
 
-**Not the keyboard.** `onComposerKey` handles `Enter && !e.shiftKey → send()` correctly, and the text
-did land in the right textarea. The likely cause is that **sending a message is a WRITE** (it creates a
-conversation), so the read-only demo refuses it — and the refusal is swallowed, leaving the composer
-looking as though the key did nothing. That is the G-194 pattern again, on the product's single most
-important interaction.
+**Kept as an entry on purpose.** Two escalating claims about the product were built on an instrument I
+had not validated — the second one labelled CONFIRMED because I captured network traffic, which felt
+like hard evidence and was hard evidence of the wrong thing. Before a UI symptom becomes a product
+defect, the harness that produced it has to be shown to drive the app the way a person does.
 
-**CONFIRMED 2026-07-30, AND THE INFERENCE ABOVE WAS WRONG.** Captured every `/api/v1/chat/*` call while
-pressing Enter: only the three page-load GETs (`audio-config`, `models`, `skills`, `conversations`, all
-200). **There is no POST at all** — no stream request, no conversation create. The composer still held
-its text afterwards.
+**Rules this leaves behind for `scripts/` and the sweep skill:**
+- Never `fill()` a React-controlled input in a behavioural test. Use `pressSequentially`/`type`.
+- A UI test asserting "nothing happened" must first prove it can make something happen.
+- `getByText(/^Sources$/i)` matched 1 element on a page with no assistant answer at all — a locator that
+  matches when the feature is absent can only ever produce false results. Assert on the row, not a word.
 
-So this is NOT a server-side read-only refusal. `send()` returns early **on the client**, before any
-fetch, and says nothing. The next step is to read `send()`'s guard clauses and find which one fires for
-this account/state (the header showed "No pipeline", which is one candidate) — then make the guard
-explain itself instead of silently discarding the keystroke.
+**Still unexplained, and NOT yet a gap:** after the conversation POST, the composer keeps its text and no
+stream request was observed on my POST-only filter. That may be normal (navigation to the new
+conversation, or a non-POST SSE transport) or may be real. It needs a run that watches all methods before
+anyone writes it down as a defect.
 
-Recording the wrong inference deliberately: it was plausible, it was consistent with G-194, and it was
-false. Capturing the network was what distinguished them, and inferring a cause from a UI symptom is
-what this whole class of defect keeps punishing.
-
-**Why it matters if confirmed.** The read-only demo is the account buyers are handed. If it cannot send
-a chat message, the core promise ("a private AI, everywhere") cannot be tried at all, and the failure
-presents as an unresponsive UI rather than as a permissions boundary. Two separate decisions follow:
-whether a demo viewer should be allowed to converse (likely yes — an ephemeral conversation is not a
-change to org data), and, regardless, that the refusal must be visible.
-
-**Blocks:** live verification that a citation row renders as a working link (the citation-provenance
-fixes are deployed but unproven in the UI for exactly this reason).
+**Consequence:** the citation-footer verification is still unproven, but it is unblocked — the harness
+can now drive a real message.
