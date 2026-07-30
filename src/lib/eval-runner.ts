@@ -198,7 +198,12 @@ export async function runEvalDef(
   // an answer follows from its sources, and for an app the only defensible sources are the ones IT read —
   // not a global corpus it never consulted. The golden path stays for org-wide library evals, and is the
   // fallback whenever an app has no evaluable runs yet.
-  const samples = def.appId ? await samplesForApp(def.appId, orgId, judge.model) : await buildSamples(judge.model);
+  const picked = def.appId
+    ? await samplesForApp(def.appId, orgId, judge.model)
+    : { samples: await buildSamples(judge.model), source: 'golden(library-eval)' };
+  const samples = picked.samples;
+  // eslint-disable-next-line no-console
+  console.log(`[eval] ${def.metric} samples=${samples.length} source=${picked.source}`);
   const tpl = { metric: def.metric, direction: def.direction, defaultThreshold: def.threshold };
   const perSample: MetricScore[] = [];
 
@@ -280,7 +285,7 @@ async function samplesForApp(
   appId: string,
   orgId: string,
   model: string,
-): Promise<Awaited<ReturnType<typeof buildSamples>>> {
+): Promise<{ samples: Awaited<ReturnType<typeof buildSamples>>; source: string }> {
   try {
     const { listAppRunsView } = await import('@/lib/app-runs-view-reader');
     const { samplesFromRuns } = await import('@/lib/eval-samples-from-runs');
@@ -299,11 +304,24 @@ async function samplesForApp(
         })),
       })),
     );
-    if (fromRuns.length > 0) return fromRuns;
-  } catch {
-    // fall through to golden
+    if (fromRuns.length > 0) return { samples: fromRuns, source: `app-runs(${fromRuns.length}/${runs.length})` };
+    // Distinguish the two silent cases that `total` alone cannot: no runs at all, versus runs whose steps
+    // carried nothing usable. Taking four wrong diagnoses to find one missing input was the cost of not
+    // knowing which; a fallback that cannot say WHY it fell back is the same defect as a score with no
+    // evidence behind it.
+    return {
+      samples: await buildSamples(model),
+      source: runs.length === 0 ? 'golden(no-app-runs)' : `golden(no-usable-contexts-in-${runs.length}-runs)`,
+    };
+  } catch (err) {
+    // NARROWED FROM A SILENT CATCH. As written before, any error here degraded to golden and reported
+    // nothing — converting a bug into a plausible-looking fallback, which is exactly how the dropped-field
+    // defects hid all session. The reason now travels on the run's attribution.
+    return {
+      samples: await buildSamples(model),
+      source: `golden(app-run-read-failed: ${err instanceof Error ? err.message.slice(0, 80) : String(err).slice(0, 80)})`,
+    };
   }
-  return buildSamples(model);
 }
 
 /** Score one golden sample offline, mapping the sample shape onto the heuristic's inputs. */
