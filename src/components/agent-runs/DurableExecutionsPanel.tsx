@@ -165,7 +165,7 @@ export function DurableExecutionsPanel() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <p className="text-sm text-muted-foreground">
-          Durable jobs running on the Temporal runtime — which are running, at what state, and their
+          Durable jobs running on the workflow runtime — which are running, at what state, and their
           correlated run. Re-run a finished job or cancel a running one. Separate from the recorded
           run history.
         </p>
@@ -188,7 +188,7 @@ export function DurableExecutionsPanel() {
         </div>
       ) : !view.reachable ? (
         <div className="rounded-md border border-border p-4 text-sm">
-          <p className="font-medium text-foreground">Temporal configured but unreachable</p>
+          <p className="font-medium text-foreground">Workflow runtime configured but unreachable</p>
           <p className="mt-1 text-muted-foreground">{view.note}</p>
         </div>
       ) : view.executions.length === 0 ? (

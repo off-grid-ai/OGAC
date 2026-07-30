@@ -84,7 +84,7 @@ export function AddAbacRuleButton() {
       body: JSON.stringify({ role, resource, attribute, operator, value, effect }),
     });
     if (res.ok) {
-      toast.success('ABAC rule added');
+      toast.success('Access rule added');
       setOpen(false);
       router.refresh();
     } else {
@@ -101,7 +101,7 @@ export function AddAbacRuleButton() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Add an ABAC rule</SheetTitle>
+            <SheetTitle>Add an access rule</SheetTitle>
             <SheetDescription>Attribute-based access — deny overrides allow.</SheetDescription>
           </SheetHeader>
           <SheetBody>

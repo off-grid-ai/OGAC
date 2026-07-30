@@ -87,7 +87,7 @@ export default async function GovernancePage() {
 }
 
 const GOVERNANCE_MODULES: ModuleLink[] = [
-  { title: 'Policies', href: '/governance/policies', description: 'Egress leash, data ceilings, and the OPA authz rules pipelines inherit.' },
+  { title: 'Policies', href: '/governance/policies', description: 'Egress leash, data ceilings, and the access rules your work inherits.' },
   { title: 'Guardrails', href: '/governance/guardrails', description: 'PII, injection, and toxicity scanners applied on every governed run.' },
   { title: 'Secrets', href: '/governance/secrets', description: 'Vaulted connector + service credentials and dynamic database access.' },
   { title: 'Access', href: '/governance/access', description: 'People, machine clients, roles, sessions, and federation.' },

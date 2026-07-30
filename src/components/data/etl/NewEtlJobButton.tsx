@@ -49,12 +49,12 @@ export function NewEtlJobButton({ hasConnectors }: Readonly<{ hasConnectors: boo
     <>
       <Button size="sm" onClick={() => setOpen(true)}>
         <Plus className="mr-1 size-4" />
-        New ETL job
+        New data job
       </Button>
       <FormSheet
         open={open}
         onOpenChange={setOpen}
-        title="New ETL job"
+        title="New data job"
         description="You'll build the source → transforms → destination visually on the next screen."
         footer={
           <Button onClick={create} disabled={busy}>

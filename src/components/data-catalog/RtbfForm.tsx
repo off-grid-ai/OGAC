@@ -85,7 +85,7 @@ export function RtbfForm() {
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
           Erase a data subject across every plane. The console erases what it owns immediately and
-          propagates to the vector index and data lake now; device replicas get a durable tombstone
+          propagates to meaning-based search and the data lake now; device replicas get a durable tombstone
           they apply on next sync. Anything unreachable is honestly reported as deferred, never faked.
         </p>
         <div className="space-y-1.5">

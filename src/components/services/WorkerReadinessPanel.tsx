@@ -53,7 +53,7 @@ export function WorkerReadinessPanel() {
         <div>
           <CardTitle className="text-sm">Durable worker readiness</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Live poller evidence per task queue (Temporal DescribeTaskQueue).
+            Live poller evidence per task queue.
             {summary ? ` ${summary.readyCount}/${summary.totalCount} queues ready.` : ''}
           </p>
         </div>

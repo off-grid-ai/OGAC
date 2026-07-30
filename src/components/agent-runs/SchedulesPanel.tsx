@@ -129,7 +129,7 @@ export function SchedulesPanel() {
         </div>
       ) : !view.reachable ? (
         <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
-          Temporal is configured but unreachable. {view.note}
+          The scheduling service is configured but unreachable. {view.note}
         </div>
       ) : view.schedules.length === 0 ? (
         <p className="text-sm text-muted-foreground">No schedules yet. Create one to run an agent on a cron.</p>

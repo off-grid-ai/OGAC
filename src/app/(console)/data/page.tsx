@@ -85,7 +85,7 @@ export default async function DataPage() {
         value: qCount === null ? 'Unavailable' : `${qCount.toLocaleString()} vectors`,
         description:
           qCount === null
-            ? 'The vector index did not respond.'
+            ? 'Meaning-based search did not respond.'
             : `${brainDocs.length.toLocaleString()} source documents available for indexing.`,
         href: '/data/knowledge',
         state: qCount === null ? 'attention' : 'neutral',
@@ -251,7 +251,7 @@ export default async function DataPage() {
             <CardContent className="space-y-2">
               <ErasureForm />
               <p className="text-xs text-muted-foreground">
-                Right-to-erasure propagates across the lake, KB, vector index, memory, and audit.
+                Right-to-erasure propagates across the lake, knowledge base, meaning-based search, memory, and audit.
               </p>
             </CardContent>
           </Card>

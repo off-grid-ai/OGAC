@@ -75,7 +75,7 @@ export function AddCustomRoleButton({ modules }: Readonly<{ modules: { id: strin
           <SheetHeader>
             <SheetTitle>Define a custom role</SheetTitle>
             <SheetDescription>
-              Layer a role on the built-in RBAC — it inherits a base role and grants module access.
+              Layer a role on the built-in roles — it inherits a base role and grants module access.
             </SheetDescription>
           </SheetHeader>
           <SheetBody>
