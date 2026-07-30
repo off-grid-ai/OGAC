@@ -122,3 +122,31 @@ A measurement can support this judgement. It can never replace it. "The button i
 Report the gate, never inflate. A screenshot you did not read is not a verified screen — and a DB count is not
 a verified surface. Both mistakes were made in one session; the founder caught the second one by opening the
 page himself.
+
+## The blind spot that made a swept module still broken: routes are not artifacts
+
+I swept Workspace by enumerating routes and screenshotting them, reported the module done, and the
+founder then found `[1] source — part 1 · 0%` under a grounded chat answer within minutes. A citation
+that named no document, showed an internal chunk index, asserted 0% relevance for a source it was
+citing, and could not be clicked.
+
+**It was never in a single screenshot I took, because it does not exist until a run produces it.**
+Route enumeration captures SHELLS — the page, its empty state, its panels. The thing an operator
+actually reads and is asked to trust is GENERATED: an answer with citations, a run's step evidence, a
+compiled spec, a review's risk levels, an exported report, a delivered email. A sweep that only visits
+URLs will pass a module whose entire output layer is wrong.
+
+So a module is not swept until, for every surface that produces output, the sweep has **caused real
+output to exist and then read it**:
+
+- Send a message that actually retrieves, and read the citation footer — names, links, scores.
+- Run an app end to end, and read every step's evidence panel, not just the run list.
+- Trigger the empty, the partial, and the failed variant. A failed read must never render as "no rows"
+  and an unknown number must never render as `0`.
+- Follow every link the artifact offers. A link that 404s or points at an id of the wrong kind is the
+  same defect as no link — I linked to `/data/knowledge/[id]` only after checking that `[id]` is a
+  COLLECTION id, because I had already invented four URLs earlier in the session.
+
+If a surface's output cannot be generated in the sweep, say so in the report as an unswept surface.
+Do not let "all routes screenshotted" stand in for "the module works" — that is the same
+proxy-for-the-goal substitution this skill's first section is about, one level up.

@@ -49,7 +49,11 @@ test('buildSources: collapses multiple parts of one doc, keeps best score + all 
 });
 
 test('buildSources: blank name falls back to "source"', () => {
-  assert.equal(buildSources([{ name: '  ', position: 0, score: 1 }])[0].name, 'source');
+  // A missing name stays EMPTY. It used to become the literal string 'source', which the footer then
+  // rendered as a document title — the reader could not tell an unnamed document from one actually
+  // called "source". The renderer says "Unnamed document" instead; that wording is presentation, and
+  // the pure layer refuses to invent a fact.
+  assert.equal(buildSources([{ name: '  ', position: 0, score: 1 }])[0].name, '');
 });
 
 test('parseCitationMarkers: interleaves text and clickable markers in order', () => {
@@ -122,4 +126,69 @@ test('sourceNames: ordered distinct names, aligned with buildSources numbering',
   assert.deepEqual(sourceNames(cites), ['A.pdf', 'B.md']);
   // The prompt numbering and the render numbering share this list, so they can't drift.
   assert.equal(sourceNames(cites)[0], buildSources(cites)[0].name);
+});
+
+
+// ── A citation must not assert a relevance it does not have ─────────────────────────────────────────
+//
+// LIVE FINDING. The footer read `[1] source — part 1 · 0%` under a correct, well-grounded answer. The
+// 0% was a MISSING score coerced to zero, which states as fact the opposite of what citing a source
+// means. Same rule as ratio()'s `pct: null` in product-metrics.ts: unknown is not zero.
+test('buildSources: an unsupplied score is null, never 0', () => {
+  const [s] = buildSources([{ name: 'Policy.md', position: 0 } as unknown as Citation]);
+  assert.equal(s.score, null, 'unknown relevance must be null so the UI can omit it');
+});
+
+test('buildSources: a real 0 score is preserved as 0, not confused with unknown', () => {
+  const [s] = buildSources([{ name: 'Policy.md', position: 0, score: 0 }]);
+  assert.equal(s.score, 0);
+});
+
+test('buildSources: the best KNOWN score wins over an unknown one', () => {
+  const [s] = buildSources([
+    { name: 'H.pdf', position: 0 } as unknown as Citation,
+    { name: 'H.pdf', position: 1, score: 0.8 },
+  ]);
+  assert.equal(s.score, 0.8, 'a null must not shadow a real score, nor win a max() against it');
+});
+
+// ── The identity that makes a citation followable ───────────────────────────────────────────────────
+//
+// The row was not clickable because nothing in the chain carried a document id: the retriever built
+// citations without docId/collectionId while holding both, and the chat route then re-mapped to
+// {name, position, score}. The pure layer's job is to keep identity through the dedupe.
+test('buildSources: carries docId/collectionId/collection through so the footer can link', () => {
+  const [s] = buildSources([
+    { name: 'HR Policy.pdf', position: 0, score: 0.9, docId: 'doc_1', collectionId: 'col_hr', collection: 'HR Policies' },
+  ]);
+  assert.equal(s.docId, 'doc_1');
+  assert.equal(s.collectionId, 'col_hr');
+  assert.equal(s.collection, 'HR Policies');
+});
+
+test('buildSources: two DIFFERENT unnamed documents stay two rows', () => {
+  // Keying the dedupe on the name alone collapsed every unnamed document into one row, so an answer
+  // grounded in three unnamed sources claimed a single source.
+  const s = buildSources([
+    { name: '', position: 0, score: 0.9, docId: 'doc_a' } as unknown as Citation,
+    { name: '', position: 0, score: 0.8, docId: 'doc_b' } as unknown as Citation,
+  ]);
+  assert.equal(s.length, 2);
+  assert.deepEqual(s.map((x) => x.docId), ['doc_a', 'doc_b']);
+});
+
+// ── The CROSSING assertion for the retriever → route → footer boundary ──────────────────────────────
+//
+// Both sides typechecked while the route stripped the fields, because {name,position,score} is
+// assignable to Citation. The guard belongs on the crossing: whatever the retriever emits must still
+// be linkable after the transport the route performs.
+test('retriever citation → chat transport → a followable source', () => {
+  const fromRetriever: Citation[] = [
+    { name: 'Reimbursement Policy 2025.pdf', position: 2, score: 0.82, collection: 'HR Policies', docId: 'doc_9', collectionId: 'col_hr' },
+  ];
+  const transported: Citation[] = ([] as Citation[]).concat(fromRetriever); // what the route now does
+  const [s] = buildSources(transported);
+  assert.ok(s.collectionId, 'without this the footer has no destination and the row is inert');
+  assert.equal(s.name, 'Reimbursement Policy 2025.pdf');
+  assert.equal(s.score, 0.82);
 });
