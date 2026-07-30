@@ -490,7 +490,23 @@ Newest first. Every entry is live-verified unless it says otherwise.
   heuristic (`faithfulness:heuristic`) instead of using the entailment engine the grounding path uses. Two
   engines for one concept: one works, one always returns 0. A faithfulness gate that always fails is as useless
   as one that always passes, and worse — it trains people to ignore it.
-  **Located precisely — `src/lib/eval-runner.ts` ~207-218.** When the ragas sidecar returns no aggregate for
+  **ROOT CAUSE FOUND, and it is NOT the engine — 2026-07-30.** The ladder fix was made (ragas → entailment →
+  heuristic, `eval-runner.ts`) and faithfulness STILL logs `faithfulness:heuristic score=0`. The entailment rung
+  returns null because it has nothing to work with: `buildSamples()` sources contexts from
+  `searchDocuments(c.query, 3)`, and when retrieval returns nothing the sample has **no contexts at all**.
+  Faithfulness is "does the answer follow from its contexts" — with no contexts it is **unmeasurable by every
+  engine**, which is why ragas produced no aggregate, why entailment declined, and why the heuristic returned 0.
+  Three engines agreeing on 0 was never three failures; it was one missing input.
+  **So the real gap is the golden corpus, not the scorer.** 33 golden cases exist, but their queries do not
+  retrieve — the cases were authored without checking that the retrieval layer can find anything for them.
+  **Fix, in order:** (1) verify `searchDocuments` returns hits for the golden queries — if it does not, the
+  corpus needs queries that match the indexed content, or the content needs indexing; (2) only then do
+  faithfulness numbers mean anything. The ladder fix stays: it is correct and will engage the moment contexts
+  exist, and it removed a lexical scorer that could only ever return 0.
+  **Reading instruction until then: `faithfulness:heuristic score=0` means UNMEASURED, not failing.**
+
+  **Previously (superseded, kept because the reasoning was sound and the conclusion was wrong):**
+  Located to `src/lib/eval-runner.ts` ~207-218. When the ragas sidecar returns no aggregate for
   the metric, the code degrades to `heuristicSampleScore(def.metric, sample)`, and for faithfulness that
   lexical heuristic returns 0. The degradation is *honestly tagged* (`computedBy: 'heuristic'`) — the defect is
   not dishonesty, it is that **the fallback ladder is missing its middle rung**: ragas → heuristic, with no step
