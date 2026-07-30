@@ -22,7 +22,7 @@ export async function getAppRunView(id: string, orgId: string = DEFAULT_ORG): Pr
     .where(and(eq(appRuns.id, id), eq(appRuns.orgId, orgId)))
     .limit(1);
   if (!row) return null;
-  return withAgentPrompts(toAppRunView(row), orgId);
+  return (await withAgentPrompts([toAppRunView(row)], orgId))[0] ?? null;
 }
 
 /**
@@ -33,27 +33,30 @@ export async function getAppRunView(id: string, orgId: string = DEFAULT_ORG): Pr
  * trace renders exactly as before, because an investigation surface that fails to load is worse than one
  * that is missing a field.
  */
-async function withAgentPrompts(view: AppRunView, orgId: string): Promise<AppRunView> {
-  const ids = view.steps
-    .filter((s) => s.kind === 'agent' && s.childRunId)
-    .map((s) => s.childRunId as string);
-  if (ids.length === 0) return view;
+async function withAgentPrompts(views: AppRunView[], orgId: string): Promise<AppRunView[]> {
+  const ids = views.flatMap((v) =>
+    v.steps.filter((s) => s.kind === 'agent' && s.childRunId).map((s) => s.childRunId as string),
+  );
+  if (ids.length === 0) return views;
   try {
+    // ONE query for every run in the batch. The first version only filled the single-run read, on the
+    // assumption the detail screen used it — it does not: AppRunStatus polls the LIST route, so the prompt
+    // appeared on the server's first paint and vanished on the next poll. Batching by id means the list
+    // path costs one extra query regardless of how many runs it returns, which is what made skipping it
+    // the wrong optimisation in the first place.
     const rows = await db
       .select({ id: agentRuns.id, query: agentRuns.query })
       .from(agentRuns)
-      .where(and(inArray(agentRuns.id, ids), eq(agentRuns.orgId, orgId)));
+      .where(and(inArray(agentRuns.id, [...new Set(ids)]), eq(agentRuns.orgId, orgId)));
     const byId = new Map(rows.map((r) => [r.id, r.query]));
-    return {
-      ...view,
-      steps: view.steps.map((s) =>
-        s.childRunId && byId.get(s.childRunId)
-          ? { ...s, prompt: String(byId.get(s.childRunId)) }
-          : s,
+    return views.map((v) => ({
+      ...v,
+      steps: v.steps.map((s) =>
+        s.childRunId && byId.get(s.childRunId) ? { ...s, prompt: String(byId.get(s.childRunId)) } : s,
       ),
-    };
+    }));
   } catch {
-    return view;
+    return views;
   }
 }
 
@@ -78,7 +81,8 @@ export async function listAppRunsView(
   // Reports table, Review inbox and runs monitor never surface QA runs. `listApps` is the single
   // source of "which apps are visible" (it already excludes autotest apps), so this stays DRY and
   // consistent with the Studio grid. Non-demo tenants keep every run (behaviour-preserving).
-  if (!isDemoTenantOrg(orgId)) return views;
+  if (!isDemoTenantOrg(orgId)) return withAgentPrompts(views, orgId);
   const visibleAppIds = new Set((await listApps(orgId).catch(() => [])).map((a) => a.id));
-  return views.filter((v) => visibleAppIds.has(v.appId));
+  // Filter FIRST, then fill prompts — no point joining for runs this tenant will never see.
+  return withAgentPrompts(views.filter((v) => visibleAppIds.has(v.appId)), orgId);
 }
