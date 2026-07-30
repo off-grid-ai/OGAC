@@ -142,18 +142,37 @@ test('providedSourcesFromPriorResults carries only governed connector evidence',
   ]);
 });
 
-test('summarizeRows keeps complete small reference tables and labels larger truncation', () => {
+test('summarizeRows keeps every value LABELLED, and labels larger truncation', () => {
   const complete = Array.from({ length: MAX_GOVERNED_SOURCE_ROWS }, (_, id) => ({ id }));
   const completeSummary = summarizeRows('rate card', 'pricing', complete, complete.length);
-  assert.match(completeSummary, /"columns":\["id"\]/);
-  assert.match(completeSummary, /\[19\]/);
-  assert.doesNotMatch(completeSummary, /"id":19/);
+  // Labelled row objects, never positional arrays. Columnar JSON stripped the field names to save
+  // tokens and CORRUPTED the data doing it: on live run apprun_3f045e0b, bare numeric tuples were
+  // classified as IP addresses and a date as a phone number, so the masker replaced the very quota
+  // figures the agent needed. It is also what a reviewer reads on the run page.
+  assert.match(completeSummary, /"id":19/);
+  assert.doesNotMatch(completeSummary, /"columns":/);
   assert.doesNotMatch(completeSummary, /Showing/);
 
   const larger = [...complete, { id: 20 }];
   const clipped = summarizeRows('rate card', 'pricing', larger, larger.length);
+  // The ROW CAP is what bounds the payload — the honest lever, rather than dropping the labels.
   assert.match(clipped, /Showing 20 of 21/);
   assert.doesNotMatch(clipped, /"id":20/);
+});
+
+test('summarizeRows labels a multi-row read the way the live quota read arrives', () => {
+  // The exact shape from apprun_3f045e0b: six rows, which used to trip the columnar branch.
+  const quota = Array.from({ length: 6 }, (_, i) => ({
+    id: 7 + i,
+    employee_id: 2,
+    category: ['Travel', 'Medical', 'LTA', 'Communication', 'Training', 'Relocation'][i],
+    annual_quota: '150000.00',
+    remaining: '73341.61',
+  }));
+  const out = summarizeRows('reimbursement quota', 'employee_quota', quota, quota.length);
+  assert.match(out, /"annual_quota":"150000.00"/, out);
+  assert.match(out, /"category":"Training"/);
+  assert.doesNotMatch(out, /"rows":\[\[/, 'no positional arrays');
 });
 
 test('executeStep(human) returns awaiting_human WITHOUT blocking', async () => {

@@ -1435,23 +1435,22 @@ export function summarizeRows(
   const head = `${label} (${resource}): ${count} row(s).`;
   if (shown.length === 0) return head;
   const coverage = count > shown.length ? ` Showing ${shown.length} of ${count}.` : '';
-  // Repeating every object key for a 20-row reference table bloats the guardrail/model payload and
-  // can exceed a content-scanner deadline. Columnar JSON preserves every value and relationship
-  // while naming each field once. Small results stay in the friendlier row-object form.
-  if (
-    shown.length <= 5 ||
-    shown.some((row) => !row || typeof row !== 'object' || Array.isArray(row))
-  ) {
-    return `${head}${coverage}\n${JSON.stringify(shown)}`;
-  }
-  const columns = Array.from(
-    new Set(shown.flatMap((row) => Object.keys(row as Record<string, unknown>))),
-  );
-  const values = shown.map((row) => {
-    const record = row as Record<string, unknown>;
-    return columns.map((column) => record[column] ?? null);
-  });
-  return `${head}${coverage}\n${JSON.stringify({ columns, rows: values })}`;
+  // EVERY VALUE STAYS LABELLED. This used to switch to columnar JSON above five rows —
+  // {"columns":[...],"rows":[[7,2,"Meera Malhotra","150000.00","76658.39",...]]} — to name each field
+  // once and keep the payload small. That saving cost more than it bought, twice over:
+  //
+  //   1. It CORRUPTED THE DATA. Stripped of their field names, adjacent numeric values read as other
+  //      entity types to the PII scanner: on live run apprun_3f045e0b the six quota rows came back as
+  //      "IP_ADDRESS_3e1cbd52" and a date became "[PHONE]", so the agent was handed masked nonsense
+  //      where the quota figures should have been and correctly reported it could not decide. A bare
+  //      tuple of decimals is genuinely ambiguous; `"annual_quota":"150000.00"` is not.
+  //   2. It is unreadable. This string is rendered on the run detail page, and a positional array is
+  //      not something a department reviewer can check a decision against.
+  //
+  // Payload size is bounded by the ROW CAP (MAX_GOVERNED_SOURCE_ROWS), which is the honest lever —
+  // fewer rows, each fully labelled — rather than by removing the labels that give every number its
+  // meaning to the scanner, the model and the reader alike.
+  return `${head}${coverage}\n${JSON.stringify(shown)}`;
 }
 
 function errorResult(step: AppStep, detail: string): StepResult {
