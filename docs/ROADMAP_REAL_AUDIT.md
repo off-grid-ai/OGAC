@@ -508,9 +508,18 @@ Newest first. Every entry is live-verified unless it says otherwise.
   already rendered as tables for reviewers — not against a global knowledge base the app never consulted.
   Judging an expense-claim app against a bank-policy corpus is the wrong question even when retrieval works:
   the app's answer should follow from the claim and the quota rows it read, and nothing else.
-  So: **source eval contexts from the run's own connector outputs.** That needs no brain, no re-indexing, and it
-  makes faithfulness mean the thing §8H actually asks for. It also composes with the ladder fix already made —
-  the entailment rung will engage the moment contexts arrive from that source. The ladder fix stays: it is correct and will engage the moment contexts
+  **BUILT 2026-07-30** — `src/lib/eval-samples-from-runs.ts`, 9 tests. Samples now come from an app's own runs:
+  contexts are its completed `connector-query` outputs, the answer is its agent's, the question is the step
+  label the author wrote. No brain, no re-indexing, no descope violation, and it composes with the ladder fix —
+  the entailment rung engages the moment contexts arrive this way.
+  Two rules encoded because they are what four wrong diagnoses cost: a run with **no contexts returns null** and
+  stays OUT of the corpus (scoring it 0 calls the app unfaithful when nothing was measured), and a **failed read
+  is not a source** — an errored step's message is excluded, so "credential refused" can never be graded as
+  evidence. `groundTruth` is left empty rather than invented, since a production run has no expected answer.
+  **This is strictly better evidence than a golden set:** it is what the app actually did, on real cases, with
+  the sources it actually used — §8H's "every production use case" read literally.
+  **Remaining:** wire `eval-runner`'s `buildSamples` to prefer this for app-bound defs, then re-run to confirm
+  the engine tag becomes `grounding` rather than `heuristic`. The ladder fix stays: it is correct and will engage the moment contexts
   exist, and it removed a lexical scorer that could only ever return 0.
   **Reading instruction until then: `faithfulness:heuristic score=0` means UNMEASURED, not failing.**
 
