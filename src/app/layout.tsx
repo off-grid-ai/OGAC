@@ -11,6 +11,18 @@ import './globals.css';
 const OG_TITLE = `${LANDING.brand} · ${LANDING.footer.companyDescription}`;
 const OG_DESCRIPTION = `${LANDING.hero.headline} ${LANDING.hero.offer}`;
 
+// The link-unfurl cover. Hosted on the PUBLIC marketing origin on purpose: this app also serves
+// onprem-console.getoffgridai.co, which sits behind Cloudflare Access, so an image served from here
+// would 302 to a login page for every crawler and the card would come up blank. An absolute URL on the
+// public origin unfurls the same wherever the link is pasted.
+// `card: 'summary_large_image'` was already set but no image was ever declared, so nothing rendered.
+const OG_IMAGE = {
+  url: 'https://getoffgridai.co/assets/cover.png',
+  width: 2976,
+  height: 1440,
+  alt: OG_TITLE,
+};
+
 export const metadata: Metadata = {
   title: OG_TITLE,
   description: OG_DESCRIPTION,
@@ -19,11 +31,13 @@ export const metadata: Metadata = {
     description: OG_DESCRIPTION,
     siteName: 'Off Grid AI',
     type: 'website',
+    images: [OG_IMAGE],
   },
   twitter: {
     card: 'summary_large_image',
     title: OG_TITLE,
     description: OG_DESCRIPTION,
+    images: [OG_IMAGE],
   },
 };
 
