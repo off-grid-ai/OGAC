@@ -1861,3 +1861,29 @@ tested in `test/api-failure.test.ts`; nothing new needs designing per site.
 currently reads as a product failure. It makes a correctly-governed system look broken.
 
 **Find them:** `grep -rn "if (!res.ok) throw" src/`
+
+## G-195 — the read-only demo account may be unable to send a chat message at all, and is not told why
+
+**Found:** 2026-07-30, while trying to generate a grounded answer to verify the citation footer.
+
+**Observed, live:** signed in as `demo-bank@getoffgridai.co` on `/work/chat`, typed a question, pressed
+Enter. The text stayed in the composer and no answer appeared. Screenshot: `scratchpad/cite-full.png`.
+
+**Not the keyboard.** `onComposerKey` handles `Enter && !e.shiftKey → send()` correctly, and the text
+did land in the right textarea. The likely cause is that **sending a message is a WRITE** (it creates a
+conversation), so the read-only demo refuses it — and the refusal is swallowed, leaving the composer
+looking as though the key did nothing. That is the G-194 pattern again, on the product's single most
+important interaction.
+
+**NOT YET CONFIRMED** — the network response was not captured. Confirm first by re-running the repro
+with a `page.on('response')` filter on `/api/v1/chat/*` and reading the status/body. Do not fix before
+reproducing; the cause above is inference, not evidence.
+
+**Why it matters if confirmed.** The read-only demo is the account buyers are handed. If it cannot send
+a chat message, the core promise ("a private AI, everywhere") cannot be tried at all, and the failure
+presents as an unresponsive UI rather than as a permissions boundary. Two separate decisions follow:
+whether a demo viewer should be allowed to converse (likely yes — an ephemeral conversation is not a
+change to org data), and, regardless, that the refusal must be visible.
+
+**Blocks:** live verification that a citation row renders as a working link (the citation-provenance
+fixes are deployed but unproven in the UI for exactly this reason).
