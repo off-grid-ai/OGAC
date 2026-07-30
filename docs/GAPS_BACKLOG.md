@@ -1839,3 +1839,25 @@ The vocabulary ratchet is now a real gate: `scripts/check-hero-vocabulary.mjs` w
 a per-term count RISES — verified adversarially by adding `langfuse`/`kestra` to a component (caught:
 "langfuse: 21 files (baseline 20)") and clearing after restore. The 300 standing leaks are recorded, not
 excused; lowering the baseline locks in each cleanup.
+
+## G-194 — 193 call sites still discard the server's reason for a failed write
+
+**Found:** 2026-07-30, by reproducing the "Add to my prompts" refusal live.
+
+**The defect.** `if (!res.ok) throw new Error('failed')` throws away the explanation the route already
+wrote. Reproduced exactly: `POST /api/v1/prompts` returns
+`403 {"error":"forbidden","reason":"read-only demo: this account can view everything but cannot make
+changes"}` and the user was shown **"Could not add starter"** — told the product is broken when they
+were merely not permitted. Those have opposite next actions: report a bug vs ask for access.
+
+**Scale.** `grep -rn "if (!res.ok) throw" src/ | wc -l` → **194**. One (PromptStarterLibrary) is fixed.
+
+**The fix, per site.** Replace the throw with `explainResponse(res, '<the attempt>')` from
+`src/lib/api-failure.ts` and show `f.message`, using `toast.info` when `f.refusal` is true (a 401/403 is
+the system working correctly and must not be styled as an error). The decision logic is pure and already
+tested in `test/api-failure.test.ts`; nothing new needs designing per site.
+
+**Why it matters beyond politeness.** On the read-only demo — the account buyers are shown — every write
+currently reads as a product failure. It makes a correctly-governed system look broken.
+
+**Find them:** `grep -rn "if (!res.ok) throw" src/`
