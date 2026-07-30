@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { submitAppRun } from '@/lib/adapters/apprun';
+import { runInputWithCase } from '@/lib/connector-filter';
 import { callerFromSession } from '@/lib/app-access-caller';
 import { newAppRunId } from '@/lib/app-run';
 import { evaluateBlastRadius, resolveRunMode, type RunMode } from '@/lib/app-run-controls';
@@ -36,9 +37,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const body = (await req.json().catch(() => ({}))) as {
     input?: Record<string, unknown>;
+    /** The picked record itself. `case_record` is the older sender's spelling; both are accepted. */
+    case?: unknown;
+    case_record?: unknown;
     mode?: RunMode;
   };
-  const input = body.input && typeof body.input === 'object' ? body.input : {};
+  // The CASE RECORD is a sibling of `input` in the request, and it used to be dropped right here — the
+  // route's body type never declared it. The run then stored only `{ input: "Meera Malhotra · submitted
+  // · 41,346.44" }`, a display string, so every step that filters on the case had nothing to bind: both
+  // `{{case.employee_id}}` (author-written) and the inferred scope (case-scope.ts) fell back to reading
+  // the table unfiltered. That is the whole reason the quota read returned 20 unrelated rows.
+  //
+  // Both senders are honoured: RunPanel posts `case`, AppInputForm posts `case_record` as a JSON string.
+  // caseRecordFrom() already parses either, so the record just has to survive the boundary.
+  const input = runInputWithCase(body);
+
   const requestedMode: RunMode | undefined = body.mode === 'shadow' ? 'shadow' : undefined;
 
   // Per-app ACCESS CONTROL — the WHO/UNDER-WHAT-CONDITIONS gate, layered before the pipeline

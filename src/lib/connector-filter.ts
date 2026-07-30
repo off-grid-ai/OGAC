@@ -84,6 +84,33 @@ export function caseRecordFrom(
 }
 
 /**
+ * Fold a request's sibling case record into the run input.
+ *
+ * The picked record arrives as a SIBLING of `input` in the request body (`{ input, case }`), and a route
+ * that only reads `body.input` drops it silently — which is exactly what happened: the run stored the
+ * display string "Meera Malhotra · submitted · 41,346.44" and nothing downstream could filter on the
+ * case, so both `{{case.employee_id}}` and the inferred scope read the table unfiltered.
+ *
+ * Lives here, next to caseRecordFrom, because this is the same question from the other side: that
+ * function says what counts as a case record, this one makes sure it survives the request boundary. Two
+ * senders exist — `case` (a record) and `case_record` (a JSON string) — and caseRecordFrom parses either,
+ * so this only has to carry it through under a canonical key.
+ */
+export function runInputWithCase(body: {
+  input?: unknown;
+  case?: unknown;
+  case_record?: unknown;
+}): Record<string, unknown> {
+  const base =
+    body.input && typeof body.input === 'object' && !Array.isArray(body.input)
+      ? (body.input as Record<string, unknown>)
+      : {};
+  const raw = body.case ?? body.case_record;
+  if (raw === undefined || raw === null) return { ...base };
+  return { ...base, case: raw };
+}
+
+/**
  * Resolve a step's declared params against the case record.
  *
  * A literal value passes through. A `{{case.field}}` / `{{input.field}}` placeholder is replaced with that
