@@ -38,11 +38,14 @@ export async function POST(req: Request) {
     [...selectableAppCapabilityRefs(context, 'data')].map((ref) => ref.slice('data:'.length)),
   );
 
-  const { spec, gaps } = await compileAppSpec(description, {
+  const { spec, gaps, questions } = await compileAppSpec(description, {
     orgId,
     ownerId,
     allowedDataDomainIds,
     defaultPipelineId: soleSelectableAppPipelineId(context),
   });
-  return NextResponse.json({ object: 'app_compile', spec, gaps });
+  // `questions` is Flow 3's clarifying step: what the author should answer before publishing, each
+  // with the fact that produced it and the field an answer resolves. Omitting it here was why the
+  // compile API returned none despite the compiler producing them.
+  return NextResponse.json({ object: 'app_compile', spec, gaps, questions });
 }
