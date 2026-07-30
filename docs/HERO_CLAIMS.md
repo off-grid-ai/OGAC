@@ -110,7 +110,7 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 
 | # | Claim | Surface | Gate | Evidence / what's missing |
 |---|---|---|---|---|
-| B3.1 | **Describe it in plain words → working software** | Solutions → Studio / builder | 🔴 GAP | **End-to-end proven live 2026-07-30, and it exposed the remaining blocker.** Compile → save → run all work: the sentence compiles to a 5-step governed spec binding `expense claims` (not the org's *insurance* `claims` — `phrase-qualifier.ts`), the missing quota read is auto-inserted and reported (`agent-data-dependency.ts`), the app saves (`app_c0f4398a`), the picker offers 11 real open claims, and the run reaches `awaiting_human` with both reads `done`. **BUT the decision is useless:** the auto-inserted read carries NO case-scoping params, so it returns 20 arbitrary quota rows and the agent correctly answers *"no reimbursement quota data is provided in the sources for Meera Malhotra"*. Run `apprun_0c63589e`. Same class as the original twenty-unrelated-rows defect, reintroduced by the fix for the missing read. **To close:** scope the read to the case. Compile time cannot know the target's columns, so the right seam is RUN time — `executeConnectorStep` already has the case record and can filter on keys it shares with the resource. Also: the compiled agent prompt renders `$41,346.44` — must be ₹ for these tenants. |
+| B3.1 | **Describe it in plain words → working software** | Solutions → Studio / builder | 🔶 WIRED | **The chain is proven live; one downstream defect stops the decision being useful.** Run `apprun_a60fcc2f` (2026-07-30): sentence → 5-step governed spec with correct bindings (`expense claims`, not the org's insurance `claims`) → quota read auto-inserted and reported → saved (`app_c0f4398a`) → picker offers 11 real open claims → run. Both reads are now **correctly case-scoped live**: s1 `ok(1 rows) — scoped by claim_no, employee_id`, dep1 `ok(6 rows) — scoped by employee_id` (was 20 unrelated rows each). Two root causes fixed: the run route dropped the picked record (`runInputWithCase`), and a compiler-inserted read had no filter to write (`case-scope.ts`, run-time inference). Blocked now only by **GAP M1** below — masking breaks entity identity, so the agent cannot tell the claim and the quota describe the same person. |
 | B3.2 | It **inherits your data** | Connector-query steps bound to data domains | ✅ VERIFIED | 2026-07-29: case-scoped reads live — 1 claim row + that employee's 1 quota row, `{{case.employee_id}}` resolved, on both tenants. |
 | B3.3 | It **inherits your rules** (data ceiling) | Pipeline data allowlist, enforced pre-connector | ✅ VERIFIED | A read outside the allowlist is denied before the connector is touched, audited as `pipeline.data.deny`. Observed live. |
 | B3.4 | **People review what matters** | Human step + review/approve | ✅ VERIFIED | 2026-07-29: `apprun_9ba6a45d` — read → quota → decision (₹41,346.44 vs ₹137,454.12, headroom ₹96,107.68) → **human approved** → output → `done`. Work screen HANDLED 9 → 10. |
@@ -164,9 +164,40 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 
 **The gaps, in the order they hurt a demo:**
 
-0. **B3.1 — the headline claim reaches a useless decision.** Everything upstream now works; the
-   auto-inserted read is unscoped, so the agent is handed 20 unrelated rows and says so. One narrow
-   fix away (case-scope the read at run time), and it is the sentence on screen in Beat 3.
+0. **GAP M1 — masking destroys entity identity, so a governed agent cannot do the work.** The single
+   most important finding of this session, and it blocks the headline claim.
+
+   Run `apprun_a60fcc2f` read exactly the right data — Meera Malhotra's one claim (₹41,346.44) and her
+   six quota rows (Training: ₹200,000 annual, ₹137,454.12 remaining, so the claim is comfortably within
+   quota). The agent still could not decide, and its reasoning was correct given what it was shown:
+
+   > "The claim submitted by [REDACTED_PERSON_23] … does **not** appear in the provided data. The only
+   > claim listed in `expense_claims` is for [REDACTED_PERSON_12][REDACTED_PERSON_13], not
+   > [REDACTED_PERSON_23]. Additionally, the `employee_quota` table does not contain any rows with the
+   > employee name [REDACTED_PERSON_23]."
+
+   One person, three different tokens. The masker's placeholder counter is PER SCAN, and a run scans in
+   several places independently (`app-run.ts:745` masks the folded query; `agentrun.ts:958` masks again;
+   `providedSources` travel as their own channel). So the same real value becomes a different opaque
+   token in each channel, and the agent — reasoning faithfully over what it was given — concludes the
+   records describe different people. Note also `[REDACTED_PERSON_12][REDACTED_PERSON_13]`: one name
+   split across two tokens, which makes the join even harder.
+
+   **This is not an argument for less masking.** It is an argument for VALUE-STABLE pseudonyms: replace
+   an entity with a token derived from the value itself (`PERSON_a3f9`), so the same person is the same
+   token in every scan, every channel and every step, while no real name ever reaches the model.
+   Referential integrity is what makes governed data still *usable* — and "your AI does the work
+   without ever seeing the name" is a stronger claim than anything currently on the page.
+
+   Batching the scans would paper over this one run; it would break again the moment a run scans in two
+   places. The token must be a function of the value, not of the scan.
+
+   Deliberately NOT patched at the end of a long session: it touches the PII path shared by chat,
+   agents and pipelines, and the current placeholder is minted downstream of where we still hold the
+   original value — so the fix needs the analyzer's spans, not a rewrite of already-redacted text.
+
+1. **B3.1 currency** — the compiled agent prompt renders `$41,346.44`. These tenants are Indian BFSI;
+   it must be ₹. Small, and it is on screen in the hero.
 1. **GAP V1 — vocabulary leaks** (P3). Every surface the CIO opens after the loop. Systemic; needs a check, not a sweep.
 2. **B2.4 — grounding is lexical, not entailment-grade** (G-F3). "Answers you can verify" is an on-screen chip.
 3. **B4.7 — provenance may be seeded rather than real.** We display "signed and tamper-evident".
