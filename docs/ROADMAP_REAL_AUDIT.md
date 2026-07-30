@@ -68,7 +68,7 @@ The wedge, and the strongest evidence we have.
 |---|---|---|
 | Alert shows failed or degraded run | 🔶 | Runs list shows status; alerting path unverified |
 | Operator opens execution trace | ✅ | Per-step detail with status + timing |
-| Sees data, model, prompt, tool, policy, evaluation stages | 🔶 | Data/model/policy visible; **prompt + evaluation stages not on the trace** |
+| Sees data, model, prompt, tool, policy, evaluation stages | 🔶 | Data/model/policy ✅. **Prompt ✅ 2026-07-30** — read from the child agent run so it is the text actually sent (post-masking, post-source-folding), collapsed behind a disclosure with its character count. Verified live on `apprun_76864dd2`: present after a poll cycle, containing the case subject and the folded source rows. **Evaluation stages remain absent** — eval runs now retain per-case evidence (fixed earlier today), so surfacing it here is the follow-on |
 | Identifies the failure | ✅ | Failures name their cause, never present as emptiness (`connector-failure.ts`) |
 | Compares with previous versions | ❓ | Version history exists; comparison unverified |
 | Fixes and tests | ❓ | — |
