@@ -63,7 +63,15 @@ export function MemoryDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex flex-col gap-0 p-0">
+      <SheetContent
+        side="right"
+        className="flex flex-col gap-0 p-0"
+        // Radix focus-traps onto the first focusable child, which put a green focus ring on the text field the
+        // moment the panel opened. On a field nobody has touched that reads as a validation state — in a
+        // regulated product, a coloured ring means "something is wrong here". Focus the panel instead; the
+        // field is one Tab away and the keyboard path is preserved.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         {/* SheetContent carries p-0, so nothing inside inherits padding. Padded locally rather than by
             changing SheetContent, which every other sheet in the app also uses. */}
         <SheetHeader className="gap-1 border-b border-border px-4 py-3 pr-10">
@@ -72,7 +80,7 @@ export function MemoryDialog({
             Facts the assistant remembers across your chats.
           </SheetDescription>
         </SheetHeader>
-        <SheetBody className="space-y-3 px-4 py-3">
+        <SheetBody className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
           {/* Heights matched explicitly (h-9 both) — the input and button rendered at different heights, which
               reads as broken before anyone reads the words. No autoFocus: it left a permanent focus ring that
               looked like a validation error on a field the user had not touched. */}
@@ -84,13 +92,19 @@ export function MemoryDialog({
               onKeyDown={(e) => e.key === 'Enter' && add()}
               placeholder="Add a fact to remember…"
             />
-            <Button size="sm" onClick={add} disabled={!draft.trim()} className="h-9 shrink-0 gap-1.5">
+            <Button
+              size="sm"
+              onClick={add}
+              disabled={!draft.trim()}
+              // A washed-out primary still reads as clickable. Muted + no pointer makes the state unambiguous.
+              className="h-9 shrink-0 gap-1.5 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+            >
               <Plus className="size-4" /> Add
             </Button>
           </div>
           <div className="space-y-1.5">
             {items.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border px-3 py-6 text-center">
+              <div className="rounded-md border border-dashed border-border px-3 py-5 text-center">
                 <p className="text-xs text-muted-foreground">Nothing remembered yet.</p>
                 <p className="mt-1 text-[11px] text-muted-foreground/70">
                   Add a fact above and it is included in every chat.
