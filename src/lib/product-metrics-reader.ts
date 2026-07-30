@@ -72,12 +72,25 @@ export async function computeProductMetrics(
       finishedAt: r.finishedAt ? new Date(r.finishedAt).toISOString() : undefined,
     }));
 
+    // WHICH APPS HAVE EVALUATIONS. My first version never populated `hasEvaluations`, so
+    // appsWithEvaluations could only ever report 0% — a metric that cannot be non-zero is worse than no
+    // metric, because it reads as a finding about the product instead of a bug in the measurement. It very
+    // nearly sent us building eleven eval definitions to fix a number that was lying. Sourced from
+    // `eval_definitions.app_id` (raw SQL: the table has no drizzle binding).
+    const evalRes = await db.execute(sql`
+      SELECT DISTINCT app_id FROM eval_definitions
+      WHERE org_id = ${orgId} AND app_id IS NOT NULL`);
+    const evalRows =
+      ((evalRes as unknown as { rows?: Record<string, unknown>[] }).rows ??
+        (evalRes as unknown as Record<string, unknown>[])) || [];
+    const appsWithEvals = new Set(evalRows.map((r) => String(r.app_id)));
+
     // `isTemplate` marks a template itself, not an app BUILT from one; app→template lineage lives in the
     // `lineage` column and is not read here. So template adoption is reported over what we can actually
     // source, and this is noted rather than guessed at — see the §13 audit row.
     const appList: MetricApp[] = appRows
       .filter((a) => !a.isTemplate)
-      .map((a) => ({ id: a.id, pipelineId: a.pipelineId ?? null }));
+      .map((a) => ({ id: a.id, pipelineId: a.pipelineId ?? null, hasEvaluations: appsWithEvals.has(a.id) }));
 
     // The canonical ledger `audit_events_v2` is raw SQL (no drizzle binding), the same seam
     // readComplianceActivity uses.

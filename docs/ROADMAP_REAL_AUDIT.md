@@ -453,6 +453,24 @@ Newest first. Every entry is live-verified unless it says otherwise.
 
 ### 2026-07-30
 
+- **AI QA for the 11 apps — started, and the first finding was a lie in my own metric.** Founder called this
+  critical. `appsWithEvaluations` reported **0 of 11**, which reads as a damning product fact. It was a bug: the
+  reader I had just written never populated `hasEvaluations`, so the metric could only ever return 0%. **A
+  metric that cannot be non-zero is worse than no metric** — it very nearly sent us building eleven eval
+  definitions to fix a number that was lying. Now sourced from `eval_definitions.app_id`.
+  What the check DID establish, from the live box:
+  - `eval_definitions` has an **`app_id` column**, so evals bind per APP, not only per pipeline. Good — that is
+    the right granularity for "every production use case should have evaluations" (§8H).
+  - org_bharat has only **3 eval definitions** (faithfulness ×2, answer_relevancy ×1) and **none is bound to an
+    app or a pipeline**. So the real gap is genuine, just not 11/11 — it is "3 unbound definitions exist".
+  - **7 of the 11 apps have NO pipeline** (`app_5803e04b`, `app_b82a42be`, `app_c0f4398a`, `app_d07ab6a9`,
+    `app_demo_crosssell`, `bhapp_fraud`, `bhapp_xsell`). That is a second, larger finding: it explains the 59%
+    governed-activity share, and it means pipeline-scoped governance does not reach most apps.
+  - The table is `eval_definitions`, not `eval_defs` — worth recording since a query against the wrong name
+    returns "relation does not exist", which is easy to misread as "no evals exist".
+  **Next:** per-app eval definitions for all 11 (faithfulness + answer-relevancy + a PII-masking check at
+  minimum), then bind the 7 unbound apps to pipelines, then release gates so a failing suite blocks a publish.
+
 - **§13 metrics computation built** — `src/lib/product-metrics.ts`, 15 tests. The §13 audit's finding was
   that almost every success metric is derivable from recorded data and almost none is computed; this is the
   missing computation for the three groups that need no new instrumentation: **reliability** (successful /
