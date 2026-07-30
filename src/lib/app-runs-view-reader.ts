@@ -5,9 +5,9 @@
 // into the client-safe AppRunView via the pure `toAppRunView` mapper. It never re-implements a
 // scheduling rule — it only reads the `app_runs` row(s). Disjoint from app-run-store.ts (2A, WRITE).
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db';
-import { appRuns } from '@/db/schema';
+import { agentRuns, appRuns } from '@/db/schema';
 import { type AppRunView, toAppRunView } from '@/lib/app-runs-view';
 import { listApps } from '@/lib/apps-store';
 import { isDemoTenantOrg } from '@/lib/demo-test-artifacts';
@@ -21,7 +21,40 @@ export async function getAppRunView(id: string, orgId: string = DEFAULT_ORG): Pr
     .from(appRuns)
     .where(and(eq(appRuns.id, id), eq(appRuns.orgId, orgId)))
     .limit(1);
-  return row ? toAppRunView(row) : null;
+  if (!row) return null;
+  return withAgentPrompts(toAppRunView(row), orgId);
+}
+
+/**
+ * Fill in each agent step's `prompt` from its child agent run (Flow 7 step 3).
+ *
+ * Only on the SINGLE-run read: the runs LIST does not show prompts and would otherwise pay for a join it
+ * never uses. Best-effort by design — a missing or unreadable child run leaves `prompt` undefined and the
+ * trace renders exactly as before, because an investigation surface that fails to load is worse than one
+ * that is missing a field.
+ */
+async function withAgentPrompts(view: AppRunView, orgId: string): Promise<AppRunView> {
+  const ids = view.steps
+    .filter((s) => s.kind === 'agent' && s.childRunId)
+    .map((s) => s.childRunId as string);
+  if (ids.length === 0) return view;
+  try {
+    const rows = await db
+      .select({ id: agentRuns.id, query: agentRuns.query })
+      .from(agentRuns)
+      .where(and(inArray(agentRuns.id, ids), eq(agentRuns.orgId, orgId)));
+    const byId = new Map(rows.map((r) => [r.id, r.query]));
+    return {
+      ...view,
+      steps: view.steps.map((s) =>
+        s.childRunId && byId.get(s.childRunId)
+          ? { ...s, prompt: String(byId.get(s.childRunId)) }
+          : s,
+      ),
+    };
+  } catch {
+    return view;
+  }
 }
 
 // listAppRunsView — recent runs, optionally filtered to one app, newest first. Backs the runs LIST

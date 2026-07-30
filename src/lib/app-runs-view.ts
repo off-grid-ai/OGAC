@@ -20,6 +20,15 @@ export interface AppRunStepRow {
   refs?: string[];
   detail?: string;
   childRunId?: string;
+  /**
+   * The exact prompt the model was given, for an agent step. Flow 7 in `docs/roadmap-real.md` requires
+   * the operator to see "data, model, prompt, tool, policy and evaluation stages"; the prompt was the one
+   * absent, and it is what an operator investigating a bad answer needs FIRST — the answer is a function
+   * of it, so without it every other stage is guesswork. Read from the child agent run, not re-derived,
+   * so it is what actually went to the model (post-masking, post-source-folding) rather than what we
+   * think was sent.
+   */
+  prompt?: string;
   reviewer?: string;
   /** SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered). */
   wouldPerform?: { sink: string; recipient?: string; subject?: string; payloadPreview: string };

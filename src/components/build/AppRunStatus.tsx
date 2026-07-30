@@ -268,6 +268,19 @@ function StepRow({ step, index }: Readonly<{ step: AppRunStepRow; index: number 
           </div>
         ) : null}
         {step.outcome ? <StepEvidence outcome={step.outcome} /> : null}
+        {/* Flow 7 step 3: the operator must see the PROMPT, not just the answer. Collapsed by default —
+            it is long, and it is only needed when investigating. `<details>` keeps it one click away with
+            no state to manage and no extra request. */}
+        {step.prompt ? (
+          <details className="mt-1 rounded border border-border/60 bg-muted/20">
+            <summary className="cursor-pointer px-2 py-1 text-[11px] text-muted-foreground">
+              Prompt sent to the model ({step.prompt.length.toLocaleString()} characters)
+            </summary>
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap border-t border-border/60 p-2 text-[11px] text-foreground">
+              {step.prompt}
+            </pre>
+          </details>
+        ) : null}
         {step.detail ? <p className="mt-1 text-[11px] text-muted-foreground">{step.detail}</p> : null}
         {step.refs && step.refs.length > 0 ? (
           <div className="mt-1 flex flex-wrap gap-1">
