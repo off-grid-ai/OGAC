@@ -70,9 +70,9 @@ The wedge, and the strongest evidence we have.
 | Operator opens execution trace | ✅ | Per-step detail with status + timing |
 | Sees data, model, prompt, tool, policy, evaluation stages | 🔶 | Data/model/policy ✅. **Prompt ✅ 2026-07-30** — read from the child agent run so it is the text actually sent (post-masking, post-source-folding), collapsed behind a disclosure with its character count. Verified live on `apprun_76864dd2`: present after a poll cycle, containing the case subject and the folded source rows. **Evaluation stages remain absent** — eval runs now retain per-case evidence (fixed earlier today), so surfacing it here is the follow-on |
 | Identifies the failure | ✅ | Failures name their cause, never present as emptiness (`connector-failure.ts`) |
-| Compares with previous versions | ❓ | Version history exists; comparison unverified |
-| Fixes and tests | ❓ | — |
-| Rolls out or rolls back | ❓ | — |
+| Compares with previous versions | 🔶 | **Swept live 2026-07-30 — split by entity.** PIPELINES have real version history: `GET /api/v1/admin/pipelines/{id}/versions` → append-only rows with a full `snapshot` per version (verified on `pl_9138b148-290`, v1 `note:"created"`), so comparison is possible there. **APPS have no versions at all** — no `apps/{id}/versions` route and no app-versions table — and an app run is what an operator is usually investigating. That is the gap: version the app, not just the pipeline |
+| Fixes and tests | 🔶 | An app's steps and prompts are editable (`updateApp` re-syncs the materialized agent), and a run can be re-run from the original input (`app-runs/[id]/workflow` rerun). The fix→test→compare loop has not been walked as one sequence |
+| Rolls out or rolls back | 🔶 | `POST /api/v1/admin/pipelines/{id}/rollback` exists for pipelines. Nothing rolls an APP back, which follows from apps having no versions — same root cause as step 5 |
 
 ### Flow 8: Compliance export
 | Step | Gate | Evidence |
