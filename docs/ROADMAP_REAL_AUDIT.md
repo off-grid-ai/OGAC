@@ -475,7 +475,23 @@ Newest first. Every entry is live-verified unless it says otherwise.
   faithfulness check because they invent nothing — which is why one metric is not enough), and
   `pii_leakage ≤ 0.01` (near-zero: one leaked PAN is a breach, not a quality dip, so the threshold is
   deliberately not symmetrical with the other two).
-  **Next on this thread:** run the suites for a real per-app baseline (defined ≠ executed), **bind the 7 apps
+- **Suites EXECUTED — first real per-app AI QA baseline, and it exposed an engine mismatch.**
+  | engine | runs | avg | passed |
+  |---|---|---|---|
+  | `pii_leakage:heuristic` | 6 | 0 | **6/6 ✅** |
+  | `answer_relevancy:ragas` | 4 | 80 | **4/4 ✅** |
+  | `faithfulness:heuristic` | 2 | 0 | **0/2 ❌** |
+
+  `pii_leakage` scoring 0 is a PASS — lower-is-better, so zero means nothing leaked. Read the direction before
+  reading the number.
+  **🔴 THE FINDING: `faithfulness` runs on a heuristic that returns 0, while a working entailment engine sits
+  next to it.** The model grounding adapter was verified live earlier today — it supported a paraphrase and
+  refused a contradiction. So this is not a quality failure, it is the EVAL path falling back to the lexical
+  heuristic (`faithfulness:heuristic`) instead of using the entailment engine the grounding path uses. Two
+  engines for one concept: one works, one always returns 0. A faithfulness gate that always fails is as useless
+  as one that always passes, and worse — it trains people to ignore it.
+  **Fix:** point the faithfulness eval metric at the same adapter `/api/v1/admin/grounding/verify` uses.
+  **Next on this thread:** **bind the 7 apps
   that have NO pipeline** — the more serious item, since pipeline-scoped governance currently does not reach
   most apps, which is what the 59% governed-activity share was telling us — then release gates so a failing
   suite blocks a publish.
