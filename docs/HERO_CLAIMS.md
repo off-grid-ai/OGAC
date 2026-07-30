@@ -110,7 +110,7 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 
 | # | Claim | Surface | Gate | Evidence / what's missing |
 |---|---|---|---|---|
-| B3.1 | **Describe it in plain words → working software** | Solutions → Studio / builder | 🔶 WIRED | **Compile verified live 2026-07-30** — the reimbursement sentence produces a 5-step governed spec, binds `expense claims` (not the org's *insurance* `claims` table — see `phrase-qualifier.ts`), and titles itself "Expense Claim Approval Process". Compiling exposed a worse defect than the earlier ones, now fixed: the model turned "check that employee's remaining quota" into an AGENT step with **no read of the quota**, so the app validated, ran, and answered confidently about a number it never fetched — with `gaps: []`. `agent-data-dependency.ts` now inserts the missing read (before the agent, since a later read cannot inform it) or leaves it alone if the phrase resolves to nothing, and reports every insertion. **Still to promote to ✅:** save the compiled spec and run it end to end. |
+| B3.1 | **Describe it in plain words → working software** | Solutions → Studio / builder | 🔴 GAP | **End-to-end proven live 2026-07-30, and it exposed the remaining blocker.** Compile → save → run all work: the sentence compiles to a 5-step governed spec binding `expense claims` (not the org's *insurance* `claims` — `phrase-qualifier.ts`), the missing quota read is auto-inserted and reported (`agent-data-dependency.ts`), the app saves (`app_c0f4398a`), the picker offers 11 real open claims, and the run reaches `awaiting_human` with both reads `done`. **BUT the decision is useless:** the auto-inserted read carries NO case-scoping params, so it returns 20 arbitrary quota rows and the agent correctly answers *"no reimbursement quota data is provided in the sources for Meera Malhotra"*. Run `apprun_0c63589e`. Same class as the original twenty-unrelated-rows defect, reintroduced by the fix for the missing read. **To close:** scope the read to the case. Compile time cannot know the target's columns, so the right seam is RUN time — `executeConnectorStep` already has the case record and can filter on keys it shares with the resource. Also: the compiled agent prompt renders `$41,346.44` — must be ₹ for these tenants. |
 | B3.2 | It **inherits your data** | Connector-query steps bound to data domains | ✅ VERIFIED | 2026-07-29: case-scoped reads live — 1 claim row + that employee's 1 quota row, `{{case.employee_id}}` resolved, on both tenants. |
 | B3.3 | It **inherits your rules** (data ceiling) | Pipeline data allowlist, enforced pre-connector | ✅ VERIFIED | A read outside the allowlist is denied before the connector is touched, audited as `pipeline.data.deny`. Observed live. |
 | B3.4 | **People review what matters** | Human step + review/approve | ✅ VERIFIED | 2026-07-29: `apprun_9ba6a45d` — read → quota → decision (₹41,346.44 vs ₹137,454.12, headroom ₹96,107.68) → **human approved** → output → `done`. Work screen HANDLED 9 → 10. |
@@ -162,8 +162,11 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 | 🔴 GAP | 6 |
 | ⬜ OTHER REPO | 1 |
 
-**The six gaps, in the order they hurt a demo:**
+**The gaps, in the order they hurt a demo:**
 
+0. **B3.1 — the headline claim reaches a useless decision.** Everything upstream now works; the
+   auto-inserted read is unscoped, so the agent is handed 20 unrelated rows and says so. One narrow
+   fix away (case-scope the read at run time), and it is the sentence on screen in Beat 3.
 1. **GAP V1 — vocabulary leaks** (P3). Every surface the CIO opens after the loop. Systemic; needs a check, not a sweep.
 2. **B2.4 — grounding is lexical, not entailment-grade** (G-F3). "Answers you can verify" is an on-screen chip.
 3. **B4.7 — provenance may be seeded rather than real.** We display "signed and tamper-evident".
