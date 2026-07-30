@@ -453,6 +453,26 @@ Newest first. Every entry is live-verified unless it says otherwise.
 
 ### 2026-07-30
 
+- **🔴 THE APP QUALITY TAB QUERIES BY APP, THE DATA IS BOUND BY PIPELINE — third instance of one mismatch.**
+  Founder opened `bhapp_reimb/quality`: "No evals yet, 0 attached" and "Golden set for this pipeline (0)".
+  Neither was missing data.
+  1. **Evals** — the panel attaches per PIPELINE; the seed bound them by `app_id`. Fixed (bind apps → pipelines,
+     backfill eval `pipeline_id`): visibility **18 → 36 of 42**, verified on screen for two apps.
+  2. **Golden set** — `listGoldenCases(id)` treats a string arg as `{ appId }` (`evals.ts:171`), so the page
+     queries by APP while every case is bound by PIPELINE. Cases *already existed* for pipelines nobody had
+     touched (collections 3, kyc 3, motor 3) and still displayed 0. **This is a code bug, not absent data**, and
+     seeding more cases would not have fixed it — I nearly did exactly that.
+  3. **A panel titled "…for this pipeline" that filters by app id** is the same defect stated in the UI: the
+     heading is the spec, the query contradicts it.
+  **Fix:** on an app surface, resolve the app's `pipelineId` and query golden cases (and evals) by it — one
+  resolution, used by both panels, so they cannot disagree again.
+  **Also open:** four identical "Hallucination / Faithfulness" chips in "Attach from the library"
+  (`listEvalDefs(null)`) — unresolved; only ONE template carries that name and only 3 unbound defs exist, so the
+  duplication is in how the library list is assembled, not in the data. Needs the actual `listEvalDefs(null)`
+  query read.
+  **Founder verdict on the surface: "the UX isn't sitting well, that needs work."** Recorded as-is — three
+  panels on one screen each disagreeing with their own heading is a UX problem before it is a data problem.
+
 - **AI QA for the 11 apps — started, and the first finding was a lie in my own metric.** Founder called this
   critical. `appsWithEvaluations` reported **0 of 11**, which reads as a damning product fact. It was a bug: the
   reader I had just written never populated `hasEvaluations`, so the metric could only ever return 0%. **A
