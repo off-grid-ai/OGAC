@@ -68,7 +68,9 @@ const params = JSON.parse(process.env.PARAMS || '{}'); // { id: 'app_x', slug: '
 mkdirSync(OUT, { recursive: true });
 
 const fill = (route) => route.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => params[k] ?? `[${k}]`);
-const targets = routes.map(fill);
+// --module scopes the CRAWL as well, not just --list. Without this it swept all 293 routes and timed out —
+// and the founder's method is explicitly one module at a time.
+const targets = routes.filter(inModule).map(fill);
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -82,6 +84,9 @@ await page.waitForTimeout(4000);
 const problems = [];
 for (const route of targets) {
   if (route.includes('[')) { problems.push(`SKIPPED (no param): ${route}`); continue; }
+  // A FAKE id makes a real detail page render its not-found/empty shell, which then trips the
+  // "near-empty" heuristic and reports a defect that does not exist. Params must be real entity ids.
+  if (/placeholder|__fake__/.test(route)) { problems.push(`SKIPPED (fake id): ${route}`); continue; }
   const name = route.replace(/^\//, '').replace(/\//g, '_') || 'root';
   try {
     const resp = await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle', timeout: 25000 });

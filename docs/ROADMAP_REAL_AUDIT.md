@@ -453,6 +453,24 @@ Newest first. Every entry is live-verified unless it says otherwise.
 
 ### 2026-07-30
 
+- **WORKSPACE MODULE SWEEP (10 routes: 7 static, 3 dynamic — all 10 swept).** Founder's method, per the new
+  `ui-module-sweep` skill. Fixed and deployed: "All chats" filtered to chats with NO project (so a workspace where
+  everything is filed showed "No chats yet"); "All chats" was rendered INSIDE the Projects group as though it were
+  a project; the Memory sheet's Input lacked `min-w-0` and pushed its own Add button off-viewport; the workspace
+  was empty for the signed-in identity because the data is per-USER and only `demo-bank` had rows; and Prompts was
+  empty because I seeded `prompts` when the page reads `prompt_library` (fourth wrong-name guess of the session —
+  wrong rows removed, 4 org-visible prompts per tenant now).
+  **STILL OPEN — `/work/projects/[id]`: the "Project memory (n)" CardTitle overlaps its own description text**,
+  with the title wrapped to three lines in a narrow column. Screenshot evidence in the sweep output. NOT guessed
+  at: the markup (CardHeader → CardTitle + p) reads correctly, so the cause is in the computed grid/column layout
+  and needs the browser inspected rather than a CSS change fired blind. The same card's input WAS fixed
+  (`min-w-0`), which is the second component with that exact defect — worth a repo-wide check for flex rows
+  containing an Input.
+  **False positives my own sweep produced**, all now guarded or known: fake ids made every detail route look
+  "near-empty"; `--module` did not scope the crawl so it swept all 293 routes and timed out; and the
+  "engineering vocabulary" flag on `/work/prompts` is a regex over-match — that page is genuinely good.
+  **Every flag needs its screenshot read before it counts as a finding.**
+
 - **🔴 THE WORKSPACE (§8 "Work") IS NOT SEEDED FOR THE DEMO TENANTS — founder-reported, now quantified.**
   *"The entire workspace section has no seed data. It's so difficult to truly understand all of its
   functionality."* Confirmed, and the numbers are the argument:

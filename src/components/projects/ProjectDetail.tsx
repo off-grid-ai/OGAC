@@ -390,6 +390,9 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
               {canEdit ? (
                 <div className="flex items-center gap-1.5">
                   <Input
+                    // min-w-0 so the input shrinks instead of clipping its own placeholder and squeezing
+                    // the Add button — the same defect fixed in MemoryDialog, in a second component.
+                    className="min-w-0 flex-1"
                     value={newFact}
                     placeholder="Add a fact the project should remember…"
                     onChange={(e) => setNewFact(e.target.value)}
