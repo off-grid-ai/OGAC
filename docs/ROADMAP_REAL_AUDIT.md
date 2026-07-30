@@ -201,3 +201,177 @@ have one** — applied rather than left as advice:
 
 Each fails loudly if its boundary regresses, and each is on the specific thing that actually broke rather than
 a general "does it work" test — which is why the originals all passed while the product was wrong.
+---
+
+## §12 Technical table stakes — audited and gated
+
+Eleven headed groups, ~150 items. **What this audit is and is not:** every row below is gated from either
+(a) live evidence produced this session or already in the capability map, or (b) presence in the router /
+`src/lib`, established by enumerating code rather than guessing names. It is NOT a live exercise of 150
+items — that is weeks of work, and claiming it would be the inflation this file exists to prevent. So a
+🔶 here means "the code is there and named honestly", and ❓ means **unknown, not broken**.
+
+**Naming check, because it changed six answers.** A first pass by literal term reported zero hits for
+circuit-breaker, dead-letter, key-rotation, A/B testing, schema-evolution and risk-classification. Five of
+those six exist under different names (`breaker`/`halfOpen`, `dlq`, `rotateSigningKey`, `variant`/`experiment`,
+`migrat*`). Only **risk classification** is genuinely absent under any spelling. Recording the five as gaps
+would have manufactured five fake defects — the same trap as the four invented 404 URLs earlier today.
+
+### Deployment
+| Item | Gate | Note |
+|---|---|---|
+| Customer data center · private cloud | ✅ | The whole product runs on-prem; this session deployed to it ~15 times |
+| Docker / compose | ✅ | `deploy/docker-compose*.yml`, `deploy/Makefile` |
+| Environment separation | 🔶 | `.env.local` / `.env.production` on the box; no promotion pipeline |
+| Infrastructure-as-code | 🔶 | Compose + scripts; fleet orchestration lives in the private repo |
+| Kubernetes | ❓ | Not exercised here |
+| Customer cloud · hybrid · air-gapped | ❓ | Architecturally implied by on-prem-first; never run |
+| Backup and restore · disaster recovery | ❓ | **The most consequential ❓ in this section** — an enterprise buyer asks early and it is untested |
+
+### Identity and access
+| Item | Gate | Note |
+|---|---|---|
+| SSO · OIDC | ✅ | Keycloak live; OpenSearch OIDC cutover done earlier |
+| RBAC | ✅ | Team membership + role gates pipeline lifecycle, verified live |
+| ABAC | ✅ | Enforced on the app-run path (OPA adapter live) |
+| Service accounts · API keys | ✅ | Bearer admin token + virtual keys; used throughout this session |
+| Fine-grained permissions | ✅ | Per-app access + retrieval ACL by asker |
+| SAML · SCIM | 🔶 | Referenced in code; provisioning never exercised |
+| Break-glass access | 🔶 | Present in code |
+| Temporary credentials | ✅ | OpenBao dynamic DB creds proven live (issue/auth/revoke) |
+| Separation of duties | 🔶 | Maker-checker exists on actions; not audited as a duty split |
+
+### Security
+| Item | Gate | Note |
+|---|---|---|
+| Tenant isolation | ✅ | Cross-org RAG leak closed and covered by a regression test |
+| Secret management | ✅ | OpenBao KV v2 lifecycle proven live |
+| PII detection and masking | ✅ | Fail-closed; **and value-stable pseudonyms added today** so masked data stays joinable |
+| Egress control | ✅ | Egress leash enforced before the model call |
+| Audit logging | ✅ | `audit_events_v2` is the canonical ledger; every enforcement writes to it |
+| DLP | ✅ | Cloud-response DLP proven live (capability map) |
+| Rate limiting | ✅ | 60 req/min per IP on `/api/*` |
+| Encryption in transit | ✅ | Cloudflare tunnel + TLS at the edge |
+| Key rotation | 🔶 | `rotateSigningKey` exists; rotation never exercised end to end |
+| Prompt-injection defense · tool sandboxing | 🔶 | Guardrail scanners + sandbox concepts present |
+| SIEM integration | ✅ | OpenSearch audit index + alerting monitors |
+| Encryption at rest · vulnerability / dependency / container scanning · network policies | ❓ | Infra-side; not verified from here |
+
+### Reliability
+| Item | Gate | Note |
+|---|---|---|
+| Durable execution | ✅ | Temporal-backed runs; a paused human step resumes |
+| Human approval as a durable pause | ✅ | Proven repeatedly today (`awaiting_human` → resume) |
+| Retries · timeouts | ✅ | Present and exercised (connector timeouts, scan timeouts) |
+| Graceful degradation | ✅ | Best-effort paths degrade with a named reason rather than failing the run |
+| Rollback · version pinning | 🔶 | Pipelines version + roll back (verified live); **apps do not** — the Flow 7 gap |
+| Checkpointing · circuit breakers · DLQ | 🔶 | Present under other names (`breaker`, `dlq`) |
+| Idempotency | 🔶 | Widely referenced; not asserted by a test |
+| Service-health monitoring | ✅ | `npm run smoke` + per-service health endpoints |
+| HA · horizontal scaling · SLOs/SLAs | ❓ | Single-box demo deployment; not a scaled test |
+
+### Data
+| Item | Gate | Note |
+|---|---|---|
+| Structured connectors | ✅ | Six demo connectors probed live (mysql, postgres, mssql, s3, kafka, rest) |
+| Permission-aware retrieval | ✅ | Retrieval ACL by asker identity |
+| Data classification | ✅ | Catalog + classification seeded |
+| Lineage · provenance | ✅ | Marquez lineage + Ed25519 run provenance, tamper-evidence proven today |
+| Data-quality monitoring | ✅ | Great Expectations live and discriminating (verified today) |
+| Incremental sync · CDC | 🔶 | Airbyte/Kestra paths exist; not exercised as sync |
+| Retention · deletion | 🔶 | RTBF surface exists; erasure propagation unexercised |
+| Schema evolution | 🔶 | Migration paths exist |
+| Legal holds · data residency | 🔶 | Referenced; policy-level, unexercised |
+| Unstructured connectors | ❓ | — |
+
+### Model operations
+| Item | Gate | Note |
+|---|---|---|
+| Multi-model · local and cloud inference | ✅ | Five models attributed in FinOps; local + cloud behind one gateway |
+| Model routing · fallback | ✅ | Policy-driven routing; fallback on unreachable |
+| Token and cost tracking | ✅ | 118k tokens / $0.2367 with a real per-model split |
+| Structured outputs · tool calling · streaming | ✅ | In use across chat/agents |
+| Prompt versioning | ✅ | Prompt registry with versions |
+| Model evaluation | ✅ | 25 runs / 71 cases; **per-case evidence now retained** (fixed today) |
+| Caching · batch inference | 🔶 | Present |
+| A/B testing · canary releases | 🔶 | `variant`/`experiment` concepts exist; no release-gate flow |
+| Context management | 🔶 | Implicit in prompt assembly |
+| Versioning (models) · rollback | ❓ | Model pinning exists; rollback unexercised |
+
+### Agent operations
+| Item | Gate | Note |
+|---|---|---|
+| Human approval | ✅ | With **risk and confidence** as of today |
+| Long-running execution · durable state | ✅ | Durable workflow runs |
+| Permissioned tool access | ✅ | Tool permissions enforced |
+| Event triggers · scheduling | ✅ | Inbound webhook trigger → governed run proven live; cron schedules exist |
+| Budget control | 🔶 | Blast-radius caps enforced at run start; **dollar budgets unconsumable** until keys reconcile (B4.10) |
+| Kill switches | ✅ | Per-app disable enforced before any step |
+| Maximum-step limits · loop detection | 🔶 | Step caps present |
+| Sandboxed tools · delegation · concurrency control | 🔶 | Present |
+| Execution replay | 🔶 | Rerun from original input exists; not a true replay |
+
+### Evaluation
+| Item | Gate | Note |
+|---|---|---|
+| Golden datasets · offline evaluations | ✅ | `golden` suite: 87% over 69 cases |
+| Faithfulness · groundedness | ✅ | Entailment-grade grounding verified today (paraphrase supported, contradiction refused) |
+| Quality thresholds | ✅ | Per-metric thresholds, direction-aware |
+| Human review | ✅ | Review decisions logged |
+| Drift detection | 🔶 | Drift projects + runs exist |
+| Cost · latency as eval dimensions | 🔶 | Tracked, not asserted as eval gates |
+| Regression testing · online evaluations | 🔶 | Suites exist; not wired as a gate |
+| Business metrics · bias · safety | ❓ | Safety scanners exist; not evaluated as a suite |
+| Release gates | 🔴 | Nothing blocks a publish on an eval score — the clearest gap in this group |
+
+### Observability
+| Item | Gate | Note |
+|---|---|---|
+| Per-run timeline | ✅ | Step-by-step with timing |
+| End-to-end traces | ✅ | Langfuse-backed, matched on tags |
+| Policy decisions | ✅ | Every enforcement audited with its reason |
+| Approval history | ✅ | Logged |
+| Data lineage | ✅ | Marquez |
+| Cost breakdown | ✅ | Per model; **per subject as of today** |
+| Quality scores | ✅ | Rolled up per engine and suite |
+| Error diagnosis | ✅ | Failures name their cause; **prompt now on the trace** (today) |
+| Model and tool spans | 🔶 | Model spans yes; tool spans not separated |
+| Logs · metrics | ✅ | Victoria Metrics + service logs |
+| Business outcomes | 🔶 | Outcomes surface exists (B4.10 chips unproven) |
+| Export to existing tools | 🔶 | OpenSearch/OTel sinks referenced |
+
+### Compliance
+| Item | Gate | Note |
+|---|---|---|
+| Append-only audit trail | ✅ | `audit_events_v2`; tamper-evidence proven on a live run |
+| Policy version history | ✅ | Append-only policy versions |
+| Human oversight records | ✅ | Approval decisions with actor and reason |
+| Model and application inventory | ✅ | Apps, agents, models all enumerable |
+| Evidence export | 🔶 | `compliance/export` route exists; never generated end to end |
+| Control mapping · regulatory retention | 🔶 | Frameworks surface exists |
+| Data-processing records · consent records | 🔶 | Referenced |
+| Incident records | 🔶 | Present |
+| **Risk classification** | 🔴 | **Absent under any spelling.** The only item in §12 with no implementation at all — and EU-AI-Act-shaped buyers ask for it by name |
+
+### Developer experience
+| Item | Gate | Note |
+|---|---|---|
+| APIs | ✅ | The whole console is API-first; this session drove it entirely by API |
+| Webhooks | ✅ | Inbound trigger + outbound egress with signed receipt, both proven live |
+| OpenAI-compatible interfaces | ✅ | Gateway is OpenAI-compatible |
+| CLI | ✅ | Deploy/verify scripts; `npm run` surface |
+| Local development · test environments | ✅ | `next dev` on the box, demo tenants |
+| Version control · CI/CD integration | 🔶 | Git-based; pre-push gates exist, no CI pipeline verified |
+| Mock data | ✅ | Seeded demo tenants (Indian BFSI) |
+| SDKs · connector SDK · extension framework · app packaging | 🔶 | Adapter/port architecture is the extension seam; no published SDK |
+| Promotion between environments | 🔴 | No promotion path; single environment |
+
+### What this audit says overall
+
+**Three 🔴 items across ~150** — release gates on eval scores, risk classification, and environment promotion.
+That is a genuinely strong table-stakes position, and it is consistent with the pattern all session: the
+platform is far more built than its own documents claim, and the defects that matter are **boundaries where a
+built capability loses its evidence**, not missing capabilities.
+
+**The most consequential ❓ is backup and restore / disaster recovery.** An enterprise buyer asks in the first
+technical call, and it is untested. Cheap to establish, expensive to be wrong about.
