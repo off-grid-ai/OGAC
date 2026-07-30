@@ -202,7 +202,11 @@ export async function retrieve(
   const scored = rows
     .filter((r) => Array.isArray(r.embedding))
     .map((r) => ({
-      name: docNames.get(r.docId) ?? 'document',
+      // No fabricated 'document' name, and docId is CARRIED — it was selected into `rows` above and
+      // then dropped here, so a project-grounded citation had no identity to link to. Same pair of
+      // defects as retrieveOrgKnowledge had.
+      docId: r.docId,
+      name: docNames.get(r.docId) ?? '',
       content: r.content,
       position: r.position,
       score: cosine(qVec, r.embedding as number[]),
@@ -217,6 +221,13 @@ export async function retrieve(
     'the source filename when you do.\n' +
     scored.map((c) => `[Source: ${c.name} (part ${c.position + 1})]\n${c.content}`).join('\n---\n') +
     '\n</knowledge_base>';
-  const citations = scored.map((c) => ({ name: c.name, position: c.position, score: c.score }));
+  const citations = scored.map((c) => ({
+    name: c.name,
+    position: c.position,
+    score: c.score,
+    docId: c.docId,
+    // The project is where a reviewer opens this document, so it is the row's destination.
+    projectId,
+  }));
   return { context, citations };
 }

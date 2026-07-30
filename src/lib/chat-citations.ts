@@ -19,9 +19,15 @@ export interface Citation {
   score: number;
   /** Human-readable collection holding the document, when the retriever knows it. */
   collection?: string;
-  /** Identity of the cited document / its collection, so the footer can be a real link. */
+  /** Identity of the cited document, so the footer can be a real link. */
   docId?: string;
-  collectionId?: string;
+  /**
+   * WHERE the document is opened. A citation comes from one of two knowledge bases and they live at
+   * different routes, so the origin is carried as data and the RENDERER owns the route mapping —
+   * this module stays free of URL knowledge.
+   */
+  collectionId?: string; // org-wide knowledge → the collection holding it
+  projectId?: string; // a project's own knowledge base → the project
 }
 
 // A numbered, de-duplicated source for the footer. `index` is the 1-based [n] the body cites.
@@ -40,6 +46,7 @@ export interface Source {
   collection?: string;
   docId?: string;
   collectionId?: string;
+  projectId?: string;
 }
 
 // Collapse an ordered Citation[] into numbered Sources: one entry per distinct document name,
@@ -67,6 +74,7 @@ export function buildSources(citations: Citation[] | null | undefined): Source[]
       existing.collection ||= c.collection?.trim() || undefined;
       existing.docId ||= c.docId?.trim() || undefined;
       existing.collectionId ||= c.collectionId?.trim() || undefined;
+      existing.projectId ||= c.projectId?.trim() || undefined;
     } else {
       byName.set(key, {
         index: byName.size + 1,
@@ -76,6 +84,7 @@ export function buildSources(citations: Citation[] | null | undefined): Source[]
         collection: c.collection?.trim() || undefined,
         docId: c.docId?.trim() || undefined,
         collectionId: c.collectionId?.trim() || undefined,
+        projectId: c.projectId?.trim() || undefined,
       });
     }
   }

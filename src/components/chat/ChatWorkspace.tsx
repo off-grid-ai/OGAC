@@ -54,7 +54,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { type Artifact, artifactTitle, parseArtifact } from '@/lib/artifacts';
-import { buildSources } from '@/lib/chat-citations';
+import { type Source, buildSources } from '@/lib/chat-citations';
 import {
   type MentionCandidate,
   type MentionRef,
@@ -332,6 +332,16 @@ function ThinkingBlock({
   );
 }
 
+// Where a cited document is OPENED. The two knowledge bases live at different routes, so the pure
+// citation layer carries the origin as data and this function is the only place that knows URLs.
+// Returns null when the retriever gave us no identity — the row then renders as inert text rather
+// than a link that goes nowhere.
+function sourceHref(s: Source): string | null {
+  if (s.collectionId) return `/data/knowledge/${s.collectionId}`;
+  if (s.projectId) return `/work/projects/${s.projectId}`;
+  return null;
+}
+
 // "Sources" footer — the numbered, de-duplicated citation list under a grounded answer, keyed to the
 // inline [n] chips. Clicking an inline chip scrolls to and briefly highlights the matching row
 // (setActive). No citations → renders nothing (footer absent).
@@ -377,9 +387,9 @@ function SourcesFooter({
           >
             <span className="font-mono text-[10px] font-medium text-primary">[{s.index}]</span>
             <span className="min-w-0 flex-1 truncate">
-              {s.collectionId ? (
+              {sourceHref(s) ? (
                 <Link
-                  href={`/data/knowledge/${s.collectionId}`}
+                  href={sourceHref(s) as string}
                   className="text-foreground underline decoration-border decoration-dotted underline-offset-2 hover:decoration-primary"
                   title={`Open ${s.name || 'this document'} in ${s.collection || 'the knowledge base'}`}
                 >
