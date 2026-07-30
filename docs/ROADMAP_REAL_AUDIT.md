@@ -453,6 +453,20 @@ Newest first. Every entry is live-verified unless it says otherwise.
 
 ### 2026-07-30
 
+- **🔴 THE GOLDEN SET WAS DECORATIVE ACROSS EVERY PIPELINE.** Purging placeholders ("… — sample query N" whose
+  expected answer was just the pipeline's own name) deleted **33 cases**. What remains is only the 6 real cases
+  written today: Reimbursement 2, Fraud 2, Loan 1, Cross-Sell 1 — and **Collections, KYC and Motor-Claim FNOL now
+  have ZERO**. Earlier in this session I read "collections 3, kyc 3, motor 3" as evidence that golden cases
+  *already existed* and used it to argue the display was the bug. Both were true: the display WAS querying the
+  wrong column, AND the data behind it was filler. A placeholder is worse than an empty state — the empty state
+  says "add cases", the polluted state says "you have five" and averages three meaningless ones into the score.
+  **Remaining:** write real cases for Collections intervention, KYC Verification and Motor-Claim FNOL, and more
+  for the four that now have 1–2. A pipeline with one case is measurable but not meaningfully gated.
+- **Eval duplication fixed by correcting my own model.** Seeded 3 per APP, but apps SHARE pipelines (four share
+  Reimbursement Governance) and the panel lists per PIPELINE → "12 attached" of near-identical checks. Now **3
+  per pipeline across all 7**, named after the pipeline, `app_id` cleared. The heading was right twice: first it
+  showed the query was wrong, then that my seeding was.
+
 - **🔴 THE APP QUALITY TAB QUERIES BY APP, THE DATA IS BOUND BY PIPELINE — third instance of one mismatch.**
   Founder opened `bhapp_reimb/quality`: "No evals yet, 0 attached" and "Golden set for this pipeline (0)".
   Neither was missing data.
