@@ -470,6 +470,16 @@ Newest first. Every entry is live-verified unless it says otherwise.
   "near-empty"; `--module` did not scope the crawl so it swept all 293 routes and timed out; and the
   "engineering vocabulary" flag on `/work/prompts` is a regex over-match — that page is genuinely good.
   **Every flag needs its screenshot read before it counts as a finding.**
+  **BUTTONS EXERCISED (the half I first skipped — the founder's "that's the only way").** 4 of 5 pass with an
+  OBSERVABLE change asserted, not just a click landing: clicking a conversation loads its transcript; selecting a
+  project filters the list; "All chats" restores it; SKILLS opens a picker.
+  **🔴 5th: "Add to my prompts" does nothing.** The demo account is READ-ONLY ("cannot make changes"), so the write
+  is probably correctly refused — **the defect is that it refuses SILENTLY.** The user clicks, nothing moves, and
+  there is no way to tell "you may not do this" from "this is broken". `roadmap-real.md`'s "Honest product state"
+  non-negotiable requires the UI to distinguish exactly that. Fix: surface the refusal (a toast naming the
+  read-only account), or disable the control with a reason on hover. **Do not "fix" it by allowing the write.**
+  **WORKSPACE VERDICT: swept 10/10, 6 defects fixed and deployed, 2 open** (project-memory title overlap; silent
+  read-only refusal). Founder confirmed the two chat fixes on screen.
 
 - **🔴 THE WORKSPACE (§8 "Work") IS NOT SEEDED FOR THE DEMO TENANTS — founder-reported, now quantified.**
   *"The entire workspace section has no seed data. It's so difficult to truly understand all of its
