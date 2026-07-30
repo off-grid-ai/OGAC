@@ -71,14 +71,18 @@ export function MemoryDialog({
           </SheetDescription>
         </SheetHeader>
         <SheetBody className="pb-6">
+          {/* min-w-0 is load-bearing: without it the Input keeps its intrinsic width, refuses to shrink, and
+              pushes the Add button outside the sheet — which is exactly how this rendered, with Add clipped at
+              the viewport edge. */}
           <div className="flex gap-2">
             <Input
+              className="min-w-0 flex-1"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && add()}
               placeholder="Add a fact to remember…"
             />
-            <Button size="sm" onClick={add} className="gap-1.5">
+            <Button size="sm" onClick={add} className="shrink-0 gap-1.5">
               <Plus className="size-4" /> Add
             </Button>
           </div>

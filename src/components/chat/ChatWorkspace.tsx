@@ -765,7 +765,11 @@ export function ChatWorkspace({
       }
     : { id: null };
   const visibleConversations = conversations
-    .filter((c) => (activeProjectId ? c.projectId === activeProjectId : !c.projectId))
+    // "All chats" means ALL chats. This used to be `!c.projectId`, i.e. only chats NOT in a project — so a
+    // workspace with every conversation filed under a project showed "No chats yet" while the projects sat
+    // right above it. The label said one thing and the filter did another, which is the same defect as a panel
+    // titled "…for this pipeline" that queried by app id.
+    .filter((c) => (activeProjectId ? c.projectId === activeProjectId : true))
     .filter((c) => c.title.toLowerCase().includes(search.toLowerCase()));
 
   const refreshConversations = useCallback(async () => {
@@ -1575,6 +1579,24 @@ export function ChatWorkspace({
           </div>
         </div>
 
+        {/* SCOPE SELECTOR — "All chats" is not a project. It used to render as the first row INSIDE the
+            Projects group, so it read as though it were one, and the group's heading described it. Lifted out
+            so Projects contains only projects. */}
+        <div className="px-2.5 pb-1.5">
+            <button
+              type="button"
+              onClick={() => selectProject(null)}
+              className={cn(
+                'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
+                !activeProjectId
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              )}
+            >
+              All chats
+            </button>
+        </div>
+
         {/* Projects */}
         <div className="px-2.5 pb-1">
           <div className="flex items-center justify-between px-1 pb-1">
@@ -1591,18 +1613,7 @@ export function ChatWorkspace({
             </button>
           </div>
           <div className="space-y-0.5">
-            <button
-              type="button"
-              onClick={() => selectProject(null)}
-              className={cn(
-                'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
-                !activeProjectId
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              All chats
-            </button>
+
             {projects.map((p) => (
               <button
                 key={p.id}
