@@ -223,6 +223,13 @@ export interface AuditEvent {
   latencyMs?: number;
   checks?: CheckResult[];
   keyId?: string | null;
+  /**
+   * Who the GATEWAY attributed the call to: a virtual-key ALIAS or an end-user id
+   * (`user_api_key_alias ?? user_api_key_user_id`, see litellm-log-shape.ts). Distinct from `keyId`,
+   * which is our own key row id and is only known for first-party traffic. FinOps needs this because
+   * the gateway never sends a key row id — without it, per-subject spend is unattributable.
+   */
+  caller?: string | null;
 }
 
 export interface EnrollmentToken {

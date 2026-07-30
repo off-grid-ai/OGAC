@@ -86,3 +86,70 @@ test('assembleFinOps: empty inputs yield an empty, non-throwing projection', () 
   assert.deepEqual(f.byKey, []);
   assert.deepEqual(f.daily, []);
 });
+
+// ── B4.10 — the gateway's caller identity must reach the buckets ────────────────────────────────────
+//
+// Live: totals showed 121 requests / $0.2367 while byKey reported 0 for EVERY key and bySubject was [].
+// Cause was one line — analytics.ts discarded the gateway's `caller` (a virtual-key ALIAS or end-user id,
+// see litellm-log-shape.ts) and hardcoded keyId: null, so a budget could never be consumed.
+
+test('B4.10: gateway traffic attributes by CALLER ALIAS when no key row id is present', () => {
+  const keys: ApiKey[] = [
+    // A small budget on purpose: with the seeded $120 budget, $0.018 of real spend is 0.015% and rounds
+    // to 0, so a "pct > 0" assertion would be testing the rounding, not the attribution.
+    key({ id: 'seedkey_priya', name: 'Priya Sharma (Ops Lead)', subject: 'priya@x.example', budgetUsd: 0.05 }),
+  ];
+  // Exactly the gateway's shape: no keyId, identity only in `caller`, matched on the key's NAME.
+  const events: AuditEvent[] = [
+    ev({ id: 'g1', keyId: null, caller: 'Priya Sharma (Ops Lead)', model: 'cloud-claude', tokens: 1000 }),
+    ev({ id: 'g2', keyId: null, caller: 'priya@x.example', model: 'cloud-claude', tokens: 1000 }),
+  ];
+  const f = assembleFinOps(events, keys);
+  const k = f.byKey.find((x) => x.id === 'seedkey_priya')!;
+  assert.equal(k.requests, 2, 'both calls must land on the key');
+  assert.ok(k.costUsd > 0, `spend must be attributed, got ${k.costUsd}`);
+  assert.ok((k.pct ?? 0) > 0, `a budget must actually be consumable, got pct=${k.pct} cost=${k.costUsd}`);
+});
+
+test('B4.10: bySubject is populated from the caller, not left empty', () => {
+  const keys: ApiKey[] = [key({ id: 'k1', name: 'Reimbursement Desk', subjectType: 'team', subject: 'fin-ops' })];
+  const events: AuditEvent[] = [
+    ev({ id: 'g1', keyId: null, caller: 'Reimbursement Desk' }),
+    ev({ id: 'g2', keyId: null, caller: 'trigger:webhook' }), // no key row — still a real identity
+  ];
+  const f = assembleFinOps(events, keys);
+  const labels = f.bySubject.map((b) => b.label);
+  assert.ok(labels.includes('team:fin-ops'), JSON.stringify(labels));
+  // An identity with no key row is named, not silently dropped.
+  assert.ok(labels.includes('trigger:webhook'), JSON.stringify(labels));
+});
+
+test('B4.10: the buckets sum to totals — the closing test for this claim', () => {
+  const keys: ApiKey[] = [key({ id: 'k1', name: 'Desk', subject: 'desk' })];
+  const events: AuditEvent[] = [
+    ev({ id: '1', keyId: null, caller: 'Desk', model: 'cloud-claude', tokens: 1000 }),
+    ev({ id: '2', keyId: null, caller: 'someone-else', model: 'cloud-claude', tokens: 2000 }),
+    ev({ id: '3', keyId: null, caller: null, model: 'cloud-claude', tokens: 500 }),
+  ];
+  const f = assembleFinOps(events, keys);
+  const subjReq = f.bySubject.reduce((a, b) => a + b.requests, 0);
+  assert.equal(subjReq, f.totals.requests, 'every request must be attributed somewhere');
+  const subjTok = f.bySubject.reduce((a, b) => a + b.tokens, 0);
+  assert.equal(subjTok, f.totals.tokens);
+});
+
+test('B4.10: unattributable traffic is labelled, and does not borrow another subject', () => {
+  const keys: ApiKey[] = [key({ id: 'k1', name: 'Desk', subject: 'desk' })];
+  const f = assembleFinOps([ev({ id: '1', keyId: null, caller: null })], keys);
+  assert.deepEqual(f.bySubject.map((b) => b.label), ['unattributed']);
+  // And it must NOT be credited to the only key present.
+  assert.equal(f.byKey.find((k) => k.id === 'k1')!.requests, 0);
+});
+
+test('B4.10: a foreign caller still cannot borrow this tenant’s key', () => {
+  // The tenant-isolation contract must survive the new alias matching.
+  const keys: ApiKey[] = [key({ id: 'surkey', name: 'Claims Automation', subject: 'claims-ops' })];
+  const f = assembleFinOps([ev({ id: '1', keyId: null, caller: 'Lending Automation' })], keys);
+  assert.equal(f.byKey.find((k) => k.id === 'surkey')!.requests, 0);
+  assert.deepEqual(f.bySubject.map((b) => b.label), ['Lending Automation']);
+});

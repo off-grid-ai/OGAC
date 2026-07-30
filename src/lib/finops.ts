@@ -132,12 +132,35 @@ function group(events: AuditEvent[], keyOf: (e: AuditEvent) => string): Bucket[]
     .sort((a, b) => b.costUsd - a.costUsd);
 }
 
+/**
+ * Which key row an event belongs to.
+ *
+ * `keyId` is our own row id and is only present on first-party traffic. The GATEWAY sends `caller` — a
+ * virtual-key ALIAS or end-user id — so a key is matched by alias/name as well. Without this every key
+ * reported zero spend against a real $0.2367 of traffic, and a budget could never be consumed.
+ */
+function keyRowFor(e: AuditEvent, keys: ApiKey[]): ApiKey | undefined {
+  if (e.keyId) {
+    const byId = keys.find((k) => k.id === e.keyId);
+    if (byId) return byId;
+  }
+  const caller = (e.caller ?? '').trim().toLowerCase();
+  if (!caller) return undefined;
+  return keys.find(
+    (k) =>
+      k.id.toLowerCase() === caller ||
+      k.name.trim().toLowerCase() === caller ||
+      k.subject.trim().toLowerCase() === caller,
+  );
+}
+
 function keySpend(keys: ApiKey[], events: AuditEvent[]): KeySpend[] {
   const byKey = new Map<string, AuditEvent[]>();
   for (const e of events) {
-    if (!e.keyId) continue;
-    if (!byKey.has(e.keyId)) byKey.set(e.keyId, []);
-    byKey.get(e.keyId)!.push(e);
+    const row = keyRowFor(e, keys);
+    if (!row) continue;
+    if (!byKey.has(row.id)) byKey.set(row.id, []);
+    byKey.get(row.id)!.push(e);
   }
   return keys.map((k) => {
     const b = bucket(k.name);
@@ -161,7 +184,6 @@ function keySpend(keys: ApiKey[], events: AuditEvent[]): KeySpend[] {
 // keyId is NOT in the supplied key set (e.g. it belongs to another org) attributes to 'unattributed'
 // rather than leaking a foreign subject/key into this tenant's view.
 export function assembleFinOps(events: AuditEvent[], keys: ApiKey[]): FinOps {
-  const keyById = new Map(keys.map((k) => [k.id, k]));
   const totalCost = round(events.reduce((a, e) => a + costOf(e), 0));
   const localReq = events.filter((e) => priceFor(e.model) === 0).length;
   const daily = group(events, (e) => e.ts.slice(0, 10))
@@ -175,13 +197,16 @@ export function assembleFinOps(events: AuditEvent[], keys: ApiKey[]): FinOps {
       localShare: events.length ? Math.round((localReq / events.length) * 100) : 0,
     },
     byModel: group(events, (e) => e.model).map((b) => ({ ...b, label: modelLabel(b.label) })),
-    bySubject: group(
-      events.filter((e) => e.keyId),
-      (e) => {
-        const k = keyById.get(e.keyId!);
-        return k ? `${k.subjectType}:${k.subject}` : 'unattributed';
-      },
-    ),
+    // Attribute to the key's SUBJECT when we can resolve the key, else to the caller identity the
+    // gateway named, else 'unattributed' — which is now a real signal (traffic we genuinely cannot
+    // attribute) rather than the whole dataset. This used to filter on `e.keyId`, which no gateway
+    // event carries, so the bucket was unconditionally empty however much spend flowed through.
+    bySubject: group(events, (e) => {
+      const k = keyRowFor(e, keys);
+      if (k) return `${k.subjectType}:${k.subject}`;
+      const caller = (e.caller ?? '').trim();
+      return caller || 'unattributed';
+    }),
     byKey: keySpend(keys, events),
     daily,
   };

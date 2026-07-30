@@ -59,7 +59,12 @@ export async function gatewayEvents(pipelineTag?: string | null): Promise<AuditE
         tool: null,
         outcome: status >= 400 ? 'blocked' : 'ok',
         latencyMs: Number(s.ms ?? 0),
+        // The gateway does not know our key ROW ids, so keyId stays null for its traffic. What it does
+        // send is `caller` — the virtual-key alias or end-user id it attributed the call to. Discarding
+        // it here (the previous behaviour) forced every FinOps bucket to zero: byKey reported 0 for each
+        // key and bySubject was empty, so a budget could never be consumed no matter the real spend.
         keyId: null,
+        caller: String(s.caller ?? s.gateway ?? '').trim() || null,
       } satisfies AuditEvent;
     });
   } catch {
