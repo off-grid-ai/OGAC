@@ -38,11 +38,26 @@ const routes = enumerateRoutes();
 const dynamic = routes.filter((r) => r.includes('['));
 const staticRoutes = routes.filter((r) => !r.includes('['));
 
+const moduleArg = (process.argv.find((a) => a.startsWith('--module=')) || '').split('=')[1];
+const inModule = (r) => !moduleArg || r === `/${moduleArg}` || r.startsWith(`/${moduleArg}/`);
+
+// --emit writes the two files scripts/sanity-crawl-v2.mjs expects, so its route list is never hand-maintained.
+// That crawler already handles dynamic-id discovery, in-page tab state and the mobile pass — this only feeds it.
+if (process.argv.includes('--emit')) {
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync('/tmp/static_routes.txt', staticRoutes.filter(inModule).join('\n') + '\n');
+  writeFileSync('/tmp/dynamic_templates.txt', dynamic.filter(inModule).join('\n') + '\n');
+  console.log(`wrote /tmp/static_routes.txt (${staticRoutes.filter(inModule).length}) and /tmp/dynamic_templates.txt (${dynamic.filter(inModule).length})`);
+  console.log('now: BASE=… USER_EMAIL=… PASS=… OUT=/tmp/sx STATIC_ROUTES=/tmp/static_routes.txt DYNAMIC_TEMPLATES=/tmp/dynamic_templates.txt node scripts/sanity-crawl-v2.mjs');
+  process.exit(0);
+}
+
 if (process.argv.includes('--list')) {
-  console.log(`${routes.length} routes — ${staticRoutes.length} static, ${dynamic.length} dynamic\n`);
-  for (const r of staticRoutes) console.log(`  ${r}`);
+  const sr = staticRoutes.filter(inModule), dr = dynamic.filter(inModule);
+  console.log(`${moduleArg ? `module /${moduleArg}: ` : ''}${sr.length + dr.length} routes — ${sr.length} static, ${dr.length} dynamic\n`);
+  for (const r of staticRoutes.filter(inModule)) console.log(`  ${r}`);
   console.log('\ndynamic (need --params to exercise):');
-  for (const r of dynamic) console.log(`  ${r}`);
+  for (const r of dynamic.filter(inModule)) console.log(`  ${r}`);
   process.exit(0);
 }
 
