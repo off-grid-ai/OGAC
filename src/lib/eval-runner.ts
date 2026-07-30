@@ -209,15 +209,60 @@ export async function runEvalDef(
   const aggregate = ragas?.[def.metric];
   // Ragas returns ONE dataset-level aggregate per metric; the heuristic scores every sample. Which
   // engine actually produced the number is recorded on the run, never assumed from which was asked.
-  const computedBy: EvalEngine | 'heuristic' = aggregate === undefined ? 'heuristic' : 'ragas';
+  // ── THE FALLBACK LADDER: ragas → entailment → heuristic ─────────────────────────────────────────
+  //
+  // It used to be ragas → heuristic, and the missing middle rung made every faithfulness run score 0. The
+  // degradation was honestly TAGGED (`faithfulness:heuristic`), so nothing was fabricated — but a gate that
+  // always fails is as useless as one that always passes, and worse, because it teaches people to ignore a
+  // real one. It would have made all 11 apps look broken on their most important metric.
+  //
+  // GROUNDING IS FAITHFULNESS. The entailment adapter behind /api/v1/admin/grounding/verify scores a
+  // paraphrase as supported and refuses a contradiction (verified live 2026-07-30), so for these two metrics
+  // it is a far better second rung than a lexical overlap score. Best-effort: if it is unreachable we still
+  // fall through to the heuristic, and whichever rung produced the number is what gets recorded.
+  const entailment =
+    aggregate === undefined && /^(faithfulness|groundedness)$/i.test(def.metric)
+      ? await entailmentScores(samples)
+      : null;
+  const computedBy: EvalEngine | 'heuristic' =
+    aggregate !== undefined ? 'ragas' : entailment ? ('grounding' as EvalEngine) : 'heuristic';
   const scored =
-    aggregate === undefined
-      ? samples.map((sample) =>
-          scoreMetric(tpl, heuristicSampleScore(def.metric, sample), 'heuristic', def.threshold),
-        )
-      : [scoreMetric(tpl, aggregate, 'ragas', def.threshold)];
+    aggregate !== undefined
+      ? [scoreMetric(tpl, aggregate, 'ragas', def.threshold)]
+      : entailment
+        ? entailment.map((value) => scoreMetric(tpl, value, 'grounding', def.threshold))
+        : samples.map((sample) =>
+            scoreMetric(tpl, heuristicSampleScore(def.metric, sample), 'heuristic', def.threshold),
+          );
 
   return persistRun(def, [...perSample, ...scored], computedBy, orgId);
+}
+
+/**
+ * Per-sample entailment scores from the grounding port — the ladder's middle rung.
+ *
+ * Returns null (not zeros) when the port is unconfigured, unreachable, or returns nothing usable, so the
+ * caller degrades to the heuristic rather than recording a fabricated 0. A null here means "this rung could
+ * not answer", which is a different fact from "the answer was unfaithful".
+ */
+async function entailmentScores(
+  samples: readonly { answer: string; contexts: string[] }[],
+): Promise<number[] | null> {
+  try {
+    const { getGrounding } = await import('@/lib/adapters/registry');
+    const port = getGrounding();
+    const out: number[] = [];
+    for (const s of samples) {
+      const sources = s.contexts.filter((c) => c.trim()).map((text) => ({ text }));
+      if (sources.length === 0 || !s.answer.trim()) return null;
+      const r = await port.verify(s.answer, sources);
+      if (typeof r?.score !== 'number') return null;
+      out.push(r.score / 100); // the port reports 0–100; metric thresholds are 0–1
+    }
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Score one golden sample offline, mapping the sample shape onto the heuristic's inputs. */
