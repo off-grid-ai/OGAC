@@ -1790,3 +1790,39 @@ name are both rejected at write time with the reason.
 `applyGuardrailRules` treated "pattern will not compile" and "rule found nothing" as the same
 outcome — both `continue`d — so a broken regex read as a clean pass. A rule that could not be
 evaluated has not cleared the text; it is now an explicit `skipped`.
+
+## 2026-07-30 — UI/UX + investor-script verification of the app run surface
+
+Found by screenshotting the LIVE run detail page (`/solutions/apps/app_c0f4398a/runs/apprun_31cfa927`)
+as the bharatunion demo viewer and reading it against `investor-relations/hero-animation-SCRIPT.md` —
+Beat 3's on-screen line is this exact claim, and the script's GOVERNING RULE ("overrides everything on
+screen") kills our vocabulary and every OSS name from a customer's screen.
+
+Fixed in the same pass: the step detail line was the raw AUDIT string (`data-domain … → connector
+con_f5c959 :: expense_claims (read) → ok(1 rows via mysql)`) and the step chip was the raw kind
+(`connector-query`). Both now read plainly; the audit line moved to the ledger as `pipeline.data.read`.
+
+Still open, in the order they hurt the Beat 3 demo:
+
+- **G-UX1 — step OUTPUT is a raw JSON dump.** The read steps render
+  `{"columns":["id","employee_id",…],"rows":[[7,2,"Meera Malhotra","Travel","150000.00",…]]}` and
+  `[{"id":1,"claim_no":"EXP-2025-00001",…}]` straight onto the page. This is the single biggest gap
+  against the `docs/APP_AS_PRODUCT.md` bar ("a non-technical person in a department can use the surface
+  unaided") — a department reviewer cannot read a positional array. Needs a real records view (columns
+  as headers, ₹ formatted, the case's own row emphasised), not a prettier dump.
+- **G-UX2 — RUN INPUT is a raw JSON blob**, and it is the FIRST thing on the page. It should read as
+  the case: who, what, how much, what state. The record is now correctly carried end-to-end
+  (`runInputWithCase`), so the data to render it properly is all present.
+- **G-UX3 — a connector id is still on screen** as the step's source chip (`con_f5c959:expense_claims`).
+  It is the citation ref, so it needs a display form separate from the join key rather than a rename.
+- **G-UX4 — `/insights/ai/langfuse-datasets/` puts an OSS product name in a customer-facing URL.**
+  Surfaced by `scripts/check-hero-vocabulary.mjs`. A route rename is a nav change, so it wants its own
+  slice.
+- **G-UX5 — currency renders as `$`** in the compiled agent prompt and its answer (`$41,346.44`) for an
+  Indian BFSI tenant. Must be ₹.
+
+The vocabulary ratchet is now a real gate: `scripts/check-hero-vocabulary.mjs` with
+`scripts/hero-vocabulary-baseline.json` (28 terms, 300 flagged files of 777 scanned). It fails only when
+a per-term count RISES — verified adversarially by adding `langfuse`/`kestra` to a component (caught:
+"langfuse: 21 files (baseline 20)") and clearing after restore. The 300 standing leaks are recorded, not
+excused; lowering the baseline locks in each cleanup.
