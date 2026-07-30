@@ -453,6 +453,20 @@ Newest first. Every entry is live-verified unless it says otherwise.
 
 ### 2026-07-30
 
+- **Golden cases: every pipeline now has real ones, none has placeholders.** After the 33-row purge left
+  Collections, KYC and Motor-Claim FNOL at zero, cases were written for them **from each pipeline's own
+  description** rather than invented from the domain — KYC states "validates PAN, Aadhaar and address proofs
+  against the customer record; strictest allowlist and mandatory masking", Motor-Claim FNOL "never lets
+  policyholder PII leave the network", Collections "collector approval and an auditable report". The
+  expectations encode governance behaviour the pipelines already claim, which is defensible without domain
+  invention.
+  Coverage: Collections 2 · Cross-Sell 1 · Fraud 2 · KYC 2 · Loan 1 · Motor-Claim FNOL 2 · Reimbursement 2.
+  **⏳ AWAITING DOMAIN SIGN-OFF** — a KYC officer should confirm the wording before these gate a release. That
+  is tracked HERE and deliberately NOT flagged in the data: a "provisional" marker inside a golden set is
+  exactly how the 33 placeholder rows crept in and survived.
+  **Still thin:** Cross-Sell and Loan hold ONE case each. One case is measurable but not meaningfully gated,
+  and saying so beats letting "1 case" read as covered.
+
 - **Library chips: leak fixed, 4 → 2 verified live; the residue is a different code path.** The app Quality page
   called `listEvalDefs(null)` — the LEGACY `string|null` overload meaning `appId: null`, which filters
   `app_id IS NULL` **only**. So every pipeline-bound eval without an app leaked into "Attach from the library"
