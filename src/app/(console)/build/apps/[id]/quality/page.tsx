@@ -37,7 +37,12 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
   const [evals, golden, libraryEvals] = await Promise.all([
     listEvalDefs(scope),
     listGoldenCases(scope),
-    listEvalDefs(null), // org-wide library (unattached) — attachable to this pipeline
+    // ORG-WIDE LIBRARY = unattached to BOTH an app and a pipeline. `listEvalDefs(null)` is the legacy
+    // string|null form meaning `appId: null`, which filters `app_id IS NULL` ONLY — so every
+    // pipeline-bound eval that has no app leaked in here and was offered for "attaching" when it was
+    // already attached. That is the four identical "Hallucination / Faithfulness" chips. It would also
+    // have grown by 21 the moment the per-pipeline dedupe cleared `app_id`.
+    listEvalDefs({ pipelineId: null }), // → pipeline_id IS NULL AND app_id IS NULL
   ]);
 
   return (
