@@ -26,6 +26,8 @@ import {
   statusTone,
 } from '@/lib/app-runs-view';
 import { displayCell, humanizeColumn, parseRowsOutput } from '@/lib/step-output-view';
+import { caseRecordFrom } from '@/lib/connector-filter';
+import { assessReview } from '@/lib/review-risk';
 
 // ─── AppRunStatus (Builder Epic Phase 4A) — the RUNNING screen (screen 3 of 5) ────────────────────
 //
@@ -53,6 +55,61 @@ const POLL_MS = 2000;
  * vocabulary, not ours). Anything else — a failure sentence, a prose outcome, an empty read — is already
  * legible and is shown exactly as written. So the fallback is never worse than before.
  */
+/**
+ * Risk and confidence for a pending approval — Flow 6's unimplemented step.
+ *
+ * LEVELS WITH REASONS, never a percentage. Every input is a discrete fact about the run (a read was
+ * narrowed or it was not; a step errored or it did not), so a score would invent precision — the same
+ * defect as the agent inventing a currency symbol, and what "Honest product state" forbids. A reviewer
+ * can disagree with the level and still act on the reasons, which is why the reasons are always shown.
+ */
+function ReviewAssessmentPanel({ run }: { run: AppRunView }) {
+  const { risk, confidence } = assessReview(
+    run.steps.map((s) => ({
+      kind: s.kind,
+      status: s.status,
+      label: s.label,
+      detail: s.detail,
+      outcome: s.outcome,
+      wouldPerform: s.wouldPerform ?? null,
+    })),
+    caseRecordFrom(run.input),
+  );
+  const tone: Record<string, string> = {
+    high: 'text-destructive',
+    medium: 'text-amber-600 dark:text-amber-400',
+    low: 'text-muted-foreground',
+  };
+  // Confidence reads the other way round: HIGH is reassuring, LOW is what needs attention.
+  const confTone: Record<string, string> = {
+    high: 'text-emerald-600 dark:text-emerald-400',
+    medium: 'text-amber-600 dark:text-amber-400',
+    low: 'text-destructive',
+  };
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {[
+        { title: 'Risk', signal: risk, cls: tone[risk.level] },
+        { title: 'Confidence', signal: confidence, cls: confTone[confidence.level] },
+      ].map(({ title, signal, cls }) => (
+        <div key={title} className="rounded border border-border bg-muted/20 p-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{title}</span>
+            <span className={`text-xs font-medium uppercase ${cls}`}>{signal.level}</span>
+          </div>
+          <ul className="mt-1.5 space-y-1">
+            {signal.reasons.map((r) => (
+              <li key={r} className="text-[11px] leading-snug text-foreground">
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StepEvidence({ outcome }: { outcome: string }) {
   const view = parseRowsOutput(outcome);
   if (!view) {
@@ -225,7 +282,11 @@ export function AppRunStatus({ initial }: Readonly<{ initial: AppRunView }>) {
 
       {/* Screen 4 — inline when a human step has paused the run. */}
       {canReview(run) && pending ? (
-        <AppReview run={run} pending={pending} onResolved={refresh} />
+        <div className="space-y-3">
+          {/* Flow 6: the reviewer sees risk and confidence BEFORE the approve/reject controls. */}
+          <ReviewAssessmentPanel run={run} />
+          <AppReview run={run} pending={pending} onResolved={refresh} />
+        </div>
       ) : null}
     </div>
   );
