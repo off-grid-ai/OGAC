@@ -144,14 +144,34 @@ export function StudioForge({
         body: JSON.stringify({ description: nextBrief }),
       });
       if (!res.ok) throw new Error('Could not build from that description');
-      const data = (await res.json()) as { spec: AppSpec; gaps: string[] };
+      const data = (await res.json()) as {
+        spec: AppSpec;
+        gaps: string[];
+        questions?: { question: string; because: string }[];
+      };
       setSpec(data.spec);
       setGaps(data.gaps ?? []);
       const stepWord = `${data.spec.steps.length} step${data.spec.steps.length === 1 ? '' : 's'}`;
       const gapWord = data.gaps?.length ? ` I flagged ${data.gaps.length} thing${data.gaps.length === 1 ? '' : 's'} to resolve.` : '';
+      // Flow 3 step 2 in roadmap-real.md — "OGAC asks clarifying questions". The compiler returns only
+      // questions derived from facts about THIS spec (an unbound read, a limit with no number, "approve"
+      // with no human step), so asking them here is specific rather than a generic interrogation. They
+      // arrive as their own turn because a question the author can answer in the next message is the whole
+      // point; burying it in a side panel makes it a notice again.
+      const asked = data.questions ?? [];
       setTurns((t) => [
         ...t,
         { role: 'forge', text: `Built "${data.spec.title}" — ${stepWord}, running on ${pipelineName(data.spec.pipelineId)}.${gapWord} See the preview →` },
+        ...(asked.length > 0
+          ? [
+              {
+                role: 'forge' as const,
+                text:
+                  `Before you publish, ${asked.length === 1 ? 'one thing' : `${asked.length} things`} I had to guess at — tell me and I'll rebuild:\n\n` +
+                  asked.map((q) => `• ${q.question}\n  ${q.because}`).join('\n\n'),
+              },
+            ]
+          : []),
       ]);
       navigatePreview(data.gaps?.length ? 'governance' : 'app');
       scrollDown();
