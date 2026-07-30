@@ -1579,24 +1579,6 @@ export function ChatWorkspace({
           </div>
         </div>
 
-        {/* SCOPE SELECTOR — "All chats" is not a project. It used to render as the first row INSIDE the
-            Projects group, so it read as though it were one, and the group's heading described it. Lifted out
-            so Projects contains only projects. */}
-        <div className="px-2.5 pb-1.5">
-            <button
-              type="button"
-              onClick={() => selectProject(null)}
-              className={cn(
-                'w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-all duration-150 active:scale-[0.99]',
-                !activeProjectId
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              All chats
-            </button>
-        </div>
-
         {/* Projects */}
         <div className="px-2.5 pb-1">
           <div className="flex items-center justify-between px-1 pb-1">
@@ -1644,6 +1626,19 @@ export function ChatWorkspace({
           <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
             Chats
           </span>
+          {/* The scope reset lives HERE, not as a row in the Projects list. "All chats" used to sit directly
+              above the PROJECTS heading, which read as though the projects were nested under it — and it was
+              redundant, because an unfiltered Chats list already shows every chat. It now appears only while a
+              project is actually filtering, which is the only moment it means anything. */}
+          {activeProjectId ? (
+            <button
+              type="button"
+              onClick={() => selectProject(null)}
+              className="text-[10px] uppercase tracking-[0.12em] text-primary transition-colors duration-150 hover:underline"
+            >
+              Clear filter
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setSkillsOpen(true)}
