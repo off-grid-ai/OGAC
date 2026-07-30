@@ -64,13 +64,17 @@ export function MemoryDialog({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col gap-0 p-0">
-        <SheetHeader>
+        {/* SheetContent carries p-0, so nothing here inherits padding — the description ran under the close
+            button and the input row extended past the sheet edge, clipping "Add". Padding is applied locally
+            rather than by removing p-0, which would change every other sheet in the app. pr-10 keeps the
+            description clear of the X. */}
+        <SheetHeader className="px-4 pt-4 pr-10">
           <SheetTitle className="text-sm">Memory</SheetTitle>
           <SheetDescription className="text-xs">
             Facts the assistant remembers about you across conversations. Injected into every chat.
           </SheetDescription>
         </SheetHeader>
-        <SheetBody className="pb-6">
+        <SheetBody className="px-4 pb-6">
           {/* min-w-0 is load-bearing: without it the Input keeps its intrinsic width, refuses to shrink, and
               pushes the Add button outside the sheet — which is exactly how this rendered, with Add clipped at
               the viewport edge. */}
