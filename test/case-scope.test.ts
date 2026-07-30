@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
   columnsOfRow,
+  couldScope,
+  identifierKey,
   inferCaseScope,
   isQualifiedIdentifier,
   scopeDetail,
@@ -114,5 +116,54 @@ describe('B3.1 — columnsOfRow / scopeDetail', () => {
     assert.match(scopeDetail({ filters: { employee_id: 'E1' }, keys: ['employee_id'] }), /employee_id/);
     // "read unscoped" is the fact a reviewer needs in order to distrust the answer — never silent.
     assert.match(scopeDetail({ filters: {}, keys: [] }), /unscoped/);
+  });
+});
+
+// ── Two conventions, one identifier ─────────────────────────────────────────────────────────────────
+//
+// A SQL column is `employee_id`; a webhook or API-shaped case record spells it `employeeId`. Until these
+// met, the rule silently never fired on JSON-shaped cases — the reimbursement app's `{ invoiceId }` case
+// could never be scoped, and nothing said so.
+describe('B3.1 — identifier conventions', () => {
+  test('a camelCase case key matches a snake_case column', () => {
+    const scope = inferCaseScope(['invoice_id', 'amount'], { invoiceId: 'INV-1' });
+    // Emitted under the RESOURCE's spelling, since that is what goes into the statement.
+    assert.deepEqual(scope.filters, { invoice_id: 'INV-1' });
+  });
+
+  test('camelCase qualified identifiers are recognised, bare ones still are not', () => {
+    for (const c of ['invoiceId', 'employeeId', 'policyNo', 'branchCode', 'auditRef']) {
+      assert.ok(isQualifiedIdentifier(c), c);
+    }
+    for (const c of ['Id', 'id', 'No', 'amount', 'employeeName']) {
+      assert.ok(!isQualifiedIdentifier(c), c);
+    }
+  });
+
+  test('identifierKey folds both conventions onto one form', () => {
+    assert.equal(identifierKey('employee_id'), identifierKey('employeeId'));
+    assert.equal(identifierKey('Employee_ID'), identifierKey('employeeId'));
+    assert.notEqual(identifierKey('employee_id'), identifierKey('employer_id'));
+  });
+});
+
+describe('B3.1 — couldScope (do not pay for a probe that cannot help)', () => {
+  test('true when the case carries a qualified identifier', () => {
+    assert.equal(couldScope({ employee_id: 2, status: 'submitted' }), true);
+    assert.equal(couldScope({ invoiceId: 'INV-1' }), true);
+  });
+
+  test('false when nothing could ever match — the probe would be pure waste', () => {
+    // A webhook posting free text, or a case whose only key is the table-local `id`.
+    assert.equal(couldScope({ subject: 'Claim query', body: 'please advise' }), false);
+    assert.equal(couldScope({ id: 1 }), false);
+    assert.equal(couldScope({}), false);
+    assert.equal(couldScope(null), false);
+  });
+
+  test('false when the identifier is present but has no usable value', () => {
+    assert.equal(couldScope({ employee_id: null }), false);
+    assert.equal(couldScope({ employee_id: '  ' }), false);
+    assert.equal(couldScope({ employee_id: { nested: 1 } }), false);
   });
 });

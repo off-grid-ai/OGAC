@@ -19,6 +19,7 @@
 
 import { maskTextForModel, type PiiScanLike } from '@/lib/guardrail-rules-runtime';
 import type { ModelCallVerdict } from '@/lib/pipeline-enforcement';
+import { stabilizePseudonyms } from '@/lib/pii-pseudonym';
 
 /**
  * The effective PII-masking decision for a model call: the MAX of the org floor and the pipeline
@@ -112,6 +113,15 @@ export function maskOrBlock(
   required: boolean,
   text: string,
   scanResult: { ok: true; scan: PiiScanLike } | { ok: false; error: unknown },
+  /**
+   * Org id, used to SALT value-stable pseudonyms (GAP M1). Given one, the masker's per-scan
+   * placeholders (`[REDACTED_PERSON_23]`) are re-keyed to tokens derived from the value
+   * (`[PERSON_1f4a9c33]`), so one person is one token in every scan, channel and step — without which a
+   * governed agent cannot join two records about the same customer and refuses to decide. Omitted ⇒
+   * legacy behaviour, so existing callers are unaffected. Salting per org stops any cross-tenant
+   * correlation. See pii-pseudonym.ts, including its fail-closed alignment invariant.
+   */
+  pseudonymSalt?: string,
 ): PiiMaskDecision {
   if (!required) return { block: false, text, masked: false, reason: null };
   if (!scanResult.ok) {
@@ -133,5 +143,9 @@ export function maskOrBlock(
     };
   }
   const esc = applyPiiEscalation(text, true, scanResult.scan);
-  return { block: false, text: esc.text, masked: esc.masked, reason: null };
+  // Re-key the placeholders to value-stable pseudonyms. stabilizePseudonyms returns the REDACTED text
+  // unchanged whenever the alignment is not exact, so this can never widen what is emitted.
+  const stable =
+    esc.masked && pseudonymSalt ? stabilizePseudonyms(text, esc.text, pseudonymSalt) : esc.text;
+  return { block: false, text: stable, masked: esc.masked, reason: null };
 }

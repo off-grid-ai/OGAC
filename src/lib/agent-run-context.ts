@@ -136,6 +136,13 @@ export function maskRetrievalHits(
   hits: readonly RetrievalHit[],
   required: boolean,
   attempts: readonly PiiScanAttempt[],
+  /**
+   * Org id, salting value-stable pseudonyms (GAP M1). This is the channel that made the defect
+   * undeniable: every hit is scanned SEPARATELY, so with per-scan placeholders the same person got a
+   * different token in each of six source rows — and then a seventh in the folded query. Salted, one
+   * person is one token across all of them, which is what lets the agent join the records at all.
+   */
+  pseudonymSalt?: string,
 ): MaskRetrievalHitsResult {
   if (!required || hits.length === 0) {
     return { block: false, hits: [...hits], maskedRefs: [], reason: null };
@@ -152,7 +159,7 @@ export function maskRetrievalHits(
   const safe: RetrievalHit[] = [];
   const maskedRefs: string[] = [];
   for (const [index, hit] of hits.entries()) {
-    const decision = maskOrBlock(true, retrievalHitMaskingText(hit), attempts[index]!);
+    const decision = maskOrBlock(true, retrievalHitMaskingText(hit), attempts[index]!, pseudonymSalt);
     if (decision.block) {
       return {
         block: true,

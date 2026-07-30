@@ -209,6 +209,14 @@ test(
     assert.ok(appEvidence.includes(`"connectorId":"${connector.id}"`));
     assert.ok(appEvidence.includes(`"domainId":"${domain.id}"`));
     assert.doesNotMatch(appEvidence, /access|secret/);
-    assert.match(appResult.detail ?? '', /via s3/);
+    // Provenance is retained on the step's REFS (connector:resource) and in the audit ledger. The
+    // reader-facing detail deliberately no longer names the engine: `via s3` is an OSS product name on
+    // a department user's screen, which the hero script's governing rule forbids. Assert both halves.
+    assert.ok(
+      (appResult.refs ?? []).some((r) => r.name === `${connector.id}:${domain.resource}`),
+      `source provenance must survive on refs: ${JSON.stringify(appResult.refs)}`,
+    );
+    assert.doesNotMatch(appResult.detail ?? '', /via s3/, 'the engine name must not be on screen');
+    assert.match(appResult.detail ?? '', /^Read \d+ record/, appResult.detail ?? '');
   },
 );

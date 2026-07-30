@@ -226,7 +226,10 @@ test(
       dependencies,
     );
     assert.equal(result.status, 'done');
-    assert.match(result.detail ?? '', /via kafka/);
+    // Provenance lives on the step's refs + the audit ledger; the reader-facing detail must not name
+    // the engine (an OSS product name on a customer's screen — the hero script's governing rule).
+    assert.doesNotMatch(result.detail ?? '', /via kafka/, 'the engine name must not be on screen');
+    assert.match(result.detail ?? '', /^Read \d+ record/, result.detail ?? '');
     const appEvidence = result.output ?? '';
     assert.match(appEvidence, /RSK-42/);
     assert.match(appEvidence, /"topic":"enterprise\.risk-signals"/);

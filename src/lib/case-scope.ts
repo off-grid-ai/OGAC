@@ -49,9 +49,23 @@ export interface CaseScope {
  * identifier suffix, and reject the bare form outright.
  */
 export function isQualifiedIdentifier(column: string): boolean {
-  const c = column.trim().toLowerCase();
-  // At least one prefix segment, then an identifier-ish suffix. `employee_id` ✓  `id` ✗  `_id` ✗
-  return /^[a-z0-9]+(?:_[a-z0-9]+)*_(?:id|code|no|number|ref)$/.test(c);
+  const c = column.trim();
+  // snake_case, as SQL columns are written: `employee_id` ✓  `id` ✗  `_id` ✗
+  if (/^[a-z0-9]+(?:_[a-z0-9]+)*_(?:id|code|no|number|ref)$/i.test(c)) return true;
+  // camelCase, as a JSON case record is written: `invoiceId` ✓  `id` ✗. A webhook or an API-shaped case
+  // spells the same key this way, and without it the rule silently never fires on those cases at all —
+  // which is how the reimbursement app's `{ invoiceId }` case could never be scoped.
+  return /^[a-z][a-zA-Z0-9]*(?:Id|Code|No|Number|Ref)$/.test(c);
+}
+
+/**
+ * The comparable form of an identifier name: case-folded with separators removed.
+ *
+ * So a case record's `invoiceId` matches a column named `invoice_id` — the same identifier written in
+ * two conventions. Without this the JSON side and the SQL side never meet.
+ */
+export function identifierKey(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 /** Scalars only, and never blank — a filter on '' is not a narrowing, it is a guess. */
@@ -78,17 +92,20 @@ export function inferCaseScope(
 ): CaseScope {
   if (!caseRecord) return { filters: {}, keys: [] };
 
-  // Case-record keys by normalised name, so `Employee_Id` in the row matches `employee_id` in the table.
-  const byNorm = new Map<string, unknown>();
-  for (const [k, v] of Object.entries(caseRecord)) byNorm.set(k.trim().toLowerCase(), v);
+  // Case-record keys by comparable form, so `Employee_Id` / `employeeId` in the record all match a
+  // column named `employee_id`.
+  const byKey = new Map<string, unknown>();
+  for (const [k, v] of Object.entries(caseRecord)) byKey.set(identifierKey(k), v);
 
   const filters: Record<string, ScopeValue> = {};
   const keys: string[] = [];
   for (const column of resourceColumns) {
     if (!isQualifiedIdentifier(column)) continue;
-    if (!byNorm.has(column.trim().toLowerCase())) continue;
-    const value = scopeValue(byNorm.get(column.trim().toLowerCase()));
+    const key = identifierKey(column);
+    if (!byKey.has(key)) continue;
+    const value = scopeValue(byKey.get(key));
     if (value === null) continue;
+    // Emitted under the RESOURCE's spelling — that is what goes into the statement.
     filters[column] = value;
     keys.push(column);
   }
@@ -109,4 +126,19 @@ export function columnsOfRow(row: unknown): string[] {
 export function scopeDetail(scope: CaseScope): string {
   if (scope.keys.length === 0) return 'unscoped (no shared identifier with the case)';
   return `scoped to the case by ${scope.keys.join(', ')}`;
+}
+
+/**
+ * Could a scope EVER be inferred from this case record?
+ *
+ * The probe read that discovers a resource's columns costs a round trip, and it is pure waste when the
+ * case record carries no qualified identifier for it to match — a webhook that posts `{subject, body}`,
+ * or a case whose only key is a bare `id`. Checking the record first is free, so the extra read only
+ * happens where it can actually change what the step reads.
+ */
+export function couldScope(caseRecord: Record<string, unknown> | null | undefined): boolean {
+  if (!caseRecord) return false;
+  return Object.entries(caseRecord).some(
+    ([k, v]) => isQualifiedIdentifier(k) && scopeValue(v) !== null,
+  );
 }

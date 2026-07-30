@@ -182,8 +182,21 @@ test('seeded reimbursement app runs step-by-step and PAUSES at the human gate', 
   assert.ok(reads.every((r) => r.status === 'done'), `both reads resolved: ${reads.map((r) => `${r.stepId}:${r.status}`).join(',')}`);
 
   // The two reads hit the invoices + reimbursement-quota domains, in order, before the decision.
+  // Asserted by FIRST OCCURRENCE, not by slicing the call list: a step with no author-written filter
+  // now issues a 1-row column probe before its real read (case-scope.ts), so a domain legitimately
+  // appears twice. The property that matters is the ordering of the reads relative to the decision,
+  // never the exact number of calls — pinning the call count would pin an implementation detail.
   const order = (deps as unknown as { _order: string[] })._order;
-  assert.deepEqual(order.slice(0, 2), ['read:invoices', 'read:reimbursement quota'], `read order: ${order.join(',')}`);
+  const at = (needle: string) => order.indexOf(needle);
+  assert.ok(at('read:invoices') >= 0, `invoices read missing: ${order.join(',')}`);
+  assert.ok(
+    at('read:invoices') < at('read:reimbursement quota'),
+    `invoices must be read before the quota: ${order.join(',')}`,
+  );
+  assert.ok(
+    at('read:reimbursement quota') < at('agent:ag_eligibility'),
+    `both reads must precede the decision: ${order.join(',')}`,
+  );
   assert.ok(order.includes('agent:ag_eligibility'), 'the eligibility agent ran after the reads');
 });
 

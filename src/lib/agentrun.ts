@@ -956,7 +956,7 @@ async function runAgentImpl(
     } catch (err) {
       scanResult = { ok: false, error: err };
     }
-    const decision = maskOrBlock(requireMasking, query, scanResult);
+    const decision = maskOrBlock(requireMasking, query, scanResult, attribution.org);
     if (decision.block) {
       mark('mask', 'block', decision.reason ?? 'PII masking failed', [], t);
       auditEnforcement(
@@ -1021,7 +1021,7 @@ async function runAgentImpl(
         }
       }),
     );
-    const sourceMasking = maskRetrievalHits(routed.hits, true, sourceAttempts);
+    const sourceMasking = maskRetrievalHits(routed.hits, true, sourceAttempts, attribution.org);
     if (sourceMasking.block) {
       mark('mask', 'block', sourceMasking.reason ?? 'source PII masking failed', [], t);
       auditEnforcement(

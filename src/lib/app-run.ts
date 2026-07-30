@@ -69,7 +69,7 @@ import {
   connectorReadSentence,
 } from '@/lib/connector-failure';
 import { caseRecordFrom, resolveStepParams, unresolvedFilterMessage } from '@/lib/connector-filter';
-import { type CaseScope, columnsOfRow, inferCaseScope, scopeDetail } from '@/lib/case-scope';
+import { type CaseScope, columnsOfRow, couldScope, inferCaseScope, scopeDetail } from '@/lib/case-scope';
 import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 import { auditEnforcement } from '@/lib/pipeline-contract';
 import {
@@ -756,7 +756,7 @@ async function executeAgentStep(
     } catch (err) {
       scanResult = { ok: false, error: err };
     }
-    const decision = maskOrBlock(requireMasking, query, scanResult);
+    const decision = maskOrBlock(requireMasking, query, scanResult, ctx.orgId);
     if (decision.block) {
       auditEnforcement(
         { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
@@ -867,7 +867,11 @@ async function executeConnectorStep(
   // `id` must never be matched. Author-written filters are left exactly as they are.
   const trustedActor = ctx.actor?.trim() || `app-run:${ctx.runId}`;
   let inferred: CaseScope = { filters: {}, keys: [] };
-  const inferredScope = Object.keys(params.filters).length === 0 && !!ctx.input;
+  // The probe costs a round trip, so only run it when the case record actually carries a qualified
+  // identifier that could match a column. Without this, an app whose case is a webhook blob paid for a
+  // second read on every step and could never have been scoped by it.
+  const caseRecord = caseRecordFrom(ctx.input);
+  const inferredScope = Object.keys(params.filters).length === 0 && couldScope(caseRecord);
   if (inferredScope) {
     const probe = await deps.queryDomain(resolved, connector, {
       op: 'read',
@@ -877,7 +881,7 @@ async function executeConnectorStep(
     });
     // A failed or empty probe teaches us nothing about the columns; fall through to the unscoped read,
     // which will report the failure or the emptiness on its own terms.
-    inferred = inferCaseScope(columnsOfRow(probe.result?.rows?.[0]), caseRecordFrom(ctx.input));
+    inferred = inferCaseScope(columnsOfRow(probe.result?.rows?.[0]), caseRecord);
   }
   const { result, detail, failure } = await deps.queryDomain(resolved, connector, {
     op: step.op ?? 'read',
