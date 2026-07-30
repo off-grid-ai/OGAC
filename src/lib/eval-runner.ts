@@ -8,7 +8,7 @@ import {
   type GEvalResult,
 } from '@/lib/eval-geval';
 import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
-import { heuristicScore, rollupMetrics, scoreMetric, type MetricScore } from '@/lib/eval-metrics';
+import { heuristicScore, metricsToEvalResults, rollupMetrics, scoreMetric, type MetricScore } from '@/lib/eval-metrics';
 import { capEvalSamples } from '@/lib/eval-sampling';
 import type { EvalEngine } from '@/lib/eval-templates';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
@@ -312,6 +312,11 @@ async function persistRun(
       score: rollup.score,
       total: rollup.total,
       passed: rollup.passed,
+      // RETAIN THE EVIDENCE. This function already has the per-sample metrics — it rolls them up to
+      // compute the score above — and used to drop them, so 64 of 84 stored runs carried a number with
+      // nothing behind it. A failing run that cannot say WHAT failed is not an audit record, and
+      // "every important action must leave an understandable record" is a stated non-negotiable.
+      results: metricsToEvalResults(perSample),
       pipelineId: def.pipelineId,
     },
     orgId,

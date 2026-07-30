@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import {
   clamp01,
   heuristicCoherence,
@@ -15,9 +15,11 @@ import {
   heuristicScore,
   heuristicTaskCompletion,
   heuristicToxicity,
+  metricsToEvalResults,
   rollupMetrics,
   scoreMetric,
   toolCorrectnessF1,
+  type MetricScore,
   verdict,
 } from '../src/lib/eval-metrics.ts';
 
@@ -178,4 +180,52 @@ test('heuristicScore dispatches the new metrics (and g_eval has NO heuristic →
   assert.ok(heuristicScore('tool_correctness', { toolsCalled: ['a'], toolsExpected: ['a'] }) === 1);
   // g_eval must never be scored by a heuristic — it needs an LLM judge; dispatch returns 0.
   assert.equal(heuristicScore('g_eval', { answer: 'anything' }), 0);
+});
+
+// ── Eval runs must retain their evidence ─────────────────────────────────────────────────────────────
+//
+// LIVE FINDING: 64 of 84 stored eval runs carried a score and NO per-case results. persistRun had the
+// per-sample metrics in scope (it rolls them up for the score) and dropped them, so a failing run
+// (ragas_mrub4g7g, score 39, 0/1 passed) recorded nothing about what failed — breaking "every important
+// action must leave an understandable record".
+describe('metricsToEvalResults', () => {
+  const m = (over: Partial<MetricScore> = {}): MetricScore => ({
+    metric: 'faithfulness',
+    value: 0.39,
+    threshold: 0.7,
+    direction: 'higher-better',
+    pass: false,
+    engine: 'ragas',
+    ...over,
+  });
+
+  test('keeps the metric, the rule it was judged against, and who judged it', () => {
+    const [r] = metricsToEvalResults([m()]);
+    assert.equal(r.query, 'faithfulness');
+    assert.equal(r.expected, '≥ 0.70');
+    assert.equal(r.top, 'ragas', 'a verdict must always be attributable to an engine');
+    assert.equal(r.pass, false);
+    assert.equal(r.score, 39, 'matches how run scores are already displayed');
+  });
+
+  test('states the rule direction-aware, so ≤ metrics are not misread as ≥', () => {
+    const [r] = metricsToEvalResults([m({ direction: 'lower-better', threshold: 0.2 })]);
+    assert.equal(r.expected, '≤ 0.20');
+  });
+
+  test('one entry per sample — nothing collapsed or deduplicated away', () => {
+    const out = metricsToEvalResults([m(), m({ metric: 'answer_relevancy', value: 0.9, pass: true })]);
+    assert.equal(out.length, 2);
+    assert.deepEqual(out.map((r) => r.query), ['faithfulness', 'answer_relevancy']);
+    assert.deepEqual(out.map((r) => r.pass), [false, true]);
+  });
+
+  test('clamps a garbage value rather than storing a nonsense percentage', () => {
+    assert.equal(metricsToEvalResults([m({ value: 4.2 })])[0].score, 100);
+    assert.equal(metricsToEvalResults([m({ value: Number.NaN })])[0].score, 0);
+  });
+
+  test('no samples yields no rows — an empty run is not faked into evidence', () => {
+    assert.deepEqual(metricsToEvalResults([]), []);
+  });
 });

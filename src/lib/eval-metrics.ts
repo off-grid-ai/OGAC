@@ -479,3 +479,35 @@ export function heuristicScore(metric: string, s: HeuristicSample): number {
   const score = HEURISTICS[metric];
   return score ? score(s, s.answer ?? '') : 0;
 }
+
+/**
+ * The per-case evidence a metric run should retain — pure.
+ *
+ * LIVE FINDING (2026-07-30): 64 of 84 eval runs stored a score and NO per-case results. `persistRun` in
+ * eval-runner.ts had the per-sample metrics in scope — it rolls them up to compute the score — and then
+ * dropped them, so the Quality surface showed pass rates nobody could drill into and a failing run
+ * (`ragas_mrub4g7g`, score 39, 0/1 passed) recorded nothing about WHAT failed.
+ *
+ * That breaks two things `docs/roadmap-real.md` treats as non-negotiable: "Full observability — no invisible
+ * behavior. Every important action must leave an understandable record", and Flow 7's "operator sees data,
+ * model, prompt, tool, policy and evaluation stages". It is also the same defect class as a data-quality gate
+ * reporting "3/3 passed" without naming the rules.
+ *
+ * `EvalResult` was shaped for retrieval golden cases, so the field meanings are stated here rather than left
+ * to be inferred — a reader of the stored row should not have to guess what `expected` holds for a metric run:
+ *   • `query`    — the metric that was judged ("faithfulness")
+ *   • `expected` — the rule it was judged against, direction-aware ("≥ 0.70")
+ *   • `score`    — the metric value as a percentage, matching how run scores are already displayed
+ *   • `top`      — the engine that produced the value, so a verdict is always attributable
+ */
+export function metricsToEvalResults(
+  perSample: readonly MetricScore[],
+): { query: string; expected: string; pass: boolean; top: string; score: number }[] {
+  return perSample.map((m) => ({
+    query: m.metric,
+    expected: `${m.direction === 'lower-better' ? '≤' : '≥'} ${m.threshold.toFixed(2)}`,
+    pass: m.pass,
+    top: m.engine,
+    score: Math.round(clamp01(m.value) * 100),
+  }));
+}
