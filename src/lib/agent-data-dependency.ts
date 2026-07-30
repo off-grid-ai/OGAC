@@ -28,6 +28,23 @@ import type { AppStep } from '@/lib/app-model';
 import type { DataDomain } from '@/lib/data-domains';
 import { resolveQualifiedPhrase } from '@/lib/phrase-qualifier';
 
+/**
+ * Compare labels on a lightly stemmed form.
+ *
+ * The specialisation check has to survive plural/singular: the step label "Read Expense Claim" reduces to
+ * "expense claim" while the sibling domain is labelled "claims", and neither string contains the other —
+ * so without stemming the guard silently failed and the insurance table was still added. Dropping a
+ * trailing "s" per word is crude but exactly sufficient here, and it cannot merge unrelated nouns.
+ */
+function norm(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w))
+    .join(' ');
+}
+
 /** A step reduced to what this rule needs. Structural, so it is testable without the whole AppSpec. */
 export interface DependencyStep {
   id: string;
@@ -79,11 +96,37 @@ export function ensureAgentDataReads(
   const inserted: DependencyFix['inserted'] = [];
   // Domains already read by an EARLIER step. Order matters: a read after the agent does not help it.
   const readSoFar = new Set<string>();
+  const labelsRead: string[] = [];
   let synthetic = 0;
+
+  /**
+   * Is this domain already covered by something read earlier?
+   *
+   * Not just by id — also by SPECIALISATION. The live case: an expense-claim app already reads
+   * "expense claims", and the agent's prompt says "if the claim amount exceeds…". The phrase "the claim
+   * amount" fuzzily resolves to the org's separate INSURANCE "claims" table, so the pass helpfully added
+   * a read of insurance claims to an expense-claim app — reintroducing the very mis-binding that
+   * phrase-qualifier.ts exists to prevent.
+   *
+   * A domain whose label is a substring of one already read is the broader sibling of the same noun
+   * ("claims" ⊂ "expense claims"). The specific one is what the author meant; adding the general one on
+   * top is never the intent, and reading an unrelated table is worse than reading nothing.
+   */
+  const alreadyCovered = (d: DataDomain): boolean => {
+    if (readSoFar.has(d.id)) return true;
+    const label = norm(d.label);
+    return labelsRead.some((seen) => seen.includes(label) || label.includes(seen));
+  };
+  const markRead = (id: string, label: string) => {
+    readSoFar.add(id);
+    labelsRead.push(norm(label));
+  };
 
   for (const step of steps) {
     if (step.kind === 'connector-query' && step.domain) {
-      readSoFar.add(step.domain);
+      // The label is needed for the specialisation check, so prefer the domain's own label when the
+      // caller's step carries the "Read <label>" form.
+      markRead(step.domain, (step.label ?? '').replace(/^read\s+/i, ''));
       out.push(step);
       continue;
     }
@@ -98,7 +141,13 @@ export function ensureAgentDataReads(
     const needed: DataDomain[] = [];
     for (const phrase of phrases) {
       const { resolved } = resolveQualifiedPhrase(phrase, description, resolve);
-      if (!resolved || readSoFar.has(resolved.id) || needed.some((d) => d.id === resolved.id)) continue;
+      if (!resolved || alreadyCovered(resolved) || needed.some((d) => d.id === resolved.id)) continue;
+      // A broader sibling of something we are about to add is equally unwanted.
+      if (needed.some((d) => {
+        const a = norm(d.label);
+        const b = norm(resolved.label);
+        return a.includes(b) || b.includes(a);
+      })) continue;
       needed.push(resolved);
     }
 
@@ -106,7 +155,7 @@ export function ensureAgentDataReads(
       synthetic += 1;
       const read = makeRead(domain, `dep${synthetic}`);
       out.push(read);
-      readSoFar.add(domain.id);
+      markRead(domain.id, domain.label);
       inserted.push({ domainId: domain.id, domainLabel: domain.label, beforeStepId: step.id });
     }
     out.push(step);

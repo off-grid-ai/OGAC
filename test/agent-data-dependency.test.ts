@@ -85,6 +85,37 @@ describe('B3.1 — ensureAgentDataReads', () => {
     assert.equal(inserted[0].domainId, QUOTA.id);
   });
 
+  // ── The false positive my own first version introduced, pinned. ──
+  test('does not add a BROADER sibling domain when a specific one is already read', () => {
+    // Live: an expense-claim app reads "expense claims"; the agent prompt says "if the claim amount
+    // exceeds…". "the claim amount" fuzzily resolves to the org's separate INSURANCE "claims" table, so
+    // the pass added a read of insurance claims to an expense-claim app — reintroducing exactly the
+    // mis-binding phrase-qualifier.ts exists to prevent.
+    const INSURANCE = domain('dom_insurance_claims', 'claims');
+    const resolveBoth = (phrase: string): DataDomain | null => {
+      const p = phrase.toLowerCase();
+      if (p.includes('reimbursement quota')) return QUOTA;
+      if (p.includes('expense claim')) return CLAIMS;
+      if (p.includes('claim')) return INSURANCE; // the fuzzy sibling
+      return null;
+    };
+    const steps: DependencyStep[] = [
+      { id: 's1', kind: 'connector-query', label: 'Read expense claims', domain: CLAIMS.id },
+      {
+        id: 's2',
+        kind: 'agent',
+        label: 'Check Against Reimbursement Quota',
+        inlineAgent: { systemPrompt: "Determine if the claim amount exceeds the employee's remaining reimbursement quota." },
+      },
+    ];
+    const { inserted } = ensureAgentDataReads(steps, DESC, resolveBoth, makeRead);
+    assert.deepEqual(
+      inserted.map((i) => i.domainId),
+      [QUOTA.id],
+      'must add the quota and NOT the insurance claims table',
+    );
+  });
+
   test('never invents a source for a phrase that resolves to nothing', () => {
     const steps: DependencyStep[] = [
       { id: 's1', kind: 'agent', label: 'Consult the astrology almanac', inlineAgent: { systemPrompt: 'divine it' } },
