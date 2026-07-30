@@ -468,8 +468,17 @@ Newest first. Every entry is live-verified unless it says otherwise.
     governed-activity share, and it means pipeline-scoped governance does not reach most apps.
   - The table is `eval_definitions`, not `eval_defs` — worth recording since a query against the wrong name
     returns "relation does not exist", which is easy to misread as "no evals exist".
-  **Next:** per-app eval definitions for all 11 (faithfulness + answer-relevancy + a PII-masking check at
-  minimum), then bind the 7 unbound apps to pipelines, then release gates so a failing suite blocks a publish.
+- **AI QA seeded — all 11 apps now have evaluations (0 → 11, 33 definitions).**
+  `scripts/seed-app-evals.sql`, idempotent, verified live (`count(DISTINCT app_id)` → 11). Three metrics per
+  app, each catching a different failure, all on engines verified live today:
+  `faithfulness ≥ 0.80` (confident invention), `answer_relevancy ≥ 0.75` (on-topic non-answers, which PASS a
+  faithfulness check because they invent nothing — which is why one metric is not enough), and
+  `pii_leakage ≤ 0.01` (near-zero: one leaked PAN is a breach, not a quality dip, so the threshold is
+  deliberately not symmetrical with the other two).
+  **Next on this thread:** run the suites for a real per-app baseline (defined ≠ executed), **bind the 7 apps
+  that have NO pipeline** — the more serious item, since pipeline-scoped governance currently does not reach
+  most apps, which is what the 59% governed-activity share was telling us — then release gates so a failing
+  suite blocks a publish.
 
 - **§13 metrics computation built** — `src/lib/product-metrics.ts`, 15 tests. The §13 audit's finding was
   that almost every success metric is derivable from recorded data and almost none is computed; this is the
