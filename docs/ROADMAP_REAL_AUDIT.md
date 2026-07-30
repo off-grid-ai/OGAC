@@ -32,7 +32,7 @@ The wedge, and the strongest evidence we have.
 | Step | Gate | Evidence |
 |---|---|---|
 | Describe the goal | ✅ | `POST /api/v1/admin/apps/compile` on a plain sentence |
-| OGAC asks clarifying questions | 🔴 | Compile is one-shot; no clarification turn exists |
+| OGAC asks clarifying questions | ✅ | `compile-clarify.ts` derives questions from facts about the spec (unbound read, limit with no number, "approve" with no human step), returned by the compile API and ASKED as a turn in the Forge conversation. Verified live: an ambiguous brief returned `You described "large" — what value is the cut-off?`; a fully specified one returned none |
 | Identifies available data, tools, policies | ✅ | Binds `expense claims` not the insurer's `claims` (`phrase-qualifier.ts`); inserts a missing quota read and *reports* it |
 | Proposes a workflow | ✅ | 5-step spec: 2 reads → agent → human → output |
 | User reviews the plain-language plan | 🔶 | Spec + gaps render; nobody has watched a non-technical person read it |
@@ -57,8 +57,8 @@ The wedge, and the strongest evidence we have.
 | Step | Gate | Evidence |
 |---|---|---|
 | Reviewer sees pending item | ✅ | Run pauses; review surface inlines at the human step |
-| Understands the action and evidence | 🔶 | **Weakest link: the evidence is raw JSON.** See G-UX1b |
-| Sees risk and confidence | 🔴 | No risk/confidence signal on the review surface |
+| Understands the action and evidence | ✅ | Step outputs render as tables with the source's own column names humanised (`annual_quota` → "Annual quota"); one shared `StepEvidence` component so the step list and the review panel cannot drift. Verified live: 0 raw JSON payloads on the page |
+| Sees risk and confidence | ✅ | `review-risk.ts` — LEVELS WITH REASONS, never a percentage (every input is a discrete fact, so a score would invent precision). Verified live: `RISK MEDIUM — Approving runs the remaining steps, including Send Decision Report. This decision covers 41,346.44.` / `CONFIDENCE HIGH — All 2 sources were read and narrowed to this case.` |
 | Approves / edits / rejects / escalates | 🔶 | Approve + reject verified earlier; **edit and escalate unverified** |
 | Decision is logged | ✅ | Audit ledger + run history |
 | Feedback enters the evaluation system | ❓ | Not exercised |
@@ -110,16 +110,24 @@ The wedge, and the strongest evidence we have.
 
 ## What to work next, in order
 
-1. **Flow 6's evidence problem (G-UX1b).** A reviewer sees raw positional JSON. Every other part of the
-   flagship flow works and this is what a department reviewer actually looks at. Highest value, lowest risk.
-2. **Risk and confidence on the review surface** (Flow 6) — a 🔴 with no code behind it, and the doc names it
-   as a step. A reviewer approving without a confidence signal is the governance gap that matters most.
-3. **Clarifying questions in compile** (Flow 3) — the doc's second step, and we are one-shot. Turns a good
-   demo into the product the document describes.
-4. **Prompt + evaluation stages on the trace** (Flow 7, and the observability non-negotiable).
-5. **One consistent honest-state vocabulary** across surfaces, rather than seven ad-hoc fixes.
-6. **Time a cold enterprise setup** (Flow 1) — the doc's own "hours, not months" bar is unmeasured, and
-   measuring it is cheap.
+**Done 2026-07-30** (all verified on the live box, not merely merged): Flow 6's evidence rendering, Flow 6's
+risk-and-confidence step, and Flow 3's clarifying questions — pure rule → API → the surface the user is
+already on. Two route-level bugs surfaced while proving them: the compile route dropped `questions`, and the
+evidence renderer had already been duplicated across two review surfaces within a single commit.
+
+1. **Prompt + evaluation stages on the trace** (Flow 7, and the observability non-negotiable). The trace
+   shows data, model and policy; the prompt that produced an answer is absent, which is the one thing an
+   operator investigating a bad answer most needs.
+2. **One consistent honest-state vocabulary** across surfaces. The doc names seven states; we fixed several
+   individually this session (a 400 no longer reads as an outage; a failed read cannot read as "no rows"; an
+   unscoped read says so). Seven ad-hoc fixes IS the gap — one vocabulary, applied everywhere.
+3. **Time a cold enterprise setup** (Flow 1). The doc's own bar is "hours, not months" and it is unmeasured.
+   Cheap to measure, and unmeasurable claims are how the older ledger drifted.
+4. **Walk Flow 2 as a flow** — every step exists; nobody has done the ten in sequence.
+5. **Reconcile gateway keys with console key rows** (B4.10) — per-subject spend is live; budgets sit on
+   objects the traffic never names.
+6. **The ❓ sweep.** Everything marked UNVERIFIED above. On this session's record roughly half of what looks
+   broken is already working, so this is cheaper than it looks and reorders everything below it.
 
 Everything marked ❓ is a candidate for a verification sweep before any of it is built. On this session's
 record, roughly half of what looks broken is already working.
