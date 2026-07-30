@@ -36,22 +36,23 @@ Honesty bar from `CLAUDE.md`: report the gate, never inflate.
 
 ### Where the ledger stands — 2026-07-30
 
-**37 claims: 19 ✅ VERIFIED · 11 🔶 WIRED · 6 🔴 GAP · 1 ⬜ OTHER REPO.**
+**37 claims: 20 ✅ VERIFIED · 11 🔶 WIRED · 5 🔴 GAP · 1 ⬜ OTHER REPO.**
 
-The six remaining gaps, i.e. everything we say out loud and cannot yet prove:
+The five remaining gaps, i.e. everything we say out loud and cannot yet prove:
 
 | Claim | The promise | Why it is still a gap |
 |---|---|---|
 | **B2.3** | "Quality-gated" | Engine reports `fallback (stub)`; a run evaluates 0 expectations (G-F4) |
 | **B2.4** | "Answers you can verify" | Lexical grounding — a paraphrase of a source scores 0, so it fails on normal language (G-F3) |
 | **B3.10** | "Results go out" | The output step is intercepted because global live actions are off (fail-safe, by design). Webhook egress + signed receipt ARE proven; this is an operator decision about the demo tenants |
-| **B4.7** | "Signed and tamper-evident" | Displayed off a seeded value; never verified on a freshly executed run — and trivially testable by a buyer |
 | **B4.10** | "CHEAPER" | No cost model behind the chip; dollar budgets are $0 no-ops on free models |
 | **P3** | No product names on screen | 300 flagged files. The ratchet stops it growing; the standing leak is not cleared |
 
 Closed on 2026-07-30: **B3.1** ("describe it in plain words → get working software") promoted 🔴 → ✅ on
-run `apprun_2da37694`, and **GAP M1** (masking destroying entity identity) closed with value-stable
-pseudonyms.
+run `apprun_2da37694`; **GAP M1** (masking destroying entity identity) closed with value-stable
+pseudonyms; and **B4.7** (tamper-evident provenance) promoted 🔴 → ✅ — that row turned out to be STALE,
+which is the second time this week the backlog described a defect that was already fixed. Reproduce
+before building.
 
 **Keep this tally honest by re-deriving it, not by editing it from memory.** The figures above were
 recomputed per row; a loose `grep` over this file double-counts, because the gate emojis also appear in
@@ -158,7 +159,7 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 | B4.4 | **Secrets** are held properly | Governance → Secrets (OpenBao) | ✅ VERIFIED | KV v2 lifecycle + dynamic DB credentials (issue / auth / revoke) proven live. Used for real: a connector credential was vaulted 2026-07-29 and the read succeeded through it. |
 | B4.5 | **Egress is controlled** | Egress / DLP | 🔶 WIRED | Model-call leash verified (B3.8). Content-level egress inspection on outbound payloads not verified. |
 | B4.6 | **Every result traceable and audited** | Audit ledger | ✅ VERIFIED | `audit_events_v2` is the canonical ledger; enforcement decisions (deny, mask, data-unavailable) are written with actor, run and reason. |
-| B4.7 | **Provenance** — tamper-evident results | Run provenance signature | 🔴 GAP | Demo runs carry a *deterministically seeded* signature so the UI can show the trail. **A newly executed run's provenance is not verified.** Showing "signed and tamper-evident" on a seeded value while a real run may carry none is precisely the overclaim this ledger exists to catch. |
+| B4.7 | **Provenance** — tamper-evident results | Run provenance signature | ✅ VERIFIED | **2026-07-30 — verified on a FRESHLY EXECUTED run, and the backlog entry was stale.** `run_8cb8f882` (executed 06:08 by the B3.1 run above, not seeded) through the real `POST /api/v1/admin/provenance/verify/run`: `{"status":"verified","ok":true,"algorithm":"Ed25519"}` with manifest key == active key. Then tamper-evidence proven rather than assumed: appending `APPROVED FOR 9,999,999.00` to the stored answer, leaving the signature intact, flipped the verdict to `{"status":"tampered","ok":false,"detail":"Signature does NOT verify under the key that signed it — the content or signature was altered."}`, and restoring the answer returned it to `verified`. The chosen tamper is the one that matters — a fraudulent approval amount injected into a run record. |
 | B4.8 | **Quality / evals** | Insights → Quality | ✅ VERIFIED | Faithfulness scoring closed live against the judge sidecar; judge runs as a governed per-org system agent (no pinned model). |
 | B4.9 | **Drift** is caught | Insights → Drift | 🔶 WIRED | Drift surfaces exist and the engine is wired. Promote by making a seeded dataset drift and reading the alert. |
 | B4.10 | **Cost / FinOps** | Insights → Cost | 🔴 GAP | **PA-6** — rollups + an on-prem cost model are not built. Note: dollar budgets are $0 no-ops on free models, so a "budget enforced" demo is currently vacuous. |
