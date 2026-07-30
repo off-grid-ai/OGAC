@@ -36,23 +36,31 @@ Honesty bar from `CLAUDE.md`: report the gate, never inflate.
 
 ### Where the ledger stands — 2026-07-30
 
-**37 claims: 20 ✅ VERIFIED · 11 🔶 WIRED · 5 🔴 GAP · 1 ⬜ OTHER REPO.**
+**37 claims: 21 ✅ VERIFIED · 11 🔶 WIRED · 4 🔴 GAP · 1 ⬜ OTHER REPO.**
 
-The five remaining gaps, i.e. everything we say out loud and cannot yet prove:
+The four remaining gaps, i.e. everything we say out loud and cannot yet prove:
 
 | Claim | The promise | Why it is still a gap |
 |---|---|---|
 | **B2.3** | "Quality-gated" | Engine reports `fallback (stub)`; a run evaluates 0 expectations (G-F4) |
-| **B2.4** | "Answers you can verify" | Lexical grounding — a paraphrase of a source scores 0, so it fails on normal language (G-F3) |
 | **B3.10** | "Results go out" | The output step is intercepted because global live actions are off (fail-safe, by design). Webhook egress + signed receipt ARE proven; this is an operator decision about the demo tenants |
 | **B4.10** | "CHEAPER" | No cost model behind the chip; dollar budgets are $0 no-ops on free models |
 | **P3** | No product names on screen | 300 flagged files. The ratchet stops it growing; the standing leak is not cleared |
 
 Closed on 2026-07-30: **B3.1** ("describe it in plain words → get working software") promoted 🔴 → ✅ on
 run `apprun_2da37694`; **GAP M1** (masking destroying entity identity) closed with value-stable
-pseudonyms; and **B4.7** (tamper-evident provenance) promoted 🔴 → ✅ — that row turned out to be STALE,
-which is the second time this week the backlog described a defect that was already fixed. Reproduce
-before building.
+pseudonyms; **B4.7** (tamper-evident provenance) promoted 🔴 → ✅; and **B2.4** (entailment-grade
+grounding) promoted 🔴 → ✅.
+
+**A process finding that outranks any single row: THREE of these gap rows were STALE** — B4.7 and B2.4
+today, after two more on 2026-07-29. The defect they described was already fixed, and each cost minutes to
+disprove versus days to "build". Backlog rot is now the NORM here, not the exception, so:
+
+- **Reproduce every gap live before writing a line of code.** Non-negotiable; it has paid off four times.
+- **Env-set is not verified.** B2.4's adapter falls back to the lexical floor when the gateway is down, so
+  reading `OFFGRID_ADAPTER_GROUNDING=model` proves nothing. Exercise the real path with inputs that
+  DISCRIMINATE — a paraphrase the old engine would fail AND a contradiction a rubber-stamp would pass.
+- A 🔴 row with no re-verification date should be treated as unknown, not as broken.
 
 **Keep this tally honest by re-deriving it, not by editing it from memory.** The figures above were
 recomputed per row; a loose `grep` over this file double-counts, because the gate emojis also appear in
@@ -122,7 +130,7 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 | B2.1 | Scattered sources **consolidate** into one governed body | Data → Flows / jobs → warehouse | ✅ VERIFIED | Console job → compiled flow → dispatched execution proven live (recorded in the orchestration note). No-DAG jobs fall back to direct copy. |
 | B2.2 | It is **catalogued, classified and masked** | Data → Catalog + masking rules | 🔶 WIRED | Catalog + masking rules exist and are seeded. Promote by showing a masked column actually masked in a query result. |
 | B2.3 | **Quality-gated** | Data quality expectations | 🔴 GAP | **G-F4** — engine reports `engine:"fallback (stub)"`; a run evaluates 0 expectations. The claim is currently decorative. |
-| B2.4 | **Answers you can verify** — inline citations tracing to governed sources | Work → Chat, grounded + cited | 🔴 GAP | **G-F3** — grounding runs the lexical/heuristic fallback: exact overlap → supported, a **paraphrase → unsupported (score 0)**. Citations render, but "verify the source" is not entailment-grade. This is a headline chip. |
+| B2.4 | **Answers you can verify** — inline citations tracing to governed sources | Work → Chat, grounded + cited | ✅ VERIFIED | **2026-07-30 — entailment-grade grounding is LIVE and the G-F3 row was stale.** The model adapter is active on the box (`OFFGRID_ADAPTER_GROUNDING=model`, `qwen3-vl-8b`) and — since it silently falls back to the lexical floor when the gateway is down — was tested through the real `POST /api/v1/admin/grounding/verify` with cases that DISCRIMINATE: a paraphrase sharing almost no vocabulary ("The borrower failed to pay on time." vs "The customer was delinquent on the instalment due date.") → `supported, score 1, source S1`, which the lexical floor scores ~0; a CONTRADICTION ("paid every instalment on time") → `supported:false, score 0`; unrelated text → `score 0`, no source attributed. Lexical would fail the paraphrase and a rubber-stamping model would pass the contradiction; neither happened. |
 | B2.5 | **Scoped to each role** | Retrieval ACL / asker identity | ✅ VERIFIED | Cross-org RAG leak closed and covered by `security-236-rag-cross-org-leak.integration.test.ts`; org scoping re-verified live 2026-07-29 across all three hosts (bearer + session). |
 | B2.6 | **Single source of truth** / lineage end to end | Data → Lineage | 🔶 WIRED | Lineage surfaces exist. Promote by tracing one answer's citation back through lineage to the source row. |
 | B2.7 | **Expertise that never walks out the door** | Org brain retention | 🔶 WIRED | Brain ingest + org isolation tested. No live artifact for the "expert left, knowledge retained" story the beat shows. |
