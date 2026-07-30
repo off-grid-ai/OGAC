@@ -34,6 +34,29 @@ Honesty bar from `CLAUDE.md`: report the gate, never inflate.
 | 🔴 **GAP** | Known missing, broken, or overclaimed. Row names the defect. |
 | ⬜ **OTHER REPO** | Belongs to `mobile` / `desktop`, not the console. Listed so coverage is honest, not to be built here. |
 
+### Where the ledger stands — 2026-07-30
+
+**37 claims: 19 ✅ VERIFIED · 11 🔶 WIRED · 6 🔴 GAP · 1 ⬜ OTHER REPO.**
+
+The six remaining gaps, i.e. everything we say out loud and cannot yet prove:
+
+| Claim | The promise | Why it is still a gap |
+|---|---|---|
+| **B2.3** | "Quality-gated" | Engine reports `fallback (stub)`; a run evaluates 0 expectations (G-F4) |
+| **B2.4** | "Answers you can verify" | Lexical grounding — a paraphrase of a source scores 0, so it fails on normal language (G-F3) |
+| **B3.10** | "Results go out" | The output step is intercepted because global live actions are off (fail-safe, by design). Webhook egress + signed receipt ARE proven; this is an operator decision about the demo tenants |
+| **B4.7** | "Signed and tamper-evident" | Displayed off a seeded value; never verified on a freshly executed run — and trivially testable by a buyer |
+| **B4.10** | "CHEAPER" | No cost model behind the chip; dollar budgets are $0 no-ops on free models |
+| **P3** | No product names on screen | 300 flagged files. The ratchet stops it growing; the standing leak is not cleared |
+
+Closed on 2026-07-30: **B3.1** ("describe it in plain words → get working software") promoted 🔴 → ✅ on
+run `apprun_2da37694`, and **GAP M1** (masking destroying entity identity) closed with value-stable
+pseudonyms.
+
+**Keep this tally honest by re-deriving it, not by editing it from memory.** The figures above were
+recomputed per row; a loose `grep` over this file double-counts, because the gate emojis also appear in
+the legend above, in the gap prose, and in the roadmap queue.
+
 **A row may only be promoted to ✅ by someone who ran it and read the output.** "The code looks right"
 is 🔶. Two of the first backlog items picked up on 2026-07-29 were already fixed — verify before
 building, and record the evidence so the next session doesn't re-verify.
