@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { explainResponse } from '@/lib/api-failure';
 import {
   PROMPT_STARTERS,
   buildPromptPayload,
@@ -35,11 +36,19 @@ export function PromptStarterLibrary({ onAdded }: Readonly<{ onAdded: () => void
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(buildPromptPayload(starter)),
       });
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) {
+        // The server explains WHY (e.g. "read-only demo: … cannot make changes"). Discarding that and
+        // showing "Could not add starter" told the user the product was broken when they were simply
+        // not permitted. A refusal is surfaced as information, not as an error.
+        const f = await explainResponse(res, 'add this starter');
+        if (f.refusal) toast.info(f.message);
+        else toast.error(f.message);
+        return;
+      }
       toast.success(`Added "${starter.title}" to your prompts`);
       onAdded();
     } catch {
-      toast.error('Could not add starter');
+      toast.error('Could not reach the server. Check your connection and try again.');
     } finally {
       setAdding(null);
     }
