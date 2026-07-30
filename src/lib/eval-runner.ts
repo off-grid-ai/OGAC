@@ -194,7 +194,11 @@ export async function runEvalDef(
   const judge = await loadJudgeRouting(orgId);
   // eslint-disable-next-line no-console
   console.log(`[eval] ${def.metric} via ${judge.attribution}`);
-  const samples = await buildSamples(judge.model);
+  // PREFER THE APP'S OWN RUNS as the sample source (eval-samples-from-runs.ts). Faithfulness asks whether
+  // an answer follows from its sources, and for an app the only defensible sources are the ones IT read —
+  // not a global corpus it never consulted. The golden path stays for org-wide library evals, and is the
+  // fallback whenever an app has no evaluable runs yet.
+  const samples = def.appId ? await samplesForApp(def.appId, orgId, judge.model) : await buildSamples(judge.model);
   const tpl = { metric: def.metric, direction: def.direction, defaultThreshold: def.threshold };
   const perSample: MetricScore[] = [];
 
@@ -263,6 +267,43 @@ async function entailmentScores(
   } catch {
     return null;
   }
+}
+
+/**
+ * Samples for an app-bound eval: its own recent runs, falling back to the golden set.
+ *
+ * A brand-new app has no runs, and an eval that simply fails for a new app is a gate people learn to ignore
+ * — so the fallback is explicit rather than an empty corpus. Best-effort on the read: a failure here degrades
+ * to golden rather than taking the eval down.
+ */
+async function samplesForApp(
+  appId: string,
+  orgId: string,
+  model: string,
+): Promise<Awaited<ReturnType<typeof buildSamples>>> {
+  try {
+    const { listAppRunsView } = await import('@/lib/app-runs-view-reader');
+    const { samplesFromRuns } = await import('@/lib/eval-samples-from-runs');
+    // (appId, orgId, limit) — arg order matters here; the org filter is the tenant boundary.
+    const runs = await listAppRunsView(appId, orgId, 25);
+    const fromRuns = samplesFromRuns(
+      runs.map((r) => ({
+        id: r.id,
+        status: r.status,
+        outcome: r.outcome,
+        steps: r.steps.map((st) => ({
+          kind: st.kind,
+          status: st.status,
+          label: st.label,
+          outcome: st.outcome,
+        })),
+      })),
+    );
+    if (fromRuns.length > 0) return fromRuns;
+  } catch {
+    // fall through to golden
+  }
+  return buildSamples(model);
 }
 
 /** Score one golden sample offline, mapping the sample shape onto the heuristic's inputs. */
