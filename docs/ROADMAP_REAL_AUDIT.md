@@ -453,6 +453,33 @@ Newest first. Every entry is live-verified unless it says otherwise.
 
 ### 2026-07-30
 
+- **🔴 THE WORKSPACE (§8 "Work") IS NOT SEEDED FOR THE DEMO TENANTS — founder-reported, now quantified.**
+  *"The entire workspace section has no seed data. It's so difficult to truly understand all of its
+  functionality."* Confirmed, and the numbers are the argument:
+
+  | table | total | `default` (dev) | org_bharat | org_suraksha |
+  |---|---|---|---|---|
+  | `chat_conversations` | 19 | **13** (mac 8, mohammed 5) | **3** | 3 |
+  | `chat_projects` | 9 | — | — | — |
+  | `chat_messages` | 45 | — | — | — |
+  | `files` | 183 | — | — | — |
+
+  **Two compounding reasons the section looks empty**, and the second is the one that matters:
+  1. Most rows belong to the `default` org — development traffic, not tenant demo data.
+  2. **Workspace data is scoped per USER**, so a demo viewer sees only conversations/projects THEY own. Even a
+     well-seeded tenant looks empty to a viewer unless the seed is owned by the viewer account.
+  **This is the precondition for the 53 🔶 rows**, not a cosmetic gap: "wired but unproven" is largely
+  *unprovable* while the surfaces have nothing in them to exercise.
+  **Seed under the DEMO VIEWER identity** (`demo-bank@getoffgridai.co` / `demo-insurer@…`), not an admin, or the
+  screens stay blank for exactly the person a buyer watches.
+
+- **Correction: I twice claimed "no table exists" for Projects and Artifacts. Wrong.** I guessed table names
+  (`projects`, `artifacts`) instead of reading what the page fetches — `ProjectsBrowser` calls
+  `/api/v1/chat/projects`, and the tables are `chat_projects` / `chat_artifacts`, both populated. Third time this
+  session that inferring a name from a symptom produced a false finding, after four invented 404 routes and the
+  `eval_defs` / `eval_definitions` mix-up. **The rule already written in this file — enumerate from the router or
+  the schema, never from a label — applies to TABLE names too.**
+
 - **Golden cases: every pipeline now has real ones, none has placeholders.** After the 33-row purge left
   Collections, KYC and Motor-Claim FNOL at zero, cases were written for them **from each pipeline's own
   description** rather than invented from the domain — KYC states "validates PAN, Aadhaar and address proofs
