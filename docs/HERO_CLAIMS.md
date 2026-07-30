@@ -110,7 +110,7 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 
 | # | Claim | Surface | Gate | Evidence / what's missing |
 |---|---|---|---|---|
-| B3.1 | **Describe it in plain words → working software** | Solutions → Studio / builder | 🔶 WIRED | **The chain is proven live; one downstream defect stops the decision being useful.** Run `apprun_a60fcc2f` (2026-07-30): sentence → 5-step governed spec with correct bindings (`expense claims`, not the org's insurance `claims`) → quota read auto-inserted and reported → saved (`app_c0f4398a`) → picker offers 11 real open claims → run. Both reads are now **correctly case-scoped live**: s1 `ok(1 rows) — scoped by claim_no, employee_id`, dep1 `ok(6 rows) — scoped by employee_id` (was 20 unrelated rows each). Two root causes fixed: the run route dropped the picked record (`runInputWithCase`), and a compiler-inserted read had no filter to write (`case-scope.ts`, run-time inference). Blocked now only by **GAP M1** below — masking breaks entity identity, so the agent cannot tell the claim and the quota describe the same person. |
+| B3.1 | **Describe it in plain words → working software** | Solutions → Studio / builder | ✅ VERIFIED | **Proven end to end live 2026-07-30, run `apprun_76864dd2`.** A plain sentence compiled to a 5-step governed spec with correct bindings (`expense claims`, not the org's insurance `claims`), the missing quota read was auto-inserted and reported, the app saved (`app_c0f4398a`), the picker offered 11 real open claims, and the run read `1 record from expense claims, narrowed to this case by claim_no and employee_id` + `6 records from reimbursement quota, narrowed to this case by employee_id`, then decided correctly on MASKED data: *"the Training annual quota is 200,000.00 and 62,545.88 is used … the claim (41,346.44) is less than the remaining quota (137,454.12) … within the employee's remaining Training category quota"* — and paused at `awaiting_human` for the manager. Four defects had to fall for this: the run route dropping the picked record (`runInputWithCase`), the inserted read having no filter (`case-scope.ts`), per-scan pseudonyms breaking entity identity (GAP M1), and columnar row output corrupting the figures. Remaining: currency renders `$`, must be ₹ (G-UX5). |
 | B3.2 | It **inherits your data** | Connector-query steps bound to data domains | ✅ VERIFIED | 2026-07-29: case-scoped reads live — 1 claim row + that employee's 1 quota row, `{{case.employee_id}}` resolved, on both tenants. |
 | B3.3 | It **inherits your rules** (data ceiling) | Pipeline data allowlist, enforced pre-connector | ✅ VERIFIED | A read outside the allowlist is denied before the connector is touched, audited as `pipeline.data.deny`. Observed live. |
 | B3.4 | **People review what matters** | Human step + review/approve | ✅ VERIFIED | 2026-07-29: `apprun_9ba6a45d` — read → quota → decision (₹41,346.44 vs ₹137,454.12, headroom ₹96,107.68) → **human approved** → output → `done`. Work screen HANDLED 9 → 10. |
@@ -164,37 +164,27 @@ check (`scripts/check-hero-vocabulary.mjs`) so it cannot regress, not a one-off 
 
 **The gaps, in the order they hurt a demo:**
 
-0. **GAP M1 — masking destroys entity identity, so a governed agent cannot do the work.** The single
-   most important finding of this session, and it blocks the headline claim.
+0. **GAP M1 — CLOSED 2026-07-30 (value-stable pseudonyms).** Masking made one person look like several:
+   the placeholder counter was per-scan and a run scans in several places independently, so Meera
+   Malhotra arrived as `[REDACTED_PERSON_23]`, `[REDACTED_PERSON_12][REDACTED_PERSON_13]` and a third
+   token — and the agent correctly concluded the records described different people.
 
-   Run `apprun_a60fcc2f` read exactly the right data — Meera Malhotra's one claim (₹41,346.44) and her
-   six quota rows (Training: ₹200,000 annual, ₹137,454.12 remaining, so the claim is comfortably within
-   quota). The agent still could not decide, and its reasoning was correct given what it was shown:
+   Fixed by deriving the token from the VALUE rather than the scan (`src/lib/pii-pseudonym.ts`), salted
+   per org so nothing correlates across tenants. Wired at `maskOrBlock`, the one seam holding both the
+   original and the redacted text, so all four call sites inherit it — including
+   `maskRetrievalHits`, which scans every source row separately and was the worst offender.
 
-   > "The claim submitted by [REDACTED_PERSON_23] … does **not** appear in the provided data. The only
-   > claim listed in `expense_claims` is for [REDACTED_PERSON_12][REDACTED_PERSON_13], not
-   > [REDACTED_PERSON_23]. Additionally, the `employee_quota` table does not contain any rows with the
-   > employee name [REDACTED_PERSON_23]."
+   No entity spans were needed: the caller holds both strings and they differ only at the replaced
+   spans, so the spans are recoverable by aligning them. Engine-agnostic, no new service. If the
+   alignment is not exact it returns the REDACTED text — never the original.
 
-   One person, three different tokens. The masker's placeholder counter is PER SCAN, and a run scans in
-   several places independently (`app-run.ts:745` masks the folded query; `agentrun.ts:958` masks again;
-   `providedSources` travel as their own channel). So the same real value becomes a different opaque
-   token in each channel, and the agent — reasoning faithfully over what it was given — concludes the
-   records describe different people. Note also `[REDACTED_PERSON_12][REDACTED_PERSON_13]`: one name
-   split across two tokens, which makes the join even harder.
+   Verified live: `apprun_3f045e0b` showed one stable `[PERSON_d34f0659]` throughout, and
+   `apprun_76864dd2` reached the correct ₹-quota decision on fully masked data.
 
-   **This is not an argument for less masking.** It is an argument for VALUE-STABLE pseudonyms: replace
-   an entity with a token derived from the value itself (`PERSON_a3f9`), so the same person is the same
-   token in every scan, every channel and every step, while no real name ever reaches the model.
-   Referential integrity is what makes governed data still *usable* — and "your AI does the work
-   without ever seeing the name" is a stronger claim than anything currently on the page.
-
-   Batching the scans would paper over this one run; it would break again the moment a run scans in two
-   places. The token must be a function of the value, not of the scan.
-
-   Deliberately NOT patched at the end of a long session: it touches the PII path shared by chat,
-   agents and pipelines, and the current placeholder is minted downstream of where we still hold the
-   original value — so the fix needs the analyzer's spans, not a rewrite of already-redacted text.
+   **The lesson worth keeping: masking and utility were never actually in tension.** Both failures
+   blamed on governance — unjoinable pseudonyms, then corrupted figures — were our own representation
+   choices upstream of the masker. The columnar row format stripped field names to save tokens, and a
+   bare tuple of decimals genuinely does look like an IP address to a scanner.
 
 1. **B3.1 currency** — the compiled agent prompt renders `$41,346.44`. These tenants are Indian BFSI;
    it must be ₹. Small, and it is on screen in the hero.
