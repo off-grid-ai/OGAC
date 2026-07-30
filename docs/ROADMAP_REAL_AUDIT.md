@@ -375,3 +375,55 @@ built capability loses its evidence**, not missing capabilities.
 
 **The most consequential ❓ is backup and restore / disaster recovery.** An enterprise buyer asks in the first
 technical call, and it is untested. Cheap to establish, expensive to be wrong about.
+---
+
+## §8 Core product areas (A–J) — audited and gated
+
+| Area | Gate | Evidence / what is missing |
+|---|---|---|
+| **A. Organizational intelligence** — a permissioned graph over people, systems, data, decisions, apps, agents, models, policies, outcomes | 🔶 | The ENTITIES all exist and are enumerable, and the §8 questions are largely answerable per item: where knowledge came from (lineage ✅), who can access it (retrieval ACL ✅), which decisions used it (run refs ✅), whether a human verified it (approval records ✅), how confident (confidence signal ✅ as of today). What does NOT exist is the GRAPH — nothing traverses "which workflows depend on this knowledge" or "is it still valid". The document's own warning ("this cannot become an unstructured memory dump") is respected by accident rather than by design |
+| **B. Data plane** | 🔶 | Schema discovery ✅, classification ✅, permissions mapping ✅, lineage ✅, retrieval ✅, structured querying ✅ (six connectors probed live). Incremental sync 🔶, retention controls 🔶, unstructured querying ❓. Connector BREADTH is the gap against the list: databases/warehouses/S3/Kafka/REST yes; SharePoint, Drive, CRM, ERP, ticketing, email, messaging — not present |
+| **C. Governed model gateway** | ✅ | Local, cloud, fallback, cost/latency/data-class routing, rate limits, kill switches, logging, redaction, caching all present; five models attributed live. **The document's acid test — "restricted data may only use models inside the customer's infrastructure … technically enforced, not a warning" — is met**: the egress leash blocks before the model call, verified live |
+| **D. Pipelines** | ✅ | A pipeline binds data, retrieval, models, prompts, tools, policies, guardrails, approvals, cost limits, monitoring; **versioned** (append-only snapshots, verified live) **and inherited** — a compiled app inherited the allowlist, masking, guardrails and leash without its author asking. This is the best-evidenced area in §8 |
+| **E. Studio** | 🔶 | Describe an outcome ✅, review the generated workflow ✅, test against real cases ✅, add human review ✅, clarifying questions ✅ (today). The node graph is correctly SECONDARY. Missing: upload examples, add business rules as first-class objects, and "explain what it is building in business language" is partial — the plan renders, but nobody has watched a non-technical person read it |
+| **F. Apps and agents** | 🔶 | Apps: review queues ✅, background workflows ✅, scheduled jobs ✅, API access ✅, forms 🔶, conversational ✅, dashboards 🔶, batch 🔶, case management 🔶, mobile ❓. Agents: tool use ✅, approval ✅, structured outputs ✅, deterministic steps ✅, long-running ✅, retry/timeout ✅, memory 🔶, delegation 🔶, **human escalation 🔴** (approve/reject exist; escalate does not) |
+| **G. Human review** | 🔶 | The document lists seven things the review experience must show. Now: what the system wants to do ✅, why ✅, which sources ✅ (readable tables, today), what uncertainty remains ✅ (confidence, today), what happens after approval ✅ (risk names the pending steps, today). **Missing: what policy applies** (enforced but not shown at the review point) and **what happens after rejection**. Approver actions: approve ✅, reject ✅, add a reason ✅; **edit 🔶, ask for more information 🔴, reassign 🔴, escalate 🔴**. "That reason should feed future evaluation" — 🔴, the loop is not closed |
+| **H. Evaluation and AI quality** | 🔶 | Golden datasets ✅, faithfulness ✅, groundedness ✅, human feedback ✅, drift 🔶, regression 🔶, safety 🔶, business-quality metrics 🔴, prompt-degradation detection 🔴, model comparison 🔶. Quality is visible by application/model/engine/time ✅ — but **not by team or by version**, both of which the document names |
+| **I. Governance and compliance** | ✅ | RBAC ✅ ABAC ✅ classifications ✅ model policies ✅ tool permissions ✅ egress ✅ approval policies ✅ audit ✅ policy versioning ✅. Retention 🔶, consent 🔶, regional controls 🔶. Against "every important run should be": identifiable ✅ cited ✅ signed ✅ attributable ✅ versioned 🔶 (pipeline yes, app no) reproducible 🔶 **reversible 🔴** |
+| **J. Observability and FinOps** | 🔶 | Who/what/which data/which models/what failed/what was blocked/what quality — all ✅. What each run costs ✅. **Business outcome produced 🔴.** FinOps: budgets 🔶 (unconsumable until keys reconcile), cost allocation ✅ per subject (today), model comparison ✅, **cost per workflow 🔴, cost per successful outcome 🔴, chargeback/showback 🔴** |
+
+**Read:** C and D are done and well-evidenced. **G (human review) is the weakest area in §8** — three of the seven required disclosures and four of the seven approver actions are missing, and it is the surface a regulated buyer inspects hardest.
+
+---
+
+## §9 Critical UX principles — audited and gated
+
+| Principle | Gate | Assessment |
+|---|---|---|
+| **Outcome first** | ✅ | The builder opens on "describe what you need", not a model picker. Verified live end to end today |
+| **Progressive disclosure** | 🔶 | Prompt ✅ (added today), model ✅, retrieval ✅, policies ✅, logs ✅, versions 🔶, evals 🔶, tools 🔶 — all behind disclosure rather than on the default surface, which is the principle honoured. Gaps are the two 🔶 items not being inspectable at all |
+| **Explain every important action** | 🔶 | What happened ✅, why ✅, what information was used ✅, who approved ✅, how certain ✅ (today). **What rule permitted it 🔴** — enforcement is audited but not shown to the person at the point of action. **What should happen next 🔶** — risk names the pending steps, but there is no "next action" affordance |
+| **Governance feels native** | 🔶 | Enforcement happens inline and is stated inline (a denied read names the ceiling; a blocked model call names the leash). But of the document's five example sentences, only two have an equivalent on screen. Notably **"this output cannot be published without a citation" 🔴** and **"this workflow failed its quality threshold" 🔴** — the second is the release-gate gap from §12 |
+| **Fast path and expert path on ONE object** | ✅ | A compiled app and a hand-wired app are the same `AppSpec`; Studio and the canvas edit the same object. No forked product |
+| **Trust through visibility** | 🔶 | Is it running ✅, did it fail ✅, is it waiting for approval ✅, which source did it use ✅, **did data leave the company 🔶** (egress is enforced and audited but not surfaced as a per-run answer), **what will this cost 🔴** — no pre-run cost estimate anywhere, and the document lists it as a question a user should never have to wonder about |
+
+**Read:** the two strongest principles (outcome-first, one object for both paths) are ✅. The recurring miss is **stating the RULE and the COST at the point of action** — both are known internally and neither reaches the person.
+
+---
+
+## §13 Product success metrics — audited and gated
+
+The document opens this section by rejecting the obvious measures: *"OGAC should not be measured by prompts or model calls."* That makes this section a check on whether the product can report on ITSELF.
+
+| Group | Gate | Assessment |
+|---|---|---|
+| **Adoption** — active employees, teams, applications, apps built by non-technical users, time to first application, time to production | 🔴 | Runs and actors are recorded, so the raw material exists. **Nothing aggregates any of it.** "Apps built by non-technical users" and "time to first application" are not derivable at all — we do not record who built an app or when they started |
+| **Business impact** — hours saved, cycle-time reduction, cost per completed process, error reduction, quality improvement, revenue, risks detected, capabilities created | 🔴 | The outcomes surface exists but none of these are computed. Run duration is recorded, so cycle-time is the one within reach; "hours saved" needs a baseline nobody captures |
+| **Reuse** — templates reused, pipelines reused, policies reused, shared signals, apps per common capability | 🔴 | Templates and pipelines are reusable and the bindings are recorded, so this is **the cheapest group to close** — it is a query over existing joins, not new instrumentation |
+| **Reliability** — successful/failed runs, human escalation rate, policy violation rate, rollback rate, MTTR | 🔶 | Successful/failed runs ✅ and policy violations ✅ are both directly countable from `app_runs` and `audit_events_v2`. Escalation rate 🔴 (escalation does not exist), rollback rate 🔴 (apps cannot roll back), MTTR 🔴 |
+| **Quality** — eval scores, human acceptance rate, correction rate, drift, citation accuracy, groundedness | 🔶 | Eval scores ✅ and groundedness ✅ are live. Human acceptance and correction rate are derivable from review decisions (recorded ✅) but **not computed**. Citation accuracy 🔴 |
+| **Governance** — % of AI activity through OGAC, % of apps with evaluations, % of consequential actions with required approval, blocked violations, time to generate audit evidence | 🔶 | Blocked violations ✅ countable. The three percentages are all derivable from data we already hold and **none are computed**. "Time required to generate audit evidence" 🔴 — and it is the one a buyer will actually time in the room |
+
+**Read, and this is the most important finding of the §8/§9/§13 pass:** almost every metric in §13 is **derivable from data already recorded** and almost none is **computed**. That is the same defect class as the five boundary bugs — the information exists and is discarded at the last step — but at the level of the product's own scoreboard. It also means this is far cheaper than it looks: the Reuse group and the three Governance percentages are queries over existing joins.
+
+**And it is self-referential in a way worth stating:** the document says the product wins by making an enterprise measurably faster. Right now the product cannot measure that about itself.
