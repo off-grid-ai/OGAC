@@ -499,9 +499,18 @@ Newest first. Every entry is live-verified unless it says otherwise.
   Three engines agreeing on 0 was never three failures; it was one missing input.
   **So the real gap is the golden corpus, not the scorer.** 33 golden cases exist, but their queries do not
   retrieve — the cases were authored without checking that the retrieval layer can find anything for them.
-  **Fix, in order:** (1) verify `searchDocuments` returns hits for the golden queries — if it does not, the
-  corpus needs queries that match the indexed content, or the content needs indexing; (2) only then do
-  faithfulness numbers mean anything. The ladder fix stays: it is correct and will engage the moment contexts
+  **AND THE FIX IS NOT WHERE I SAID EITHER — the dependency is descoped.** `searchDocuments()` lives in
+  `src/lib/brain.ts`: the golden samples' contexts come from the ORGANIZATIONAL BRAIN, which the founder parked
+  on 2026-07-30. So "index the corpus so retrieval works" is work inside descoped territory, and doing it would
+  have quietly violated the descope while looking like an eval fix.
+  **The right fix is architectural and IS in scope.** An app's faithfulness should be judged against the sources
+  THAT APP actually read — its own `connector-query` step outputs, which are already retained on the run and
+  already rendered as tables for reviewers — not against a global knowledge base the app never consulted.
+  Judging an expense-claim app against a bank-policy corpus is the wrong question even when retrieval works:
+  the app's answer should follow from the claim and the quota rows it read, and nothing else.
+  So: **source eval contexts from the run's own connector outputs.** That needs no brain, no re-indexing, and it
+  makes faithfulness mean the thing §8H actually asks for. It also composes with the ladder fix already made —
+  the entailment rung will engage the moment contexts arrive from that source. The ladder fix stays: it is correct and will engage the moment contexts
   exist, and it removed a lexical scorer that could only ever return 0.
   **Reading instruction until then: `faithfulness:heuristic score=0` means UNMEASURED, not failing.**
 
