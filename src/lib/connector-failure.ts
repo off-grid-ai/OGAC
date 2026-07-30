@@ -81,3 +81,31 @@ export function describeThrown(error: unknown): string | undefined {
   const message = typeof err?.message === 'string' ? err.message.trim() : '';
   return message ? message.slice(0, 120) : undefined;
 }
+
+/**
+ * The sentence a PERSON reads on a completed data-read step.
+ *
+ * `describeDecision()` is documented as "a ready log line" for the AUDIT LEDGER, and it reads like one:
+ *   data-domain "expense claims" [dom_7d17b157-0e6] → connector con_f5c959 :: expense_claims (read)
+ *   → ok(1 rows via mysql) — scoped to the case by claim_no, employee_id
+ * app-run put that string into `step.detail`, and AppRunStatus renders `step.detail` verbatim — so the
+ * audit line was on a department user's screen. Verified on the live run detail page for
+ * apprun_a60fcc2f: `data-domain`, `connector`, raw ids, and `mysql` all visible.
+ *
+ * The hero script's governing rule kills exactly those from a screen (any OSS/product name, our
+ * internal nouns), and the app-as-product bar is that a non-technical person can use the surface
+ * unaided. Both audiences are real, so they get different strings: the audit line stays EXACTLY as it
+ * is and goes to the ledger, and this is what the screen shows.
+ *
+ * The scope is always stated, including its absence — an unscoped read returned other records too, and
+ * that is precisely what a reviewer needs in order to judge the answer.
+ */
+export function connectorReadSentence(
+  label: string,
+  rows: number,
+  scopeKeys: readonly string[],
+): string {
+  const what = `Read ${rows === 1 ? '1 record' : `${rows} records`} from ${label}`;
+  if (scopeKeys.length === 0) return `${what} — not narrowed to this case, so other records are included.`;
+  return `${what}, narrowed to this case by ${scopeKeys.join(' and ')}.`;
+}

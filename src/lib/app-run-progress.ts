@@ -48,6 +48,26 @@ const KIND_LABEL: Record<string, string> = {
   action: 'Carry out the action',
 };
 
+/**
+ * The SHORT reader word for a step kind, for a chip or badge.
+ *
+ * AppRunStatus rendered the raw `step.kind` — so `connector-query` was on screen next to every read,
+ * while this module already existed to say "never a raw kind like connector-query". The rule was here
+ * and the UI went around it; exported so there is one authority instead of two vocabularies.
+ */
+export function stepKindChip(kind: string): string {
+  return KIND_CHIP[kind] ?? kind.replace(/-/g, ' ');
+}
+
+const KIND_CHIP: Record<string, string> = {
+  'connector-query': 'data',
+  agent: 'reasoning',
+  guardrail: 'safety',
+  human: 'review',
+  output: 'send',
+  action: 'action',
+};
+
 function labelFor(step: ProgressSpecStep): string {
   const label = step.label?.trim();
   if (label) return label;

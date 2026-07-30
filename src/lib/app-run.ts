@@ -66,6 +66,7 @@ import {
 import {
   type ConnectorFailure,
   connectorFailureMessage,
+  connectorReadSentence,
 } from '@/lib/connector-failure';
 import { caseRecordFrom, resolveStepParams, unresolvedFilterMessage } from '@/lib/connector-filter';
 import { type CaseScope, columnsOfRow, inferCaseScope, scopeDetail } from '@/lib/case-scope';
@@ -916,15 +917,30 @@ async function executeConnectorStep(
       refs: [{ name: `${resolved.connectorId}:${resolved.resource}` }],
     };
   }
+  // TWO AUDIENCES, TWO STRINGS. `detail` from describeDecision() is an AUDIT line (its own docs call it
+  // "a ready log line") and it reads like one — data-domain, connector, raw ids, `mysql`. AppRunStatus
+  // renders step.detail verbatim, so that line was on a department user's screen; confirmed on the live
+  // run page for apprun_a60fcc2f. The audit line is unchanged and goes to the ledger; the step carries
+  // the reader's sentence. The scope is stated either way — an unscoped read included other records,
+  // which is what a reviewer needs in order to judge the answer.
+  auditEnforcement(
+    { orgId: ctx.orgId, actor: ctx.actor, runId: ctx.runId, contract: ctx.contract ?? null },
+    'pipeline.data.read',
+    `data:${resolved.id}`,
+    'ok',
+    inferredScope ? `${detail} — ${scopeDetail(inferred)}` : detail,
+  );
   return {
     stepId: step.id,
     kind: 'connector-query',
     status: 'done',
     output: summarizeRows(resolved.label, resolved.resource, result.rows, result.count),
     refs: [{ name: `${resolved.connectorId}:${resolved.resource}` }],
-    // An inferred filter changed what this step read, so it is stated on the step — including when
-    // nothing could be inferred, because "read unscoped" is what a reviewer needs to judge the answer.
-    detail: inferredScope ? `${detail} — ${scopeDetail(inferred)}` : detail,
+    detail: connectorReadSentence(
+      resolved.label,
+      result.count,
+      Object.keys({ ...params.filters, ...inferred.filters }),
+    ),
   };
 }
 
