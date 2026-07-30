@@ -1875,9 +1875,19 @@ conversation), so the read-only demo refuses it — and the refusal is swallowed
 looking as though the key did nothing. That is the G-194 pattern again, on the product's single most
 important interaction.
 
-**NOT YET CONFIRMED** — the network response was not captured. Confirm first by re-running the repro
-with a `page.on('response')` filter on `/api/v1/chat/*` and reading the status/body. Do not fix before
-reproducing; the cause above is inference, not evidence.
+**CONFIRMED 2026-07-30, AND THE INFERENCE ABOVE WAS WRONG.** Captured every `/api/v1/chat/*` call while
+pressing Enter: only the three page-load GETs (`audio-config`, `models`, `skills`, `conversations`, all
+200). **There is no POST at all** — no stream request, no conversation create. The composer still held
+its text afterwards.
+
+So this is NOT a server-side read-only refusal. `send()` returns early **on the client**, before any
+fetch, and says nothing. The next step is to read `send()`'s guard clauses and find which one fires for
+this account/state (the header showed "No pipeline", which is one candidate) — then make the guard
+explain itself instead of silently discarding the keystroke.
+
+Recording the wrong inference deliberately: it was plausible, it was consistent with G-194, and it was
+false. Capturing the network was what distinguished them, and inferring a cause from a UI symptom is
+what this whole class of defect keeps punishing.
 
 **Why it matters if confirmed.** The read-only demo is the account buyers are handed. If it cannot send
 a chat message, the core promise ("a private AI, everywhere") cannot be tried at all, and the failure
