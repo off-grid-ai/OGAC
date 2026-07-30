@@ -128,8 +128,26 @@ evidence renderer had already been duplicated across two review surfaces within 
    objects the traffic never names.
 6. **The ❓ sweep.** Everything marked UNVERIFIED above. On this session's record roughly half of what looks
    broken is already working, so this is cheaper than it looks and reorders everything below it.
-7. **The `ragas` eval suite is 0/2 passing** (scores 37 and 39) while `golden` runs at 87%. Found by the
-   sweep, not by any row — a failing quality suite is worth more attention than several of the items above it.
+7. **🔴 EVAL RUNS RECORD A SCORE BUT NOT THE EVIDENCE — 64 of 84.** Chased the `ragas` 0/2 failure into
+   something much larger. Per-case `results` are empty on most runs:
+
+   | engine | runs | runs with NO per-case results |
+   |---|---|---|
+   | `golden` | 64 | 54 |
+   | `ragas` | 12 | 3 |
+   | `faithfulness:ragas` | 4 | 4 |
+   | `faithfulness:heuristic` | 3 | 3 |
+   | `geval` | 1 | 0 |
+
+   So the Quality surface shows pass rates nobody can drill into, and the newest ragas run
+   (`ragas_mrub4g7g`, score 39, 0/1 passed) records nothing about WHAT failed. This breaks two things the
+   document treats as non-negotiable: **"Full observability — no invisible behavior. Every important action
+   must leave an understandable record"**, and Flow 7's *"operator sees data, model, prompt, tool, policy and
+   evaluation stages"*. A score with no cases behind it is the same defect class as "3/3 expectations passed"
+   with no rule names — fixed for data quality earlier today, still open here.
+
+   `geval` at 1/1 populated shows the write path CAN carry results, so this is a per-engine omission rather
+   than a missing feature. Start there.
 
 **A warning about how to run the sweep, learned by getting it wrong.** My first pass probed five endpoints and
 four returned 404 — because I TYPED the route names from what the surfaces are called (`/evidence-packs`,
