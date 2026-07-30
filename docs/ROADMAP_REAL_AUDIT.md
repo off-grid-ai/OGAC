@@ -518,8 +518,21 @@ Newest first. Every entry is live-verified unless it says otherwise.
   evidence. `groundTruth` is left empty rather than invented, since a production run has no expected answer.
   **This is strictly better evidence than a golden set:** it is what the app actually did, on real cases, with
   the sources it actually used — §8H's "every production use case" read literally.
-  **Remaining:** wire `eval-runner`'s `buildSamples` to prefer this for app-bound defs, then re-run to confirm
-  the engine tag becomes `grounding` rather than `heuristic`. The ladder fix stays: it is correct and will engage the moment contexts
+  **WIRED but NOT PROVEN — 2026-07-30.** `eval-runner` now calls `samplesForApp()` when a def carries an
+  `appId`. Re-ran the faithfulness def for `app_c0f4398a` (an app with several verified runs from today) and the
+  engine tag STILL reads `faithfulness:heuristic score=0`, with **`total=1`** — one sample, which means it took
+  the GOLDEN path, not the app's runs. Run-sourced sampling would have produced up to five.
+  So one of these is true, and the next session should determine which before changing anything else:
+  (a) `samplesForApp` threw and the best-effort catch silently degraded to golden — the most likely, and the
+  cost of a broad `catch` on a diagnostic path;
+  (b) `listAppRunsView(appId, orgId, 25)` returned runs whose steps carry no `outcome` in the view projection,
+  so `samplesFromRuns` found no contexts and correctly returned none;
+  (c) the deployed bundle predates the wiring.
+  **Cheapest discriminator:** log or return the sample count and source from the run route — `total` alone
+  cannot distinguish "no app runs" from "app runs had no usable contexts" from "the import threw", and that
+  ambiguity is exactly what made this defect take four wrong diagnoses. The broad catch should also narrow to
+  the specific failure it is guarding, since as written it converts a bug into a silent fallback.
+  **Status is honest: the chain is built and unproven. `faithfulness:heuristic score=0` still means UNMEASURED.** The ladder fix stays: it is correct and will engage the moment contexts
   exist, and it removed a lexical scorer that could only ever return 0.
   **Reading instruction until then: `faithfulness:heuristic score=0` means UNMEASURED, not failing.**
 
