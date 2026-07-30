@@ -453,6 +453,21 @@ Newest first. Every entry is live-verified unless it says otherwise.
 
 ### 2026-07-30
 
+- **Library chips: leak fixed, 4 → 2 verified live; the residue is a different code path.** The app Quality page
+  called `listEvalDefs(null)` — the LEGACY `string|null` overload meaning `appId: null`, which filters
+  `app_id IS NULL` **only**. So every pipeline-bound eval without an app leaked into "Attach from the library"
+  and was offered for attaching when it was already attached. Fixed to `{ pipelineId: null }` →
+  `pipeline_id IS NULL AND app_id IS NULL`, which the *pipeline* Quality page was already using correctly.
+  **It also caught a regression I had just created:** clearing `app_id` on 21 defs during the per-pipeline dedupe
+  would have added 21 more phantom chips on the next render.
+  **The remaining 2 are NOT eval_definitions** — all three unbound defs have proper names
+  (`Answers cite a bank policy`, `No guaranteed-outcome language`, `PAN and account numbers stay masked`), so the
+  duplicate label comes from the TEMPLATE catalog rendered beside the library. Different code path; needs the
+  chip-assembly in the panel read. Recorded rather than guessed at.
+  **The pattern, four times today:** a legacy convenience overload that quietly means something narrower than the
+  caller intends. `listGoldenCases` has the identical shape (`arg === null → { appId: arg }`) and the identical
+  hazard. The explicit filter object is unambiguous and already existed — the convenience form IS the defect.
+
 - **🔴 THE GOLDEN SET WAS DECORATIVE ACROSS EVERY PIPELINE.** Purging placeholders ("… — sample query N" whose
   expected answer was just the pipeline's own name) deleted **33 cases**. What remains is only the 6 real cases
   written today: Reimbursement 2, Fraud 2, Loan 1, Cross-Sell 1 — and **Collections, KYC and Motor-Claim FNOL now
