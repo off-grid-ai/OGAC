@@ -334,9 +334,11 @@ export async function POST(req: Request) {
         );
         if (r.context) {
           messages.push({ role: 'system', content: r.context });
-          citations = citations.concat(
-            r.citations.map((c) => ({ name: c.name, position: c.position, score: c.score })),
-          );
+          // Pass the citations through INTACT. This used to re-map to {name, position, score},
+          // silently discarding collection/docId — so the footer had no document to link to and no
+          // human context to show. Eighth instance of the dropped-field-at-a-boundary defect; both
+          // sides typechecked because the narrower shape is assignable.
+          citations = citations.concat(r.citations);
         }
       } catch {
         /* org knowledge optional — chat still answers without it */

@@ -35,6 +35,7 @@ import {
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -331,9 +332,23 @@ function ThinkingBlock({
   );
 }
 
-// "Sources" footer — the numbered, de-duplicated citation list under a grounded answer. Each row is
-// [n] doc · parts · relevance, keyed to the inline [n] chips. Clicking an inline chip scrolls to and
-// briefly highlights the matching row (setActive). No citations → renders nothing (footer absent).
+// "Sources" footer — the numbered, de-duplicated citation list under a grounded answer, keyed to the
+// inline [n] chips. Clicking an inline chip scrolls to and briefly highlights the matching row
+// (setActive). No citations → renders nothing (footer absent).
+//
+// WHAT A ROW SAYS, AND WHY. This footer used to render `[1] source — part 1 · 0%`: three pieces of
+// retrieval plumbing dressed up as provenance. "source" was a fabricated stand-in for a name we did
+// not have, "part 1" was the internal CHUNK INDEX, and "0%" was a missing score coerced to zero.
+// None of the three helps the only reader who matters here — someone checking whether an answer is
+// supported. That reader needs: which document, where it lives, and can I open it.
+//
+//   - The document NAME is the row, and it LINKS to the collection that holds it when we know the
+//     id. A citation you cannot follow is not evidence.
+//   - The COLLECTION is shown because it is the reviewer's mental index ("HR Policies"), unlike a
+//     chunk number.
+//   - Matched passages are reported as a COUNT and only when more than one matched. The chunk index
+//     itself is never displayed; it means nothing outside the retriever.
+//   - Relevance is OMITTED when unknown rather than printed as 0%.
 function SourcesFooter({
   citations,
   activeIndex,
@@ -361,12 +376,28 @@ function SourcesFooter({
             )}
           >
             <span className="font-mono text-[10px] font-medium text-primary">[{s.index}]</span>
-            <span className="min-w-0 flex-1 truncate text-foreground" title={s.name}>
-              {s.name}
+            <span className="min-w-0 flex-1 truncate">
+              {s.collectionId ? (
+                <Link
+                  href={`/data/knowledge/${s.collectionId}`}
+                  className="text-foreground underline decoration-border decoration-dotted underline-offset-2 hover:decoration-primary"
+                  title={`Open ${s.name || 'this document'} in ${s.collection || 'the knowledge base'}`}
+                >
+                  {s.name || 'Unnamed document'}
+                </Link>
+              ) : (
+                <span className="text-foreground" title={s.name}>
+                  {s.name || <span className="italic text-muted-foreground">Unnamed document</span>}
+                </span>
+              )}
+              {s.collection ? (
+                <span className="ml-1.5 text-muted-foreground">in {s.collection}</span>
+              ) : null}
             </span>
             <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-              part{s.parts.length > 1 ? 's' : ''} {s.parts.join(', ')} ·{' '}
-              {(s.score * 100).toFixed(0)}%
+              {s.parts.length > 1 ? `${s.parts.length} passages` : ''}
+              {s.parts.length > 1 && s.score !== null ? ' · ' : ''}
+              {s.score !== null ? `${(s.score * 100).toFixed(0)}% match` : ''}
             </span>
           </li>
         ))}

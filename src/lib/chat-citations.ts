@@ -17,14 +17,29 @@ export interface Citation {
   name: string;
   position: number;
   score: number;
+  /** Human-readable collection holding the document, when the retriever knows it. */
+  collection?: string;
+  /** Identity of the cited document / its collection, so the footer can be a real link. */
+  docId?: string;
+  collectionId?: string;
 }
 
 // A numbered, de-duplicated source for the footer. `index` is the 1-based [n] the body cites.
 export interface Source {
   index: number;
+  /** The document name. EMPTY when the retriever did not supply one — see buildSources. */
   name: string;
-  score: number; // best (max) relevance across the source's matched parts, 0..1
-  parts: number[]; // 1-based part numbers of this doc that matched, ascending, de-duped
+  /**
+   * Best (max) relevance across the source's matched parts, 0..1, or `null` when no score was
+   * supplied. Never 0 as a stand-in: a cited source rendered "0% relevant" states as fact the
+   * opposite of what citing it means. Same rule as `ratio()` in product-metrics.ts.
+   */
+  score: number | null;
+  /** 0-based chunk indexes that matched. INTERNAL — not for display; see the footer's comment. */
+  parts: number[];
+  collection?: string;
+  docId?: string;
+  collectionId?: string;
 }
 
 // Collapse an ordered Citation[] into numbered Sources: one entry per distinct document name,
@@ -34,15 +49,34 @@ export function buildSources(citations: Citation[] | null | undefined): Source[]
   if (!citations?.length) return [];
   const byName = new Map<string, Source>();
   for (const c of citations) {
-    const name = (c.name ?? '').trim() || 'source';
+    // NO FABRICATED NAME. This used to fall back to the literal string 'source', which rendered as
+    // a document title — the reader could not tell "the document is called source" from "we do not
+    // know what this document is". An unknown name stays empty and the footer says so in words.
+    const name = (c.name ?? '').trim();
     const part = Number.isFinite(c.position) ? c.position + 1 : 1; // stored 0-based → 1-based
-    const score = Number.isFinite(c.score) ? c.score : 0;
-    const existing = byName.get(name);
+    // A MISSING score is null, not 0. `0` here printed a confident "0%" under every answer whose
+    // retriever did not score its hits.
+    const score = Number.isFinite(c.score) ? c.score : null;
+    // Dedupe on the document IDENTITY where we have one, falling back to the name. Keying on the
+    // name alone collapsed every unnamed document into a single row.
+    const key = c.docId?.trim() || name || `#${byName.size + 1}`;
+    const existing = byName.get(key);
     if (existing) {
-      if (score > existing.score) existing.score = score;
+      if (score !== null && (existing.score === null || score > existing.score)) existing.score = score;
       if (!existing.parts.includes(part)) existing.parts.push(part);
+      existing.collection ||= c.collection?.trim() || undefined;
+      existing.docId ||= c.docId?.trim() || undefined;
+      existing.collectionId ||= c.collectionId?.trim() || undefined;
     } else {
-      byName.set(name, { index: byName.size + 1, name, score, parts: [part] });
+      byName.set(key, {
+        index: byName.size + 1,
+        name,
+        score,
+        parts: [part],
+        collection: c.collection?.trim() || undefined,
+        docId: c.docId?.trim() || undefined,
+        collectionId: c.collectionId?.trim() || undefined,
+      });
     }
   }
   const sources = [...byName.values()];

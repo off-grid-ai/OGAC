@@ -316,8 +316,13 @@ export async function retrieve(
   const scored = rows
     .filter((r) => Array.isArray(r.embedding))
     .map((r) => ({
-      name: docNames.get(r.docId) ?? 'document',
-      collection: colNames.get(r.collectionId) ?? 'knowledge',
+      // docId/collectionId are carried, not just the display names. Without an id the footer had
+      // nothing to link to, which is why a cited source was not openable — a citation a reviewer
+      // cannot follow is not provenance.
+      docId: r.docId,
+      collectionId: r.collectionId,
+      name: docNames.get(r.docId) ?? '',
+      collection: colNames.get(r.collectionId) ?? '',
       content: r.content,
       position: r.position,
       score: cosine(qVec, r.embedding as number[]),
@@ -339,6 +344,8 @@ export async function retrieve(
     position: c.position,
     score: c.score,
     collection: c.collection,
+    docId: c.docId,
+    collectionId: c.collectionId,
   }));
   return { context, citations };
 }
