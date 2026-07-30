@@ -39,7 +39,7 @@ The wedge, and the strongest evidence we have.
 | Generates the app and tests | 🔶 | App generated (`app_5803e04b`); **test generation not verified** |
 | User tests with examples | ✅ | Case picker offered 11 real open claims |
 | User corrects failures | ❓ | Editing an app re-syncs the agent prompt (fixed earlier); the loop is unexercised |
-| Generates/updates evaluations | ❓ | Evals exist as a surface; auto-generation from an app is unverified |
+| Generates/updates evaluations | 🔶 | **Evals RUN with real results** (swept live 2026-07-30): `GET /api/v1/admin/evals` → 25 runs, 71 cases, 60 passed / 11 failed, 85% pass. Two suites: `golden` 87% over 69 cases, and **`ragas` 0/2 passing — scores 37 and 39, last run 2026-07-21**. So evaluation is real and one suite is failing badly; what remains unverified is AUTO-generation of evals from a compiled app |
 | Submitted for approval / published | 🔶 | Publish + template paths exist; not run end to end |
 
 ### Flow 5: Use an application
@@ -128,6 +128,16 @@ evidence renderer had already been duplicated across two review surfaces within 
    objects the traffic never names.
 6. **The ❓ sweep.** Everything marked UNVERIFIED above. On this session's record roughly half of what looks
    broken is already working, so this is cheaper than it looks and reorders everything below it.
+7. **The `ragas` eval suite is 0/2 passing** (scores 37 and 39) while `golden` runs at 87%. Found by the
+   sweep, not by any row — a failing quality suite is worth more attention than several of the items above it.
+
+**A warning about how to run the sweep, learned by getting it wrong.** My first pass probed five endpoints and
+four returned 404 — because I TYPED the route names from what the surfaces are called (`/evidence-packs`,
+`/feedback`, `/compliance/activity`, `/apps/[id]/versions`). None of those exist; the real ones are
+`/api/v1/admin/compliance/{activity,controls,export,frameworks}` and `/api/v1/admin/eval-defs`. Those 404s are
+evidence of nothing except my guessing, and recording them as gaps would have manufactured four fake defects —
+exactly the `/solutions/apps/[id]/safety` mistake already documented in `ROADMAP.md`. **Enumerate routes from
+`src/app/api` before probing them.**
 
 Everything marked ❓ is a candidate for a verification sweep before any of it is built. On this session's
 record, roughly half of what looks broken is already working.
