@@ -64,37 +64,38 @@ export function MemoryDialog({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col gap-0 p-0">
-        {/* SheetContent carries p-0, so nothing here inherits padding — the description ran under the close
-            button and the input row extended past the sheet edge, clipping "Add". Padding is applied locally
-            rather than by removing p-0, which would change every other sheet in the app. pr-10 keeps the
-            description clear of the X. */}
-        <SheetHeader className="px-4 pt-4 pr-10">
+        {/* SheetContent carries p-0, so nothing inside inherits padding. Padded locally rather than by
+            changing SheetContent, which every other sheet in the app also uses. */}
+        <SheetHeader className="gap-1 border-b border-border px-4 py-3 pr-10">
           <SheetTitle className="text-sm">Memory</SheetTitle>
-          <SheetDescription className="text-xs">
-            Facts the assistant remembers about you across conversations. Injected into every chat.
+          <SheetDescription className="text-xs leading-snug">
+            Facts the assistant remembers across your chats.
           </SheetDescription>
         </SheetHeader>
-        <SheetBody className="px-4 pb-6">
-          {/* min-w-0 is load-bearing: without it the Input keeps its intrinsic width, refuses to shrink, and
-              pushes the Add button outside the sheet — which is exactly how this rendered, with Add clipped at
-              the viewport edge. */}
-          <div className="flex gap-2">
+        <SheetBody className="space-y-3 px-4 py-3">
+          {/* Heights matched explicitly (h-9 both) — the input and button rendered at different heights, which
+              reads as broken before anyone reads the words. No autoFocus: it left a permanent focus ring that
+              looked like a validation error on a field the user had not touched. */}
+          <div className="flex items-center gap-2">
             <Input
-              className="min-w-0 flex-1"
+              className="h-9 min-w-0 flex-1 text-xs"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && add()}
               placeholder="Add a fact to remember…"
             />
-            <Button size="sm" onClick={add} className="shrink-0 gap-1.5">
+            <Button size="sm" onClick={add} disabled={!draft.trim()} className="h-9 shrink-0 gap-1.5">
               <Plus className="size-4" /> Add
             </Button>
           </div>
           <div className="space-y-1.5">
             {items.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">
-                Nothing remembered yet.
-              </p>
+              <div className="rounded-md border border-dashed border-border px-3 py-6 text-center">
+                <p className="text-xs text-muted-foreground">Nothing remembered yet.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground/70">
+                  Add a fact above and it is included in every chat.
+                </p>
+              </div>
             ) : null}
             {items.map((m) => (
               <div

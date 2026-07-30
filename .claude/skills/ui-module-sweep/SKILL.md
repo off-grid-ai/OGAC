@@ -84,6 +84,39 @@ E2E         — spec files added, and what property each pins
 
 State the denominator. "Swept 23 of 23 Workspace routes" is evidence; "swept Workspace" is not.
 
+## The verification standard (founder, 2026-07-30)
+
+> "You're supposed to verify as a principal UI/UX specialist that has spent 20 years building enterprise
+> products for BFSI and regulated ecosystems — whether this makes sense, is consistent, easy to understand,
+> and the best user experience."
+
+**This is a judgement, not a measurement.** The failure mode it corrects, which recurred four times in one
+session: verifying the cheapest observable that plausibly correlates with the goal, then reporting the GOAL as
+verified.
+
+| What was checked | What was claimed | What was actually true |
+|---|---|---|
+| `grep -c min-w-0` | "the sheet is fixed" | The class was present; the sheet still rendered wrong |
+| `count(DISTINCT app_id) = 11` | "all apps have evals" | Rows existed; the surface showed "0 attached" |
+| Add button's x ≤ viewport width | "fixed" | Inside the viewport, and still visually crude |
+| `OK: /signin 200` | "deployed" | One route answered; a committed fix was never built |
+
+Every one of those is the same defect this codebase keeps producing — a proxy standing in for evidence. A score
+with no cases behind it. A green gate that cannot name its rules. "Sent" for mail that never left.
+
+**So ask, of every screen, in this order:**
+1. **Does it make sense?** Would a department user know what this is for without being told?
+2. **Is it consistent?** Same spacing, control heights, empty-state treatment and vocabulary as its siblings.
+   Mismatched control heights read as broken before anyone reads a word.
+3. **Is it easy to understand?** Is the primary action obvious, and does every label mean what it says?
+4. **Is it the best experience available?** Not merely "not broken" — a functional screen that looks crude is
+   not done in a regulated enterprise product, where the UI is the trust signal.
+5. **Would a BFSI reviewer trust it?** Placeholder data, an unexplained refusal, or a number with no evidence
+   behind it destroys that trust faster than a missing feature.
+
+A measurement can support this judgement. It can never replace it. "The button is inside the viewport" is not
+"this is a good panel."
+
 ## Honesty bar
 
 Report the gate, never inflate. A screenshot you did not read is not a verified screen — and a DB count is not
