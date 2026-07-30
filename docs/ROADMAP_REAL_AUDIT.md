@@ -159,3 +159,35 @@ exactly the `/solutions/apps/[id]/safety` mistake already documented in `ROADMAP
 
 Everything marked ❓ is a candidate for a verification sweep before any of it is built. On this session's
 record, roughly half of what looks broken is already working.
+
+---
+
+## A recurring defect class in this codebase: the dropped field at a boundary
+
+Four instances in one session, each a layer that HAD the data and a boundary that discarded it:
+
+| Surface | The layer had | The boundary dropped it | Symptom |
+|---|---|---|---|
+| App runs | the picked case record | `POST …/apps/[id]/run` read only `body.input` | every case filter silently inert; reads returned other people's rows |
+| Data quality | the requested expectations | the verdict synthesized `passed_expectation_1/2/3` | a green gate could not name what it checked |
+| FinOps | the gateway's `caller` | `gatewayEvents()` hardcoded `keyId: null` | `byKey` 0 for every key against real spend; budgets unconsumable |
+| Evals | the per-sample metrics | `persistRun()` stored only the rollup | 64 of 84 runs: a score with no evidence |
+| Compile | the clarifying questions | the route destructured `{ spec, gaps }` | API returned none while the compiler produced three |
+
+**Every one passed typecheck and the full test suite.** They are invisible to both because each side is
+internally correct — the producer produces, the consumer consumes what it is given, and nothing asserts that
+what crossed between them is what was produced.
+
+**Not mechanically detectable.** A scan for "INSERTs a score without a detail column" finds nothing useful
+here: two of the five were not persistence at all but a reader and a route, and the scan's hits
+(`user-invites`, `erasure-tombstone-store`) are benign — an invite's `status` needs no evidence. Grep cannot
+see a field that is absent.
+
+**What did catch all five:** exercising the real path end to end and comparing what the surface shows against
+what the layer beneath produced. Concretely — run it live, then read the stored row or the API response and
+ask "is everything the producer computed actually here?". That is the only check that has worked, and it
+worked five times.
+
+**Cheapest durable guard:** a test at each boundary asserting the crossing, not the sides — e.g. `bySubject`
+must sum to `totals` (added for FinOps, and it is what proved that fix), and a compiled spec's `questions`
+must survive the route. One assertion per boundary, on the thing that actually broke.
