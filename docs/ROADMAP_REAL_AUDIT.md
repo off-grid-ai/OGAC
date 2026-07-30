@@ -8,6 +8,23 @@ partner ecosystems.
 This file is the bridge: every CHECKABLE requirement in that document, mapped to a gate, so work is chosen
 against evidence rather than against a reading of the spec.
 
+> **THIS FILE IS THE PROGRESS LOG.** Founder instruction 2026-07-30: keep it updated so what has changed and
+> what has not is always visible. `docs/roadmap-real.md` stays the untouched SPECIFICATION; every gate, every
+> promotion and every dated finding lands here. The Progress log is at the bottom.
+
+## OUT OF SCOPE (founder, 2026-07-30) — "we'll tackle later"
+
+Explicitly descoped until the founder says otherwise. **Do not work these, and do not count them as gaps:**
+
+- **§8A Organizational intelligence / the "organizational brain"** — the permissioned intelligence graph.
+  Its ENTITIES exist and are individually gated below; the graph itself is deferred.
+- **OGAM / OGAD node sync** — §5 Layer 2 (intelligence at the node) and **Flow 9** (node intelligence
+  contribution) in their entirety. These live in the `mobile` / `desktop` repos anyway.
+- **B1.4** in `HERO_CLAIMS.md` ("nothing private ever leaves the device") depends on the same capture
+  boundary, so it is parked with them rather than counted against the console.
+
+Everything else in the specification remains in scope.
+
 **Gates** (same discipline as `HERO_CLAIMS.md`, which this complements):
 
 | Gate | Means |
@@ -88,7 +105,7 @@ The wedge, and the strongest evidence we have.
 | 1 — Enterprise setup | ❓ | Two tenants exist and work, but nobody has timed a cold setup. The doc's bar is "hours, not months" — that is a measurable claim and it is unmeasured |
 | 2 — Connect a data source | 🔶 | Connectors, classification, lineage all exist; the ten-step flow has not been walked as a flow. Sub-step **"test retrieval"** is ✅ (six demo connectors probed live) |
 | 4 — Build from a template | 🔶 | Templates + publish exist; adoption never watched (B3.6) |
-| 9 — Node intelligence contribution | ⬜ | `mobile` / `desktop` repos, not the console |
+| 9 — Node intelligence contribution | ⏸ | **OUT OF SCOPE** (founder, 2026-07-30). Also `mobile` / `desktop`, not the console |
 
 ---
 
@@ -381,7 +398,7 @@ technical call, and it is untested. Cheap to establish, expensive to be wrong ab
 
 | Area | Gate | Evidence / what is missing |
 |---|---|---|
-| **A. Organizational intelligence** — a permissioned graph over people, systems, data, decisions, apps, agents, models, policies, outcomes | 🔶 | The ENTITIES all exist and are enumerable, and the §8 questions are largely answerable per item: where knowledge came from (lineage ✅), who can access it (retrieval ACL ✅), which decisions used it (run refs ✅), whether a human verified it (approval records ✅), how confident (confidence signal ✅ as of today). What does NOT exist is the GRAPH — nothing traverses "which workflows depend on this knowledge" or "is it still valid". The document's own warning ("this cannot become an unstructured memory dump") is respected by accident rather than by design |
+| **A. Organizational intelligence** — a permissioned graph | ⏸ OUT OF SCOPE | The ENTITIES all exist and are enumerable, and the §8 questions are largely answerable per item: where knowledge came from (lineage ✅), who can access it (retrieval ACL ✅), which decisions used it (run refs ✅), whether a human verified it (approval records ✅), how confident (confidence signal ✅ as of today). What does NOT exist is the GRAPH — nothing traverses "which workflows depend on this knowledge" or "is it still valid". The document's own warning ("this cannot become an unstructured memory dump") is respected by accident rather than by design |
 | **B. Data plane** | 🔶 | Schema discovery ✅, classification ✅, permissions mapping ✅, lineage ✅, retrieval ✅, structured querying ✅ (six connectors probed live). Incremental sync 🔶, retention controls 🔶, unstructured querying ❓. Connector BREADTH is the gap against the list: databases/warehouses/S3/Kafka/REST yes; SharePoint, Drive, CRM, ERP, ticketing, email, messaging — not present |
 | **C. Governed model gateway** | ✅ | Local, cloud, fallback, cost/latency/data-class routing, rate limits, kill switches, logging, redaction, caching all present; five models attributed live. **The document's acid test — "restricted data may only use models inside the customer's infrastructure … technically enforced, not a warning" — is met**: the egress leash blocks before the model call, verified live |
 | **D. Pipelines** | ✅ | A pipeline binds data, retrieval, models, prompts, tools, policies, guardrails, approvals, cost limits, monitoring; **versioned** (append-only snapshots, verified live) **and inherited** — a compiled app inherited the allowlist, masking, guardrails and leash without its author asking. This is the best-evidenced area in §8 |
@@ -427,3 +444,42 @@ The document opens this section by rejecting the obvious measures: *"OGAC should
 **Read, and this is the most important finding of the §8/§9/§13 pass:** almost every metric in §13 is **derivable from data already recorded** and almost none is **computed**. That is the same defect class as the five boundary bugs — the information exists and is discarded at the last step — but at the level of the product's own scoreboard. It also means this is far cheaper than it looks: the Reuse group and the three Governance percentages are queries over existing joins.
 
 **And it is self-referential in a way worth stating:** the document says the product wins by making an enterprise measurably faster. Right now the product cannot measure that about itself.
+
+---
+
+## Progress log
+
+Newest first. Every entry is live-verified unless it says otherwise.
+
+### 2026-07-30
+
+- **§13 metrics computation built** — `src/lib/product-metrics.ts`, 15 tests. The §13 audit's finding was
+  that almost every success metric is derivable from recorded data and almost none is computed; this is the
+  missing computation for the three groups that need no new instrumentation: **reliability** (successful /
+  failed / success-rate / blocked violations / median run seconds), **reuse** (pipelines actually used,
+  template adoption, apps per pipeline), **governance** (apps with evaluations, governed-activity share,
+  human-approval share). Pure, no I/O — a thin reader is the remaining wiring.
+  Three judgement calls recorded in the module: an empty denominator reports `null`, never `0%` ("0% of apps
+  have evaluations" when no apps exist is the same lie as a failed read saying "no rows"); success rate
+  counts only runs that reached a TERMINAL state, so a run correctly paused for an approver is not scored as
+  a failure; and *hours saved / cost per process / error reduction are deliberately NOT computed* because
+  they need a baseline nobody captures — inventing them would be the same defect as inventing a currency symbol.
+- **§8, §9, §13 audited** — the checkable surface is now fully gated. Weakest area found: **§8G human review**
+  (three of seven required disclosures and four of seven approver actions missing).
+- **§12 audited and gated** (~150 items) — only **3 genuine gaps**: release gates, risk classification,
+  environment promotion. Five apparent gaps were naming differences, caught before being filed.
+- **Flow 7 step 3: prompt on the trace** — read from the child agent run so it is the text actually sent.
+  Also fixed my own optimisation error: filled only the single-run read while the screen polls the list.
+- **Crossing assertions on all five boundaries** — the durable guard for the session's defect class.
+- **Eval evidence retention** — 64 of 84 runs stored a score with no per-case results; now retained.
+- **Flow 6: risk + confidence, and readable evidence** — levels with reasons, never a percentage.
+- **Flow 3 step 2: clarifying questions** — derived from the spec, not model-generated.
+- **M1 value-stable pseudonyms · B3.1 end to end · B4.7 tamper-evidence · B2.4 entailment grounding ·
+  B2.3 quality engine** — all promoted with live evidence (see `HERO_CLAIMS.md`).
+
+### The pattern to carry forward
+
+Five ledger rows this session described defects that were already fixed. Eleven real defects were a **field
+dropped at a boundary** — every one passing typecheck and 5,500 tests, because each side was correct in
+isolation. Two were my own, made while "fixing" something else. The check that caught all of them: exercise
+the real path, then ask whether everything the producer computed is actually present.
