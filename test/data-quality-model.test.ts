@@ -96,3 +96,49 @@ describe('B2.3 — rejectedVerdict (a refusal is not an outage)', () => {
     assert.match(s, /rejected the request/);
   });
 });
+
+// ── The CROSSING assertion for the data-quality boundary ─────────────────────────────────────────────
+//
+// This boundary dropped the expectation IDENTITIES: the verdict reported "3/3 passed" with the rules named
+// passed_expectation_1/2/3, so a green gate could not say what it had checked. The guard is on the crossing —
+// every rule the caller REQUESTED must be accounted for in the verdict it gets back.
+describe('data-quality boundary — every requested rule must be accounted for', () => {
+  const REQ: Expectation[] = [
+    { type: 'expect_column_values_to_not_be_null', column: 'claim_no' },
+    { type: 'expect_column_values_to_be_between', column: 'amount', min: 0, max: 1000 },
+    { type: 'expect_column_values_to_be_in_set', column: 'status', value_set: ['submitted'] },
+  ];
+
+  test('all-pass: every requested rule appears by name in the verdict', () => {
+    const v = parseCheckpointResult({ success: true, evaluated: 3, failed: [] }, REQ);
+    assert.equal(v.results.length, REQ.length, 'one result per requested rule');
+    for (const e of REQ) {
+      assert.ok(
+        v.results.some((r) => r.column === e.column && r.type === e.type),
+        `${e.type} [${e.column}] must be accounted for, not summarised away`,
+      );
+    }
+  });
+
+  test('mixed: passes plus failures still account for every requested rule exactly once', () => {
+    const v = parseCheckpointResult(
+      {
+        success: false,
+        evaluated: 3,
+        failed: [{ type: 'expect_column_values_to_be_between', column: 'amount', unexpected_count: 1 }],
+      },
+      REQ,
+    );
+    assert.equal(v.results.length, 3);
+    assert.equal(v.passed + v.failed, REQ.length, 'passed + failed must equal what was asked');
+    const seen = v.results.map((r) => `${r.type}|${r.column}`);
+    assert.equal(new Set(seen).size, seen.length, 'no rule counted twice');
+  });
+
+  test('a refusal accounts for every rule as NOT EVALUATED — never silently fewer', () => {
+    const v = rejectedVerdict(REQ, 'HTTP 400');
+    assert.equal(v.results.length, REQ.length);
+    assert.equal(v.total, REQ.length);
+    assert.ok(v.results.every((r) => r.unexpectedCount === -1));
+  });
+});

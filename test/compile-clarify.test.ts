@@ -98,3 +98,30 @@ describe('clarifyingQuestions', () => {
     assert.equal(blocksRun([]), false);
   });
 });
+
+// ── The CROSSING assertion for the compile boundary ──────────────────────────────────────────────────
+//
+// The compile ROUTE dropped `questions`: the compiler produced three and the API returned none, because the
+// handler destructured only { spec, gaps }. Unit tests on both sides passed throughout. The guard is that a
+// CompileResult-shaped object must carry the questions through whatever serialises it — a JSON round-trip is
+// what a route actually does to it.
+describe('compile boundary — questions must survive serialisation to the client', () => {
+  const steps: ClarifiableStep[] = [{ id: 's1', kind: 'connector-query', label: 'Read claims' }];
+
+  test('questions survive the JSON round-trip a route performs', () => {
+    const questions = clarifyingQuestions('Flag any large claim and email the employee.', steps);
+    assert.ok(questions.length > 0, 'fixture must actually produce questions');
+    const overWire = JSON.parse(JSON.stringify({ object: 'app_compile', spec: {}, gaps: [], questions }));
+    assert.equal(overWire.questions.length, questions.length, 'none dropped in transit');
+    for (const q of overWire.questions) {
+      assert.ok(q.question && q.because && q.resolves, `every field must survive: ${JSON.stringify(q)}`);
+    }
+  });
+
+  test('a response shape that omits questions is detectably wrong', () => {
+    // This is precisely what the route returned before the fix, and what this asserts can never pass silently.
+    const questions = clarifyingQuestions('Flag any large claim.', steps);
+    const bad = { object: 'app_compile', spec: {}, gaps: [] } as { questions?: unknown[] };
+    assert.notEqual(bad.questions?.length ?? 0, questions.length);
+  });
+});

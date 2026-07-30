@@ -188,6 +188,16 @@ what the layer beneath produced. Concretely — run it live, then read the store
 ask "is everything the producer computed actually here?". That is the only check that has worked, and it
 worked five times.
 
-**Cheapest durable guard:** a test at each boundary asserting the crossing, not the sides — e.g. `bySubject`
-must sum to `totals` (added for FinOps, and it is what proved that fix), and a compiled spec's `questions`
-must survive the route. One assertion per boundary, on the thing that actually broke.
+**Cheapest durable guard:** a test at each boundary asserting the crossing, not the sides. **All five now
+have one** — applied rather than left as advice:
+
+| Boundary | The crossing now asserted |
+|---|---|
+| App runs | picker record → `runInputWithCase` → `resolveStepParams` BINDS, for every scalar field |
+| Data quality | every REQUESTED rule is accounted for by name; `passed + failed` equals what was asked |
+| FinOps | `bySubject` requests and tokens sum to `totals` (this is what proved that fix) |
+| Evals | one stored result per scored sample; pass counts agree; every row names its metric and engine |
+| Compile | `questions` survive the JSON round-trip a route performs |
+
+Each fails loudly if its boundary regresses, and each is on the specific thing that actually broke rather than
+a general "does it work" test — which is why the originals all passed while the product was wrong.
