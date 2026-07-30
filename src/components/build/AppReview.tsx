@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { type AppRunView, type AppRunStepRow, priorContextForReview } from '@/lib/app-runs-view';
+import { StepEvidence } from '@/components/build/StepEvidence';
+import { stepKindChip } from '@/lib/app-run-progress';
 
 // ─── AppReview (Builder Epic Phase 4A, HITL) — the REVIEW screen (screen 4 of 5) ──────────────────
 //
@@ -90,13 +92,13 @@ export function AppReview({
               <div key={s.id} className="rounded-md border border-border/60 px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-foreground">{s.label}</span>
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{s.kind}</span>
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    {stepKindChip(s.kind)}
+                  </span>
                 </div>
-                {s.outcome ? (
-                  <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] text-foreground">
-                    {s.outcome}
-                  </pre>
-                ) : null}
+                {/* Same evidence renderer as the step list — a reviewer must not see a readable table on
+                    one surface and raw JSON on the other. */}
+                {s.outcome ? <StepEvidence outcome={s.outcome} maxHeight="max-h-32" /> : null}
                 {s.refs && s.refs.length > 0 ? (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {s.refs.map((r, i) => (
