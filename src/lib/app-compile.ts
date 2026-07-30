@@ -42,6 +42,7 @@ import {
 } from '@/lib/agent-data-dependency';
 import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
 import { getOrgContext } from '@/lib/org-context';
+import { withSourceFidelityRule } from '@/lib/agent-prompt-rules';
 
 // ─── Result contract ───────────────────────────────────────────────────────────────────────────
 export interface CompileResult {
@@ -248,10 +249,11 @@ const SIMPLE_STEP_BUILDERS: Record<
     label: ps.label?.trim() || 'Decision',
     kind: 'agent',
     inlineAgent: {
-      systemPrompt:
+      systemPrompt: withSourceFidelityRule(
         ps.instruction?.trim() ||
-        ps.label?.trim() ||
-        `Reason over the prior step results for: ${description}`,
+          ps.label?.trim() ||
+          `Reason over the prior step results for: ${description}`,
+      ),
       grounded: true,
     },
   }),
@@ -330,7 +332,7 @@ const CLAUSE_STEP_BUILDERS: Record<string, (clause: string, id: string) => AppSt
     id,
     label: shortLabel(clause) || 'Decision',
     kind: 'agent',
-    inlineAgent: { systemPrompt: clause.trim(), grounded: true },
+    inlineAgent: { systemPrompt: withSourceFidelityRule(clause), grounded: true },
   }),
   output: (clause, id) => ({
     id,
@@ -358,7 +360,7 @@ function completeHeuristicSteps(steps: AppStep[], description: string): void {
       label: 'Decision',
       kind: 'agent',
       inlineAgent: {
-        systemPrompt: description.trim() || 'Reason over the collected inputs.',
+        systemPrompt: withSourceFidelityRule(description || 'Reason over the collected inputs.'),
         grounded: true,
       },
     });
@@ -386,7 +388,7 @@ function synthesizedAgent(id: string, description: string, fallback: string): Ap
     id,
     label: 'Decision',
     kind: 'agent',
-    inlineAgent: { systemPrompt: description.trim() || fallback, grounded: true },
+    inlineAgent: { systemPrompt: withSourceFidelityRule(description || fallback), grounded: true },
   };
 }
 
@@ -692,7 +694,7 @@ function branchStep(clause: string, id: string): AppStep {
     id,
     label: shortLabel(clause) || 'Action',
     kind: 'agent',
-    inlineAgent: { systemPrompt: clause.trim(), grounded: true },
+    inlineAgent: { systemPrompt: withSourceFidelityRule(clause), grounded: true },
   };
 }
 
