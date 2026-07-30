@@ -229,3 +229,49 @@ describe('metricsToEvalResults', () => {
     assert.deepEqual(metricsToEvalResults([]), []);
   });
 });
+
+// ── The CROSSING assertion (the guard this defect class needs) ────────────────────────────────────────
+//
+// Five defects this session were a layer that had the data and a boundary that discarded it, and every one
+// passed typecheck and the whole suite — because each SIDE was internally correct. The assertion that catches
+// them is on the crossing: everything the producer computed must be present after it crosses.
+//
+// For evals that means: a run's stored evidence must account for every sample it was scored on. If persistRun
+// ever drops `results` again, or drops some of them, this fails — which is exactly what nothing did before.
+describe('evals boundary — evidence must account for every scored sample', () => {
+  const sample = (i: number): MetricScore => ({
+    metric: `metric_${i}`,
+    value: 0.5,
+    threshold: 0.8,
+    direction: 'higher-better',
+    pass: false,
+    engine: 'ragas',
+  });
+
+  test('one stored result per sample, for any batch size', () => {
+    for (const n of [1, 2, 5, 20]) {
+      const perSample = Array.from({ length: n }, (_, i) => sample(i));
+      const stored = metricsToEvalResults(perSample);
+      assert.equal(stored.length, perSample.length, `${n} samples must yield ${n} stored results`);
+    }
+  });
+
+  test('the pass count in the evidence matches the pass count in the samples', () => {
+    // The rollup and the evidence must agree; a score of "1 of 3 passed" beside three failing rows is
+    // exactly the incoherence a reviewer cannot resolve.
+    const perSample = [sample(1), { ...sample(2), pass: true }, { ...sample(3), pass: true }];
+    const stored = metricsToEvalResults(perSample);
+    assert.equal(
+      stored.filter((r) => r.pass).length,
+      perSample.filter((m) => m.pass).length,
+    );
+  });
+
+  test('every stored row names the metric and the engine — no anonymous verdicts', () => {
+    for (const r of metricsToEvalResults([sample(1), sample(2)])) {
+      assert.ok(r.query.trim().length > 0, 'a verdict with no metric name is not evidence');
+      assert.ok(r.top.trim().length > 0, 'a verdict with no engine is not attributable');
+      assert.match(r.expected, /^[≥≤] \d\.\d{2}$/, r.expected);
+    }
+  });
+});

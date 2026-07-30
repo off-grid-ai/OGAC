@@ -212,3 +212,28 @@ describe('unresolvedFilterMessage', () => {
     assert.ok(!m.includes('←'), 'the internal binding arrow is not for a reader');
   });
 });
+
+// ── The CROSSING assertion for the run-input boundary ────────────────────────────────────────────────
+//
+// The run route dropping the picked case record made every case filter silently inert, and typecheck plus the
+// whole suite passed — because both sides were correct in isolation. The guard has to be on the crossing:
+// whatever the picker produced must still be bindable after it has been through the route's input builder.
+describe('run-input boundary — a picked record must survive into a bindable filter', () => {
+  const PICKED = { id: 1, claim_no: 'EXP-2025-00001', employee_id: 2, employee_name: 'Meera Malhotra' };
+
+  test('picker record → route input → resolved filter, end to end', () => {
+    // Exactly the chain that was broken: toCaseCandidate's `record` → runInputWithCase → resolveStepParams.
+    const runInput = runInputWithCase({ input: { input: 'Meera Malhotra · submitted' }, case: PICKED });
+    const resolved = resolveStepParams({ employee_id: '{{case.employee_id}}' }, runInput);
+    assert.deepEqual(resolved.filters, { employee_id: 2 });
+    assert.deepEqual(resolved.unresolved, [], 'the filter must bind, not fall back to an unfiltered read');
+  });
+
+  test('every scalar field of the picked record stays reachable', () => {
+    const runInput = runInputWithCase({ input: {}, case: PICKED });
+    for (const [k, v] of Object.entries(PICKED)) {
+      const r = resolveStepParams({ [k]: `{{case.${k}}}` }, runInput);
+      assert.deepEqual(r.filters, { [k]: v }, `${k} must survive the boundary`);
+    }
+  });
+});
