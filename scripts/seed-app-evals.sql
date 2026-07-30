@@ -40,8 +40,11 @@ CROSS JOIN (VALUES
   ('pii_leakage',      'guardrails',  'lower-better',  0.01, 'No personal data in the output',
    'Near-zero tolerance: one leaked PAN, Aadhaar or account number is a breach, not a quality dip. Lower is better.')
 ) AS m(metric, engine, direction, threshold, label, description)
+-- EVERY app, templates INCLUDED. The first version filtered `is_template = false` and so silently skipped
+-- 3 of the 14 apps — including bhapp_reimb, which is a template WITH a pipeline and showed "No evals yet" on
+-- its Quality tab while I was reporting "all 11 apps covered". A template is a real app an operator opens; the
+-- filter was reasoning about the table, not about what the user sees.
 WHERE a.org_id = 'org_bharat'
-  AND a.is_template = false
   AND NOT EXISTS (
     SELECT 1 FROM eval_definitions e WHERE e.app_id = a.id AND e.metric = m.metric
   );
