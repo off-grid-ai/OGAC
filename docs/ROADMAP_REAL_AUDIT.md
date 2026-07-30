@@ -490,7 +490,16 @@ Newest first. Every entry is live-verified unless it says otherwise.
   heuristic (`faithfulness:heuristic`) instead of using the entailment engine the grounding path uses. Two
   engines for one concept: one works, one always returns 0. A faithfulness gate that always fails is as useless
   as one that always passes, and worse — it trains people to ignore it.
-  **Fix:** point the faithfulness eval metric at the same adapter `/api/v1/admin/grounding/verify` uses.
+  **Located precisely — `src/lib/eval-runner.ts` ~207-218.** When the ragas sidecar returns no aggregate for
+  the metric, the code degrades to `heuristicSampleScore(def.metric, sample)`, and for faithfulness that
+  lexical heuristic returns 0. The degradation is *honestly tagged* (`computedBy: 'heuristic'`) — the defect is
+  not dishonesty, it is that **the fallback ladder is missing its middle rung**: ragas → heuristic, with no step
+  for the entailment adapter that already works. Grounding IS faithfulness; `/api/v1/admin/grounding/verify`
+  scores a paraphrase correctly and refuses a contradiction, verified live 2026-07-30.
+  **Fix:** insert the grounding port between ragas and the heuristic for `faithfulness` / `groundedness`, so the
+  ladder reads ragas → entailment → heuristic. Keep the honest engine tag on whichever rung produced the score.
+  Until then, treat every `faithfulness:heuristic` result as *unmeasured*, NOT as failing — the 0/2 above says
+  nothing about answer quality.
   **Next on this thread:** **bind the 7 apps
   that have NO pipeline** — the more serious item, since pipeline-scoped governance currently does not reach
   most apps, which is what the 59% governed-activity share was telling us — then release gates so a failing
