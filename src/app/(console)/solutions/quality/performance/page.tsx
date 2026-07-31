@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { publicLabel } from '@/lib/lineage-labels';
 import { ScoreTrendChart } from '@/components/analytics/AnalyticsCharts';
 import { RunSweepButton } from '@/components/observability/RunSweepButton';
 import { Badge } from '@/components/ui/badge';
@@ -173,7 +174,13 @@ export default async function QualityPerformancePage() {
                           </Link>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{run.engine}</Badge>
+                          {/* The raw engine string names the OSS evaluator — "answer_relevancy:ragas" told a customer
+                              exactly which library scored their answer. publicLabel maps internal and
+                              engine names to plain language; the raw value stays in the tooltip for an
+                              operator who needs it. */}
+                          <Badge variant="outline" title={run.engine}>
+                            {publicLabel(run.engine)}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">{run.score}%</TableCell>
                         <TableCell className="text-right text-xs">

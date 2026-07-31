@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { leaksInternalName, lineageLabel } from '../src/lib/lineage-labels.ts';
+import { leaksInternalName, lineageLabel, publicLabel } from '../src/lib/lineage-labels.ts';
 
 test('the two names seen live on the lineage graph are removed', () => {
   assert.equal(lineageLabel('Knowledge base (Brain)'), 'Knowledge base (knowledge)');
@@ -27,4 +27,16 @@ test('word boundaries are respected — a real word containing a match is not ma
 
 test('empty and null inputs yield an empty string rather than throwing', () => {
   for (const v of [null, undefined, '', '   ']) assert.equal(lineageLabel(v), '');
+});
+
+// ── The Quality page's Engine column ────────────────────────────────────────────────────────────────
+//
+// LIVE FINDING. /solutions/quality/performance rendered "answer_relevancy:ragas" in an Engine badge —
+// naming the OSS evaluator that scored a customer's answer, on a customer-facing surface.
+test('publicLabel strips the evaluator names shown in the Quality engine column', () => {
+  assert.equal(leaksInternalName(publicLabel('answer_relevancy:ragas')), false);
+  assert.match(publicLabel('answer_relevancy:ragas'), /quality checks/);
+  // These two are already plain and must survive untouched — they describe the METHOD, not a vendor.
+  assert.equal(publicLabel('faithfulness:grounding'), 'faithfulness:grounding');
+  assert.equal(publicLabel('pii_leakage:heuristic'), 'pii_leakage:heuristic');
 });

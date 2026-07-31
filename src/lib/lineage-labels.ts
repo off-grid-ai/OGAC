@@ -41,6 +41,15 @@ export function lineageLabel(raw: string | null | undefined): string {
     .replace(/\s{2,}/g, ' ');
 }
 
+/**
+ * The same rule under a name that says what it is for.
+ *
+ * This started as a lineage fix, but the leak is not lineage-specific: the Quality page's Engine column
+ * showed "answer_relevancy:ragas", naming the OSS evaluator to a customer. Any surface that displays a
+ * name written by an internal component should pass it through here.
+ */
+export const publicLabel = lineageLabel;
+
 /** True when a label still names something internal — used by tests to guard the list. */
 export function leaksInternalName(raw: string | null | undefined): boolean {
   const s = (raw ?? '').toLowerCase();
