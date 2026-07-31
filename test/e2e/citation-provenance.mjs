@@ -10,28 +10,21 @@
 import { signIn, type, verdict, waitFor, OUT } from './lib.mjs';
 
 const ROW = 'citation-provenance';
-const { browser, page } = await signIn(
-  // DEEP-LINK, no navigation guessing. This is the exact conversation from the founder's screenshot
-  // (the ₹41,346.44 Training-quota answer) and its stored citation was repaired by
-  // scripts/fix-seeded-citations.sql. Clicking through a sidebar added a failure mode that had nothing
-  // to do with the claim under test.
-  process.env.CONV_ROUTE || '/work/chat/conv_634a202ae6c5',
-);
+// NAVIGATE BY CLICKING, never by deep link. `/work/chat/<id>` silently loads a DIFFERENT conversation
+// (logged separately as a real defect), so a deep-linked run asserts against the wrong page — it produced
+// two false "no citation row" verdicts before I noticed the URL bar disagreed with my intent.
+const { browser, page } = await signIn('/work/chat');
+await page.waitForTimeout(3500);
 
-// TWO WAYS a citation row can exist, and both must be checked because they fail differently:
-//   (a) an EXISTING answer whose stored citations render — this is what the seed fix repaired;
-//   (b) a NEW answer produced by live retrieval.
-// Opening a stored conversation is tried first: it needs no model call, so it isolates rendering +
-// stored data from retrieval. My first version only did (b), which meant a 90s model timeout and a
-// broken renderer produced the identical verdict.
-const stored = page
-  .getByRole('link', { name: /claim|policy|KYC|reimbursement|collection|Meera/i })
-  .or(page.getByRole('button', { name: /claim|policy|KYC|reimbursement|collection|Meera/i }))
-  .first();
-if ((await stored.count()) > 0) {
-  await stored.click({ timeout: 10000 }).catch(() => {}); // a missing entry point is not a throw
-  await page.waitForTimeout(4000);
+const target = process.env.CHAT_TITLE || 'KYC re-verification questions';
+const entry = page.getByText(new RegExp(target, 'i')).first();
+if (!(await entry.count())) {
+  verdict(ROW, false, `no chat titled "${target}" visible to this identity — chats are per-user scoped`);
+  await browser.close();
+  process.exit(1);
 }
+await entry.click();
+await page.waitForTimeout(7000);
 
 const composer = page.locator('textarea[aria-label="Message Off Grid AI"]');
 if (!(await composer.count())) {

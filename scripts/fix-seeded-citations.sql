@@ -47,3 +47,31 @@ WHERE m.id = c.msg_id;
 UPDATE chat_messages
 SET citations = NULL
 WHERE citations::text LIKE '%governed source%';
+
+-- ─── Backfill identity onto citations that have a NAME but no docId ────────────────────────────────
+--
+-- Some seeded citations already named a real document ("KYC & Periodic Re-KYC Policy (RBI Master
+-- Direction)") but carried no docId/collectionId, so the footer rendered the name as inert text — correct
+-- behaviour for a citation with no destination, but the destination exists and was simply never recorded.
+-- Matched on the document NAME, which is exact here; anything that does not match is left alone rather
+-- than pointed at an approximation.
+UPDATE chat_messages m
+SET citations = c.payload
+FROM (
+  SELECT m2.id AS msg_id,
+    jsonb_agg(
+      CASE WHEN d.id IS NOT NULL
+        THEN elem || jsonb_build_object('docId', d.id, 'collectionId', d.collection_id)
+        ELSE elem
+      END
+      ORDER BY ord
+    ) AS payload
+  FROM chat_messages m2
+  CROSS JOIN LATERAL jsonb_array_elements(m2.citations) WITH ORDINALITY AS t(elem, ord)
+  LEFT JOIN org_knowledge_docs d ON d.name = (elem ->> 'name')
+  WHERE m2.citations IS NOT NULL
+    AND jsonb_typeof(m2.citations) = 'array'
+    AND m2.citations::text NOT LIKE '%docId%'
+  GROUP BY m2.id
+) c
+WHERE m.id = c.msg_id;

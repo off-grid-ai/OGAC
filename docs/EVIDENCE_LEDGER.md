@@ -92,7 +92,35 @@ router before building, but four admin-authenticated routes is real evidence.
 because nothing is pending — not because the surface is broken. Seed a run that pauses for approval and
 this row becomes judgeable. Until then it is honestly unproven.
 
-**Row 1 — RESOLVED. The defect was chat THREADING, not citations, and fixing it made both work.**
+**Row 1 — VERIFIED by the script.**
+
+```
+VERIFIED  citation-provenance
+  row="[1] KYC & Periodic Re-KYC Policy (RBI Master Direction) 95% match"
+  href=/data/knowledge/kc_d556ff941ccc | named=true followable=true honestScore=true
+```
+
+Against `[1] source · part 1 · 0%` at the start of the session. 27 messages carry linkable citations.
+
+It took THREE independent fixes, and the order they were found in is the lesson:
+1. **Chat threading** (`fix-chat-threading.sql`) — the answer was not rendering at all, so nothing
+   downstream could be observed. Found LAST, mattered MOST.
+2. **Fabricated seed payloads** (`fix-seeded-citations.sql`) — `{ref, source}` placeholders replaced with
+   real documents, then identity backfilled onto citations that had a name but no `docId`.
+3. **The renderer** — no invented name, no false `0%`, no internal chunk index, identity carried through
+   both retrievers, `sourceHref()` owning the route mapping.
+
+The script itself also had to be fixed to navigate BY CLICKING: `/work/chat/<id>` silently loads a
+different conversation, which produced two false "no citation row" verdicts before I noticed the URL bar
+disagreed with my intent. That deep-link defect is logged separately and is still open.
+
+**Still NOT assumed fixed:** whether the WRITE path produces the broken threading shape. Both fixes above
+repaired DATA. Send two turns in a new chat, reload, and confirm both render — if they do not, the defect
+is in the write path and repairing rows again would only hide it.
+
+---
+
+**How it was found — kept for the record.**
 
 Screenshot `scratchpad/threading-fixed.png`. The transcript renders end to end and the footer reads:
 
