@@ -2017,3 +2017,17 @@ the fix is the model or the hardware, not the page.
 **Worth keeping in mind generally:** load-testing a demo tenant leaves visible marks in its own telemetry.
 Verification traffic should ideally run against a separate org so the demo tenant's numbers stay
 representative.
+
+## G-199 — role vocabulary differs between the console DB and Keycloak
+
+Assigning Keycloak realm roles to match `user.role` revealed a mismatch: the console DB uses `member`,
+the Keycloak realm defines `viewer` / `admin` / `console-admin` and has no `member`. Those users fell
+back to `viewer`, which is close but not the same statement.
+
+Two stores describing the same fact in different words will drift. Pick one vocabulary and map explicitly
+at the boundary rather than by fallback.
+
+**Also fixed alongside:** `listUsers` now attaches `/users/{id}/role-mappings/realm`, because Keycloak's
+`/users` never returns them — the Roles column had been empty for every user on the access-control page.
+Both were needed: the code was not fetching roles, AND no roles were assigned. Either alone would still
+have shown a blank column, which is why fixing only the code looked like it had not worked.
