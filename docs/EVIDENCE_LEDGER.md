@@ -92,41 +92,30 @@ router before building, but four admin-authenticated routes is real evidence.
 because nothing is pending — not because the surface is broken. Seed a run that pauses for approval and
 this row becomes judgeable. Until then it is honestly unproven.
 
-**Row 1 is now a RENDERING question — every other cause has been eliminated.** `conv_98482ffa486f` was
-reassigned to `demo-editor@getoffgridai.co` / `org_bharat`, and it carries:
+**Row 1 — the deep link never loaded the target conversation. Every prior verdict was the wrong page.**
 
-```json
-{"name":"Death-Claim Assessment SOP","docId":"00dfde9e-…","collectionId":"d93bff10-…",
- "position":0,"score":0.93}
-```
+Opening `/work/chat/conv_98482ffa486f` as its owner renders **"NEFT return reconciliation"** — a different
+conversation — carrying my own test question. The target's answer text ("Policy 4471 covers inpatient
+hospitalisation") is absent entirely. So the citation row was never missing: **I was never looking at the
+conversation I thought I was**, and every "no citation row rendered" verdict in this ledger was read off
+the wrong page.
 
-Run as the owning identity, on that exact route, the footer still renders no citation row. So:
-ownership ✗ eliminated · identity ✗ eliminated · route ✗ eliminated · stored data ✗ eliminated.
+That makes two separate items:
 
-What remains is the render path. Three of the four hypotheses are now ELIMINATED by inspection:
+1. **A real navigation defect, and a rule violation.** CLAUDE.md requires navigation to live in the URL and
+   views to be deep-linkable. `/work/chat/<id>` silently falls back to some other conversation instead of
+   loading the requested one — or refusing it visibly. Silent fallback is the worst of the three options: a
+   shared chat link takes a colleague to the wrong transcript with no indication. **Verify whether this
+   reproduces for a conversation the user has always owned** (the reassignment I did by SQL may itself be
+   the cause — e.g. a cache, or a membership row that was not updated alongside `user_id`).
+2. **Row 1's citation rendering is UNTESTED, not failing.** Nothing here shows the footer is broken. The
+   stored data is provably correct and the renderer is provably deployed; the assertion simply never
+   reached them.
 
-1. ~~Stale deployed bundle~~ — `.next/static/chunks/62190-*.js` contains `Unnamed document`. The renderer
-   fix IS live.
-2. ~~The load query drops citations~~ — `allMessages()` is `db.select()` with no projection, i.e. all
-   columns, and `listMessages` spreads `...chosen`. Nothing is dropped.
-3. ~~The column is undeclared in drizzle~~ — `chatMessages.citations` is declared.
-
-   BUT its `$type` had gone STALE: it still said `{name, position, score}[]` after citations gained
-   `docId`/`collectionId`. Runtime is unaffected (jsonb returns whole rows), which is precisely what makes
-   it dangerous — the annotation never fails, it just silently stops guarding the seam where eight
-   dropped-field bugs have already happened. Corrected in the same commit as this entry.
-
-**The one hypothesis left:** the conversation route may render a different component tree than the one
-`SourcesFooter` lives in, or the reassigned conversation's messages may not be reaching the transcript at
-all (e.g. `parent_id` threading — 36 rows needed repairing for exactly that reason earlier this session,
-and a message that is not the active child of its parent is never displayed).
-
-**Check first, and it is cheap:** open `/work/chat/conv_98482ffa486f` and confirm the ANSWER TEXT itself
-renders. If the message body is absent too, this was never a citation bug — it is a threading/visibility
-bug and the citation is simply invisible along with its message.
-
-This is the most valuable open thread in the ledger: the data is provably correct, so whatever is
-swallowing it is a real code defect rather than a seeding artefact.
+SEVENTH instrument error of the session, and the most expensive: I eliminated three hypotheses, edited the
+schema, and wrote a confident narrowing — all against a page that was not the subject. The check that
+caught it cost one page load and I should have run it before the eliminations, not after. **Confirm the
+artifact is the one you think it is BEFORE reasoning about why it looks wrong.**
 
 ## The identity ceiling is LIFTED
 
