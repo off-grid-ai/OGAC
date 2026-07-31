@@ -28,11 +28,14 @@ export async function readEvidenceCounts(orgId: string): Promise<Partial<Evidenc
       sql`SELECT count(*)::int AS n FROM audit_events_v2
           WHERE org = ${orgId} AND outcome IN ('blocked', 'denied')`,
     ),
+    // Column and table names VERIFIED against the live schema rather than guessed. My first attempt used
+    // app_runs.signature and evidence_exporters — neither exists — and both cards correctly reported
+    // "could not read" instead of silently showing 0, which is exactly what that path is for.
     count(
       sql`SELECT count(*)::int AS n FROM app_runs
-          WHERE org_id = ${orgId} AND signature IS NOT NULL AND signature <> ''`,
+          WHERE org_id = ${orgId} AND provenance IS NOT NULL`,
     ),
-    count(sql`SELECT count(*)::int AS n FROM evidence_exporters WHERE org_id = ${orgId}`),
+    count(sql`SELECT count(*)::int AS n FROM export_targets WHERE org_id = ${orgId}`),
   ]);
   return { audit, refused, signed, exporters };
 }
