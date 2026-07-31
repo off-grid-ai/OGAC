@@ -215,8 +215,13 @@ screenshots, not my confidence.
   this way for the API playground.
 - **Verify by eye after deploying:** open a Mermaid artifact and a React artifact on the box and confirm the
   iframe renders. `npm run build` must also be checked — 13 MB in `public/` is new weight.
-- **Uncommitted at session end:** the `public/vendor/mermaid/` files and the `src/lib/artifacts.ts` edit.
-  Confirm with `git status` before doing anything else.
+- **COMMITTED but NOT DEPLOYED and NOT VERIFIED.** The vendored Mermaid bundle, the `package.json` change and
+  the `src/lib/artifacts.ts` edit all landed in commit `14406344` (they were swept in by a `git add -A` while
+  committing the docs — not a deliberate release). The working tree is clean. So:
+  - nothing is lost, but **nothing here has been proven to work**;
+  - `next-only.sh` has not run since, so the box is still serving the previous build;
+  - **first action:** `npm run build` locally to confirm 13 MB of `public/vendor` does not break the build,
+    then deploy, then open a Mermaid artifact and look at it. Do not assume it renders because it compiled.
 
 ### Roadmap items the founder explicitly asked for and are NOT finished
 
