@@ -2031,3 +2031,21 @@ at the boundary rather than by fallback.
 `/users` never returns them — the Roles column had been empty for every user on the access-control page.
 Both were needed: the code was not fetching roles, AND no roles were assigned. Either alone would still
 have shown a blank column, which is why fixing only the code looked like it had not worked.
+
+## G-200 — "TOTAL SPEND $0.00" on the Cost page reads as broken, when it is the product's best argument
+
+`/insights/cost` shows **TOTAL SPEND $0.00** beside 642 tokens, 1 user, 1 project. The number is correct —
+on-prem inference has no per-token charge — but presented bare on a page titled "Attribute AI usage and
+spend", a buyer reads it as "cost tracking is not wired".
+
+**This is the single strongest claim in the deck rendered as a bug.** The whole pitch is that the work runs
+on your own hardware; $0.00 IS the outcome. It just needs to say so.
+
+**Fix, in the same shape as the evidence-posture zero-explaining pattern:** keep $0.00 as the headline and
+label it — "no per-token charge: this ran entirely on your hardware" — and, if a cloud reference rate is
+available, show the avoided spend for the same token volume as a clearly-labelled comparison. Do NOT
+fabricate a rate; if there is no defensible reference, the label alone is enough.
+
+**Not done here** because it needs a decision on whether to publish a comparison rate, which is a
+positioning choice rather than a code one. Related: dollar budgets are $0 no-ops on free models, so any
+budget UI built on spend needs the same framing.
