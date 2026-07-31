@@ -21,7 +21,14 @@ const TAG = process.env.TAG || WHO.split('@')[0];
 const ROUTES = (process.env.ROUTES || '/overview').split(',').map((r) => r.trim()).filter(Boolean);
 
 // Names that must never appear in customer-visible text. Kept in step with src/lib/lineage-labels.ts.
-const VENDOR = /\b(ragas|qdrant|langfuse|evidently|llm[- ]?guard|opensearch|seaweedfs|clickhouse|kestra|keycloak|openbao)\b/i;
+// Names that must never appear in customer-visible text. Kept in step with src/lib/lineage-labels.ts.
+//
+// DELIBERATELY EXCLUDES the storage engines a data catalogue legitimately names — "Warehouse (ClickHouse)",
+// "Core Insurance (Postgres)" — because an operator has to know where a dataset actually lives, and those
+// are standard infrastructure rather than our mechanism. What must stay hidden is our AI-engine choices
+// (which evaluator scored an answer, which vector store retrieved it) and any component named inside an
+// error the user cannot act on.
+const VENDOR = /\b(ragas|qdrant|langfuse|evidently|llm[- ]?guard|kestra|openbao)\b/i;
 
 const browser = await chromium.launch();
 const page = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
@@ -63,6 +70,12 @@ for (const route of ROUTES) {
       const style = getComputedStyle(el);
       if (style.overflowX === 'auto' || style.overflowX === 'scroll') continue;
       if (style.textOverflow === 'ellipsis') continue; // truncation is a choice, not a bug
+      // sr-only text is DELIBERATELY a 1px clipped box for screen readers, so it trips a naive
+      // "content wider than its container" test. Reporting accessibility markup as a layout defect sent me
+      // looking at Pagination four times for nothing.
+      const r = el.getBoundingClientRect();
+      if (r.width <= 2 || r.height <= 2) continue;
+      if (style.position === 'absolute' && style.clip !== 'auto') continue;
       if (el.scrollWidth - el.clientWidth > 4) out.clipped.push(t.slice(0, 40));
     }
 

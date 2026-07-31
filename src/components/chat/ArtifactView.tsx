@@ -190,7 +190,7 @@ export function ArtifactView({
             <Markdown>{code}</Markdown>
           </div>
         ) : (
-          <pre className="m-4 max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-3 font-mono text-xs">
+          <pre className="m-4 max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-border bg-background p-3 font-mono text-xs">
             {decodeArtifactText(code)}
           </pre>
         )}
@@ -202,17 +202,17 @@ export function ArtifactView({
               {result.exitCode !== null ? ` · exit ${result.exitCode}` : ''}
             </div>
             {result.refused ? (
-              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-amber-500/40 bg-amber-500/10 p-2 font-mono text-xs text-foreground">
+              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-amber-500/40 bg-amber-500/10 p-2 font-mono text-xs text-foreground">
                 {result.refused}
               </pre>
             ) : null}
             {result.stdout ? (
-              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-2 font-mono text-xs">
+              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-border bg-background p-2 font-mono text-xs">
                 {result.stdout}
               </pre>
             ) : null}
             {result.stderr ? (
-              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-destructive/40 bg-destructive/10 p-2 font-mono text-xs">
+              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-destructive/40 bg-destructive/10 p-2 font-mono text-xs">
                 {result.stderr}
               </pre>
             ) : null}

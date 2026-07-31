@@ -486,7 +486,7 @@ function CommonPromptsPanel({
         <LoadingBlock />
       ) : !available ? (
         <p className="text-xs text-muted-foreground">
-          Usage history unavailable (OpenSearch unreachable).
+          Usage history unavailable — the search index is unreachable.
         </p>
       ) : common.length === 0 ? (
         <p className="text-xs text-muted-foreground">No prompt history yet.</p>

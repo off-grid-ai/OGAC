@@ -9,6 +9,7 @@ import {
   UploadSimple,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,11 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
   const [name, setName] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);
+  // Document preview. Holds the loaded document (or an error string) so a failed read is SHOWN rather
+  // than silently leaving the panel closed.
+  const [preview, setPreview] = useState<
+    { name: string; chunks: { position: number; content: string }[]; error?: string } | null
+  >(null);
   const [chats, setChats] = useState<Conversation[]>([]);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -150,6 +156,23 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
     }
     setBusy(false);
     await loadDocs();
+  }
+
+  async function openDoc(docId: string, name: string) {
+    setPreview({ name, chunks: [] });
+    try {
+      const res = await fetch(`/api/v1/chat/projects/${projectId}/documents/${docId}`);
+      if (!res.ok) {
+        setPreview({ name, chunks: [], error: 'Could not read this document.' });
+        return;
+      }
+      const { document } = (await res.json()) as {
+        document: { chunks: { position: number; content: string }[] };
+      };
+      setPreview({ name, chunks: document.chunks ?? [] });
+    } catch {
+      setPreview({ name, chunks: [], error: 'Could not reach the server.' });
+    }
   }
 
   async function removeDoc(docId: string) {
@@ -365,11 +388,21 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
                       key={d.id}
                       className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted"
                     >
-                      <FileText className="size-3.5 text-muted-foreground" />
-                      <span className="flex-1 truncate">{d.name}</span>
+                      <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                      {/* Clickable. This panel claims these documents ground the project's answers, so a
+                          reviewer must be able to READ one — a name plus a delete button is not enough to
+                          trust a citation. Opens the indexed chunks, i.e. exactly what retrieval sees. */}
+                      <button
+                        type="button"
+                        onClick={() => void openDoc(d.id, d.name)}
+                        className="flex-1 truncate text-left underline decoration-border decoration-dotted underline-offset-2 hover:decoration-primary"
+                        title={`Preview ${d.name}`}
+                      >
+                        {d.name}
+                      </button>
                       <Trash
                         onClick={() => removeDoc(d.id)}
-                        className="size-3.5 cursor-pointer text-muted-foreground hover:text-destructive"
+                        className="size-3.5 shrink-0 cursor-pointer text-muted-foreground hover:text-destructive"
                       />
                     </div>
                   ))
@@ -429,6 +462,38 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
           </Card>
         </div>
       </div>
+
+      {/* Document preview. A side panel rather than a route: this is a quick look at a source, not a place
+          with its own sub-resources — and the reviewer's context is the project they are standing in. */}
+      <Sheet open={preview !== null} onOpenChange={(o) => !o && setPreview(null)}>
+        <SheetContent side="right" className="flex w-full max-w-2xl flex-col gap-0 p-0">
+          <SheetHeader className="gap-1 border-b border-border px-4 py-3 pr-10">
+            <SheetTitle className="font-mono text-sm">{preview?.name ?? 'Document'}</SheetTitle>
+            <p className="text-xs text-muted-foreground">
+              The indexed text this project&apos;s chats retrieve and cite.
+            </p>
+          </SheetHeader>
+          <SheetBody className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            {preview?.error ? (
+              <p className="text-sm text-amber-600">{preview.error}</p>
+            ) : preview && preview.chunks.length === 0 ? (
+              // Indexed but empty is a real state and must not look like a failed load.
+              <p className="text-sm text-muted-foreground">
+                This document is registered but has no indexed text yet.
+              </p>
+            ) : (
+              preview?.chunks.map((c) => (
+                <pre
+                  key={c.position}
+                  className="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-3 font-mono text-xs leading-relaxed"
+                >
+                  {c.content}
+                </pre>
+              ))
+            )}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

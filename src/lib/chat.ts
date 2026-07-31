@@ -4,7 +4,9 @@ import { db } from '@/db';
 import {
   chatArtifacts,
   chatArtifactVersions,
+  chatChunks,
   chatConversations,
+  chatDocuments,
   chatMemory,
   chatMessages,
   chatPrefs,
@@ -1188,4 +1190,27 @@ export async function listProjectArtifacts(projectId: string, orgId: string = DE
       ),
     )
     .orderBy(desc(chatArtifacts.updatedAt));
+}
+
+// ─── Preview a project document ────────────────────────────────────────────────────────────────────
+//
+// The project knowledge panel listed document names with only a delete button — no way to see what a
+// document actually contains, on the very panel that claims those documents ground the project's answers.
+// A reviewer asked to trust a citation has to be able to read the source.
+//
+// Returns the indexed chunks in order, which IS what retrieval sees — so the preview shows the text the
+// model was given, not a separately-stored copy that could drift from it.
+export async function readProjectDocument(docId: string, projectId: string) {
+  await ensureChatSchema();
+  const [doc] = await db
+    .select({ id: chatDocuments.id, name: chatDocuments.name, kind: chatDocuments.kind, size: chatDocuments.size })
+    .from(chatDocuments)
+    .where(and(eq(chatDocuments.id, docId), eq(chatDocuments.projectId, projectId)));
+  if (!doc) return null;
+  const chunks = await db
+    .select({ position: chatChunks.position, content: chatChunks.content })
+    .from(chatChunks)
+    .where(and(eq(chatChunks.docId, docId), eq(chatChunks.projectId, projectId)))
+    .orderBy(asc(chatChunks.position));
+  return { ...doc, chunks };
 }

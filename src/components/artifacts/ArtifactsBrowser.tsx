@@ -11,6 +11,7 @@ import {
   X,
 } from '@phosphor-icons/react/dist/ssr';
 import { decodeArtifactText } from '@/lib/artifact-text';
+import { explainResponse } from '@/lib/api-failure';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -130,7 +131,15 @@ export function ArtifactsBrowser() {
     if (r.ok) {
       toast.success(!a.published ? 'Published' : 'Unpublished');
       void load();
+      return;
     }
+    // A failed PATCH used to do NOTHING — no toast, no state change — so clicking Publish on the read-only
+    // demo looked like a dead button. Third time this exact shape has appeared (prompts starters, the
+    // builder's compile control, here): a refusal must be visible, and it is information rather than an
+    // error because the system is working as designed.
+    const f = await explainResponse(r, 'publish this artifact');
+    if (f.refusal) toast.info(f.message);
+    else toast.error(f.message);
   }
 
   function copyLink(id: string) {
@@ -148,7 +157,12 @@ export function ArtifactsBrowser() {
       toast.success(`Reverted to v${version}`);
       close();
       void load();
+      return;
     }
+    // Same silent-failure shape as togglePublish above.
+    const f = await explainResponse(r, 'revert this artifact');
+    if (f.refusal) toast.info(f.message);
+    else toast.error(f.message);
   }
 
   const live = active && isLiveKind(active.kind);

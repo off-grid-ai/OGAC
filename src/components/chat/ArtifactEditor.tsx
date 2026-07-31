@@ -32,7 +32,10 @@ export function ArtifactEditor({ value, onChange, onSave, onCancel }: Readonly<A
       autoComplete="off"
       autoCapitalize="off"
       aria-label="Edit artifact source"
-      className="h-full w-full resize-none border-0 bg-background p-4 font-mono text-xs leading-relaxed text-foreground focus:outline-none"
+      // break-words + no horizontal overflow: the editor sat inside a panel that scrolled sideways, so
+      // template placeholders like {{amount_inr}} pushed the line past the panel and the text was clipped
+      // at BOTH edges. There is vertical room; there is never a reason to read source sideways.
+      className="h-full w-full resize-none overflow-x-hidden break-words border-0 bg-background p-4 font-mono text-xs leading-relaxed text-foreground focus:outline-none"
     />
   );
 }

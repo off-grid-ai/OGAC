@@ -60,7 +60,7 @@ export interface PropagationPlan {
 // One label per target — the single source of truth for the operator-facing store name.
 export const TARGET_LABELS: Readonly<Record<PropagationTarget, string>> = {
   vector: 'Vector index (Qdrant) — subject-scoped chunks',
-  lake: 'External data lake (SeaweedFS/S3) — subject-scoped objects',
+  lake: 'External data lake — subject-scoped objects',
   device: 'Device replicas (mobile/desktop) — long-term on-device memory',
 } as const;
 
@@ -83,7 +83,7 @@ function reasonFor(target: PropagationTarget): string {
     case 'vector':
       return 'Vector index adapter not configured/reachable — deferred, not erased.';
     case 'lake':
-      return 'External data lake (S3/SeaweedFS) not configured/reachable — deferred, not erased.';
+      return 'External data lake not configured or unreachable — deferred, not erased.';
     case 'device':
       return 'No device-sync channel configured — tombstone recorded, propagation deferred.';
   }
