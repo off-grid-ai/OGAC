@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/Pagination';
+import { Markdown } from '@/components/chat/Markdown';
 import { buildSrcDoc, isLiveKind } from '@/lib/artifacts';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 import { usePagination } from '@/lib/use-pagination';
@@ -55,6 +56,9 @@ export function ArtifactsBrowser() {
   const [loading, setLoading] = useState(true);
   const [versions, setVersions] = useState<VersionRow[]>([]);
   const [q, setQ] = useState('');
+  // Rendered vs raw for a markdown artifact. A view preference, not a navigational place, so it stays
+  // local state — the URL already carries WHICH artifact is open.
+  const [showSource, setShowSource] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -254,6 +258,16 @@ export function ArtifactsBrowser() {
               >
                 <Globe className="size-3" /> {active.published ? 'Published' : 'Publish'}
               </Button>
+              {active.kind === 'markdown' ? (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="gap-1"
+                  onClick={() => setShowSource((v) => !v)}
+                >
+                  {showSource ? 'Preview' : 'Source'}
+                </Button>
+              ) : null}
               {active.published ? (
                 <Button
                   size="xs"
@@ -281,8 +295,16 @@ export function ArtifactsBrowser() {
                 className="h-full w-full border-0 bg-white"
                 srcDoc={buildSrcDoc(active)}
               />
+            ) : active.kind === 'markdown' && !showSource ? (
+              // A markdown artifact is a DOCUMENT — a dunning notice, a policy summary, a report. Showing
+              // its raw source (`**₹3,11,500**`, `# Heading`) in the one place a reviewer looks at the
+              // output makes finished work look unfinished. Rendered with the same renderer chat replies
+              // use, with a Source toggle for anyone who wants the markdown itself.
+              <div className="prose prose-sm max-w-none p-4 dark:prose-invert">
+                <Markdown>{decodeArtifactText(active.code)}</Markdown>
+              </div>
             ) : (
-              <pre className="m-3 overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-xs">
+              <pre className="m-3 overflow-x-auto whitespace-pre-wrap rounded-md border border-border bg-background p-3 font-mono text-xs">
                 {decodeArtifactText(active.code)}
               </pre>
             )}
