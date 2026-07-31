@@ -1991,3 +1991,29 @@ written; (3) only then change the render or the state model.
 
 **Do not "fix" this by removing the URL navigation** — the phase belongs in the URL so Back steps between
 builder positions. The draft is what must survive, not the routing.
+
+## G-198 — the Usage "Performance degradation" banner is CORRECT and self-inflicted (no code change)
+
+**Observed:** `/insights/usage` leads with *"Performance degradation: p95 latency 33652 ms recent versus
+2558 ms baseline"* and a headline **P95 LATENCY 29348 ms**. In a demo that is the first thing a buyer
+reads, and it says the system is degraded.
+
+**It is right.** `analytics-aggs.ts` compares a recent window against a baseline window of real measured
+traffic (`recentP95 > baseP95 * PERF_FACTOR`). Baseline 2.5s is what this deployment normally does; 33s is
+what it did today. The detector correctly caught a 13x slowdown.
+
+**The slowdown is mine.** Hours of verification traffic — dozens of chat completions and 15-40s app
+compiles against local models, several concurrent. Nothing about the product regressed.
+
+**DO NOT "FIX" THIS IN CODE.** Raising PERF_FACTOR, widening the baseline window, or hiding the banner
+would each make a working detector lie so a demo looks better — in a governance product whose entire pitch
+is honest observability, that is the worst change available. It would also be the exact defect this
+session kept finding: a surface that reports something other than what happened.
+
+**What to do instead:** leave the box idle before a demo. The recent window rolls forward and the alert
+clears itself once normal traffic resumes. If it does NOT clear after idle, then the slowdown is real and
+the fix is the model or the hardware, not the page.
+
+**Worth keeping in mind generally:** load-testing a demo tenant leaves visible marks in its own telemetry.
+Verification traffic should ideally run against a separate org so the demo tenant's numbers stay
+representative.
