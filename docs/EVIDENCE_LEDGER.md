@@ -76,7 +76,38 @@ wholesale, which is the honest default.
 
 ### Row 1 — Citation provenance (§8I "Cited", §12 Observability "Data lineage", §9 "Trust through visibility")
 
-**Gate: GAP.** The founder's screenshot shows `[1] Unnamed document`, italic, no link, no collection.
+**Gate: GAP — by script, not by opinion.** `npm run e2e citation` reports:
+
+```
+GAP  citation-provenance  no citation row rendered within 90s — the answer carried no provenance
+```
+
+Script: `test/e2e/citation-provenance.mjs`. It signs in, types a real question by keystroke into a
+knowledge-bearing chat, and asserts the citation `<li>`: that it names a document, that the name is a
+followable link matching `/data/knowledge/…` or `/work/projects/…`, and that no `0%` appears. All three
+must hold; the verdict quotes the row text and href it read.
+
+**ROOT CAUSE FOUND, and it is not the renderer.** The persisted citations in the demo data are
+placeholders I seeded myself:
+
+```json
+[{"ref":"pipeline context","source":"governed source"}]
+```
+
+No `name`, no `docId`, no `position`, no `score` — from `scripts/seed-workspace-demo.sql`. The old
+renderer dressed these up as `[1] source · part 1 · 0%`; the new renderer degrades honestly to
+`Unnamed document`. Both are wrong for a compliance surface: a fabricated provenance claim in the
+account buyers are shown.
+
+Ruled out with a query, so nobody re-investigates it: the documents DO have names — 35/35 in
+`org_knowledge_docs`, e.g. `KYC Master Direction (RBI) v3.2.pdf`. Ingest is fine.
+
+Also true and worse: only **3 messages in the entire database carry any citations at all**, so
+"Private conversations grounded in approved company context" — the subtitle on that very page — is not
+demonstrable from the demo data.
+
+**To promote:** replace the seeded citation payloads with joins against real `org_knowledge_docs` rows
+(name, docId, collectionId, position, score), re-seed, and re-run the script until it prints VERIFIED.
 
 The display layer and both retrievers now carry document identity, and the fabricated name / false `0%`
 / internal chunk index are gone — but that is `WIRED`, not `VERIFIED`, and the visible result is still

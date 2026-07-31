@@ -41,7 +41,7 @@
     "jscpd": "jscpd --config .jscpd.json",
     "jscpd:report": "jscpd --config .jscpd.json --reporters html,console",
     "hooks:install": "git config core.hooksPath .githooks",
-    "e2e": "playwright test",
+    "e2e": "node scripts/e2e-run.mjs",
     "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
