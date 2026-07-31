@@ -1,0 +1,92 @@
+# Evidence ledger — §12 table stakes and §10 flows, gated by a script
+
+**The rule that makes this document worth reading.** A row is `VERIFIED` only when a replayable script
+drives the REAL UI with REAL keystrokes and asserts on the artifact a user actually reads. The gate is
+whatever the script says. My opinion is not an input. Where no script can be written, the row is `GAP`
+by definition — not "probably fine", not "wired".
+
+**Why it exists.** Every row I marked done this session got worse the moment the founder looked at it:
+a citation footer reading `[1] source — part 1 · 0%` under a swept-and-signed-off module, an "all apps
+have evaluations" claim off a `count(*)`, a "fixed" verdict off `grep -c`. The common shape is a proxy
+reported as the goal. A script that reads the terminal artifact cannot make that substitution, so the
+ledger cannot be more optimistic than the evidence.
+
+## Gates
+
+| Gate | Meaning |
+|---|---|
+| `VERIFIED` | A script in `test/e2e/` drives the UI and asserts the artifact. Evidence path in the row. |
+| `WIRED` | Code and route exist; no script asserts the artifact. **Not** a claim that it works. |
+| `GAP` | Absent, broken, or unscriptable. Unscriptable IS a gap. |
+
+## Harness rules (learned the hard way, non-negotiable)
+
+1. **Never `fill()` a React-controlled input.** It sets the DOM value without updating state, so the
+   app's own guard fires and the test reports a product defect that does not exist. This cost a
+   fabricated `CONFIRMED` gap (G-195, withdrawn). Use `pressSequentially`.
+2. **A test asserting "nothing happened" must first prove it can make something happen.**
+3. **Never assert on a word that can match when the feature is absent.** `getByText(/^Sources$/i)`
+   returned 1 on a page with no assistant answer at all. Assert on the ROW — the `<li>` carrying a
+   `[n]` marker, its link, its href.
+4. **Assert the crossing, not the sides.** Seven boundary bugs this session typechecked because both
+   sides were individually correct while the field was dropped in transit.
+5. **A failure must never present as emptiness.** Any row whose script cannot distinguish "we could not
+   measure" from "the answer is zero" is `GAP`.
+6. **Read the screenshot.** A green typecheck, an HTTP 200 and a row count have never once told anyone
+   whether a screen makes sense.
+
+## Ledger
+
+Status of every row is `GAP` until a script promotes it. Scripts live in `test/e2e/<row-slug>.mjs` and
+are runnable individually; `npm run e2e` runs the suite and prints the gate per row.
+
+### §10 Flows
+
+| Flow | Gate | Script | Evidence |
+|---|---|---|---|
+| 1 — Enterprise setup | GAP | — | — |
+| 2 — Connect a data source | GAP | — | — |
+| 3 — Create an app in natural language | GAP | — | clarifying questions are unit-tested; no UI script |
+| 4 — Build from a template | GAP | — | — |
+| 5 — Use an application | GAP | — | — |
+| 6 — Review and approve | GAP | — | — |
+| 7 — Investigate failure | GAP | — | — |
+| 8 — Compliance export | GAP | — | — |
+| 9 — Node intelligence | DESCOPED | — | founder parked OGAM/OGAD 2026-07-30 |
+
+### §12 Technical table stakes
+
+Each subsection below is expanded row-by-row as its script is written. Rows are only listed once a
+script exists or a real attempt established it as unscriptable — an unexpanded subsection is `GAP`
+wholesale, which is the honest default.
+
+| Subsection | Rows | Gate |
+|---|---|---|
+| Deployment | 10 | GAP |
+| Identity and access | 11 | GAP |
+| Security | 17 | GAP |
+| Reliability | 14 | GAP |
+| Data | 13 | GAP |
+| Model operations | 17 | GAP |
+| Agent operations | 14 | GAP |
+| Evaluation | 15 | GAP |
+| Observability | 13 | GAP |
+| Compliance | 10 | GAP |
+| Developer experience | 15 | GAP |
+
+### Row 1 — Citation provenance (§8I "Cited", §12 Observability "Data lineage", §9 "Trust through visibility")
+
+**Gate: GAP.** The founder's screenshot shows `[1] Unnamed document`, italic, no link, no collection.
+
+The display layer and both retrievers now carry document identity, and the fabricated name / false `0%`
+/ internal chunk index are gone — but that is `WIRED`, not `VERIFIED`, and the visible result is still
+useless to a reviewer. Honest beats false; neither is finished.
+
+Open question that decides where the real defect is, **unanswered**: do the knowledge documents have
+names at all? If `org_knowledge_docs.name` / `chat_documents.name` are empty, the footer is a symptom
+and the defect is at ingest. Blocked on a working DB client on the box — `psql` is absent and a script
+in `/tmp` cannot resolve `pg` (must run from `~/console` so node resolves `node_modules`).
+
+**Promotion requires:** a script that signs in, sends a real question by keystroke into a
+knowledge-bearing chat, waits for the assistant row, and asserts the citation `<li>` contains a named
+document, an `href`, and either a real percentage or no percentage at all.
