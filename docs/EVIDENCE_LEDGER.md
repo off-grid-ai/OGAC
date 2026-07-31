@@ -43,12 +43,29 @@ point at the product rather than at my regex, which is the distinction this ledg
 ```
 VERIFIED  s12-developer-experience  /operations/api-docs  17 rows, "public API surface, grouped by area"
 
-CANDIDATE DEFECT  flow3-natural-language-app  /build/studio/new
-  The composer IS there — "Describe the process you want automated in plain language. It inherits your
-  organisation's data, rules and approvals" — and after typing a real sentence by keystroke and clicking
-  compile, NO plan and NO clarifying question appeared within 90s. Flow 3 is the product's core promise
-  (§10 Flow 3, §15). Either compile is not firing from that control or it takes >90s, and both are
-  defects on a surface a non-technical employee is meant to use unaided.
+CONFIRMED DEFECT  flow3-natural-language-app  /build/studio/new
+  `GAP  "Build the steps" could not be clicked (disabled=true)`
+
+  The composer is there and reads "Describe the process you want automated in plain language." A full
+  sentence is typed by keystroke into the page's only textarea — and the **"Build the steps" control stays
+  DISABLED, with nothing on screen saying why.**
+
+  Almost certainly the read-only demo account (building an app is a write), which is the correct decision
+  and an invisible one. Same defect as the prompts toast: a refusal the user cannot see. A disabled
+  primary action with no explanation reads as "this product is broken", not "you may not do this" — and
+  this is §10 Flow 3, the promise in §15, on the account buyers are handed.
+
+  Fix is the pattern already built for it: state the reason next to the control (reuse
+  `describeFailure`'s refusal wording from `src/lib/api-failure.ts`), and decide separately whether a demo
+  viewer should be able to compile a spec they cannot save. **Do not fix by enabling the write.**
+
+  TWO OF MY OWN ERRORS ON THE WAY HERE, both worth keeping:
+  - A loose /build/i matched the sidebar's "Build" NAV ITEM, so the script clicked navigation, fired zero
+    requests, and I read that as "compile produced nothing". Third time a loose locator sent me at the
+    wrong element. Scope the control and match its full label.
+  - The click threw a TimeoutError instead of returning a verdict, breaking this file's own rule. A
+    disabled control is a finding to report, not a stack trace — now caught, with `isDisabled()` read and
+    included in the verdict. That is the only reason the real cause surfaced.
 
 CANDIDATE DEFECT  s12-security-secrets  /governance/secrets/mounts
   5 mounts render with PATH / TYPE / DESCRIPTION, and there is NO create/enable/rotate control. Per the

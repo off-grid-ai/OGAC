@@ -15,8 +15,31 @@ if (!(await box.count())) {
   await browser.close(); process.exit(1);
 }
 await type(box, 'Check each training reimbursement claim against the employee quota and send anything over the limit to a manager for approval.');
-const go = page.getByRole('button', { name: /compile|build|generate|propose|create|continue/i }).first();
-if (await go.count()) await go.click();
+// SCOPE THE CONTROL, AND SCOPE THE SEARCH. A loose /build/i matched the sidebar's "Build" nav item and
+// clicked navigation instead of compiling — zero requests fired and I read that as "compile produced
+// nothing". Third time a loose locator sent me at the wrong element, so this matches the real control's
+// full label inside <main>, and asserts the click actually issued a request.
+// NOT scoped to <main>: the control may sit outside it, and a wrong scope throws rather than reporting.
+const go = page.getByRole('button', { name: /^build the steps$/i }).first();
+if (!(await go.count())) {
+  verdict(ROW, false, 'no "Build the steps" control on /build/studio/new');
+  await browser.close(); process.exit(1);
+}
+let compiled = false;
+page.on('response', (r) => { if (r.request().method() === 'POST') compiled = true; });
+// A TIMEOUT IS A VERDICT, never an exception — my own harness rule, which this script was breaking.
+// A disabled or unreachable control is a finding to report, not a stack trace to read.
+let clickError = '';
+try {
+  await go.click({ timeout: 15000 });
+} catch (e) {
+  clickError = String(e.message).split('\n')[0].slice(0, 90);
+  const disabled = await go.isDisabled().catch(() => null);
+  verdict(ROW, false, `"Build the steps" could not be clicked (disabled=${disabled}): ${clickError}`);
+  await page.screenshot({ path: `${OUT}/${ROW}.png`, fullPage: true }).catch(() => {});
+  await browser.close();
+  process.exit(1);
+}
 // The artifact: either clarifying questions or a proposed step list. Both are plain-language plans.
 const ok = await waitFor(async () => {
   const t = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
@@ -25,5 +48,6 @@ const ok = await waitFor(async () => {
 }, 90000);
 const t = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
 await page.screenshot({ path: `${OUT}/${ROW}.png`, fullPage: true }).catch(() => {});
-verdict(ROW, ok, ok ? `plan/questions produced: "${t.slice(0, 180)}"` : `no plan or question after 90s: "${t.slice(0, 180)}"`);
+verdict(ROW, ok, `compileRequestFired=${compiled} ` +
+  (ok ? `plan/questions produced: "${t.slice(0, 170)}"` : `no plan or question after 90s: "${t.slice(0, 170)}"`));
 await browser.close(); process.exit(ok ? 0 : 1);
