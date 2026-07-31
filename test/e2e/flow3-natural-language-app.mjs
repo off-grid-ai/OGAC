@@ -1,14 +1,16 @@
 // §10 Flow 3: describe a goal in plain language → OGAC asks clarifying questions → proposes a workflow.
+// TARGET RESOLVED: the composer is AppBuilder at /build/studio/new — /build/studio is the module index
+// and has no input, which is what my first run reported. The route was my error, not a missing feature.
 // This one MUST use real keystrokes: the studio composer is React-controlled, and the whole claim is
 // that typing a sentence produces a plan. The artifact is the proposed workflow or the questions —
 // anything less means the sentence went nowhere.
 import { signIn, type, verdict, waitFor, OUT } from './lib.mjs';
 const ROW = 'flow3-natural-language-app';
-const { browser, page } = await signIn('/build/studio');
+const { browser, page } = await signIn('/build/studio/new');
 await page.waitForTimeout(2500);
 const box = page.locator('textarea').first();
 if (!(await box.count())) {
-  verdict(ROW, false, 'no description input on /build/studio — a goal cannot be described');
+  verdict(ROW, false, 'no description input on /build/studio/new — a goal cannot be described');
   await page.screenshot({ path: `${OUT}/${ROW}.png` }).catch(() => {});
   await browser.close(); process.exit(1);
 }

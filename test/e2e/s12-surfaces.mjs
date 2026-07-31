@@ -12,10 +12,13 @@ import { signIn, verdict, OUT } from './lib.mjs';
 const ROWS = [
   { row: 's12-identity-access', route: '/governance/access',
     must: [/\brole|rbac|abac\b/i, /\b(admin|editor|viewer|member)\b/i], act: /add|invite|create|assign/i },
-  { row: 's12-security-egress', route: '/governance/egress',
-    must: [/allow|deny|block/i, /\b(domain|host|destination|endpoint)\b/i], act: /add|create|save|allow/i },
-  { row: 's12-security-secrets', route: '/governance/secrets/overview',
-    must: [/\b(mount|kv|lease|secret)\b/i, /\b(sealed|unsealed|active|healthy)\b/i], act: /create|write|rotate|new/i },
+  // /governance/egress governs which outside MODELS may be used — a different claim. §12's egress
+  // control (destinations + limits) is the api-budgets surface, which is keyed by destination.
+  { row: 's12-security-egress', route: '/runtime/api-budgets',
+    must: [/\b(destination|budget|limit|egress)\b/i], act: /add|create|save|set|new/i },
+  // Create/rotate lives on the sub-pages; the overview is posture only, which is why acts=0 there.
+  { row: 's12-security-secrets', route: '/governance/secrets/mounts',
+    must: [/\b(mount|kv|path|engine)\b/i], act: /create|write|rotate|new|add|enable/i },
   { row: 's12-observability-traces', route: '/insights/ai',
     must: [/\b(trace|span|latency|tokens?)\b/i, /\d/], act: null },
   { row: 's12-model-operations', route: '/runtime',
@@ -28,8 +31,9 @@ const ROWS = [
     must: [/\b(health|uptime|status|service)\b/i, /\b(healthy|degraded|down|ok)\b/i], act: null },
   { row: 's12-policy-decisions', route: '/governance/policies/decision-logs',
     must: [/allow|deny|blocked/i, /\b(policy|rule|bundle)\b/i], act: null },
-  { row: 's12-developer-experience', route: '/docs',
-    must: [/\b(api|endpoint|curl|token)\b/i], act: null },
+  // /docs is USER documentation. The developer surface is the sidebar's "API docs & playground".
+  { row: 's12-developer-experience', route: '/operations/api-docs',
+    must: [/\b(api|endpoint|curl|token|bearer)\b/i], act: null },
 ];
 
 let gaps = 0;

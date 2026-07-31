@@ -35,6 +35,35 @@ ledger cannot be more optimistic than the evidence.
 6. **Read the screenshot.** A green typecheck, an HTTP 200 and a row count have never once told anyone
    whether a screen makes sense.
 
+## Targets resolved — and three REAL candidate defects fall out
+
+Re-ran the four unresolved-target rows against their correct routes. One passed; the other three now
+point at the product rather than at my regex, which is the distinction this ledger exists to make.
+
+```
+VERIFIED  s12-developer-experience  /operations/api-docs  17 rows, "public API surface, grouped by area"
+
+CANDIDATE DEFECT  flow3-natural-language-app  /build/studio/new
+  The composer IS there — "Describe the process you want automated in plain language. It inherits your
+  organisation's data, rules and approvals" — and after typing a real sentence by keystroke and clicking
+  compile, NO plan and NO clarifying question appeared within 90s. Flow 3 is the product's core promise
+  (§10 Flow 3, §15). Either compile is not firing from that control or it takes >90s, and both are
+  defects on a surface a non-technical employee is meant to use unaided.
+
+CANDIDATE DEFECT  s12-security-secrets  /governance/secrets/mounts
+  5 mounts render with PATH / TYPE / DESCRIPTION, and there is NO create/enable/rotate control. Per the
+  full-CRUD rule in CLAUDE.md a read-only management page is the bare minimum, not a finished feature.
+
+CANDIDATE DEFECT  s12-identity-access  /governance/access
+  5 user rows, a Roles column header, and no role VALUES anywhere in the text. The column exists (that
+  part of my earlier correction stands) but the users may carry no roles — on an access-control page that
+  is worth confirming against the DB before assuming the UI is at fault.
+
+STILL UNRESOLVED TARGET  s12-security-egress
+  /runtime/api-budgets rendered the KEYS page ("API keys and credentials"). §12's egress control has not
+  been located yet. Not a verdict on the product.
+```
+
 ## §10 flow run (`test/e2e/flows.mjs` + `flow3-natural-language-app.mjs`)
 
 ```
