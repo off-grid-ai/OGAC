@@ -2132,6 +2132,13 @@ feature on the target deployment and a claim we cannot defend.
 origin, so previews render from the deployment itself. The `cdn` option already exists and is threaded
 through — it just defaults outward.
 
+**The precedent is already in the repo:** `public/scalar.standalone.js` is vendored exactly this way for the
+API playground, so there is a pattern to follow and no new decision to make. Mermaid is NOT currently a
+dependency (`node_modules/mermaid` absent), so this needs `npm i mermaid`, a copy of
+`dist/mermaid.esm.min.mjs` into `public/`, and `opts.cdn` defaulted to the console origin. Not done here
+because adding a dependency and verifying the bundle renders on the box deserves its own pass rather than
+being squeezed in at the end of another.
+
 **Found while fixing a related defect:** the SVG and Mermaid wrappers also hardcoded `background:#0a0a0a`,
 so in light mode every thumbnail was a solid black rectangle. That part is fixed (transparent background,
 neutral Mermaid theme) — but a correctly-themed empty box is still an empty box until the CDN dependency
