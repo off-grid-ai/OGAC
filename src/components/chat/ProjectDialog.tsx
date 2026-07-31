@@ -209,7 +209,7 @@ export function ProjectDialog({
             </div>
             <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-border p-1.5">
               {docs.length === 0 ? (
-                <p className="px-1 py-3 text-center text-xs text-muted-foreground">
+                <p className="px-1 py-3 text-xs text-muted-foreground">
                   No documents. Add text/markdown files to ground answers.
                 </p>
               ) : (

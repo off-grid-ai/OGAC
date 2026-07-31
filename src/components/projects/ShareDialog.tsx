@@ -116,7 +116,7 @@ export function ShareDialog({
 
           <div className="space-y-1 rounded-md border border-border p-1.5">
             {members.length === 0 ? (
-              <p className="px-1 py-3 text-center text-xs text-muted-foreground">
+              <p className="px-1 py-3 text-xs text-muted-foreground">
                 No members yet.
               </p>
             ) : (
