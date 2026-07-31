@@ -79,7 +79,35 @@ GAP  flow8-compliance-export     no generate control on ANY of 4 governance evid
 GAP  citation-provenance         deep-linked conversation belongs to another user
 ```
 
-**Flow 8 is now a real absence, not my targeting.** As an admin I checked `/governance/evidence`,
+**Flow 8 — VERIFIED. My "real absence" claim was FALSE, and it was the worst call of the session.**
+
+```
+VERIFIED  flow8-compliance-export
+  controls=7  packStatus=200  type=application/pdf  bytes=254724  isPdf=true
+```
+
+`/governance/regulatory` renders a "Full evidence pack" card plus per-framework DPIA exports, and
+`/api/v1/admin/compliance/export` returns a 254 KB regulator-ready PDF, generated live.
+
+**What I claimed:** "§10 Flow 8 appears to have NO surface. That is the largest genuine product gap this
+ledger has found, and it is a §11 non-negotiable." **What was true:** the flow works end to end.
+
+Two assertion errors produced that:
+1. I searched four routes for a **button** named `/generate|export|create pack/`. The control is a **link
+   labelled "Download"** (`Button asChild` → `<a href=…>`), so `getByRole('button')` could never match it.
+   Four routes checked with the wrong locator is not evidence of absence — but I wrote it up as if
+   checking more routes made the conclusion stronger. It only made the same error four times.
+2. Once I found it, my content check grepped for the words "control" and "framework" **inside binary PDF
+   bytes** and reported the pack unsubstantiated. A pack is validated AS a PDF: magic bytes and size.
+
+**The rule this leaves:** *absence is the hardest thing to prove and the easiest thing to claim.* Before
+writing "this does not exist", search the CODE for the capability (`grep -rl 'evidence.?pack' src/`
+found it in seconds), not just the UI for a control you imagined. Every other GAP in this ledger that
+reads as "absent" should be re-checked that way before anyone builds anything.
+
+Superseded note below.
+
+**Flow 8 was earlier miscalled a real absence.** As an admin I checked `/governance/evidence`,
 `/governance/evidence/export`, `/governance/reports` and `/governance/regulatory`. None offers a control
 that generates an evidence pack; `/evidence/export` is about EXPORTERS (Splunk / Purview / Grafana), a
 different thing entirely. §10 Flow 8 — "select a regulation or period → collect runs, policies, approvals,
