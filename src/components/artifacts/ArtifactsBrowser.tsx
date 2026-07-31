@@ -10,6 +10,7 @@ import {
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
+import { decodeArtifactText } from '@/lib/artifact-text';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -254,7 +255,7 @@ export function ArtifactsBrowser() {
               />
             ) : (
               <pre className="m-3 overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-xs">
-                {active.code}
+                {decodeArtifactText(active.code)}
               </pre>
             )}
           </div>
@@ -320,7 +321,7 @@ function ArtifactCard({
             />
           ) : (
             <pre className="h-full overflow-hidden whitespace-pre-wrap break-all bg-background p-3 text-[10px] leading-tight text-muted-foreground">
-              {a.code.slice(0, 400)}
+              {decodeArtifactText(a.code).slice(0, 400)}
             </pre>
           )}
           {a.published ? (
