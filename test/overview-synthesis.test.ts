@@ -165,7 +165,10 @@ test('posture tiles synthesize the blocking count, policy, guardrails, and egres
   assert.equal(block.href, '/governance/posture');
   assert.match(block.hint!, /1 policy · 2 audit · 1 redaction/);
 
-  assert.equal(byLabel.get('Policy engine')!.value, 'OPA');
+  // CONTRACT CHANGED DELIBERATELY. This asserted 'OPA' — the raw adapter id, upper-cased — which put the
+  // name of an open-source project on the Home screen as a headline value. A buyer needs to know policy is
+  // enforced as code on every request, not which project implements it.
+  assert.equal(byLabel.get('Policy engine')!.value, 'Policy-as-code');
   assert.equal(byLabel.get('Policy engine')!.tone, 'good');
 
   // Outcome-based value (never the engine/product name); reachable+configured => ACTIVE/good.
@@ -282,4 +285,21 @@ test('undated audit blocking events are kept (a producer that drops timestamps s
   const { blocking } = synthesizeOperatorHome(input);
   assert.equal(blocking.total, 1);
   assert.equal(blocking.items[0].id, 'audit:x');
+});
+
+// ── The Home screen must not name the policy engine's implementation ────────────────────────────────
+//
+// LIVE FINDING. The governance tile rendered `policy.engine.toUpperCase()`, so the first page a buyer
+// opens announced "OPA" as a headline value. What matters to them is that policy is enforced as code on
+// every request, not which open-source project implements it.
+test('the policy engine tile reads as an outcome, not an adapter id', () => {
+  const tile = (engine: string) =>
+    synthesizeOperatorHome({ ...fullInput(), policy: { ...fullInput().policy, engine } })
+      .posture.find((t) => t.label === 'Policy engine');
+
+  assert.equal(tile('opa')?.value, 'Policy-as-code');
+  assert.equal(tile('builtin')?.value, 'Built-in rules');
+  assert.equal(tile('')?.value, 'Not configured');
+  // A NEW adapter must not leak its name on the day it is added.
+  assert.ok(!/newvendor/i.test(String(tile('newvendor')?.value)));
 });

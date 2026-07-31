@@ -189,6 +189,27 @@ function localShareTone(localShare: number): HomeTile['tone'] {
   return 'warn';
 }
 
+/**
+ * How the policy engine reads to a buyer.
+ *
+ * `policy.engine` is an internal adapter id ('opa', 'builtin', …). Upper-casing it put 'OPA' on the Home
+ * screen as a headline metric — the open-source project named to the first person who opens the console.
+ * Unknown ids fall back to a neutral phrase rather than leaking a new adapter name the day it is added.
+ */
+function policyEngineLabel(engine: string | null | undefined): string {
+  switch ((engine ?? '').toLowerCase()) {
+    case 'opa':
+      return 'Policy-as-code';
+    case 'builtin':
+    case 'internal':
+      return 'Built-in rules';
+    case '':
+      return 'Not configured';
+    default:
+      return 'Policy-as-code';
+  }
+}
+
 export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
   const {
     analytics,
@@ -221,7 +242,10 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
   if (policy) {
     posture.push({
       label: 'Policy engine',
-      value: policy.engine.toUpperCase(),
+      // NOT the raw engine id. This rendered 'OPA' as the headline value on the Home screen — naming the
+      // open-source policy engine to a buyer, on the first page they see. What matters to them is that
+      // policy is enforced as code on every request, not which project implements it.
+      value: policyEngineLabel(policy.engine),
       hint: policy.reachable ? 'enforcing every request' : 'unreachable — requests uncovered',
       tone: policy.reachable ? 'good' : 'bad',
       href: '/governance/policies/overview',
@@ -332,7 +356,7 @@ function synthesizeBlocking(
     });
   }
 
-  // 2) Policy engine: denied decisions (OPA/ABAC).
+  // 2) Policy engine: denied decisions (policy-as-code / attribute rules).
   for (const d of decisions) {
     if (d.allow) continue;
     if (!inWindow(d.timestamp, now, windowMs)) continue;
