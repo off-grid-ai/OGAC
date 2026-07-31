@@ -119,7 +119,12 @@ async function PolicyOverview() {
                       </Badge>
                     ) : null}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{policy.description}</TableCell>
+                  {/* Wrap. At nowrap the longest description clipped at the card edge — "(always on)" was cut off
+                      mid-parenthesis, so the sentence explaining the ALWAYS-ACTIVE policy engine was the
+                      part a reader could not see. */}
+                  <TableCell className="whitespace-normal text-muted-foreground">
+                    {policy.description}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
