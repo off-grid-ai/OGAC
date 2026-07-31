@@ -177,7 +177,12 @@ function ProjectCard({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-medium">{p.name}</span>
+              {/* Two lines before ellipsis. Single-line truncation cut real project names mid-word — "Collections
+                  — 90 DPD bo…", "KYC re-verification dri…" — so a card could not state what it was. The
+                  name is the one thing the card exists to convey. */}
+              <span className="line-clamp-2 text-sm font-medium leading-snug" title={p.name}>
+                {p.name}
+              </span>
               {badge ? (
                 <span className="shrink-0 rounded border border-border px-1 text-[10px] uppercase text-muted-foreground">
                   {badge}
