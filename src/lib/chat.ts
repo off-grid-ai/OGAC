@@ -1157,3 +1157,35 @@ export function deriveTitle(text: string): string {
   const t = text.replace(/\s+/g, ' ').trim();
   return t.length > 48 ? `${t.slice(0, 48)}…` : t || 'New chat';
 }
+
+// ─── Artifacts produced inside a project ───────────────────────────────────────────────────────────
+//
+// A project groups conversations, and those conversations produce artifacts — but the project page showed
+// instructions, knowledge, memory and chats while the artifacts they generated were only findable in the
+// global Artifacts list. The work a project produced is part of the project.
+//
+// Joined through the project's conversations, because `chat_artifacts` records the conversation it came
+// from rather than a project id — deriving it keeps one source of truth instead of a second column that
+// can disagree.
+export async function listProjectArtifacts(projectId: string, orgId: string = DEFAULT_ORG) {
+  await ensureChatSchema();
+  return db
+    .select({
+      id: chatArtifacts.id,
+      title: chatArtifacts.title,
+      kind: chatArtifacts.kind,
+      language: chatArtifacts.language,
+      conversationId: chatArtifacts.conversationId,
+      published: chatArtifacts.published,
+      updatedAt: chatArtifacts.updatedAt,
+    })
+    .from(chatArtifacts)
+    .innerJoin(chatConversations, eq(chatConversations.id, chatArtifacts.conversationId))
+    .where(
+      and(
+        eq(chatConversations.projectId, projectId),
+        eq(chatArtifacts.orgId, orgId),
+      ),
+    )
+    .orderBy(desc(chatArtifacts.updatedAt));
+}
