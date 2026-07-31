@@ -92,9 +92,28 @@ router before building, but four admin-authenticated routes is real evidence.
 because nothing is pending — not because the surface is broken. Seed a run that pauses for approval and
 this row becomes judgeable. Until then it is honestly unproven.
 
-**Row 1 needs a conversation the harness OWNS.** Chats are per-user scoped; the repaired citations sit on
-seeded users' conversations and the deep-linked one belongs to `mac@wednesday.is`. Point `CONV_ROUTE` at a
-conversation owned by the run identity, or seed one for `demo-editor`.
+**Row 1 is now a RENDERING question — every other cause has been eliminated.** `conv_98482ffa486f` was
+reassigned to `demo-editor@getoffgridai.co` / `org_bharat`, and it carries:
+
+```json
+{"name":"Death-Claim Assessment SOP","docId":"00dfde9e-…","collectionId":"d93bff10-…",
+ "position":0,"score":0.93}
+```
+
+Run as the owning identity, on that exact route, the footer still renders no citation row. So:
+ownership ✗ eliminated · identity ✗ eliminated · route ✗ eliminated · stored data ✗ eliminated.
+
+What remains is the render path itself. Check in this order, and read the answer before changing code:
+1. **Is the deployed `.next` actually carrying the renderer fix?** The citation commits were deployed via
+   `next-only.sh`, but a torn or stale artifact would look exactly like this. Confirm the built bundle
+   contains `sourceHref`.
+2. Does `SourcesFooter` receive `citations` for a message loaded from HISTORY, or only for one streamed
+   live? The read path and the stream path may attach citations differently — which would be the
+   dropped-field-at-a-boundary defect for the ninth time, on the load path this time.
+3. Is `buildSources` returning `[]` for this shape? It is pure and unit-tested — feed it this exact JSON.
+
+This is the most valuable open thread in the ledger: the data is provably correct, so whatever is
+swallowing it is a real code defect rather than a seeding artefact.
 
 ## The identity ceiling is LIFTED
 
