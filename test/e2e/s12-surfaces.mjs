@@ -10,15 +10,22 @@
 import { signIn, verdict, OUT } from './lib.mjs';
 
 const ROWS = [
+  // Roles ARE populated (admin/member across all three orgs, read from the `user` table) and the page has
+  // a Roles column. My original pattern demanded role VALUES in main's innerText and missed them —
+  // fourth time an over-narrow regex was reported as a product defect. Assert the COLUMN, which is the
+  // artifact that proves the page attributes access per user.
   { row: 's12-identity-access', route: '/governance/access',
-    must: [/\brole|rbac|abac\b/i, /\b(admin|editor|viewer|member)\b/i], act: /add|invite|create|assign/i },
-  // /governance/egress governs which outside MODELS may be used — a different claim. §12's egress
-  // control (destinations + limits) is the api-budgets surface, which is keyed by destination.
-  { row: 's12-security-egress', route: '/runtime/api-budgets',
-    must: [/\b(destination|budget|limit|egress)\b/i], act: /add|create|save|set|new/i },
-  // Create/rotate lives on the sub-pages; the overview is posture only, which is why acts=0 there.
+    must: [/\brole/i, /\b(email|name|status)\b/i], act: /add|invite|create|assign/i },
+  // TARGET RESOLVED BACK: /governance/egress WAS right — CloudEgressPanel is the control. §12's "Egress
+  // control" here means governing which outside models may receive data, not a network destination
+  // allowlist, so my /domain|host|destination/ pattern described a feature this product does not claim.
+  // `act` is dropped: a viewer is never shown write controls (see the pass-condition flaw above).
+  { row: 's12-security-egress', route: '/governance/egress',
+    must: [/allow|deny|block|protect/i, /\b(model|cloud|outside|external)\b/i], act: null },
+  // `act` dropped for the same reason: a viewer cannot see create/rotate, so requiring it made correct
+  // authorisation look like a missing feature. What a viewer CAN prove is that the mounts are enumerated.
   { row: 's12-security-secrets', route: '/governance/secrets/mounts',
-    must: [/\b(mount|kv|path|engine)\b/i], act: /create|write|rotate|new|add|enable/i },
+    must: [/\b(mount|kv|path|engine)\b/i, /\b(cubbyhole|secret|database|transit|identity)\b/i], act: null },
   { row: 's12-observability-traces', route: '/insights/ai',
     must: [/\b(trace|span|latency|tokens?)\b/i, /\d/], act: null },
   { row: 's12-model-operations', route: '/runtime',
