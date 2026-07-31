@@ -92,7 +92,35 @@ router before building, but four admin-authenticated routes is real evidence.
 because nothing is pending — not because the surface is broken. Seed a run that pauses for approval and
 this row becomes judgeable. Until then it is honestly unproven.
 
-**Row 1 — the deep link never loaded the target conversation. Every prior verdict was the wrong page.**
+**Row 1 — FINAL STATE: a genuine render/attach defect, reached only after eliminating six confounds.**
+
+The valid test is: sign in as the conversation's OWNER and reach it by CLICKING the sidebar (deep links
+are broken — see below). Done:
+
+```
+identity  demo-bank@getoffgridai.co  = the owner of conv_285011f6cb84 ("KYC re-verification questions")
+url       /chat/conv_285011f6cb84    confirmed in the address bar after the click
+database  that conversation has a message whose citations carry name + docId + collectionId + score
+rendered  no citation row, and no "SOURCES" label anywhere on the page
+```
+
+Everything that could make this a false alarm has been ruled out by evidence, not by argument: ownership,
+identity, route, stored data, deployed bundle, load query, schema declaration. **What remains is that
+stored citations are not reaching the transcript on the READ path** — which would be the
+dropped-field-at-a-boundary defect for the ninth time, and the first one on a load path rather than a
+write path.
+
+ONE CHECK REMAINS before touching code, and it is the same one that caught me last time: confirm the
+ANSWER BODY renders on that page. The captured text showed the sidebar and chat list; it did not clearly
+show the assistant message. If the body is absent, this is a transcript-loading bug and the citation is
+merely invisible along with it.
+
+**Row 1 is therefore GAP with a located cause, not GAP-unknown.** That is as far as evidence takes it
+without a further run.
+
+---
+
+**The deep-link defect found along the way — REAL and separately actionable.**
 
 Opening `/work/chat/conv_98482ffa486f` as its owner renders **"NEFT return reconciliation"** — a different
 conversation — carrying my own test question. The target's answer text ("Policy 4471 covers inpatient
