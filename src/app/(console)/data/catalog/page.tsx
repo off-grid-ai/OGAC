@@ -101,16 +101,23 @@ export default async function DataCatalogPage() {
           {rows.map(({ asset, posture, freshness }) => (
             <Link key={asset.id} href={`/data/catalog/${asset.id}`} className="group">
               <Card className="h-full shadow-sm transition-colors group-hover:border-primary/40">
-                <CardHeader className="space-y-0 pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-sm">{asset.name}</CardTitle>
-                    <Badge className={LEVEL_TONE[posture.effectiveLevel]}>
-                      {posture.effectiveLevel}
-                    </Badge>
+                {/* CardHeader is a GRID: `grid-template-columns: minmax(0,1fr) auto` (see
+                    og-card__header). It expects exactly two children — content, then an action. This
+                    passed THREE things as two children, so the source/kind <p> landed in the right-hand
+                    action column and painted on top of the classification badge: "claim_documents"
+                    overlapped "restricted" overlapped "(SeaweedFS)" on every card. Keeping the name and
+                    subtitle together in the content column, with the badge as the action, is what the
+                    grid is for. */}
+                <CardHeader className="pb-2">
+                  <div className="min-w-0">
+                    <CardTitle className="truncate text-sm">{asset.name}</CardTitle>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      {asset.source || '—'} · {asset.kind}
+                    </p>
                   </div>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {asset.source || '—'} · {asset.kind}
-                  </p>
+                  <Badge className={LEVEL_TONE[posture.effectiveLevel]}>
+                    {posture.effectiveLevel}
+                  </Badge>
                 </CardHeader>
                 <CardContent className="space-y-2 text-xs">
                   <div className="flex flex-wrap items-center gap-1.5">
