@@ -24,6 +24,19 @@ export function isLiveKind(kind: string): boolean {
 // built for white, and it is deterministic instead of depending on where the frame is embedded.
 const PREVIEW_BG = '#ffffff';
 
+// TAILWIND, INSIDE THE PREVIEW. LIVE FINDING (2026-07-31): with the React artifact finally mounting, it
+// rendered as unstyled serif text — "High risk374/412 (91%)" with no spacing — because its source is
+// ordinary Tailwind-classed JSX (`className="flex justify-between border-b py-1"`) and the iframe had no
+// stylesheet. Model-generated React and HTML artifacts use Tailwind classes as a matter of course, so a
+// preview without it renders a jumble and reads as our bug.
+//
+// `@tailwindcss/browser` compiles the classes it finds in the document at runtime (282 KB, vendored like
+// the other runtimes — nothing leaves the network). A base font is set too, so an artifact that uses no
+// classes at all still reads as a document rather than as browser-default Times.
+const TAILWIND_TAG = (cdn: string) =>
+  `<script src="${cdn}/vendor/tailwind/tailwind.browser.js"></script>
+<style>body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111}</style>`;
+
 // Build the iframe srcDoc for a live artifact. HTML passes through as its own document; SVG is centred on
 // the preview canvas; React (Babel + React/ReactDOM UMD) and Mermaid are bootstrapped with the vendored
 // runtimes. `bridge` injects the window.offgrid.complete() proxy for AI-powered apps.
@@ -64,6 +77,7 @@ mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
   return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:${PREVIEW_BG}">
 <div id="root"></div>
 ${bridge}
+${TAILWIND_TAG(cdn)}
 <script src="${cdn}/vendor/react/react.production.min.js"></script>
 <script src="${cdn}/vendor/react/react-dom.production.min.js"></script>
 <script src="${cdn}/vendor/babel/babel.min.js"></script>

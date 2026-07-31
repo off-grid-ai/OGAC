@@ -56,8 +56,13 @@ await page.waitForTimeout(4000);
 // What counts as rendered, per kind. Deliberately narrow — each one is the output the renderer produces
 // and nothing else could produce.
 function passes(kind, probe) {
-  if (kind === 'mermaid') return probe.svgs > 0 && probe.mermaidPre === 0; // mermaid REPLACES the <pre>
-  if (kind === 'react') return probe.rootKids > 0;
+  // Mermaid injects its <svg> INSIDE the <pre class="mermaid"> rather than replacing it, so requiring
+  // the <pre> to be gone failed a diagram that had rendered perfectly. The real signal is a diagram
+  // <svg> that is NOT mermaid's error graphic.
+  if (kind === 'mermaid') return probe.svgs > 0 && !/syntax error/i.test(probe.text);
+  // A React error fallback is also one child of #root, so a count alone proves nothing — the fallback
+  // text must be absent.
+  if (kind === 'react') return probe.rootKids > 0 && !/no component to render|no default export/i.test(probe.text);
   if (kind === 'svg') return probe.svgs > 0;
   if (kind === 'html') return probe.bodyEls > 2;
   return probe.bodyEls > 0;
@@ -92,7 +97,7 @@ for (const { kind, id } of IDS) {
       mermaidPre: document.querySelectorAll('pre.mermaid').length,
       rootKids: document.getElementById('root')?.childElementCount ?? -1,
       bodyEls: document.body?.querySelectorAll('*').length ?? 0,
-      text: (document.body?.innerText || '').trim().slice(0, 100),
+      text: (document.body?.innerText || '').trim().slice(0, 200),
     }))
     .catch((e) => ({ error: String(e).slice(0, 120), svgs: 0, mermaidPre: 1, rootKids: -1, bodyEls: 0 }));
 
