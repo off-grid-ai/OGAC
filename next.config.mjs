@@ -52,7 +52,26 @@ const nextConfig = {
     ],
   },
   async headers() {
-    return [{ source: '/(.*)', headers: securityHeaders }];
+    return [
+      { source: '/(.*)', headers: securityHeaders },
+      // The artifact preview runtimes (Mermaid, React/ReactDOM, Babel), loaded INSIDE the sandboxed
+      // preview iframe. LIVE FINDING (2026-07-31), the third layer of the same bug: with the CDN
+      // vendored and the auth redirect fixed, Mermaid was STILL blocked —
+      //   "Access to script at '/vendor/mermaid/mermaid.esm.min.mjs' from origin 'null' has been
+      //    blocked by CORS policy"
+      // An ES `import` is fetched with CORS semantics even same-origin, and a `sandbox="allow-scripts"`
+      // iframe has an OPAQUE origin, which serialises to `null` — so a same-origin module import is a
+      // cross-origin request. Classic <script src> (React, Babel) is exempt, which is why only the
+      // Mermaid branch stayed black. These are immutable public vendor files; allowing any origin to
+      // read them gives nothing away.
+      {
+        source: '/vendor/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+    ];
   },
   async redirects() {
     return nextRedirects();
