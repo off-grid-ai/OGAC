@@ -1,9 +1,16 @@
 'use client';
 
-import { Trash } from '@phosphor-icons/react/dist/ssr';
+import { ArrowSquareOut, FileText, NotePencil, Trash, UploadSimple } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Textarea } from '@/components/ui/textarea';
+import { explainResponse } from '@/lib/api-failure';
+import { postKnowledgeDocument } from '@/lib/knowledge-intake';
+import { noteDocumentName } from '@/lib/knowledge-note';
 
 interface Doc {
   id: string;
@@ -13,10 +20,16 @@ interface Doc {
   createdAt: string;
 }
 
-// The documents sub-resource for a single collection's DETAIL page: upload/index a text document
-// and remove existing ones. Uses the collection documents endpoints — the file is
-// read client-side and sent as text; the server chunks + embeds it via the gateway. Read-only for
-// non-admins (no controls rendered).
+interface Preview {
+  name: string;
+  chunks: { position: number; content: string }[];
+  fileUrl?: string | null;
+  error?: string;
+}
+
+// The documents sub-resource for a single collection's DETAIL page: index a document (a file OR pasted
+// text), READ one, and remove existing ones. Non-admins get no write controls but can still open a
+// document — reviewing the source behind a citation is not an admin action.
 export function CollectionDocuments({
   collectionId,
   documents,
@@ -28,56 +41,142 @@ export function CollectionDocuments({
 }>) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteName, setNoteName] = useState('');
+  const [noteText, setNoteText] = useState('');
+  const [preview, setPreview] = useState<Preview | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  async function upload(file: File) {
+  // One index path for both intake modes — a file's text and pasted text are the same thing to the
+  // indexer, so a fix to either lands once.
+  async function index(name: string, content: string) {
     setBusy(true);
+    const result = await postKnowledgeDocument(collectionId, name, content);
+    setBusy(false);
+    if (!result.ok) {
+      // A refusal is the system working (curated collections are admin-only), so it must not be
+      // phrased as breakage — and the server's own reason beats anything invented here.
+      (result.failure.refusal ? toast.info : toast.error)(result.failure.message);
+      return false;
+    }
+    toast.success(`Indexed "${name}" (${result.chunks} chunks)`);
+    router.refresh();
+    return true;
+  }
+
+  async function upload(file: File) {
+    await index(file.name, await file.text());
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  async function saveNote() {
+    const body = noteText.trim();
+    if (!body) return;
+    if (await index(noteDocumentName(body, noteName), body)) {
+      setNoteName('');
+      setNoteText('');
+      setNoteOpen(false);
+    }
+  }
+
+  async function open(doc: Doc) {
+    setPreview({ name: doc.name, chunks: [] });
     try {
-      const content = await file.text();
-      const res = await fetch(`/api/v1/knowledge/collections/${collectionId}/documents`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: file.name, content }),
-      });
-      if (!res.ok) throw new Error('failed');
-      const { chunks } = await res.json();
-      toast.success(`Indexed "${file.name}" (${chunks} chunks)`);
-      router.refresh();
+      const res = await fetch(`/api/v1/knowledge/documents/${doc.id}`);
+      if (!res.ok) {
+        const failure = await explainResponse(res, `open "${doc.name}"`);
+        setPreview({ name: doc.name, chunks: [], error: failure.message });
+        return;
+      }
+      const { document } = (await res.json()) as {
+        document: { chunks: { position: number; content: string }[]; fileUrl: string | null };
+      };
+      setPreview({ name: doc.name, chunks: document.chunks ?? [], fileUrl: document.fileUrl });
     } catch {
-      toast.error('Failed to index document');
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
+      setPreview({ name: doc.name, chunks: [], error: 'Could not reach the server.' });
     }
   }
 
   async function remove(id: string, name: string) {
-    try {
-      const res = await fetch(`/api/v1/knowledge/documents/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('failed');
-      toast.success(`Removed "${name}"`);
-      router.refresh();
-    } catch {
-      toast.error('Failed to remove document');
+    const res = await fetch(`/api/v1/knowledge/documents/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const failure = await explainResponse(res, `remove "${name}"`);
+      (failure.refusal ? toast.info : toast.error)(failure.message);
+      return;
     }
+    toast.success(`Removed "${name}"`);
+    router.refresh();
   }
 
   return (
     <div className="space-y-3">
       {isAdmin ? (
-        <div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".txt,.md,.markdown,.csv,.json,text/*"
-            disabled={busy}
-            className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void upload(f);
-            }}
-          />
-          {busy ? <p className="mt-1 text-xs text-muted-foreground">Indexing…</p> : null}
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".txt,.md,.markdown,.csv,.json,text/*"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void upload(f);
+              }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              className="gap-1.5"
+              onClick={() => fileRef.current?.click()}
+            >
+              <UploadSimple className="size-4" /> {busy ? 'Indexing…' : 'Add file'}
+            </Button>
+            {/* Knowledge is not only files. A clause pasted out of an email is a source too, and
+                making someone save a .txt first is friction for the operator this page is for. */}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              className="gap-1.5"
+              onClick={() => setNoteOpen((o) => !o)}
+            >
+              <NotePencil className="size-4" /> Add text
+            </Button>
+          </div>
+          {noteOpen ? (
+            <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-3">
+              <Input
+                className="h-8 text-sm"
+                value={noteName}
+                placeholder="Title (optional — taken from the first line)"
+                onChange={(e) => setNoteName(e.target.value)}
+              />
+              <Textarea
+                rows={6}
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Paste the text this collection should know — a policy clause, a circular, a decision…"
+                className="text-sm"
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setNoteOpen(false);
+                    setNoteText('');
+                    setNoteName('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button size="sm" disabled={busy || !noteText.trim()} onClick={saveNote}>
+                  {busy ? 'Indexing…' : 'Index text'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -90,12 +189,22 @@ export function CollectionDocuments({
               key={d.id}
               className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm"
             >
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium text-foreground">{d.name}</div>
+              <FileText className="size-4 shrink-0 text-muted-foreground" />
+              {/* Clickable: this page claims these documents ground the org's answers, so the source
+                  behind a citation must be readable. Opens the indexed chunks — what retrieval sees. */}
+              <button
+                type="button"
+                onClick={() => void open(d)}
+                className="min-w-0 flex-1 text-left"
+                title={`Preview ${d.name}`}
+              >
+                <div className="truncate font-medium text-foreground underline decoration-border decoration-dotted underline-offset-2 hover:decoration-primary">
+                  {d.name}
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {d.kind} · {(d.size / 1024).toFixed(1)} KB · {d.createdAt.slice(0, 10)}
                 </div>
-              </div>
+              </button>
               {isAdmin ? (
                 <button
                   type="button"
@@ -110,6 +219,46 @@ export function CollectionDocuments({
           ))}
         </div>
       )}
+
+      <Sheet open={preview !== null} onOpenChange={(o) => !o && setPreview(null)}>
+        <SheetContent side="right" className="flex w-full max-w-2xl flex-col gap-0 p-0">
+          <SheetHeader className="gap-1 border-b border-border px-4 py-3 pr-10">
+            <SheetTitle className="font-mono text-sm">{preview?.name ?? 'Document'}</SheetTitle>
+            <p className="text-xs text-muted-foreground">
+              The indexed text this collection retrieves and cites.
+            </p>
+          </SheetHeader>
+          <SheetBody className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            {preview?.fileUrl ? (
+              <a
+                href={preview.fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-primary underline"
+              >
+                <ArrowSquareOut className="size-3.5" /> Open the original file
+              </a>
+            ) : null}
+            {preview?.error ? (
+              <p className="text-sm text-amber-600">{preview.error}</p>
+            ) : preview && preview.chunks.length === 0 ? (
+              // Indexed-but-empty is a real state and must not look like a failed load.
+              <p className="text-sm text-muted-foreground">
+                This document is registered but has no indexed text yet.
+              </p>
+            ) : (
+              preview?.chunks.map((c) => (
+                <pre
+                  key={c.position}
+                  className="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-3 font-mono text-xs leading-relaxed"
+                >
+                  {c.content}
+                </pre>
+              ))
+            )}
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

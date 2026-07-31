@@ -26,10 +26,13 @@ export function buildSrcDoc(
   opts: { cdn?: string; bridge?: boolean } = {},
 ): string {
   // OUR OWN ORIGIN, not a public CDN. This defaulted to https://cdn.jsdelivr.net, so on an air-gapped or
-  // restricted-network deployment — the deployment this product is FOR — Mermaid never loaded and a diagram
-  // artifact rendered as an empty box, on a page whose footer reads "nothing leaves your network".
-  // Mermaid is vendored under public/vendor/mermaid (same pattern as public/scalar.standalone.js), so the
-  // iframe fetches it from the console itself. Callers can still override for a hosted context.
+  // restricted-network deployment — the deployment this product is FOR — nothing loaded and a diagram or
+  // React artifact rendered as an empty box, on a page whose footer reads "nothing leaves your network".
+  // It failed even ON the network: the CSP in next.config.mjs is `script-src 'self' … us-assets.i.posthog.com`
+  // — jsdelivr was never allowlisted, so the browser blocked every one of these tags.
+  // Mermaid, React/ReactDOM (UMD 18) and @babel/standalone are vendored under public/vendor/* (same pattern
+  // as public/scalar.standalone.js), so the iframe fetches them from the console itself. Callers can still
+  // override for a hosted context.
   const cdn = opts.cdn ?? '';
   const bridge = opts.bridge
     ? `<script>window.offgrid={complete:function(prompt,options){return fetch('/api/v1/chat/artifacts/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({prompt:prompt},options||{}))}).then(function(r){return r.json()}).then(function(d){if(d.error)throw new Error(d.error);return d.text})};</script>`
@@ -53,9 +56,9 @@ mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
   return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#fff">
 <div id="root"></div>
 ${bridge}
-<script src="${cdn}/npm/react@18/umd/react.production.min.js"></script>
-<script src="${cdn}/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="${cdn}/npm/@babel/standalone@7/babel.min.js"></script>
+<script src="${cdn}/vendor/react/react.production.min.js"></script>
+<script src="${cdn}/vendor/react/react-dom.production.min.js"></script>
+<script src="${cdn}/vendor/babel/babel.min.js"></script>
 <script type="text/babel" data-presets="react,typescript" data-type="module">
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
 ${stripImportsExports(a.code)}

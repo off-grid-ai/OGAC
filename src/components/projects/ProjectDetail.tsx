@@ -3,7 +3,10 @@
 import {
   ArrowLeft,
   ChatCircleDots,
+  Cube,
   FileText,
+  Globe,
+  NotePencil,
   ShareNetwork,
   Trash,
   UploadSimple,
@@ -17,7 +20,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { accentHue, initials } from '@/lib/workspace-grid';
+import { explainResponse } from '@/lib/api-failure';
+import { noteDocumentName } from '@/lib/knowledge-note';
+import { accentHue, initials, relativeTime } from '@/lib/workspace-grid';
 import { ShareDialog } from './ShareDialog';
 
 interface Doc {
@@ -35,6 +40,15 @@ interface MemoryRow {
   id: string;
   fact: string;
   source: string;
+}
+interface ProjectArtifact {
+  id: string;
+  title: string;
+  kind: string;
+  language: string | null;
+  conversationId: string | null;
+  published: boolean;
+  updatedAt: string;
 }
 
 // eslint-disable-next-line complexity
@@ -56,6 +70,13 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
   const [access, setAccess] = useState<string | null>(null);
   const [memory, setMemory] = useState<MemoryRow[]>([]);
   const [newFact, setNewFact] = useState('');
+  const [artifacts, setArtifacts] = useState<ProjectArtifact[]>([]);
+  // Paste-a-note knowledge. Not every source is a file — a policy clause, an email, a decision from a
+  // meeting is text someone has in their clipboard, and making them save a .txt first is friction for
+  // exactly the non-technical operator this surface is for.
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteName, setNoteName] = useState('');
+  const [noteText, setNoteText] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const canManage = access === 'owner';
   const canEdit = access === 'owner' || access === 'edit';
@@ -71,6 +92,11 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
   const loadDocs = useCallback(async () => {
     const r = await fetch(`/api/v1/chat/projects/${projectId}/documents`);
     if (r.ok) setDocs((await r.json()).documents ?? []);
+  }, [projectId]);
+
+  const loadArtifacts = useCallback(async () => {
+    const r = await fetch(`/api/v1/chat/projects/${projectId}/artifacts`);
+    if (r.ok) setArtifacts((await r.json()).artifacts ?? []);
   }, [projectId]);
 
   const loadMemory = useCallback(async () => {
@@ -119,8 +145,9 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
     }
     await loadDocs();
     await loadMemory();
+    await loadArtifacts();
     setLoaded(true);
-  }, [projectId, loadDocs, loadMemory]);
+  }, [projectId, loadDocs, loadMemory, loadArtifacts]);
 
   useEffect(() => {
     void load();
@@ -137,25 +164,48 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
     toast.success('Project saved');
   }
 
+  // One embed path for both entry modes (a file's text and pasted text are the same thing to the
+  // indexer), so a fix to either lands once.
+  async function addDocument(docName: string, content: string) {
+    const r = await fetch(`/api/v1/chat/projects/${projectId}/documents`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: docName, content }),
+    });
+    if (r.ok) {
+      const { chunks } = await r.json();
+      toast.success(`${docName} · ${chunks} chunks embedded`);
+      return true;
+    }
+    // A refusal is not a failure: a read-only demo account is the system working, so it gets an info
+    // toast carrying the server's own words instead of "something went wrong".
+    const failure = await explainResponse(r, `add ${docName}`);
+    (failure.refusal ? toast.info : toast.error)(failure.message);
+    return false;
+  }
+
   async function upload(files: FileList | null) {
     if (!files) return;
     setBusy(true);
     for (const f of Array.from(files)) {
-      const content = await f.text();
-      const r = await fetch(`/api/v1/chat/projects/${projectId}/documents`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: f.name, content }),
-      });
-      if (r.ok) {
-        const { chunks } = await r.json();
-        toast.success(`${f.name} · ${chunks} chunks embedded`);
-      } else {
-        toast.error(`${f.name} failed`);
-      }
+      await addDocument(f.name, await f.text());
     }
     setBusy(false);
     await loadDocs();
+  }
+
+  async function saveNote() {
+    const body = noteText.trim();
+    if (!body) return;
+    setBusy(true);
+    const ok = await addDocument(noteDocumentName(body, noteName), body);
+    setBusy(false);
+    if (ok) {
+      setNoteName('');
+      setNoteText('');
+      setNoteOpen(false);
+      await loadDocs();
+    }
   }
 
   async function openDoc(docId: string, name: string) {
@@ -319,6 +369,67 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Artifacts this project produced. The work a project generated is part of the project — it
+              used to be findable only in the global Artifacts library, with nothing on the project page
+              tying an output back to the chat that made it. Each card deep-links into the existing
+              viewer panel (?artifact=<id>) rather than re-implementing a renderer here. */}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Artifacts ({artifacts.length})</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Documents, diagrams and apps produced by this project&apos;s chats.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {artifacts.length === 0 ? (
+                <p className="px-1 py-6 text-xs text-muted-foreground">
+                  No artifacts yet. When a chat in this project produces a document, diagram, table or
+                  small app, it is saved here.
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {artifacts.map((a) => {
+                    const from = chats.find((c) => c.id === a.conversationId);
+                    return (
+                      <Link
+                        key={a.id}
+                        href={`/work/artifacts?artifact=${a.id}`}
+                        className="group flex min-w-0 flex-col gap-1.5 rounded-md border border-border p-2.5 hover:border-primary/50 hover:bg-muted/50"
+                      >
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <Cube className="size-3.5 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                            {a.title}
+                          </span>
+                          {a.published ? (
+                            <span
+                              className="shrink-0 text-primary"
+                              title="Published to a public link"
+                            >
+                              <Globe className="size-3.5" />
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                          <span className="rounded border border-border px-1 py-0.5 font-mono uppercase">
+                            {a.language || a.kind}
+                          </span>
+                          <span>{relativeTime(a.updatedAt)}</span>
+                          {from ? (
+                            <>
+                              <span aria-hidden>·</span>
+                              <span className="min-w-0 truncate">from {from.title}</span>
+                            </>
+                          ) : null}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
@@ -338,18 +449,64 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
                 hidden
                 onChange={(e) => upload(e.target.files)}
               />
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => fileRef.current?.click()}
-                className="shrink-0 gap-1.5"
-              >
-                <UploadSimple className="size-3.5" />
-                {busy ? 'Embedding…' : 'Add files'}
-              </Button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setNoteOpen((o) => !o)}
+                  className="gap-1.5"
+                >
+                  <NotePencil className="size-3.5" /> Add text
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => fileRef.current?.click()}
+                  className="gap-1.5"
+                >
+                  <UploadSimple className="size-3.5" />
+                  {busy ? 'Embedding…' : 'Add files'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Paste text as knowledge. Same embed path as a file — a clause someone copied out of an
+                  email should not require saving a .txt first. */}
+              {noteOpen ? (
+                <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-2.5">
+                  <Input
+                    className="h-8 text-xs"
+                    value={noteName}
+                    placeholder="Title (optional — taken from the first line)"
+                    onChange={(e) => setNoteName(e.target.value)}
+                  />
+                  <Textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    rows={6}
+                    placeholder="Paste the text this project should know — a policy clause, a decision, an email…"
+                    className="text-xs"
+                  />
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setNoteOpen(false);
+                        setNoteText('');
+                        setNoteName('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveNote} disabled={busy || !noteText.trim()}>
+                      {busy ? 'Embedding…' : 'Save to knowledge'}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">

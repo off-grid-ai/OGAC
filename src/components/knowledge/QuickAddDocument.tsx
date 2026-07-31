@@ -13,6 +13,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Textarea } from '@/components/ui/textarea';
+import { postKnowledgeDocument } from '@/lib/knowledge-intake';
+import { noteDocumentName } from '@/lib/knowledge-note';
 
 // A small "quick add document" affordance on each collection card in the Knowledge LIST. It is a
 // convenience only — index one document into a collection without leaving the list — NOT the way to
@@ -50,28 +53,27 @@ export function QuickAddDocument({
   );
 
   const [busy, setBusy] = useState(false);
+  const [noteText, setNoteText] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  async function upload(file: File) {
+  async function index(name: string, content: string) {
     setBusy(true);
-    try {
-      const content = await file.text();
-      const res = await fetch(`/api/v1/knowledge/collections/${collectionId}/documents`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: file.name, content }),
-      });
-      if (!res.ok) throw new Error('failed');
-      const { chunks } = await res.json();
-      toast.success(`Indexed "${file.name}" (${chunks} chunks)`);
-      setOpen(false);
-      router.refresh();
-    } catch {
-      toast.error('Failed to index document');
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
+    const result = await postKnowledgeDocument(collectionId, name, content);
+    setBusy(false);
+    if (!result.ok) {
+      // Refusal vs breakage: a non-admin on a curated collection is the system working correctly.
+      (result.failure.refusal ? toast.info : toast.error)(result.failure.message);
+      return;
     }
+    toast.success(`Indexed "${name}" (${result.chunks} chunks)`);
+    setNoteText('');
+    setOpen(false);
+    router.refresh();
+  }
+
+  async function upload(file: File) {
+    await index(file.name, await file.text());
+    if (fileRef.current) fileRef.current.value = '';
   }
 
   return (
@@ -96,19 +98,43 @@ export function QuickAddDocument({
               </a>.
             </SheetDescription>
           </SheetHeader>
-          <SheetBody>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".txt,.md,.markdown,.csv,.json,text/*"
-              disabled={busy}
-              className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void upload(f);
-              }}
-            />
-            {busy ? <p className="mt-1 text-xs text-muted-foreground">Indexing…</p> : null}
+          <SheetBody className="space-y-4">
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Upload a file</p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".txt,.md,.markdown,.csv,.json,text/*"
+                disabled={busy}
+                className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void upload(f);
+                }}
+              />
+            </div>
+            {/* …or paste it. Knowledge is not only files — a clause out of a circular or an email is a
+                source too, and it goes down the identical embed path. */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">…or paste text</p>
+              <Textarea
+                rows={7}
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Paste the text this collection should know…"
+                className="text-sm"
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  disabled={busy || !noteText.trim()}
+                  onClick={() => index(noteDocumentName(noteText), noteText.trim())}
+                >
+                  {busy ? 'Indexing…' : 'Index text'}
+                </Button>
+              </div>
+            </div>
+            {busy ? <p className="text-xs text-muted-foreground">Indexing…</p> : null}
           </SheetBody>
         </SheetContent>
       </Sheet>

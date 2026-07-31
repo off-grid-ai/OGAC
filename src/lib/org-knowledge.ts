@@ -248,6 +248,40 @@ export async function addDocument(
   return { id: docId, chunks: pieces.length };
 }
 
+// Read ONE document with its indexed chunks — what retrieval actually sees.
+//
+// The collection detail page listed document names with a delete button and nothing else, on a surface
+// whose whole claim is that these documents ground the org's answers. A reviewer asked to trust a
+// citation has to be able to open the source. Tenancy is resolved the same way deleteDocument does it
+// (the doc has no org column, so the collection is the authority) — returns null rather than throwing so
+// a caller renders "not found" instead of a stack trace.
+export async function readDocument(docId: string, orgId: string = DEFAULT_ORG) {
+  await ensureSchema();
+  const [doc] = await db
+    .select({
+      id: orgKnowledgeDocs.id,
+      collectionId: orgKnowledgeDocs.collectionId,
+      name: orgKnowledgeDocs.name,
+      kind: orgKnowledgeDocs.kind,
+      size: orgKnowledgeDocs.size,
+      fileUrl: orgKnowledgeDocs.fileUrl,
+      mime: orgKnowledgeDocs.mime,
+      createdAt: orgKnowledgeDocs.createdAt,
+    })
+    .from(orgKnowledgeDocs)
+    .where(eq(orgKnowledgeDocs.id, docId))
+    .limit(1);
+  if (!doc) return null;
+  const col = await getCollection(doc.collectionId, orgId);
+  if (!col) return null;
+  const chunks = await db
+    .select({ position: orgKnowledgeChunks.position, content: orgKnowledgeChunks.content })
+    .from(orgKnowledgeChunks)
+    .where(eq(orgKnowledgeChunks.docId, docId))
+    .orderBy(orgKnowledgeChunks.position);
+  return { ...doc, collection: col.name, chunks };
+}
+
 export async function deleteDocument(docId: string, orgId: string = DEFAULT_ORG): Promise<void> {
   await ensureSchema();
   // The doc has no org column — resolve its collection and verify that collection is the caller's
