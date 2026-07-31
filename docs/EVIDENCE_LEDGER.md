@@ -35,6 +35,21 @@ ledger cannot be more optimistic than the evidence.
 6. **Read the screenshot.** A green typecheck, an HTTP 200 and a row count have never once told anyone
    whether a screen makes sense.
 
+## Current run
+
+```
+2/5 rows VERIFIED · 3 GAP        (npm run e2e)
+VERIFIED  s12-audit-trail        rows=50 attributed=true · 200 events / 7 actors / 38 actions
+VERIFIED  s12-evaluation         definitions=46 score=true threshold=true runControl=2
+GAP       citation-provenance    no citation row rendered within 90s
+GAP       flow6-review-approve   items=0 — empty queue, flow unproven (not proven-broken)
+GAP       flow8-compliance-export  route holds exporters, not evidence packs — target unresolved
+```
+
+**A GAP has two very different causes and the ledger must say which:** the feature is absent, or the
+script could not reach it (wrong route, no data). Conflating them is how a healthy surface gets
+"fixed" and a broken one gets excused. Each GAP row below states which it is.
+
 ## Ledger
 
 Status of every row is `GAP` until a script promotes it. Scripts live in `test/e2e/<row-slug>.mjs` and
@@ -49,9 +64,9 @@ are runnable individually; `npm run e2e` runs the suite and prints the gate per 
 | 3 — Create an app in natural language | GAP | — | clarifying questions are unit-tested; no UI script |
 | 4 — Build from a template | GAP | — | — |
 | 5 — Use an application | GAP | — | — |
-| 6 — Review and approve | GAP | — | — |
+| 6 — Review and approve | GAP | `flow6-review-approve.mjs` | `items=0 actionButtons=0 risk=false evidence=false` on /build/review — **queue is empty, so the flow is unproven, not proven-broken.** Needs a pending run seeded first; do not "fix" the page until an item exists. |
 | 7 — Investigate failure | GAP | — | — |
-| 8 — Compliance export | GAP | — | — |
+| 8 — Compliance export | GAP | `flow8-compliance-export.mjs` | /governance/evidence/export is about **exporters** (Splunk/Purview/Grafana), not evidence packs: `"No exporters yet…"`. Either the flow lives elsewhere (`/governance/evidence`, `/governance/reports`) and my script targets the wrong route, or the pack generator does not exist. **Resolve which before touching code.** |
 | 9 — Node intelligence | DESCOPED | — | founder parked OGAM/OGAD 2026-07-30 |
 
 ### §12 Technical table stakes
@@ -69,9 +84,9 @@ wholesale, which is the honest default.
 | Data | 13 | GAP |
 | Model operations | 17 | GAP |
 | Agent operations | 14 | GAP |
-| Evaluation | 15 | GAP |
+| Evaluation | 15 | **partly VERIFIED** — `s12-evaluation.mjs`: `definitions=46 score=true threshold=true runControl=2`. Golden datasets / quality thresholds / release-gate surface all render measured values. Remaining rows in the subsection still GAP. |
 | Observability | 13 | GAP |
-| Compliance | 10 | GAP |
+| Compliance | 10 | **partly VERIFIED** — `s12-audit-trail.mjs`: `rows=50 attributed=true`, 200 events / 7 actors / 38 actions, each row carrying actor+action+outcome. "Immutable or append-only audit trail" is evidenced. Remaining rows still GAP. |
 | Developer experience | 15 | GAP |
 
 ### Row 1 — Citation provenance (§8I "Cited", §12 Observability "Data lineage", §9 "Trust through visibility")
