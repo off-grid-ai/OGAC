@@ -1952,6 +1952,14 @@ execution may not reach it, which would mean `setParam` navigates away mid-handl
 it is abandoned. If so the ordering is the bug: persist and set state, then navigate LAST, and the
 sessionStorage write must be flushed before the push (it is synchronous, so verify it actually ran).
 
+**A SECOND fix that also did NOT work:** reordering `compile()` so the navigation is the last statement
+(state → draft → toast → `setParam`). Committed and deployed; behaviour unchanged. So the push preempting
+the handler was also not the cause, or not the only one.
+
+**Two hypotheses are now eliminated by experiment** — draft-loss-on-remount, and handler-preemption. Both
+changes are sound in themselves and are kept, but neither is the fault. The next person should INSTRUMENT
+before theorising: this row has now cost two speculative fixes, and speculation is what is failing here.
+
 **Next steps, in order:** (1) log inside `compile()` after `setParam` to see whether it executes;
 (2) read sessionStorage for `ogac:builder-draft` immediately after a compile to confirm the draft was
 written; (3) only then change the render or the state model.
