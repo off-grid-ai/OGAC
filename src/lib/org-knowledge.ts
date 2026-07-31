@@ -1,7 +1,8 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { orgKnowledgeChunks, orgKnowledgeCollections, orgKnowledgeDocs } from '@/db/schema';
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { embed } from '@/lib/embeddings';
+import { chunkText } from '@/lib/text-chunks';
 import { effectiveBaseRole } from '@/lib/role-permissions';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
@@ -58,31 +59,6 @@ async function ensureSchema(): Promise<void> {
     throw e;
   });
   return ensurePromise;
-}
-
-// Chunk text ~600 words with 120 overlap (desktop/rag.ts defaults; ~4 chars/token).
-function chunkText(text: string, chunkSize = 600, overlap = 120): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const step = chunkSize - overlap;
-  const chunks: string[] = [];
-  for (let i = 0; i < words.length; i += step) {
-    const slice = words.slice(i, i + chunkSize).join(' ');
-    if (slice.trim().length > 20) chunks.push(slice);
-    if (i + chunkSize >= words.length) break;
-  }
-  return chunks.length ? chunks : [text.trim()].filter(Boolean);
-}
-
-async function embed(input: string | string[]): Promise<number[][]> {
-  const r = await fetch(`${GATEWAY_URL}/v1/embeddings`, {
-    method: 'POST',
-    headers: gatewayHeaders({ 'content-type': 'application/json' }),
-    body: JSON.stringify({ input }),
-    signal: AbortSignal.timeout(60000),
-  });
-  if (!r.ok) throw new Error(`embeddings ${r.status}`);
-  const data = await r.json();
-  return (data?.data ?? []).map((d: { embedding: number[] }) => d.embedding);
 }
 
 function cosine(a: number[], b: number[]): number {

@@ -5,7 +5,8 @@ import { chatChunks, chatDocuments, chatProjects } from '@/db/schema';
 // Knowledgebase / RAG — ports Off Grid AI Desktop's chunk→embed→retrieve pipeline to the console,
 // using the on-prem gateway's /v1/embeddings (384-dim MiniLM) instead of an in-process model.
 
-import { GATEWAY_URL, gatewayHeaders } from '@/lib/gateway';
+import { embed } from '@/lib/embeddings';
+import { chunkText } from '@/lib/text-chunks';
 
 let ensurePromise: Promise<void> | null = null;
 async function ensureRagSchema(): Promise<void> {
@@ -28,32 +29,6 @@ async function ensureRagSchema(): Promise<void> {
     throw e;
   });
   return ensurePromise;
-}
-
-// Chunk text ~600 tokens with 120 overlap (desktop defaults; ~4 chars/token).
-function chunkText(text: string, chunkSize = 600, overlap = 120): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const wordsPerChunk = chunkSize;
-  const step = wordsPerChunk - overlap;
-  const chunks: string[] = [];
-  for (let i = 0; i < words.length; i += step) {
-    const slice = words.slice(i, i + wordsPerChunk).join(' ');
-    if (slice.trim().length > 20) chunks.push(slice);
-    if (i + wordsPerChunk >= words.length) break;
-  }
-  return chunks.length ? chunks : [text.trim()].filter(Boolean);
-}
-
-async function embed(input: string | string[]): Promise<number[][]> {
-  const r = await fetch(`${GATEWAY_URL}/v1/embeddings`, {
-    method: 'POST',
-    headers: gatewayHeaders({ 'content-type': 'application/json' }),
-    body: JSON.stringify({ input }),
-    signal: AbortSignal.timeout(60000),
-  });
-  if (!r.ok) throw new Error(`embeddings ${r.status}`);
-  const data = await r.json();
-  return (data?.data ?? []).map((d: { embedding: number[] }) => d.embedding);
 }
 
 function cosine(a: number[], b: number[]): number {

@@ -2080,6 +2080,34 @@ links and bookmarks keep working. Not done here because a route rename touches n
 
 ## G-203 — 42 data domains with heavy duplication and off-domain entries
 
+> **PARTLY FALSE, then addressed differently — 2026-07-31 (live DB read).** The duplicate half of this
+> gap does not hold: `org_bharat` has **23** domains and `org_suraksha` **14**, and inside each tenant
+> **no label repeats** (checked with `group by org_id, lower(label) having count(*) > 1` → zero rows).
+> The "42 with 13 duplicates" was a **cross-org count** of per-tenant rows — `claims` in the bank tenant,
+> `claims` in the insurer tenant and `claims` in `default` are three tenants' rules, not duplicates. A
+> tenant only ever sees its own (`listDomains` is org-scoped).
+>
+> The proposed dedupe would also have been **destructive**: pipeline data ceilings, `pipeline_versions`
+> snapshots and `solution_blueprint_versions` snapshots reference domains **by label** (e.g.
+> `["customer data","pricing rate card"]`), so renaming or deleting to fix a cosmetic issue would have
+> rewritten historical snapshots — an audit trail — and silently narrowed live ceilings.
+>
+> Also checked and false: "app steps that resolve to nothing." The `default`-org steps binding
+> `"customers"` resolve fine — the resolver matches **aliases** (tier 2), and `customer data` carries
+> `customers` as an alias. Comparing only ids and labels was an instrument error, not a product defect.
+>
+> **What was actually wrong** and is now fixed (commit `2ef75c34`): with 20+ near-identical rule cards
+> the page gave the operator no way to tell which rule the org runs on, and offered **Delete with no
+> warning** that app steps bind it — the precise trap this entry named. `/data/domains` now shows
+> "Routed to by 3 apps · 2 pipelines" (or "Not routed to yet") per card, the delete confirmation names
+> what would break, and the domain detail page gained "Read by apps" beside "Referenced by pipelines".
+> Reverse-edge matching reuses `domainMatchTokens`, the same token set enforcement uses.
+>
+> Still true and NOT changed: the off-domain entries (`candidates`, `job requisitions`,
+> `competitor intel`, `vendors`, `pricing rfq`) are EY use-case seed leftovers. They are unreferenced by
+> any app step and now read as "Not routed to yet" on the page, which is honest. Removing them is a
+> data-seed decision, and EY use cases are on hold.
+
 `/data/domains` is one of the strongest pages in the console — aliases, connector→resource bindings, a live
 "Test resolve" that uses the same deterministic resolver as the builder. Two data problems spoil it:
 
@@ -2119,6 +2147,14 @@ over quota — so the queue demonstrates range while still showing only what is 
 "fix" this by showing runs the user cannot act on; that would break the one promise the page makes.
 
 ## G-205 — live artifact previews fetch Mermaid and React from a public CDN
+
+> **FIXED IN CODE — 2026-07-31 (commits `14406344`, `fcd4372f`).** Mermaid, React/ReactDOM (UMD 18) and
+> `@babel/standalone` are vendored under `public/vendor/*` and `buildSrcDoc`'s `cdn` now defaults to the
+> console's own origin. **One thing this entry missed:** it wasn't only air-gapped deployments that were
+> broken — the CSP in `next.config.mjs` is `script-src 'self' 'unsafe-inline' 'unsafe-eval'
+> https://us-assets.i.posthog.com`, and jsdelivr was never allowlisted, so the browser blocked those
+> script tags **on a fully connected network too**. Live verification (open a Mermaid artifact and a
+> React artifact and look at them) is the remaining step before this is marked VERIFIED.
 
 `buildSrcDoc` (src/lib/artifacts.ts) defaults to `https://cdn.jsdelivr.net` to load Mermaid — and the React
 branch does the same for its runtime. On an air-gapped or restricted-network deployment there is no route to
