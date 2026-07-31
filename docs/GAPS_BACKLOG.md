@@ -2148,7 +2148,22 @@ over quota — so the queue demonstrates range while still showing only what is 
 
 ## G-205 — live artifact previews fetch Mermaid and React from a public CDN
 
-> **FIXED IN CODE — 2026-07-31 (commits `14406344`, `fcd4372f`).** Mermaid, React/ReactDOM (UMD 18) and
+> **CLOSED — VERIFIED LIVE 2026-07-31 evening.** All four live kinds render on
+> `bharatunion-onprem-console` as `demo-bank`, measured inside the panel iframe (not a thumbnail) with
+> `scripts/verify-artifact-previews.mjs`: mermaid `svgs=1` and no error graphic, react `#root` mounted with
+> real rows, html `elements=25`, svg `svgs=1`. Screenshots read, not just exit codes.
+>
+> **The CDN was only the first of FIVE causes**, each of which looked like the whole answer:
+> (1) jsdelivr unreachable air-gapped; (2) our own CSP never allowlisted it, so it was blocked online too;
+> (3) vendored files 307'd to `/signin` — the sandboxed iframe has no cookie, so the auth gate caught them;
+> (4) Mermaid alone stayed black because an ES `import` is CORS-fetched and an opaque-origin iframe sends
+> `origin: null`, so `/vendor` needs `Access-Control-Allow-Origin`; (5) **the real one** — `bodyOf()` returned
+> `''` when the externalised object read missed, discarding the body still in the DB column, so every seeded
+> artifact rendered an EMPTY document. Plus two found by reading the screenshot: React artifacts not named
+> `App` reported themselves broken, and Tailwind-classed artifacts rendered unstyled (`@tailwindcss/browser`
+> is vendored now as well).
+>
+> **Fixed in code — 2026-07-31 (commits `14406344`, `fcd4372f`).** Mermaid, React/ReactDOM (UMD 18) and
 > `@babel/standalone` are vendored under `public/vendor/*` and `buildSrcDoc`'s `cdn` now defaults to the
 > console's own origin. **One thing this entry missed:** it wasn't only air-gapped deployments that were
 > broken — the CSP in `next.config.mjs` is `script-src 'self' 'unsafe-inline' 'unsafe-eval'
@@ -2179,3 +2194,37 @@ being squeezed in at the end of another.
 so in light mode every thumbnail was a solid black rectangle. That part is fixed (transparent background,
 neutral Mermaid theme) — but a correctly-themed empty box is still an empty box until the CDN dependency
 goes.
+
+## G-206 — one fleet node serves /v1/embeddings without `--embeddings` (INFRA, private repo)
+
+**Measured live 2026-07-31.** The gateway aggregator (`:8800`) round-robins `/v1/embeddings` across the
+fleet and one node's llama.cpp was started **without `--embeddings`**. Ten identical requests from the box:
+
+```
+200 200 501 200 200 501 200 200 501 200
+```
+
+with the failing node answering
+`{"code":501,"message":"This server does not support embeddings. Start it with --embeddings"}`.
+
+**What it cost.** One in three knowledge-indexing calls failed, nothing retried, and rows were left behind
+with no vector — which is why **24 of 37 org knowledge documents had zero indexed chunks** while the
+collection pages showed a healthy document count. A document that is listed but unindexed is invisible to
+retrieval and cannot be cited: failure presenting as emptiness, one layer down.
+
+**Mitigated in the product** (`src/lib/embeddings.ts`): `embed()` retries the statuses that mean "this node,
+not this request" — 501/502/503/504/429 — up to 4 attempts, and the thrown error now carries the node's own
+words instead of a bare `embeddings 501`. A capability gap on one node of a load-balanced pool is exactly
+what a retry is for.
+
+**Still open, and NOT in this repo:** start that node with `--embeddings`, or route embeddings only to
+capability-matching nodes in the aggregator (`/v1/models` already reports per-model capabilities and their
+gateways, so the routing information exists). Owner: `off-grid-ai/onprem-fleet-orchestration`.
+
+## G-207 — the `default` org's demo rows are still visible to whoever signs in there
+
+Noted while auditing data domains, not fixed. The `default` org holds 5 leftover data domains, three
+projects named `Op`/`OPOP`/`Acme Support`, and 26 `code` artifacts belonging to development accounts. No
+tenant sees them (`listDomains`/`listArtifacts`/project queries are all org-scoped, verified), so this is
+not a leak and not demo-blocking — but signing in as a non-tenant identity lands in `default` and shows
+that debris. Worth a cleanup before any demo that does not use a tenant subdomain.

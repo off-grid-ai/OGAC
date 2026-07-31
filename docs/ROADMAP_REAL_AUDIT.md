@@ -31,6 +31,46 @@ against evidence rather than against a reading of the spec.
 > Gates in this file are still valid, but treat any `VERIFIED` that was promoted by a script alone as
 > suspect unless a screenshot was read. Roughly 14 of my defect claims that session turned out to be my own
 > instrument rather than the product.
+>
+> ### Session 2 — same day, 2026-07-31 evening (the four open items, and what they turned into)
+>
+> All four items from the handoff are **closed**, and chasing the first one down found four *further* layers
+> of the same bug plus a live infrastructure fault. Verified live on `demo-bank@getoffgridai.co`, evidence
+> read (not just exit codes). Commits `fcd4372f` … `HEAD`.
+>
+> | Item | Outcome |
+> |---|---|
+> | CDN vendoring (G-205) | **CLOSED.** All four preview kinds render live. Five distinct causes, below. |
+> | Project artifacts panel | **CLOSED.** On the project page, deep-links into the viewer. Seed repaired so it is not empty. |
+> | Knowledge: text intake + clickable org docs | **CLOSED.** Both surfaces take pasted text; org documents open their indexed chunks; **PDF is now genuinely supported** (server-side pdfjs). |
+> | G-203 42 domains / 13 duplicates | **PARTLY FALSE** — no duplicate label inside either tenant (cross-org count). Addressed instead with usage + a delete guard. See the G-203 note in GAPS_BACKLOG. |
+>
+> **"The artifact previews are black" had FIVE causes, each hiding the next.** This is the most useful thing
+> in this entry, because each layer looked like the whole answer:
+> 1. `buildSrcDoc` loaded Mermaid/React/Babel from `cdn.jsdelivr.net` — no route on an air-gapped box.
+> 2. Our own CSP never allowlisted jsdelivr, so it was blocked **on a connected network too**.
+> 3. Vendored under `public/vendor` — and the middleware auth gate 307'd every runtime to `/signin`,
+>    because the preview iframe is sandboxed without `allow-same-origin` and carries no session cookie.
+> 4. Excluded `/vendor` from the matcher — and Mermaid alone stayed black: an ES `import` is fetched with
+>    CORS semantics, and an opaque-origin iframe serialises to `origin: null`, so `/vendor` needs
+>    `Access-Control-Allow-Origin`. (Classic `<script src>` is exempt, which is why only Mermaid failed.)
+> 5. **The real one:** `bodyOf()` in `chat.ts` returned `''` whenever the externalised object read missed,
+>    throwing away the body still in the DB column. Every seeded artifact has a `codeKey` and none of the
+>    objects were ever uploaded — so all four kinds were rendering an EMPTY document. One cause, four
+>    symptoms: black box (html/svg), "Syntax error in text" (mermaid), "No default export" (react).
+>
+> Then two more, found only by looking at the screenshot: React artifacts whose component is not literally
+> named `App` declared themselves broken, and a mounted React artifact rendered as unstyled serif text
+> because Tailwind classes had no stylesheet in the iframe (`@tailwindcss/browser` is now vendored too).
+>
+> **Live infrastructure fault, needs a fleet-repo fix:** the aggregator round-robins `/v1/embeddings` and one
+> node runs llama.cpp **without `--embeddings`**. Ten identical requests: `200 200 501 200 200 501 …`. One in
+> three knowledge uploads was failing silently, which is why 24 org documents had zero indexed chunks.
+> `embed()` now retries the node-level statuses; the node itself is still wrong.
+>
+> **Content:** 44 knowledge documents had placeholder text ("Extract from …") or no chunks at all. All now
+> carry real Indian BFSI policy text and real vectors (`scripts/reindex-knowledge.mts`, replayable). Verified
+> after: 0 placeholders, 0 unindexed documents, 0 chunks without a vector.
 
 ## OUT OF SCOPE (founder, 2026-07-30) — "we'll tackle later"
 
