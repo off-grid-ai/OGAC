@@ -11,6 +11,31 @@ have evaluations" claim off a `count(*)`, a "fixed" verdict off `grep -c`. The c
 reported as the goal. A script that reads the terminal artifact cannot make that substitution, so the
 ledger cannot be more optimistic than the evidence.
 
+## The identity ceiling — why some rows CANNOT be promoted yet
+
+Every demo identity configured on the box is a **viewer**:
+
+```
+OFFGRID_DEMO_VIEWER_EMAIL / _PASSWORD
+OFFGRID_DEMO_VIEWER_BHARATUNION_EMAIL / _PASSWORD
+OFFGRID_DEMO_VIEWER_SURAKSHA_EMAIL / _PASSWORD
+```
+
+There is no editor or admin credential, and `AUTH_DEV_LOGIN=false` in production. So **any row whose
+proof requires a WRITE is unprovable by this harness today** — not because a script is missing, but
+because no identity exists that is permitted to perform it. Those rows read `GAP (identity ceiling)`
+and the correct next action is to provision a demo editor account, which is a seed/infra change rather
+than product code.
+
+This is the honest shape of the remaining work, and it is worth stating precisely because the
+alternative is what I did three times on Flow 3: read a correct refusal as a broken feature. The
+surfaces refuse cleanly and explain themselves — `"This account can explore the Builder but cannot make
+changes."` A viewer-only harness can verify that governance WORKS; it cannot verify what governance
+forbids it from doing.
+
+Affected: Flow 3 (compile an app), Flow 6 (act on a review), Flow 8 (generate a pack), and the
+create/rotate controls under Security.
+
 ## Gates
 
 | Gate | Meaning |
@@ -18,6 +43,8 @@ ledger cannot be more optimistic than the evidence.
 | `VERIFIED` | A script in `test/e2e/` drives the UI and asserts the artifact. Evidence path in the row. |
 | `WIRED` | Code and route exist; no script asserts the artifact. **Not** a claim that it works. |
 | `GAP` | Absent, broken, or unscriptable. Unscriptable IS a gap. |
+| `GAP (identity ceiling)` | A script exists and runs, but proving the row needs a write and only viewer credentials exist. Unproven, NOT broken — see the section above. |
+| `GAP (target unresolved)` | A script exists but has not been pointed at the right route yet. Says nothing about the product. |
 
 ## Harness rules (learned the hard way, non-negotiable)
 
