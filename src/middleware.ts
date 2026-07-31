@@ -238,8 +238,13 @@ export default auth(async (req) => {
 // cost — and without this the request 307s to /signin and the browser just shows a broken image.
 // (`/docs-shots` is only served because it happens to start with the public `/docs` prefix. That is an
 // accident, not a rule — do not rely on it for a new asset directory.)
+// `vendor` holds the artifact runtimes (Mermaid, React/ReactDOM UMD, @babel/standalone) that a live
+// artifact preview loads INSIDE its sandboxed iframe. LIVE FINDING (2026-07-31): vendoring them fixed the
+// CDN/CSP problem and previews were STILL black rectangles, because the sandbox has no `allow-same-origin`
+// — so the iframe's script requests carry no session cookie, the auth gate saw an anonymous request, and
+// every runtime 307'd to /signin. They are public files, not routes; excluded outright like the rest.
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|logo.png|diagrams|hero).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|logo.png|diagrams|hero|vendor|scalar).*)',
   ],
 };
