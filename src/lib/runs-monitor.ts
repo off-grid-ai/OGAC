@@ -158,6 +158,14 @@ export interface AppRunSource {
 export interface AgentRunSource {
   id: string;
   agentId: string;
+  /**
+   * The agent's human name, when the reader can resolve it.
+   *
+   * App runs show their title and chat runs show their conversation, but agent runs fell back to the raw
+   * `agentId` — so the Operations activity list read "agent_c154f63e" next to "Policy Underwriting
+   * Assist". An operator scanning what ran should not have to decode an id to know what it was.
+   */
+  agentName?: string | null;
   status: string;
   startedAt?: string | null;
   /** Agent runs record no explicit finish; the reader may pass one, else duration is unknown. */
@@ -216,7 +224,7 @@ export function fromAgentRun(src: AgentRunSource): RunRow {
     id: src.id,
     key: runKey('agent', src.id),
     kind: 'agent',
-    name: src.agentId,
+    name: (src.agentName ?? '').trim() || src.agentId,
     status: normalizeStatus(src.status),
     rawStatus: src.status,
     startedAt,

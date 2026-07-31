@@ -16,6 +16,7 @@
 
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { listAllAgents } from '@/lib/agents';
 import { listAgentRuns } from '@/lib/agentrun';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { listApps } from '@/lib/apps-store';
@@ -85,9 +86,18 @@ function appRunActor(input: Record<string, unknown> | undefined): string {
 async function readAgentRuns(orgId: string): Promise<AgentRunSource[]> {
   try {
     const runs = await listAgentRuns(PER_PLANE, orgId);
+    // Resolve agent names so the run list reads like the app list. One lookup for the whole page.
+    const names = new Map<string, string>();
+    try {
+      const agents = await listAllAgents(orgId);
+      for (const a of agents) if (a.id && a.name) names.set(a.id, a.name);
+    } catch {
+      /* names are a nicety — a failed lookup falls back to the id, never breaks the list */
+    }
     return runs.map((r) => ({
       id: r.id,
       agentId: r.agentId,
+      agentName: names.get(r.agentId) ?? null,
       status: r.status,
       startedAt: r.startedAt,
       // Agent runs record no explicit finish; leave null so the pure layer reports duration unknown.
