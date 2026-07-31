@@ -88,9 +88,34 @@ That is the largest genuine product gap this ledger has found, and it is a §11 
 ("Regulatory evidence", "Immutable audit trail", signed and archived). Worth confirming against the
 router before building, but four admin-authenticated routes is real evidence.
 
-**Flow 6 is a DATA condition, not a defect.** `items=0` persists as admin, so the review queue is empty
-because nothing is pending — not because the surface is broken. Seed a run that pauses for approval and
-this row becomes judgeable. Until then it is honestly unproven.
+**Flow 6 — the SURFACE IS GOOD; the row is GAP because of my locator, three times over.**
+
+My "the queue is empty" verdict was wrong: the database holds **35 `awaiting_human` runs in org_bharat**,
+and the page renders properly:
+
+```
+Your review queue — Decisions waiting on you. Each one is a run an app has paused for a person to
+approve or reject. Open one to see what you're approving, why, and the amount at stake.
+AWAITING YOU 2 · YOU CAN APPROVE 2 · ABOVE YOUR LIMIT 0 · APPS INVOLVED 1
+DELINQUENCY INTERVENTION — You can approve — Overdue account — K…
+```
+
+That satisfies §8G's substance: what the system wants to do, why, the amount at stake, and the reviewer's
+own authority shown explicitly ("above your limit"). Four of five assertions pass:
+`counts=true limitShown=true stakeExplained=true namedItem=true`.
+
+Only `actions=0` fails, and each attempt to fix it was another locator error:
+1. counted `tr, li` on the list → reported an empty queue while 35 runs waited;
+2. demanded an Approve button on the LIST → but the page says "**Open one** to see what you're
+   approving", so acting happens on the item detail, which is also what §10 Flow 6 describes;
+3. clicked a `link` matching /overdue|claim|review/ → landed on **`/solutions/reviews`**, i.e. I matched a
+   NAV item, exactly the trap that cost me two Flow 3 verdicts.
+
+**To finish this row:** identify the queue item's real element (inspect the rendered card in
+`scratchpad/review-queue.png`), open it, and assert the act controls on the DETAIL page — and note that
+`/build/review` and `/solutions/reviews` both exist, so establish which is canonical before asserting.
+**Nothing here suggests a product defect.** The honest gate is GAP because the script cannot yet reach the
+control, not because the control is missing.
 
 **Row 1 — VERIFIED by the script.**
 

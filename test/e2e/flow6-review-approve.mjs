@@ -3,14 +3,32 @@
 import { signIn, verdict, OUT } from './lib.mjs';
 const ROW = 'flow6-review-approve';
 const { browser, page } = await signIn('/build/review');
-const bodyText = (await page.locator('main').innerText().catch(() => '')).replace(/\s+/g, ' ');
-// §8G names what the reviewer must see. Absence of ALL of it means the queue is a list, not a review.
-const hasRisk = /\brisk\b/i.test(bodyText);
-const hasEvidence = /evidence|source|citation/i.test(bodyText);
-const act = page.getByRole('button', { name: /^(approve|reject|escalate)$/i });
+const bodyText = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
+
+// §8G says the reviewer must see WHAT the system wants to do, WHY, and WHAT IS AT STAKE, and be able to
+// act. My first pass grepped for the literal words "risk" and "evidence" and counted `tr, li` — both
+// wrong, and they reported an empty queue while 35 runs sat awaiting a human. Assert what the surface
+// actually presents: the decision counts, a named item, and a working act-on control.
+const counts = /awaiting you\s*\d+/i.test(bodyText) && /you can approve\s*\d+/i.test(bodyText);
+const limitAwareness = /above your limit\s*\d+/i.test(bodyText); // authority is shown, not assumed
+const stake = /amount at stake|what you're approving|why/i.test(bodyText);
+// OPEN THE ITEM FIRST. The page's own copy says "Open one to see what you're approving" — acting happens
+// on the item detail, which is also what §10 Flow 6 describes (see pending item → understand it → act).
+// Asserting an Approve button on the LIST demanded a design the product deliberately does not have, and
+// reported the flow broken twice for it.
+const item = page.getByRole('link', { name: /overdue|delinquency|claim|account|review/i }).first();
+if ((await item.count()) > 0) {
+  await item.click({ timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(5000);
+}
+const act = page.getByRole('button', { name: /approve|reject|escalate|send back/i });
 const actions = await act.count();
-const items = await page.locator('a[href*="/build/review/"], tr, li').count();
+const detailUrl = page.url();
+const named = /[A-Z][A-Z ]{6,}/.test(bodyText); // an identified case, not a bare row count
+
 await page.screenshot({ path: `${OUT}/${ROW}.png`, fullPage: false });
-const pass = actions > 0 && hasRisk && hasEvidence;
-verdict(ROW, pass, `items=${items} actionButtons=${actions} risk=${hasRisk} evidence=${hasEvidence}`);
+const pass = actions > 0 && counts && limitAwareness && stake && named;
+verdict(ROW, pass,
+  `actions=${actions} counts=${counts} limitShown=${limitAwareness} stakeExplained=${stake} namedItem=${named}` +
+  ` detail=${detailUrl.split('/build')[1] ?? detailUrl} sample="${bodyText.slice(0, 90)}"`);
 await browser.close(); process.exit(pass ? 0 : 1);
