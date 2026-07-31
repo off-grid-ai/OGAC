@@ -50,13 +50,24 @@ try {
   process.exit(1);
 }
 // The artifact: either clarifying questions or a proposed step list. Both are plain-language plans.
-const ok = await waitFor(async () => {
+let ok = await waitFor(async () => {
   const t = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
-  return /clarif|which data source|what value is the cut-off|who should review/i.test(t)
-    || /\bstep\s*1\b|proposed workflow|plan\b/i.test(t);
+  // COMPILE DEMONSTRABLY WORKS: POST /v1/admin/apps/compile returns 200 with a full spec (orgId,
+  // ownerId, title, summary). My earlier patterns looked for words the surface does not use and reported
+  // the product's core promise broken. Assert instead that the compiled SPEC reached the screen — the
+  // title derived from the sentence, or the steps, or a clarifying question.
+  // NEVER ASSERT YOUR OWN INPUT. A previous version matched /reimbursement|training claim/ — the sentence
+  // TYPED INTO THE TEXTAREA — and passed while compileRequestFired was false and nothing had been
+  // produced. It graded the question, not the answer. The proof of Flow 3 is OUTPUT STRUCTURE that cannot
+  // exist unless compile ran: numbered steps, or a clarifying question.
+  return /\bstep\s*[12]\b/i.test(t)
+    || /clarif|which data source should|what value is the cut-off|who should review this/i.test(t);
 }, 90000);
 const t = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
 await page.screenshot({ path: `${OUT}/${ROW}.png`, fullPage: true }).catch(() => {});
+// The request MUST have fired. Without it, any match on screen is either the page's own copy or the text
+// I typed — never evidence that the product did anything.
+ok = ok && compiled;
 verdict(ROW, ok, `compileRequestFired=${compiled} ` +
   (ok ? `plan/questions produced: "${t.slice(0, 170)}"` : `no plan or question after 90s: "${t.slice(0, 170)}"`));
 await browser.close(); process.exit(ok ? 0 : 1);

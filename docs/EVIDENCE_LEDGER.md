@@ -393,7 +393,38 @@ point at the product rather than at my regex, which is the distinction this ledg
 ```
 VERIFIED  s12-developer-experience  /operations/api-docs  17 rows, "public API surface, grouped by area"
 
-WITHDRAWN — flow3-natural-language-app was NOT a defect. Twice.
+**flow3 — FINAL: compile SUCCEEDS server-side and its result never reaches the screen.**
+
+```
+GAP  flow3-natural-language-app  compileRequestFired=true  no plan or question after 90s
+POST /v1/admin/apps/compile → 200
+{"object":"app_compile","spec":{"orgId":"org_bharat","ownerId":"demo-editor@getoffgridai.co",
+ "title":"Check each training reimbursement claim against","summary":"…"}}
+```
+
+Two independent observations: the API returns a complete spec, and the page still shows the empty "Build a
+new app" state ninety seconds later. **This is a real defect on §10 Flow 3 / §15 — the product's core
+promise — and it is a RENDER/STATE defect, not a compile defect.** Check whether the response is applied to
+component state at all, and whether an error in parsing it is being swallowed.
+
+### The false pass I caught on the way, and why it matters more than the finding
+
+An intermediate version of this script reported **VERIFIED** while `compileRequestFired=false`. It matched
+`/reimbursement|training claim/` — **the sentence I had typed into the textarea** — plus a common verb. It
+was grading the question, not the answer, and it would have put a green row in this ledger for a feature
+that does nothing.
+
+Two rules follow, and they apply to every row here:
+- **Never assert on your own input.** Anything you typed is on screen by definition.
+- **Require the REQUEST to have fired.** Without that, a match is either the page's own copy or your input
+  — never evidence the product acted. `ok = ok && compiled` is now the gate.
+
+A false VERIFIED is strictly worse than a GAP: a GAP costs an investigation, a false VERIFIED costs the
+trust that makes the whole document worth reading.
+
+---
+
+Earlier: WITHDRAWN — flow3-natural-language-app was NOT a defect. Twice.
   Final state: `GAP  refused (disabled=true) — Flow 3 needs a WRITE-CAPABLE identity; set DEMO_USER to an
   editor. Refusal wording: "This account can explore the Builder but cannot make changes."`
 
