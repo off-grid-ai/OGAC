@@ -25,7 +25,12 @@ export function buildSrcDoc(
   a: { kind: string; code: string },
   opts: { cdn?: string; bridge?: boolean } = {},
 ): string {
-  const cdn = opts.cdn ?? 'https://cdn.jsdelivr.net';
+  // OUR OWN ORIGIN, not a public CDN. This defaulted to https://cdn.jsdelivr.net, so on an air-gapped or
+  // restricted-network deployment — the deployment this product is FOR — Mermaid never loaded and a diagram
+  // artifact rendered as an empty box, on a page whose footer reads "nothing leaves your network".
+  // Mermaid is vendored under public/vendor/mermaid (same pattern as public/scalar.standalone.js), so the
+  // iframe fetches it from the console itself. Callers can still override for a hosted context.
+  const cdn = opts.cdn ?? '';
   const bridge = opts.bridge
     ? `<script>window.offgrid={complete:function(prompt,options){return fetch('/api/v1/chat/artifacts/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({prompt:prompt},options||{}))}).then(function(r){return r.json()}).then(function(d){if(d.error)throw new Error(d.error);return d.text})};</script>`
     : '';
@@ -40,7 +45,7 @@ export function buildSrcDoc(
 <pre class="mermaid" style="display:flex;justify-content:center;padding:16px">${escapeHtml(a.code)}</pre>
 ${bridge}
 <script type="module">
-import mermaid from '${cdn}/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+import mermaid from '${cdn}/vendor/mermaid/mermaid.esm.min.mjs';
 mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
 </script></body>`;
   }

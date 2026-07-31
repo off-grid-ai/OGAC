@@ -12,6 +12,26 @@ against evidence rather than against a reading of the spec.
 > what has not is always visible. `docs/roadmap-real.md` stays the untouched SPECIFICATION; every gate, every
 > promotion and every dated finding lands here. The Progress log is at the bottom.
 
+> ## ⇢ START HERE IF YOU ARE PICKING THIS UP (2026-07-31)
+>
+> **Read [`docs/SESSION_HANDOFF_2026-07-31.md`](SESSION_HANDOFF_2026-07-31.md) before this file.** It carries
+> the full record of the demo-readiness pass on both tenants: 28 real defects fixed, the four open items the
+> founder asked for by name, one change left in-flight (uncommitted), and — most importantly — the ten
+> verification rules that session paid for.
+>
+> **Goal in force:** *"make the 2 tenants demo complete, and demo ready"*, against this spec. The acceptance
+> bar is the founder's: **you could put it on a screen in front of a buyer and never explain anything away.**
+>
+> **The one thing to internalise:** automated checks did not find the defects — the founder did, by clicking.
+> A four-class route sweep reported 0–2 findings across 32 routes while he found an unclickable citation, a
+> `Target 900%`, a dead Publish button and knowledge files you cannot open. That sweep was **deleted on
+> purpose**. What works is: screenshot as the demo user, **open the image**, and judge it. When a script and a
+> screenshot disagree, the screenshot wins.
+>
+> Gates in this file are still valid, but treat any `VERIFIED` that was promoted by a script alone as
+> suspect unless a screenshot was read. Roughly 14 of my defect claims that session turned out to be my own
+> instrument rather than the product.
+
 ## OUT OF SCOPE (founder, 2026-07-30) — "we'll tackle later"
 
 Explicitly descoped until the founder says otherwise. **Do not work these, and do not count them as gaps:**
@@ -700,3 +720,53 @@ Five ledger rows this session described defects that were already fixed. Eleven 
 dropped at a boundary** — every one passing typecheck and 5,500 tests, because each side was correct in
 isolation. Two were my own, made while "fixing" something else. The check that caught all of them: exercise
 the real path, then ask whether everything the producer computed is actually present.
+
+---
+
+## Progress log — 2026-07-31 · demo-readiness pass on both tenants
+
+Full record: **[`docs/SESSION_HANDOFF_2026-07-31.md`](SESSION_HANDOFF_2026-07-31.md)**. Gaps filed:
+**G-194 … G-205** in `docs/GAPS_BACKLOG.md`. Goal in force: *make the 2 tenants demo complete and demo ready.*
+
+### What changed against the spec
+
+| Spec area | Change |
+|---|---|
+| §8I "Cited" · §9 "Trust through visibility" | The Sources footer was `[1] source · part 1 · 0%` — a fabricated name, an internal chunk index, and a **missing score coerced to zero**. Now a real document name, passages only when >1, percentage omitted when unknown, and the row **links to the collection**. Both retrievers were dropping `docId` (8th dropped-field-at-a-boundary defect). |
+| §8H Evaluation · "Release gates" | `eval_runs.score` is written 0–100 by some evaluators and 0–1 by others, and the Quality page **averaged them together** — so the mean and the degradation verdict were computed across incompatible units, on numbers release gates read. `src/lib/eval-score-scale.ts` normalises on read; out-of-range no longer clamps to 100%. |
+| §11 "Honest product state" | Four separate surfaces presented a **refusal as breakage** (prompt starters, artifact publish/revert, restricted collection, builder compile). `src/lib/api-failure.ts` is the seam. **193 call sites still discard the server's reason — G-194.** |
+| §12 Identity and access | `/governance/teams` read "0 members" on every team while 24 memberships existed, stamped with the wrong org — and membership **gates pipeline lifecycle access**, so this was tenancy, not display. The Roles column was blank for every user (Keycloak `/users` returns no role mappings **and** none were assigned — either alone still shows blank). |
+| §10 Flow 5 "Use an application" | Saved conversations **rendered the question and lost the answer entirely** — every seeded turn was a root, so the transcript walk stopped after one message. This masked every citation investigation. |
+| §10 Flow 8 "Compliance export" | **Works.** I wrongly declared it "the largest genuine product gap" after checking four routes for a *button*; the control is a link labelled "Download" and it returns a 254 KB regulator-ready PDF. |
+| §10 Flow 3 "Create an app in natural language" | **Works, and it is the best thing in the product** — a plain sentence produces a named app, a summary, the inheritance banner and governed steps with an honest advisory. I reported it broken twice; both were my assertions. A spinner and a stated 20–40 s expectation were added. |
+| §13 Governance metrics | `OPA` was a **headline value on the Home screen**. Engine and codename leaks removed from the lineage graph, the Quality engine column, agent requirement chips, a `/data` button, and eight `serviceLabel` fields. Exception kept deliberately: a data *catalogue* naming "Warehouse (ClickHouse)" is correct — an operator must know where a dataset lives. |
+| §14 Initial wedge (demo credibility) | Blueprint targets were implausible (500→5000 claims/day ⇒ "Target 900%") and priced in **USD** with `annualBenefit: 0` on an Indian BFSI demo. Now 500→650 with INR hypotheses. Artifacts of all five renderable kinds, project knowledge per project, blueprint deployments bound to real apps. |
+
+### Open against the spec — pick up here
+
+1. **Chat has no pipeline** (§8D, §11 "Governance is inherited"). `resolveConsumerPipeline` is correct; the
+   **org default chat pipeline is simply unset** for both tenants. Founder: *"what is the demo if there is no
+   pipeline?"*
+2. **Artifact previews fetch from a public CDN** (§11 "Raw data can remain local") — G-205, **in flight**.
+   Mermaid is vendored to `public/vendor/mermaid/`; the three React `<script>` tags still point outward, and
+   React 19 here ships no UMD build. **Uncommitted at session end** — check `git status` first.
+3. **Project artifacts panel** — reader and route committed, **UI never added**. Founder asked for it by name.
+4. **Knowledge should accept text as well as files**, and **org knowledge documents are not clickable** (only
+   project documents were made previewable). Both founder requests.
+5. **42 data domains, thirteen duplicated labels** — G-203. App steps bind a domain **by id**; repoint before
+   deleting, or a cosmetic duplication becomes a broken app.
+6. Still untouched from the earlier queue: release gates, risk classification, environment promotion,
+   marketplace, partner ecosystem, and Flows 1/2/4 as whole flows.
+
+### The pattern to carry forward — 2026-07-31
+
+Last session's lesson was *a field dropped at a boundary*. This session's is one level up: **I measured
+proxies and reported them as the goal.** A route sweep checking geometry and string matches returned 0–2
+findings across 32 routes while the founder found five real defects by clicking. Roughly **14 of my defect
+claims were my own instrument** — a locator that matched a nav item, `fill()` on a controlled input, a regex
+over an href instead of following the link, a `LIMIT 3` reported as a finding, a test that asserted the
+sentence I had typed.
+
+The rule that survived all of it: **when a script and a screenshot disagree, the screenshot wins.** Capture as
+the demo user, open the image, and judge whether it makes sense. Everything real came from that or from the
+founder.
