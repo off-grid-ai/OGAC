@@ -2117,3 +2117,22 @@ demo-bank is only an approver on one app.
 handful of apps spanning different decision types — a claim, a KYC escalation, a loan exception, an expense
 over quota — so the queue demonstrates range while still showing only what is genuinely theirs. Do NOT
 "fix" this by showing runs the user cannot act on; that would break the one promise the page makes.
+
+## G-205 — live artifact previews fetch Mermaid and React from a public CDN
+
+`buildSrcDoc` (src/lib/artifacts.ts) defaults to `https://cdn.jsdelivr.net` to load Mermaid — and the React
+branch does the same for its runtime. On an air-gapped or restricted-network deployment there is no route to
+that host, so the iframe stays blank and the gallery shows an empty rectangle where a diagram should be.
+
+**This contradicts the sentence printed at the bottom of the same page:** "Runs on your on-prem gateways ·
+nothing leaves your network." A diagram preview that only works with internet access is both a broken
+feature on the target deployment and a claim we cannot defend.
+
+**Fix:** vendor Mermaid and the React runtime into `public/` and point `opts.cdn` at the console's own
+origin, so previews render from the deployment itself. The `cdn` option already exists and is threaded
+through — it just defaults outward.
+
+**Found while fixing a related defect:** the SVG and Mermaid wrappers also hardcoded `background:#0a0a0a`,
+so in light mode every thumbnail was a solid black rectangle. That part is fixed (transparent background,
+neutral Mermaid theme) — but a correctly-themed empty box is still an empty box until the CDN dependency
+goes.

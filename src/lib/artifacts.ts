@@ -33,15 +33,15 @@ export function buildSrcDoc(
     return bridge ? a.code.replace(/<head[^>]*>/i, (h) => h + bridge) || bridge + a.code : a.code;
   }
   if (a.kind === 'svg') {
-    return `<!doctype html><meta charset="utf-8">${bridge}<body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0a0a0a">${a.code}`;
+    return `<!doctype html><meta charset="utf-8">${bridge}<body style="margin:0;display:grid;place-items:center;min-height:100vh;background:transparent">${a.code}`;
   }
   if (a.kind === 'mermaid') {
-    return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#0a0a0a;color:#e5e5e5;font-family:Menlo,monospace">
+    return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:transparent;color:inherit;font-family:Menlo,monospace">
 <pre class="mermaid" style="display:flex;justify-content:center;padding:16px">${escapeHtml(a.code)}</pre>
 ${bridge}
 <script type="module">
 import mermaid from '${cdn}/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
 </script></body>`;
   }
   // react
