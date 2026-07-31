@@ -103,14 +103,27 @@ reassigned to `demo-editor@getoffgridai.co` / `org_bharat`, and it carries:
 Run as the owning identity, on that exact route, the footer still renders no citation row. So:
 ownership ✗ eliminated · identity ✗ eliminated · route ✗ eliminated · stored data ✗ eliminated.
 
-What remains is the render path itself. Check in this order, and read the answer before changing code:
-1. **Is the deployed `.next` actually carrying the renderer fix?** The citation commits were deployed via
-   `next-only.sh`, but a torn or stale artifact would look exactly like this. Confirm the built bundle
-   contains `sourceHref`.
-2. Does `SourcesFooter` receive `citations` for a message loaded from HISTORY, or only for one streamed
-   live? The read path and the stream path may attach citations differently — which would be the
-   dropped-field-at-a-boundary defect for the ninth time, on the load path this time.
-3. Is `buildSources` returning `[]` for this shape? It is pure and unit-tested — feed it this exact JSON.
+What remains is the render path. Three of the four hypotheses are now ELIMINATED by inspection:
+
+1. ~~Stale deployed bundle~~ — `.next/static/chunks/62190-*.js` contains `Unnamed document`. The renderer
+   fix IS live.
+2. ~~The load query drops citations~~ — `allMessages()` is `db.select()` with no projection, i.e. all
+   columns, and `listMessages` spreads `...chosen`. Nothing is dropped.
+3. ~~The column is undeclared in drizzle~~ — `chatMessages.citations` is declared.
+
+   BUT its `$type` had gone STALE: it still said `{name, position, score}[]` after citations gained
+   `docId`/`collectionId`. Runtime is unaffected (jsonb returns whole rows), which is precisely what makes
+   it dangerous — the annotation never fails, it just silently stops guarding the seam where eight
+   dropped-field bugs have already happened. Corrected in the same commit as this entry.
+
+**The one hypothesis left:** the conversation route may render a different component tree than the one
+`SourcesFooter` lives in, or the reassigned conversation's messages may not be reaching the transcript at
+all (e.g. `parent_id` threading — 36 rows needed repairing for exactly that reason earlier this session,
+and a message that is not the active child of its parent is never displayed).
+
+**Check first, and it is cheap:** open `/work/chat/conv_98482ffa486f` and confirm the ANSWER TEXT itself
+renders. If the message body is absent too, this was never a citation bug — it is a threading/visibility
+bug and the citation is simply invisible along with its message.
 
 This is the most valuable open thread in the ledger: the data is provably correct, so whatever is
 swallowing it is a real code defect rather than a seeding artefact.

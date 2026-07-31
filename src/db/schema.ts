@@ -456,7 +456,14 @@ export const chatMessages = pgTable('chat_messages', {
   content: text('content').notNull().default(''),
   reasoning: text('reasoning'), // model thinking, kept separate from content
   images: jsonb('images').$type<string[]>(), // data: URIs sent with a user turn
-  citations: jsonb('citations').$type<{ name: string; position: number; score: number }[]>(),
+  // Kept in step with `Citation` in src/lib/chat-citations.ts. This annotation had gone stale — it still
+  // declared the old {name,position,score} shape after citations gained docId/collectionId/collection,
+  // so the compiler would have accepted code that dropped the identity fields at this boundary without a
+  // word. jsonb returns whole rows at runtime, which is exactly why a stale $type is dangerous: it never
+  // fails, it just stops protecting the seam.
+  citations: jsonb('citations').$type<
+    { name: string; position: number; score: number; collection?: string; docId?: string; collectionId?: string }[]
+  >(),
   // ─── Edit & branch (Wave 2) — a parent-pointer tree over messages ───
   // parentId points at the message this one follows (null = a root turn). Editing a user turn
   // inserts a sibling under the same parent; `active` marks which sibling is on the shown path.
