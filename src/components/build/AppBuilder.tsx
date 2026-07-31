@@ -278,8 +278,12 @@ export function AppBuilder({
       // succeeded. Keeping the phase in the URL is right (Back must work); the draft just has to
       // survive the trip.
       saveDraft(data.spec, data.gaps ?? []);
-      setParam('phase', 'refine');
+      // NAVIGATE LAST. The success toast on the line AFTER setParam never appeared in a live run, which
+      // says the router.push preempts the rest of this handler — so anything sequenced after it is not
+      // guaranteed to run. Everything that must happen (state, draft, feedback) now happens BEFORE the
+      // navigation, and the navigation is the final statement.
       toast.success('Carved a step skeleton — resolve anything flagged, then save.');
+      setParam('phase', 'refine');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Compile failed');
     } finally {
