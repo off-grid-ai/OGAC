@@ -1923,3 +1923,38 @@ table but browses `bharatunion-onprem-console`. The data lives under `org_bharat
 **Related, same session:** the empty-transcript threading defect (`fix-chat-threading.sql`) and the
 cross-tenant citation links (`fix-citation-tenancy.sql`) were both found the same way — a surface
 rendering nothing while the database held the rows.
+
+## G-197 — Flow 3: compiled spec never reaches the screen (OPEN, cause narrowed, one fix already failed)
+
+**§10 Flow 3 / §15 — the product's core promise.** Describe a process in plain language → get a plan.
+
+**Evidence, captured as the editor identity:**
+```
+POST /v1/admin/apps/compile → 200 {"object":"app_compile","spec":{orgId,ownerId,title,summary}}
+URL on load        /solutions/apps/new
+after ~20s         /solutions/apps/new?phase=refine      ← the navigation DOES happen
+screen             still the describe-phase copy, no steps, no clarifying question
+toasts             NONE — toast.success('Carved a step skeleton…') never fired
+```
+
+**What is established:** compile works; the phase param flips correctly; the refine branch renders only
+`phase === 'refine' && spec`, so `spec` is null on the far side of the navigation and only the static
+page header remains. `/build/studio/new` redirects to `/solutions/apps/new`.
+
+**A fix that did NOT work (do not repeat it blindly):** persisting the draft to sessionStorage before
+`setParam` and restoring it on mount when the URL says refine and state is empty. Committed and deployed;
+the behaviour is unchanged. So either the restore effect is not running, or the component is not
+remounting and `spec` is being lost some other way.
+
+**THE MISSING TOAST IS THE BEST LEAD AND SHOULD BE FOLLOWED FIRST.** `compile()` calls
+`toast.success('Carved a step skeleton…')` on the line after `setParam`. No toast appeared at all — so
+execution may not reach it, which would mean `setParam` navigates away mid-handler and everything after
+it is abandoned. If so the ordering is the bug: persist and set state, then navigate LAST, and the
+sessionStorage write must be flushed before the push (it is synchronous, so verify it actually ran).
+
+**Next steps, in order:** (1) log inside `compile()` after `setParam` to see whether it executes;
+(2) read sessionStorage for `ogac:builder-draft` immediately after a compile to confirm the draft was
+written; (3) only then change the render or the state model.
+
+**Do not "fix" this by removing the URL navigation** — the phase belongs in the URL so Back steps between
+builder positions. The draft is what must survive, not the routing.
