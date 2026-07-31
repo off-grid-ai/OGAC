@@ -92,7 +92,43 @@ router before building, but four admin-authenticated routes is real evidence.
 because nothing is pending — not because the surface is broken. Seed a run that pauses for approval and
 this row becomes judgeable. Until then it is honestly unproven.
 
-**Row 1 — FINAL STATE: a genuine render/attach defect, reached only after eliminating six confounds.**
+**Row 1 — RESOLVED. The defect was chat THREADING, not citations, and fixing it made both work.**
+
+Screenshot `scratchpad/threading-fixed.png`. The transcript renders end to end and the footer reads:
+
+```
+99 SOURCES
+[1] KYC & Periodic Re-KYC Policy (RBI Master Direction)   95% match
+[2] BFSI Policies & SOPs                                  87% match
+```
+
+versus `[1] source · part 1 · 0%` at the start of the session.
+
+**Root cause: seeded conversations had EVERY user turn as a root** (`parent_id = null`) with the assistant
+replies hanging off a later root, and multiple sibling replies all `active = true`. `listMessages` walks
+from the roots picking each parent's active child, so it chose the FIRST root, found it childless and
+stopped — rendering a question and no answer. `‹ 1/2 ›` was the two roots being offered as branches of one
+turn. Repaired by `scripts/fix-chat-threading.sql` (committed, replayable, three ordered steps);
+**conversations with multiple roots: 0**.
+
+`href` is null on that particular row because the ACTIVE reply is a pre-existing citation without a
+`collectionId` — so the renderer correctly falls back to inert text rather than a link to nowhere. That is
+the designed behaviour, not a defect.
+
+**THE LESSON, and it is the session's most expensive one:** I spent hours on citations — two retrievers, a
+seed rewrite, a schema `$type`, six eliminated hypotheses — and the fault was one level down, in whether
+the MESSAGE rendered at all. Every citation finding was true and none of it was the cause. **Check that
+the thing containing your artifact is visible before investigating the artifact.**
+
+**Still open, and NOT to be assumed fixed:** is the WRITE path producing this shape too? The repair fixed
+DATA. If a freshly-created conversation writes multiple roots, repairing rows again would only hide it.
+Send two turns in one new chat, reload, and confirm both render.
+
+---
+
+Prior investigation kept below for the record.
+
+**Row 1 — earlier state: a genuine render/attach defect, reached only after eliminating six confounds.**
 
 The valid test is: sign in as the conversation's OWNER and reach it by CLICKING the sidebar (deep links
 are broken — see below). Done:
