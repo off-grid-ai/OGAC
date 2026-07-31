@@ -16,6 +16,16 @@ export interface DomainDashboardActivity {
   detail: string;
   timestamp?: string;
   href: string;
+  /**
+   * WHAT this row is — "Project", "Chat", "Run", "App".
+   *
+   * Recent activity rendered a project and a conversation identically: a title, a grey subtitle and a
+   * date. "Reimbursement queries · 1 conversation" gives the reader no way to tell that clicking it opens
+   * a PROJECT rather than a chat, and the two behave completely differently. A list of mixed entity types
+   * that does not name the type is a guessing game, which is the opposite of what an operator console is
+   * for. Optional so existing callers keep compiling; every caller that mixes kinds should set it.
+   */
+  kind?: string;
 }
 
 export interface DomainDashboardModule {

@@ -127,7 +127,15 @@ export function DomainDashboard({
                   className="flex min-h-14 items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-sm text-foreground">{activity.label}</span>
+                    <span className="flex items-center gap-2">
+                      {activity.kind ? (
+                        // The TYPE, stated. Without it a project and a chat are the same row.
+                        <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {activity.kind}
+                        </span>
+                      ) : null}
+                      <span className="truncate text-sm text-foreground">{activity.label}</span>
+                    </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {activity.detail}
                     </span>

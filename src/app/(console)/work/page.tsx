@@ -48,8 +48,12 @@ export default async function WorkPage() {
         state: artifacts ? 'neutral' : 'attention',
       },
     ],
+    // Every row here is a PROJECT, and it must say so: the list rendered projects exactly like
+    // conversations — title, grey subtitle, date — so "Reimbursement queries · 1 conversation" read as a
+    // chat, while clicking it opens a project. Different destination, different thing, identical row.
     activities: (projects ?? []).slice(0, 6).map((project) => ({
       id: project.id,
+      kind: 'Project',
       label: project.name,
       detail: `${project.chatCount} conversation${project.chatCount === 1 ? '' : 's'}`,
       timestamp:
