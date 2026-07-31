@@ -66,12 +66,18 @@ const named = !/unnamed document/i.test(text);
 let followable = false;
 let dest = 'none';
 if (linked && href) {
-  dest = await page.evaluate(async (h) => {
-    const r = await fetch(h, { redirect: 'follow' });
-    const body = await r.text();
-    return `${r.status}${/page not found|route doesn't exist/i.test(body) ? ' NOT-FOUND-PAGE' : ''}`;
-  }, href);
-  followable = dest === '200';
+  // NAVIGATE, don't fetch. `fetch()` on an App Router route returns an RSC/flight payload rather than
+  // what a navigation renders, so it reported NOT-FOUND-PAGE for a page that loads correctly when opened.
+  // Following a link means going where a user goes — so open it and read the destination.
+  const resp = await page.goto(`http://localhost:3000${href}`, { waitUntil: 'networkidle', timeout: 25000 })
+    .catch(() => null);
+  const destText = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
+  const notFound = /page not found|route doesn't exist/i.test(destText);
+  const restricted = /restricted source/i.test(destText);
+  dest = `${resp?.status() ?? 'no-response'}${notFound ? ' NOT-FOUND' : ''}${restricted ? ' RESTRICTED' : ''}`;
+  // A destination is only real provenance if it actually shows the source — not a 404, and not a
+  // permission wall (which is honest, but means the reviewer still cannot see the evidence).
+  followable = !!resp && resp.status() < 400 && !notFound && !restricted && destText.length > 80;
 }
 const honestScore = !/\b0%\b/.test(text); // a cited source is never 0% relevant
 
