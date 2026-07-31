@@ -501,3 +501,21 @@ body {
 .hljs-strong {
   font-weight: 600;
 }
+
+/* ─── Card header: keep title and description in the CONTENT column ───────────────────────────────
+ *
+ * `.og-card__header` (from @offgrid/ui) is `display: grid; grid-template-columns: minmax(0,1fr) auto`,
+ * and `.og-card__action` is pinned to column 2. Any OTHER second child — most commonly a
+ * `CardDescription`, which is the standard title+description pattern — auto-flows into that same narrow
+ * column and lands BESIDE the title instead of under it.
+ *
+ * Live effect: on /insights/ai five cards rendered their heading on top of their own description
+ * ("Trace behaviour" over "Trace trace waterfalls and governed run evidence"), and the data catalogue
+ * collided a dataset name, its classification badge and its source. It reads as a broken page.
+ *
+ * Pinning every non-action child to column 1 makes the standard pattern stack correctly while leaving a
+ * real card action where the shared stylesheet puts it. Fixed here rather than at ~200 call sites.
+ */
+.og-card__header > *:not(.og-card__action) {
+  grid-column: 1;
+}
