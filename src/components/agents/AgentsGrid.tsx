@@ -1,6 +1,7 @@
 'use client';
 
 import { Robot } from '@phosphor-icons/react/dist/ssr';
+import { publicLabel } from '@/lib/lineage-labels';
 import Link from 'next/link';
 import { AgentCardActions } from '@/components/agents/AgentCardActions';
 import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
@@ -58,7 +59,9 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
         ) : null}
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-center gap-1.5">
+        {/* flex-wrap: this row was a single non-wrapping line, so on cards with a longer role or trigger
+            the pipeline chip ran off the card edge and read as "No pi…". */}
+        <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="secondary" className="text-[10px]">
             {a.role}
           </Badge>
@@ -96,7 +99,9 @@ function AgentCard({ a }: Readonly<{ a: AgentCardModel }>) {
                   variant="secondary"
                   className="bg-primary/10 text-[10px] text-primary"
                 >
-                  {p}
+                  {/* planeLabels come from internal plane ids and included "brain", our codename for the
+                      knowledge plane — shown as a requirement chip on four of five agent cards. */}
+                  {publicLabel(p)}
                 </Badge>
               ))
             ) : (
