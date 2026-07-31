@@ -110,13 +110,30 @@ stored citations are not reaching the transcript on the READ path** — which wo
 dropped-field-at-a-boundary defect for the ninth time, and the first one on a load path rather than a
 write path.
 
-ONE CHECK REMAINS before touching code, and it is the same one that caught me last time: confirm the
-ANSWER BODY renders on that page. The captured text showed the sidebar and chat list; it did not clearly
-show the assistant message. If the body is absent, this is a transcript-loading bug and the citation is
-merely invisible along with it.
+**THE CHECK WAS RUN, AND IT REDIRECTS EVERYTHING: the transcript is EMPTY.**
 
-**Row 1 is therefore GAP with a located cause, not GAP-unknown.** That is as far as evidence takes it
-without a further run.
+Clicking "KYC re-verification questions" as its owner navigates to the right URL and renders **no messages
+at all** — 0 message-like blocks in `main`, and the answer text absent from the page's full innerText on a
+separate read. Two independent checks agree.
+
+**So this was never a citation defect.** The citation cannot render because THE MESSAGES DO NOT RENDER. The
+whole line of investigation — the seeded payloads, the retrievers, the `$type`, the load query — was
+downstream of a conversation whose transcript is blank.
+
+That reframes the real finding: **opening an existing conversation from the sidebar shows an empty
+transcript**, on a demo account, for conversations that provably have messages in the database. If that
+reproduces generally it is far more serious than any citation formatting, and it is the single most
+important thing in this ledger.
+
+Caveat, stated because eight of my ten defect claims today were my own instrument: the `0 blocks` count
+uses MY locator (`main [class*="rounded"]`). The corroborating evidence is the independent full-text read
+that found no answer text. **Confirm by eye before acting** — open
+`/work/chat` as `demo-bank@getoffgridai.co`, click "KYC re-verification questions", and look. That is a
+ten-second human check and it settles it.
+
+**Row 1 = GAP, cause REDIRECTED to transcript loading.** The citation work stands on its own merits
+(fabricated seed data replaced, honest degradation, identity carried) but was never what the founder's
+screenshot needed.
 
 ---
 
