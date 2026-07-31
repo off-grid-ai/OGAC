@@ -29,8 +29,15 @@ interface Preview {
 }
 
 // The documents sub-resource for a single collection's DETAIL page: index a document (a file OR pasted
-// text), READ one, and remove existing ones. Non-admins get no write controls but can still open a
-// document — reviewing the source behind a citation is not an admin action.
+// text), READ one, and remove existing ones.
+//
+// The INTAKE controls are shown to everyone who can see the collection, and a caller who may not write
+// gets the server's own refusal ("read-only demo: this account can view everything but cannot make
+// changes"). Hiding them made the capability invisible: a viewer walking the console — which is how this
+// product is demonstrated — had no way to know the collection accepts pasted text at all, and a buyer
+// asking "can I add a document here?" got no answer from the screen. DELETE stays admin-only, because a
+// destructive control offered to someone who cannot use it is a different and worse thing.
+// Reading a document is not an admin action either — that is how a citation gets checked.
 export function CollectionDocuments({
   collectionId,
   documents,
@@ -121,7 +128,7 @@ export function CollectionDocuments({
 
   return (
     <div className="space-y-3">
-      {isAdmin ? (
+      {
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -189,7 +196,7 @@ export function CollectionDocuments({
             </div>
           ) : null}
         </div>
-      ) : null}
+      }
 
       {documents.length === 0 ? (
         <p className="text-sm text-muted-foreground">No documents indexed yet.</p>
