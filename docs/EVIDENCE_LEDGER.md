@@ -62,8 +62,23 @@ surfaces refuse cleanly and explain themselves — `"This account can explore th
 changes."` A viewer-only harness can verify that governance WORKS; it cannot verify what governance
 forbids it from doing.
 
-Affected: Flow 3 (compile an app), Flow 6 (act on a review), Flow 8 (generate a pack), and the
-create/rotate controls under Security.
+Affected: Flow 3 (compile an app), Flow 6 (act on a review), Flow 8 (generate a pack), the create/rotate
+controls under Security, and Row 1 (a chat owned by the harness identity).
+
+### Exactly how to lift it
+
+Passwords authenticate through **Keycloak ROPC** — `src/auth.config.ts` → `authenticatePassword()`, not a
+DB row — so this is a Keycloak user creation, not a seed insert:
+
+1. Create a Keycloak user in the console realm, e.g. `demo-editor@getoffgridai.co`, password set,
+   email-verified, with the group/role that maps to an **editor** (see `src/lib/tenancy.ts` for the claim →
+   role mapping, and `deploy/keycloak/` for the realm config).
+2. Add `OFFGRID_DEMO_EDITOR_EMAIL` / `_PASSWORD` to `.env.local` on the box (runtime config, never in git).
+3. Run the write-path rows against it: `DEMO_USER=demo-editor@getoffgridai.co npm run e2e`.
+   `signIn()` already takes the identity as a parameter, so no script changes are needed.
+
+Do NOT lift it by relaxing a permission check to make a test pass. The refusals are the product working;
+five GAPs are the honest price of not having an identity permitted to do the thing.
 
 ## Gates
 
