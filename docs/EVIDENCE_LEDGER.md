@@ -424,6 +424,13 @@ the process…"), so the surface is showing phase=describe after a compile that 
 This is the shape CLAUDE.md's navigation rule warns about from the other side: navigation belongs in the
 URL, and anything that must survive it cannot live in local `useState`.
 
+**Confirmation attempt #1 was itself botched — recorded so the next person does not repeat it.** I probed
+the URL with `page.url().split('/build')[1]`, which returns `undefined` whenever the path is not under
+`/build` — so it reported nothing except that `/build/studio/new` had redirected elsewhere (probably
+`/solutions/apps/new`, mirroring `/build/review` → `/solutions/reviews`). **Log the FULL url.** Also
+noted: no toast appeared at all, where a successful compile should raise "Carved a step skeleton" and a
+failure should raise an error — worth checking whether the handler is reached on that route at all.
+
 **Confirm before changing code** — I have been wrong on this row twice already:
 1. Does the URL actually carry `?phase=refine` after the click? (Read `page.url()` post-compile.)
 2. Does the component remount? (A `console.count()` in the body, or React DevTools.)
