@@ -235,10 +235,15 @@ screenshots, not my confidence.
    previewable (`readProjectDocument` + `/api/v1/chat/projects/[id]/documents/[docId]` + a Sheet in
    `ProjectDetail`), but the founder's *"I should be able to click and preview each and every file here"* was
    about the **org** collection page. Same treatment needed there.
-4. **Chat has no pipeline.** Founder: *"you should attach a pipeline. what is the demo if there is no
-   pipeline?"* `resolveConsumerPipeline` is correct (project override, else org default) — the **org default
-   chat pipeline is simply unset**. Set `defaultChatPipelineId` for `org_bharat` and `org_suraksha`; see
-   `src/lib/chat-pipeline-policy.ts`.
+4. ~~**Chat has no pipeline.**~~ **CLOSED 2026-07-31, verified on both tenants.** The chip read "No
+   pipeline" because `org_settings.default_chat_pipeline_id` was NULL for both tenants while org `default`
+   had one; `resolveConsumerPipeline` was correct all along. **`scripts/seed-chat-pipeline.sql`** creates a
+   dedicated **"Workspace Chat"** pipeline per tenant (6-domain ceiling, cloned from the widest published
+   pipeline in the same org so the gateway, model, routing, policy and guardrail overlays are the org's real
+   ones) and binds it as the org default plus the chat allowlist. A dedicated pipeline rather than reusing a
+   use-case one, because the chip must be legible: "Runs on: Workspace Chat" makes sense, "Runs on:
+   Reimbursement Governance" for a KYC question does not. Verified by loading `/work/chat` as both demo
+   users: `No pipeline: false · Workspace Chat: true`. DB-only, no deploy needed.
 
 ### Gaps filed this session (read the entries — each names the trap)
 

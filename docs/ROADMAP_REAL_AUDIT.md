@@ -744,9 +744,11 @@ Full record: **[`docs/SESSION_HANDOFF_2026-07-31.md`](SESSION_HANDOFF_2026-07-31
 
 ### Open against the spec — pick up here
 
-1. **Chat has no pipeline** (§8D, §11 "Governance is inherited"). `resolveConsumerPipeline` is correct; the
-   **org default chat pipeline is simply unset** for both tenants. Founder: *"what is the demo if there is no
-   pipeline?"*
+1. ~~**Chat has no pipeline**~~ (§8D, §11 "Governance is inherited") — **CLOSED 2026-07-31.** Both tenants
+   now run Work → Chat on a dedicated **"Workspace Chat"** pipeline (`scripts/seed-chat-pipeline.sql`), bound
+   as the org default and in the chat allowlist. `resolveConsumerPipeline` was always correct; the org
+   setting was NULL. Verified live on both demo users. An ungoverned chat contradicted §11's inheritance
+   claim on the first surface a buyer opens.
 2. **Artifact previews fetch from a public CDN** (§11 "Raw data can remain local") — G-205, **in flight**.
    Mermaid is vendored to `public/vendor/mermaid/`; the three React `<script>` tags still point outward, and
    React 19 here ships no UMD build. **Uncommitted at session end** — check `git status` first.
