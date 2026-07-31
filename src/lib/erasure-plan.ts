@@ -59,7 +59,7 @@ export interface PropagationPlan {
 
 // One label per target — the single source of truth for the operator-facing store name.
 export const TARGET_LABELS: Readonly<Record<PropagationTarget, string>> = {
-  vector: 'Vector index (Qdrant) — subject-scoped chunks',
+  vector: 'Vector index — subject-scoped chunks',
   lake: 'External data lake — subject-scoped objects',
   device: 'Device replicas (mobile/desktop) — long-term on-device memory',
 } as const;

@@ -76,7 +76,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
   },
   {
     serviceId: 'qdrant',
-    serviceLabel: 'Qdrant',
+    serviceLabel: 'Vector index',
     upstreamVersion: 'v1.12.5',
     versionSource: 'deploy/docker-compose.yml',
     denominatorSource: 'https://api.qdrant.tech/v-1-12-x/api-reference',
@@ -191,7 +191,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
   },
   {
     serviceId: 'seaweedfs',
-    serviceLabel: 'SeaweedFS',
+    serviceLabel: 'Object store',
     upstreamVersion: '3.80',
     versionSource: 'deploy/docker-compose.yml',
     denominatorSource:
@@ -230,7 +230,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
   },
   stale({
     serviceId: 'warehouse',
-    serviceLabel: 'ClickHouse Warehouse',
+    serviceLabel: 'Analytics warehouse',
     upstreamVersion: '24.8.14.39 (clickhouse/clickhouse-server:24.8-alpine)',
     versionSource:
       'deploy/docker-compose.yml (mutable minor tag); live SELECT version() on g6:8124 verified 2026-07-23 → 24.8.14.39',
@@ -391,7 +391,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
   },
   stale({
     serviceId: 'kestra',
-    serviceLabel: 'Kestra',
+    serviceLabel: 'Data orchestration',
     upstreamVersion: 'Kestra OSS — live API verified (193 plugin groups / 1235 task types / 139 triggers; basic-auth resolved). Deployed via a mutable image tag; pin for exact version reproducibility.',
     versionSource: 'deploy/docker-compose.yml (mutable tag — pin to lock the exact release); live /api/v1/plugins',
     denominatorSource: 'https://kestra.io/docs/api-reference/open-source/',
@@ -459,7 +459,7 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
 const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
   {
     serviceId: 'opensearch',
-    serviceLabel: 'OpenSearch',
+    serviceLabel: 'Search index',
     upstreamVersion: '2.18.0',
     versionSource: 'deploy/docker-compose.yml',
     denominatorSource: 'https://docs.opensearch.org/2.18/api-reference/',
@@ -497,7 +497,7 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
   },
   {
     serviceId: 'langfuse',
-    serviceLabel: 'Langfuse',
+    serviceLabel: 'Trace store',
     upstreamVersion: '3.30.0',
     versionSource: 'deploy/docker-compose.yml',
     denominatorSource:
@@ -536,7 +536,7 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
   },
   {
     serviceId: 'evidently',
-    serviceLabel: 'Evidently',
+    serviceLabel: 'Drift monitoring',
     upstreamVersion: '0.4.40',
     versionSource: 'deploy/sidecars/drift/requirements.txt',
     denominatorSource: 'https://github.com/evidentlyai/evidently/tree/v0.4.40',
@@ -571,7 +571,7 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
   },
   {
     serviceId: 'ragas',
-    serviceLabel: 'Ragas',
+    serviceLabel: 'Retrieval quality',
     upstreamVersion: '0.2.6',
     versionSource: '../onprem-fleet-orchestration/deploy/onprem/ragas-sidecar/requirements.txt',
     denominatorSource: 'https://docs.ragas.io/en/v0.2.6/references/metrics/',

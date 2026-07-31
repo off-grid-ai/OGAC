@@ -87,7 +87,7 @@ export function resolveRtbfScope(
   // 3) Vector store — subject-scoped embeddings/chunks (deferred; the retrieval index reindex).
   targets.push({
     plane: 'vector',
-    label: 'Vector index (Qdrant) — subject-scoped chunks',
+    label: 'Vector index — subject-scoped chunks',
     ref: 'qdrant',
     execution: 'deferred',
     detail: 'Delete embeddings derived from the subject-bearing rows, then reindex.',
