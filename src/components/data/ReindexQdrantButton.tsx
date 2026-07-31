@@ -27,7 +27,7 @@ export function ReindexQdrantButton({
       const json = (await res.json()) as { ok?: boolean; written?: number; qdrantCount?: number; error?: string };
       if (!res.ok || !json.ok) throw new Error(json.error ?? 'reindex failed');
       setCount(json.qdrantCount ?? null);
-      toast.success(`Reindexed ${json.written} doc(s) into Qdrant`);
+      toast.success(`Reindexed ${json.written} document(s) into the vector index`);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -47,7 +47,7 @@ export function ReindexQdrantButton({
         ) : (
           <ArrowsClockwise className="mr-1.5 size-4" />
         )}
-        {busy ? 'Reindexing…' : 'Reindex Brain → Qdrant'}
+        {busy ? 'Reindexing…' : 'Rebuild vector index'}
       </Button>
     </div>
   );

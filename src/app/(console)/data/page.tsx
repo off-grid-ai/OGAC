@@ -260,8 +260,11 @@ export default async function DataPage() {
             <CardHeader>
               <CardTitle className="text-sm">Meaning-based search</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
-                Push the Brain&apos;s documents into Qdrant so switching the retrieval backend to
-                Qdrant lands on a populated store, not an empty one.
+                {/* Was: "Push the Brain's documents into Qdrant so switching the retrieval backend to
+                    Qdrant…" — our internal codename plus the vector store, twice, on a page a buyer reads.
+                    Says what it DOES instead. */}
+                Rebuild the vector index from your organisation&apos;s indexed documents, so
+                meaning-based search answers from a populated store rather than an empty one.
               </p>
             </CardHeader>
             <CardContent>
