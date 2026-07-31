@@ -35,7 +35,16 @@ try {
 } catch (e) {
   clickError = String(e.message).split('\n')[0].slice(0, 90);
   const disabled = await go.isDisabled().catch(() => null);
-  verdict(ROW, false, `"Build the steps" could not be clicked (disabled=${disabled}): ${clickError}`);
+  // A DISABLED CONTROL IS NOT AUTOMATICALLY A DEFECT. On a read-only identity this is the correct
+  // behaviour, and AppBuilder renders `access.createExplanation` beside the button when it refuses. So
+  // the artifact to read here is the EXPLANATION: refusing is right, refusing invisibly is not. I first
+  // reported this as "disabled and never says why" off a 170-char sample that cut the message off.
+  const full = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
+  const explained = /cannot create apps|you cannot|read-only|permission|not permitted|checking whether/i.test(full);
+  await page.screenshot({ path: `${OUT}/${ROW}.png`, fullPage: true }).catch(() => {});
+  verdict(ROW, false,
+    `refused (disabled=${disabled}) explained=${explained} — Flow 3 needs a WRITE-CAPABLE identity to be` +
+    ` provable; set DEMO_USER to an editor. Refusal wording: "${(full.match(/[^.]*cannot[^.]*\./i) || ['(none found)'])[0].slice(0, 90)}"`);
   await page.screenshot({ path: `${OUT}/${ROW}.png`, fullPage: true }).catch(() => {});
   await browser.close();
   process.exit(1);

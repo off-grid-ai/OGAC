@@ -43,29 +43,29 @@ point at the product rather than at my regex, which is the distinction this ledg
 ```
 VERIFIED  s12-developer-experience  /operations/api-docs  17 rows, "public API surface, grouped by area"
 
-CONFIRMED DEFECT  flow3-natural-language-app  /build/studio/new
-  `GAP  "Build the steps" could not be clicked (disabled=true)`
+WITHDRAWN — flow3-natural-language-app was NOT a defect. Twice.
+  Final state: `GAP  refused (disabled=true) — Flow 3 needs a WRITE-CAPABLE identity; set DEMO_USER to an
+  editor. Refusal wording: "This account can explore the Builder but cannot make changes."`
 
-  The composer is there and reads "Describe the process you want automated in plain language." A full
-  sentence is typed by keystroke into the page's only textarea — and the **"Build the steps" control stays
-  DISABLED, with nothing on screen saying why.**
+  The product is CORRECT. `AppBuilder.tsx:820` renders `{!canCreate ? <p>{accessMessage}</p> : null}` and
+  `builder-surface-access.ts` supplies the sentence above. The control is disabled because the identity is
+  read-only, and the surface explains exactly that. Nothing to fix.
 
-  Almost certainly the read-only demo account (building an app is a write), which is the correct decision
-  and an invisible one. Same defect as the prompts toast: a refusal the user cannot see. A disabled
-  primary action with no explanation reads as "this product is broken", not "you may not do this" — and
-  this is §10 Flow 3, the promise in §15, on the account buyers are handed.
+  I reported this as a defect twice, escalating each time, and was wrong both times:
+  1. "compile produced nothing in 90s" — a loose `/build/i` had matched the sidebar's **Build nav item**, so
+     the script clicked navigation and fired zero requests.
+  2. "disabled and never says why" — my verdict quoted the first 170 characters of the page and the
+     explanation sits below that. Then my `explained` regex missed the real wording too, and only the
+     sentence I extracted for the verdict revealed the message was present all along.
 
-  Fix is the pattern already built for it: state the reason next to the control (reuse
-  `describeFailure`'s refusal wording from `src/lib/api-failure.ts`), and decide separately whether a demo
-  viewer should be able to compile a spec they cannot save. **Do not fix by enabling the write.**
+  THE PATTERN, stated plainly because it is the whole reason this ledger exists: three times in one row I
+  reported the product broken when my instrument was wrong — a mis-scoped locator, a truncated sample, an
+  over-narrow regex. Each felt like evidence. **A GAP means "my script did not see it", and only a resolved
+  target plus a read artifact can turn that into a claim about the product.** Any row I promote to DEFECT
+  without both is worth less than nothing, because it sends someone to fix working code.
 
-  TWO OF MY OWN ERRORS ON THE WAY HERE, both worth keeping:
-  - A loose /build/i matched the sidebar's "Build" NAV ITEM, so the script clicked navigation, fired zero
-    requests, and I read that as "compile produced nothing". Third time a loose locator sent me at the
-    wrong element. Scope the control and match its full label.
-  - The click threw a TimeoutError instead of returning a verdict, breaking this file's own rule. A
-    disabled control is a finding to report, not a stack trace — now caught, with `isDisabled()` read and
-    included in the verdict. That is the only reason the real cause surfaced.
+  To make Flow 3 provable: run it as an editor identity (`DEMO_USER=<editor> npm run e2e flow3`). Until an
+  editor account is wired into the harness the row stays GAP — unproven, NOT broken.
 
 CANDIDATE DEFECT  s12-security-secrets  /governance/secrets/mounts
   5 mounts render with PATH / TYPE / DESCRIPTION, and there is NO create/enable/rotate control. Per the
