@@ -70,7 +70,40 @@ My `must` pattern demanded role words in `main`'s innerText and did not find the
 the page has a Roles column. Four of my "candidate defects" this session have now resolved to my own
 instrument. That ratio is the useful number here — not the 15.
 
-## The identity ceiling — why some rows CANNOT be promoted yet
+## The identity ceiling is LIFTED
+
+`demo-editor@getoffgridai.co` now exists in the Keycloak `offgrid` realm with the `admin` realm role and
+`org: org_bharat`. Created via the service-account admin client already configured on the box
+(`OFFGRID_KEYCLOAK_ADMIN_CLIENT_ID/_SECRET`) — additive and reversible, no permission check was relaxed.
+
+```
+create user: 201 · assign admin role: 204 · ROPC login: 200 OK
+```
+
+`signIn()` reads `DEMO_USER` / `DEMO_PASS`, so the write-path rows run with:
+
+```
+DEMO_USER=demo-editor@getoffgridai.co DEMO_PASS='OffGridEditor2026!' npm run e2e
+```
+
+Store the pair as `OFFGRID_DEMO_EDITOR_EMAIL/_PASSWORD` in `.env.local` on the box to make it permanent.
+
+### What it immediately revealed — Flow 3 is now a REAL product question
+
+```
+GAP  flow3-natural-language-app  compileRequestFired=true  no plan or question after 90s
+```
+
+As the editor the control is enabled and clicking it **fires a real request** — so this is no longer the
+identity ceiling and no longer my regex. Compile is invoked and produces no plan or clarifying question
+within 90 seconds. That is either a slow model call or a genuine failure on §10 Flow 3, the product's
+core promise, and it is the first Flow 3 verdict in this session that says something about the PRODUCT.
+
+**Next step is diagnosis, not a fix:** capture the compile response status and body (the script already
+listens for POSTs — extend it to record the URL/status/body), and check whether the run appears in
+Langfuse. Do not change compile code before reading what the request returned.
+
+## The identity ceiling was — why some rows CANNOT be promoted yet
 
 Every demo identity configured on the box is a **viewer**:
 

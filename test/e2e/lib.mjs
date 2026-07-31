@@ -20,7 +20,7 @@ export async function type(locator, text) {
 }
 
 /** Sign in through the real credentials form and land on `route`. */
-export async function signIn(route = '/overview', who = 'demo-bank@getoffgridai.co') {
+export async function signIn(route = '/overview', who = process.env.DEMO_USER || 'demo-bank@getoffgridai.co') {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
   const page = await ctx.newPage();
