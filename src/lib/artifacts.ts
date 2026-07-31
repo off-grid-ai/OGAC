@@ -17,9 +17,16 @@ export function isLiveKind(kind: string): boolean {
   return kind === 'html' || kind === 'svg' || kind === 'react' || kind === 'mermaid';
 }
 
-// Build the iframe srcDoc for a live artifact. HTML passes through; SVG is centered on a dark
-// canvas; React (Babel + React/ReactDOM UMD) and Mermaid are bootstrapped with their libs loaded
-// inside the frame. `bridge` injects the window.offgrid.complete() proxy for AI-powered apps.
+// Artifact previews render on WHITE, in both console themes. `transparent` was tried and produced the
+// black rectangles the founder screenshotted: the preview iframe is sandboxed with an opaque origin, so a
+// document with no background of its own falls through to the UA canvas rather than to the card behind it.
+// A diagram, a document or a dashboard is a piece of paper — it reads on white, mermaid's neutral theme is
+// built for white, and it is deterministic instead of depending on where the frame is embedded.
+const PREVIEW_BG = '#ffffff';
+
+// Build the iframe srcDoc for a live artifact. HTML passes through as its own document; SVG is centred on
+// the preview canvas; React (Babel + React/ReactDOM UMD) and Mermaid are bootstrapped with the vendored
+// runtimes. `bridge` injects the window.offgrid.complete() proxy for AI-powered apps.
 // eslint-disable-next-line complexity
 export function buildSrcDoc(
   a: { kind: string; code: string },
@@ -41,10 +48,10 @@ export function buildSrcDoc(
     return bridge ? a.code.replace(/<head[^>]*>/i, (h) => h + bridge) || bridge + a.code : a.code;
   }
   if (a.kind === 'svg') {
-    return `<!doctype html><meta charset="utf-8">${bridge}<body style="margin:0;display:grid;place-items:center;min-height:100vh;background:transparent">${a.code}`;
+    return `<!doctype html><meta charset="utf-8">${bridge}<body style="margin:0;display:grid;place-items:center;min-height:100vh;background:${PREVIEW_BG}">${a.code}`;
   }
   if (a.kind === 'mermaid') {
-    return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:transparent;color:inherit;font-family:Menlo,monospace">
+    return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:${PREVIEW_BG};color:#111;font-family:Menlo,monospace">
 <pre class="mermaid" style="display:flex;justify-content:center;padding:16px">${escapeHtml(a.code)}</pre>
 ${bridge}
 <script type="module">
@@ -53,7 +60,8 @@ mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
 </script></body>`;
   }
   // react
-  return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#fff">
+  const { code, candidates } = normalizeReactSource(a.code);
+  return `<!doctype html><meta charset="utf-8"><body style="margin:0;background:${PREVIEW_BG}">
 <div id="root"></div>
 ${bridge}
 <script src="${cdn}/vendor/react/react.production.min.js"></script>
@@ -61,12 +69,11 @@ ${bridge}
 <script src="${cdn}/vendor/babel/babel.min.js"></script>
 <script type="text/babel" data-presets="react,typescript" data-type="module">
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
-${stripImportsExports(a.code)}
-const __C = typeof App !== 'undefined' ? App
-  : (typeof exports !== 'undefined' && exports.default) ? exports.default : null;
+${code}
+const __C = ${componentResolutionExpression(candidates)};
 ReactDOM.createRoot(document.getElementById('root')).render(
   __C ? React.createElement(__C) : React.createElement('pre', { style: { padding: 16, color: '#b00' } },
-    'No default export or App component found.'));
+    'This artifact has no component to render — expected a default export or a component declaration.'));
 </script></body>`;
 }
 
@@ -74,14 +81,73 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
 }
 
-// Strip ES module import/export syntax so the code runs in Babel's script scope. `export default
-// function App` → `function App`; bare `export default <expr>` → `exports.default = <expr>`.
-function stripImportsExports(code: string): string {
-  return code
-    .replace(/^\s*import\s+.*?;?\s*$/gm, '')
-    .replace(/export\s+default\s+function\s+([A-Za-z0-9_]+)/g, 'function $1')
-    .replace(/export\s+default\s+/g, 'window.exports = window.exports || {}; exports.default = ')
-    .replace(/^\s*export\s+(const|let|var|function|class)\s/gm, '$1 ');
+// ─── Finding the component a React artifact actually exports ───────────────────────────────────────
+//
+// LIVE FINDING (2026-07-31). A seeded React artifact rendered "No default export or App component
+// found." in both the thumbnail and the panel. Its source was perfectly ordinary:
+//
+//   export default function ReKycProgress() { … }
+//
+// The old mount code only ever looked for a component literally named `App`, or `exports.default`. The
+// strip turned `export default function ReKycProgress` into `function ReKycProgress` — and then nothing
+// referenced it. So every React artifact whose component was not called `App` reported itself broken,
+// which reads as "the product cannot render its own output".
+//
+// This returns the candidate names, most specific first, so the mount can try them in order.
+
+export interface NormalizedReactSource {
+  code: string;
+  /** Identifiers to try as the component, in order. Always ends with `App` for legacy artifacts. */
+  candidates: string[];
+}
+
+const DEFAULT_HOLDER = '__offgridDefault';
+
+export function normalizeReactSource(source: string): NormalizedReactSource {
+  const candidates: string[] = [];
+  let code = source.replace(/^\s*import\s+.*?;?\s*$/gm, '');
+
+  // `export default function Foo(` / `export default class Foo` — keep the declaration, remember Foo.
+  code = code.replace(
+    /export\s+default\s+(function|class)\s+([A-Za-z0-9_$]+)/g,
+    (_m, keyword: string, name: string) => {
+      candidates.push(name);
+      return `${keyword} ${name}`;
+    },
+  );
+  // `export default Foo;` — a bare identifier: drop the statement, remember Foo.
+  code = code.replace(/export\s+default\s+([A-Za-z0-9_$]+)\s*;?\s*$/gm, (_m, name: string) => {
+    candidates.push(name);
+    return '';
+  });
+  // `export default <anything else>` — an anonymous function/arrow/expression: bind it to a holder.
+  if (/export\s+default\s+/.test(code)) {
+    code = code.replace(/export\s+default\s+/g, `const ${DEFAULT_HOLDER} = `);
+    candidates.push(DEFAULT_HOLDER);
+  }
+  // Named exports lose their `export` keyword; the declarations stay.
+  code = code.replace(/^\s*export\s+(const|let|var|function|class)\s/gm, '$1 ');
+
+  // Nothing exported at all? Fall back to any capitalised top-level component declaration — plenty of
+  // model output defines `function Dashboard()` and never exports it.
+  if (!candidates.length) {
+    for (const m of code.matchAll(
+      /^\s*(?:function|class|const|let|var)\s+([A-Z][A-Za-z0-9_$]*)/gm,
+    )) {
+      candidates.push(m[1]);
+    }
+  }
+  candidates.push('App');
+  return { code, candidates: Array.from(new Set(candidates)) };
+}
+
+/** The JS expression that resolves the component at runtime, trying each candidate in order. */
+export function componentResolutionExpression(candidates: string[]): string {
+  const chain = candidates
+    .map((name) => `(typeof ${name} !== 'undefined' && ${name})`)
+    .concat(["(typeof window.exports !== 'undefined' && window.exports.default)"])
+    .join(' || ');
+  return `${chain} || null`;
 }
 
 // Best-effort human title for a saved artifact: an HTML <title>, a leading markdown/comment
