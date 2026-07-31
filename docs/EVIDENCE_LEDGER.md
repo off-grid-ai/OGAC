@@ -125,11 +125,27 @@ transcript**, on a demo account, for conversations that provably have messages i
 reproduces generally it is far more serious than any citation formatting, and it is the single most
 important thing in this ledger.
 
-Caveat, stated because eight of my ten defect claims today were my own instrument: the `0 blocks` count
-uses MY locator (`main [class*="rounded"]`). The corroborating evidence is the independent full-text read
-that found no answer text. **Confirm by eye before acting** — open
-`/work/chat` as `demo-bank@getoffgridai.co`, click "KYC re-verification questions", and look. That is a
-ten-second human check and it settles it.
+**CONFIRMED BY EYE — screenshot `scratchpad/transcript-check.png`, and the cause is visible in it.**
+
+The user's question bubble renders. Directly beneath it: **`‹ 1/2 ›` branch navigation**. And then nothing
+— no assistant answer anywhere on the page.
+
+That is the `parent_id` / ACTIVE-BRANCH threading defect, the same class that needed 36 rows repaired
+earlier in this session. `listMessages` (src/lib/chat.ts:418) walks the parent-pointer tree and at each
+step picks the sibling whose `active` flag is set, falling back to `findIndex` → `-1` → index 0. If the
+assistant reply is not the active child of the user turn — or its `parent_id` is null/wrong — it is never
+emitted, and the transcript ends after the question. The `1/2` is the proof that branch selection is
+running and choosing a branch with no visible answer.
+
+**This is a serious product defect: saved conversations lose their answers.** On the demo account, a buyer
+clicking any past chat sees their question and no reply. It also fully explains Row 1 — the citation is
+invisible because its MESSAGE is invisible.
+
+**Fix at the seam, not the symptom:** inspect `parent_id`/`active` for the assistant rows of
+`conv_285011f6cb84`, then decide whether the defect is in the seed data (rows written without a correct
+parent/active pair, as before) or in `listMessages`' selection when `active` is unset on every sibling.
+The earlier repair fixed 36 rows of DATA; if this recurs on freshly-written conversations the defect is in
+the WRITE path and repairing rows again would only hide it.
 
 **Row 1 = GAP, cause REDIRECTED to transcript loading.** The citation work stands on its own merits
 (fabricated seed data replaced, honest degradation, identity carried) but was never what the founder's
