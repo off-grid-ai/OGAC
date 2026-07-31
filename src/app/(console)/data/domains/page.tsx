@@ -4,9 +4,13 @@ import { SuggestStartersButton } from '@/components/data-domains/SuggestStarters
 import { TestResolveBox } from '@/components/data-domains/TestResolveBox';
 import type { ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { listApps } from '@/lib/apps-store';
+import { domainUsage } from '@/lib/data-domain-usage';
 import { proposeStarterDomains } from '@/lib/data-domains-seed';
 import { listDomains } from '@/lib/data-domains-store';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listPipelines } from '@/lib/pipelines';
+import { allowlistReferencesTokens, domainMatchTokens } from '@/lib/pipelines-policy';
 import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { PageFrame } from '@/components/PageFrame';
@@ -21,7 +25,25 @@ export const dynamic = 'force-dynamic';
 export default async function DataDomainsPage() {
   await requireModuleForUser('data-domains');
   const org = await currentOrgId();
-  const [domains, connectors] = await Promise.all([listDomains(org), listConnectors(org)]);
+  // Apps + pipelines are read ONCE for the whole grid (not per card) and the reverse edge is computed
+  // in pure code — the page shows which rules the org actually runs on, which is the only way to tell
+  // two similar-looking rules apart, and what a Delete would break.
+  const [domains, connectors, apps, pipelines] = await Promise.all([
+    listDomains(org),
+    listConnectors(org),
+    listApps(org).catch(() => []),
+    listPipelines(org).catch(() => []),
+  ]);
+  const usageFor = (d: { id: string; label: string; aliases: string[] }) => {
+    const tokens = domainMatchTokens(d);
+    return domainUsage(
+      d,
+      apps.map((a) => ({ id: a.id, title: a.title, steps: a.steps })),
+      pipelines
+        .filter((p) => allowlistReferencesTokens(p.dataAllowlist, tokens))
+        .map((p) => ({ id: p.id, name: p.name })),
+    );
+  };
 
   const connectorOptions = connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
   const connectorName = (id: string) => connectors.find((c) => c.id === id)?.name ?? id;
@@ -67,6 +89,7 @@ export default async function DataDomainsPage() {
               connectorName: connectorName(d.connectorId),
               resource: d.resource,
             }}
+            usage={usageFor(d)}
             connectors={connectorOptions}
           />
         ))}

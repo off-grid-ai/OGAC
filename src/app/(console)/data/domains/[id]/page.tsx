@@ -2,6 +2,8 @@ import { ArrowLeft, Signpost } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DomainDetailPanel } from '@/components/data-domains/DomainDetailPanel';
+import { listApps } from '@/lib/apps-store';
+import { appsUsingDomain } from '@/lib/data-domain-usage';
 import { getDomain, listDomains } from '@/lib/data-domains-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelinesByDomain } from '@/lib/pipelines';
@@ -21,10 +23,11 @@ export default async function DataDomainDetailPage({
   await requireModuleForUser('data-domains');
   const { id } = await params;
   const org = await currentOrgId();
-  const [domain, allDomains, connectors] = await Promise.all([
+  const [domain, allDomains, connectors, apps] = await Promise.all([
     getDomain(id, org),
     listDomains(org),
     listConnectors(org),
+    listApps(org).catch(() => []),
   ]);
   if (!domain) notFound();
 
@@ -39,6 +42,12 @@ export default async function DataDomainDetailPage({
       org,
     ).catch(() => [])
   ).map((p) => ({ id: p.id, name: p.name, status: p.status }));
+
+  // …and the apps whose steps read through it. Same pure matcher the list page uses.
+  const referencedByApps = appsUsingDomain(
+    apps.map((a) => ({ id: a.id, title: a.title, steps: a.steps })),
+    { id: domain.id, label: domain.label, aliases: domain.aliases },
+  ).map((a) => ({ id: a.id, title: a.title }));
 
   return (
     <PageFrame>
@@ -69,6 +78,7 @@ export default async function DataDomainDetailPage({
             connectors={connectorOptions}
             allDomains={allDomains}
             referencedByPipelines={referencedByPipelines}
+            referencedByApps={referencedByApps}
           />
         </div>
       }

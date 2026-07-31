@@ -24,6 +24,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { explainResponse } from '@/lib/api-failure';
+import { describeDeleteImpact, describeUsage, type DomainUsage } from '@/lib/data-domain-usage';
 import { formatAliases } from '@/lib/data-domains-ui';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
 
@@ -41,9 +43,12 @@ export interface DomainLite {
 // label + aliases → connector · resource — so an operator reads the routing at a glance.
 export function DomainCard({
   domain,
+  usage,
   connectors,
 }: Readonly<{
   domain: DomainLite;
+  /** Reverse edge: the apps/pipelines routing through this rule. Absent on surfaces that don't read it. */
+  usage?: DomainUsage;
   connectors: ConnectorOption[];
 }>) {
   const router = useRouter();
@@ -74,10 +79,15 @@ export function DomainCard({
       toast.success(`Data domain "${domain.label}" deleted`);
       setConfirmDelete(false);
       router.refresh();
-    } else {
-      toast.error('Delete failed');
+      return;
     }
+    // The server's own reason, and a refusal presented as a refusal — a viewer on a read-only demo
+    // account is the system working, not "Delete failed".
+    const failure = await explainResponse(res, `delete "${domain.label}"`);
+    (failure.refusal ? toast.info : toast.error)(failure.message);
   }
+
+  const impact = usage ? describeDeleteImpact(usage) : '';
 
   return (
     <>
@@ -122,12 +132,34 @@ export function DomainCard({
           ) : (
             <p className="text-xs text-muted-foreground/60">No aliases</p>
           )}
-          <div className="mt-auto flex items-center gap-2 text-xs">
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              {domain.connectorName}
-            </Badge>
-            <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
-            <code className="truncate font-mono text-muted-foreground">{domain.resource}</code>
+          <div className="mt-auto space-y-2">
+            <div className="flex items-center gap-2 text-xs">
+              <Badge variant="secondary" className="bg-primary/10 text-primary">
+                {domain.connectorName}
+              </Badge>
+              <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
+              <code className="truncate font-mono text-muted-foreground">{domain.resource}</code>
+            </div>
+            {/* Who routes through this rule. With 20+ near-identical cards, the binding alone doesn't
+                say which rule the org actually runs on — this does. */}
+            {usage ? (
+              <p
+                className={
+                  usage.unused
+                    ? 'text-[11px] text-muted-foreground/70'
+                    : 'text-[11px] font-medium text-foreground'
+                }
+                title={
+                  usage.unused
+                    ? 'No app step or pipeline ceiling references this rule yet.'
+                    : [...usage.apps.map((a) => a.title), ...usage.pipelines.map((p) => p.name)].join(
+                        ', ',
+                      )
+                }
+              >
+                {usage.unused ? 'Not routed to yet' : `Routed to by ${describeUsage(usage)}`}
+              </p>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -160,6 +192,14 @@ export function DomainCard({
               matched it will no longer route to {domain.connectorName}. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          {/* Deleting a rule that apps or pipelines bind leaves those bindings pointing at nothing.
+              That is how a cosmetic cleanup turns into a broken app, so it is stated before the click,
+              naming what breaks. */}
+          {impact ? (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+              {impact}
+            </p>
+          ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={busy}>
               Cancel

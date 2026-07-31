@@ -32,6 +32,7 @@ export function DomainDetailPanel({
   connectors,
   allDomains,
   referencedByPipelines = [],
+  referencedByApps = [],
 }: Readonly<{
   domain: DataDomain & { connectorName: string };
   connectorName: string;
@@ -39,6 +40,8 @@ export function DomainDetailPanel({
   allDomains: DataDomain[];
   /** Pipelines whose data ceiling (dataAllowlist) allowlists THIS domain — the reverse edge. */
   referencedByPipelines?: { id: string; name: string; status: string }[];
+  /** Apps with a connector-query step bound to THIS domain (by id or label). */
+  referencedByApps?: { id: string; title: string }[];
 }>) {
   const router = useRouter();
   const params = useSearchParams();
@@ -222,6 +225,38 @@ export function DomainDetailPanel({
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                       {p.status}
                     </span>
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* The other half of the reverse edge: the app steps that actually read through this rule. A
+          pipeline permits reach; an app step is what exercises it — and it is the thing a delete
+          breaks, so it belongs on the same page as Delete. */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm">Read by apps ({referencedByApps.length})</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Apps with a step bound to this domain — by id or by label, the two shapes a step can use.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {referencedByApps.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No app step reads through this rule yet.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {referencedByApps.map((a) => (
+                <Link key={a.id} href={`/apps/${a.id}`}>
+                  <Badge
+                    variant="outline"
+                    className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                  >
+                    {a.title}
                   </Badge>
                 </Link>
               ))}
