@@ -2067,3 +2067,13 @@ so callers never choose. Until then both are cross-referenced in comments.
 **Also corrected here:** I claimed `RUN_ENGINES = ['golden','promptfoo','ragas']` in GoldenCasesManager was a
 user-facing dropdown offering OSS names. It is not — those are internal ids and the button renders them
 through `evalEngineLabel`. I reported a defect without reading the render path.
+
+## G-202 — two route PATHS carry a vendor name
+
+`/insights/ai/langfuse-prompts` and `/insights/ai/langfuse-datasets`. The nav labels are already clean
+("Manage prompts & datasets"), so this is only visible in the address bar and in a shared link — but that
+is exactly where a buyer looks, and it names a component of our stack.
+
+Rename to `/insights/ai/prompts` and `/insights/ai/datasets`, with redirects from the old paths so existing
+links and bookmarks keep working. Not done here because a route rename touches nav config, links and
+`contextual-navigation` keys, and deserves its own verified pass rather than being squeezed in.
