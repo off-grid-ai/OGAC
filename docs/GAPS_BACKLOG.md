@@ -2077,3 +2077,24 @@ is exactly where a buyer looks, and it names a component of our stack.
 Rename to `/insights/ai/prompts` and `/insights/ai/datasets`, with redirects from the old paths so existing
 links and bookmarks keep working. Not done here because a route rename touches nav config, links and
 `contextual-navigation` keys, and deserves its own verified pass rather than being squeezed in.
+
+## G-203 — 42 data domains with heavy duplication and off-domain entries
+
+`/data/domains` is one of the strongest pages in the console — aliases, connector→resource bindings, a live
+"Test resolve" that uses the same deterministic resolver as the builder. Two data problems spoil it:
+
+**Duplicates.** `claims` ×3, `reimbursement quota` ×3, `candidates` ×2, `claim documents` ×2,
+`competitor intel` ×2, `expense claims` ×2, `invoices` ×2, `job requisitions` ×2, `pricing rate card` ×2,
+`pricing rfq` ×2, `helpdesk cases` ×2, `customer data` ×2, `transactions` ×2. A rule table whose whole
+promise is "deterministic, never a guess" showing the same label three times undermines exactly that claim.
+
+**Off-domain entries.** `candidates` (aliases: cvs, resumes, applicants), `job requisitions`, `vendors`,
+`invoices`, `competitor intel` — recruitment, procurement and competitive intel inside a bank's and an
+insurer's governed data model. Defensible in principle; reads as generic seed leftovers next to
+`kyc documents` and `repayment history`.
+
+**NOT fixed here, deliberately.** App steps bind a domain BY ID, so deleting a duplicate orphans any step
+pointing at it — turning a cosmetic duplication into a broken app, which is exactly what happened when the
+duplicate system pipelines were deduped without repointing references first. The fix must: (1) pick a
+canonical id per (org, label), (2) repoint `apps.steps` / agent step bindings that reference the others,
+(3) only then delete. Verify against a run afterwards, not just against the list.
