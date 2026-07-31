@@ -1,4 +1,18 @@
-// ─── Lineage display names — pure ──────────────────────────────────────────────────────────────────
+// ─── Display names for internal identifiers — pure ─────────────────────────────────────────────────
+//
+// OVERLAPS WITH src/lib/eval-engine-label.ts — READ THIS BEFORE ADDING A THIRD.
+//
+// `evalEngineLabel` already maps BARE engine ids to outcome language (ragas -> "Retrieval quality",
+// evidently -> "Drift & quality") and is the right choice wherever the value is a single engine id. I
+// wrote this module without finding it first, which is a DRY failure on my part.
+//
+// What this one does that the other cannot: sanitise COMPOUND strings where an engine or codename is
+// embedded in a larger identifier — "answer_relevancy:ragas", "brain.retrieve.qdrant",
+// "Knowledge base (Brain)". Those come from lineage jobs, dataset names and eval run keys, not from a
+// clean id field, so a lookup table cannot match them.
+//
+// Rule of thumb: a bare engine id -> evalEngineLabel. An arbitrary string that may CONTAIN one ->
+// publicLabel. They should be consolidated behind one entry point; logged as a gap.
 //
 // The lineage graph rendered the names the emitters wrote, and those are INTERNAL: "Knowledge base
 // (Brain)" exposes our codename, and `brain.retrieve.qdrant` names the vector engine. Neither belongs on

@@ -1,6 +1,7 @@
 'use client';
 
 import { CheckCircle, Plus, XCircle } from '@phosphor-icons/react';
+import { publicLabel } from '@/lib/lineage-labels';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -138,7 +139,7 @@ export function AppQualityPanel({
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-foreground">{d.name}</div>
                     <div className="text-[11px] text-muted-foreground">
-                      {d.metric} · {d.engine} · threshold {d.threshold} · {d.direction}
+                      {d.metric} · {publicLabel(d.engine)} · threshold {d.threshold} · {d.direction}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">

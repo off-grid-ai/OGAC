@@ -1,6 +1,7 @@
 'use client';
 
 import { TestTube } from '@phosphor-icons/react/dist/ssr';
+import { publicLabel } from '@/lib/lineage-labels';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -93,7 +94,7 @@ export function AbacTester() {
           </Badge>
           <span className="text-muted-foreground">{decision.reason}</span>
           <Badge variant="outline" className="ml-auto">
-            {decision.engine}
+            {publicLabel(decision.engine)}
           </Badge>
         </div>
       ) : null}

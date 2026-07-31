@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowCounterClockwise, Code, Eye, FloppyDisk, Play, Sparkle, X } from '@phosphor-icons/react/dist/ssr';
+import { publicLabel } from '@/lib/lineage-labels';
 import { decodeArtifactText } from '@/lib/artifact-text';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -196,7 +197,7 @@ export function ArtifactView({
         {result ? (
           <div className="mx-4 mb-4 space-y-1.5">
             <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Output · {result.engine}
+              Output · {publicLabel(result.engine)}
               {result.timedOut ? ' · timed out' : ''}
               {result.exitCode !== null ? ` · exit ${result.exitCode}` : ''}
             </div>

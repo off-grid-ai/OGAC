@@ -1,6 +1,7 @@
 'use client';
 
 import { Play, Terminal } from '@phosphor-icons/react/dist/ssr';
+import { publicLabel } from '@/lib/lineage-labels';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,7 @@ function SandboxOutput({ result }: Readonly<{ result: Result }>) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <Badge variant="outline">{result.engine}</Badge>
+        <Badge variant="outline">{publicLabel(result.engine)}</Badge>
         <Badge
           variant="secondary"
           className={result.ok ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}

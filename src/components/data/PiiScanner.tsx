@@ -1,6 +1,7 @@
 'use client';
 
 import { Eye } from '@phosphor-icons/react/dist/ssr';
+import { publicLabel } from '@/lib/lineage-labels';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -74,7 +75,7 @@ export function PiiScanner() {
               >
                 {result.hits ? `${result.entities.length} entities found` : 'no PII detected'}
               </Badge>
-              <Badge variant="outline">{result.engine}</Badge>
+              <Badge variant="outline">{publicLabel(result.engine)}</Badge>
               {result.entities.map((e) => (
                 <Badge key={e} variant="secondary" className="text-muted-foreground">
                   {e}

@@ -1,6 +1,7 @@
 'use client';
 
 import { ChartLine, CheckCircle, Cube, Play } from '@phosphor-icons/react/dist/ssr';
+import { publicLabel } from '@/lib/lineage-labels';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -281,7 +282,7 @@ export function DriftCatalog({ engineStatus }: Readonly<{ engineStatus: DriftEng
                 {result.status}
               </Badge>
               <span className="text-muted-foreground">
-                engine {result.engine}
+                engine {publicLabel(result.engine)}
                 {result.driftScore !== null ? ` · score ${result.driftScore}` : ''}
               </span>
             </div>

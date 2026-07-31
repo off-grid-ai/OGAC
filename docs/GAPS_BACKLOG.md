@@ -2049,3 +2049,21 @@ fabricate a rate; if there is no defensible reference, the label alone is enough
 **Not done here** because it needs a decision on whether to publish a comparison rate, which is a
 positioning choice rather than a code one. Related: dollar budgets are $0 no-ops on free models, so any
 budget UI built on spend needs the same framing.
+
+## G-201 — two modules map internal names to display language; consolidate them
+
+`src/lib/eval-engine-label.ts` (`evalEngineLabel`) already mapped bare engine ids to outcome language —
+`ragas` → "Retrieval quality", `evidently` → "Drift & quality" — and predates my work. I then wrote
+`src/lib/lineage-labels.ts` (`publicLabel`) without finding it. That is a DRY failure.
+
+They are not redundant, but the split is accidental rather than designed:
+- `evalEngineLabel` — a BARE engine id, via lookup. Better labels ("Retrieval quality" beats "quality checks").
+- `publicLabel` — an arbitrary string that may CONTAIN an engine or codename ("answer_relevancy:ragas",
+  "brain.retrieve.qdrant", "Knowledge base (Brain)"), via word-boundary substitution. A lookup cannot match these.
+
+**Consolidate behind one entry point:** try the lookup on the whole string first, fall back to substitution,
+so callers never choose. Until then both are cross-referenced in comments.
+
+**Also corrected here:** I claimed `RUN_ENGINES = ['golden','promptfoo','ragas']` in GoldenCasesManager was a
+user-facing dropdown offering OSS names. It is not — those are internal ids and the button renders them
+through `evalEngineLabel`. I reported a defect without reading the render path.
