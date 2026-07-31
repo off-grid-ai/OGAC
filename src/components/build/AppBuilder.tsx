@@ -17,7 +17,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AppStepEditor, type StepEditorHandlers } from '@/components/build/AppStepEditor';
 import {
@@ -174,6 +174,45 @@ export function AppBuilder({
 
   const [description, setDescription] = useState('');
   const [spec, setSpec] = useState<AppSpec | null>(initialApp ?? null);
+
+  // ── Draft survival across the describe → refine navigation ──────────────────────────────────────
+  //
+  // sessionStorage, not localStorage: an unsaved compile is scoped to this tab and this sitting, and
+  // should not reappear days later in another window as though it were saved work.
+  const DRAFT_KEY = 'ogac:builder-draft';
+  const saveDraft = useCallback((s: AppSpec, g: string[]) => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ spec: s, gaps: g }));
+    } catch {
+      /* private mode / quota — the in-memory spec still works when no remount happens */
+    }
+  }, []);
+  const clearDraft = useCallback(() => {
+    try {
+      sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      /* nothing to clean up */
+    }
+  }, []);
+
+  // Restore a compiled draft when the URL says we are refining but the state is empty — i.e. this
+  // component just remounted across the navigation. Only for a NEW app: when editing a saved app the
+  // server-provided initialApp is the truth and a stale draft must never shadow it.
+  useEffect(() => {
+    if (initialApp || spec || rawPhase !== 'refine') return;
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { spec?: AppSpec; gaps?: string[] };
+      if (saved?.spec) {
+        setSpec(saved.spec);
+        setGaps(saved.gaps ?? []);
+      }
+    } catch {
+      /* a corrupt draft is discarded rather than crashing the builder */
+    }
+  }, [initialApp, spec, rawPhase]);
+
   const [gaps, setGaps] = useState<string[]>([]);
   const [compiling, setCompiling] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -232,6 +271,13 @@ export function AppBuilder({
       const data = (await res.json()) as { spec: AppSpec; gaps: string[] };
       setSpec(data.spec);
       setGaps(data.gaps ?? []);
+      // PERSIST THE DRAFT BEFORE NAVIGATING. `spec` is component state and setParam does a
+      // router.push, so if this client component remounts on that navigation the spec set one line
+      // above is gone — and because the refine branch renders only `phase === 'refine' && spec`,
+      // NEITHER branch renders and the author sees a header over an empty page after a compile that
+      // succeeded. Keeping the phase in the URL is right (Back must work); the draft just has to
+      // survive the trip.
+      saveDraft(data.spec, data.gaps ?? []);
       setParam('phase', 'refine');
       toast.success('Carved a step skeleton — resolve anything flagged, then save.');
     } catch (e) {
@@ -279,7 +325,8 @@ export function AppBuilder({
       const app = (await res.json()) as { id: string };
       toast.success(`"${spec.title}" saved`);
       if (editing) router.refresh();
-      else router.push(`/solutions/apps/${app.id}`);
+      else clearDraft();
+      router.push(`/solutions/apps/${app.id}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally {
