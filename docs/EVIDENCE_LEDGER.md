@@ -11,6 +11,35 @@ have evaluations" claim off a `count(*)`, a "fixed" verdict off `grep -c`. The c
 reported as the goal. A script that reads the terminal artifact cannot make that substitution, so the
 ledger cannot be more optimistic than the evidence.
 
+## Row 1 status after the data fix — GAP (identity ceiling), cause identified
+
+The fabricated citation payloads ARE gone. Verified in the database, not inferred:
+
+```
+messages with a linkable docId: 21          remaining "governed source" placeholders: 0
+{"name":"Death-Claim Assessment SOP","docId":"00dfde9e-…","collectionId":"d93bff10-…",
+ "position":0,"score":0.93}
+```
+
+`scripts/fix-seeded-citations.sql` (committed, replayable) matched each answer to a TOPICALLY correct
+document from its own text — claims SOPs for the hospitalisation answers, the reimbursement policy for
+the Training-quota answer, KYC documents for re-verification — because citing a real-but-irrelevant
+document is the same lie in a better costume. The 9 messages that matched nothing were set to **no
+citation** rather than a wrong one.
+
+**The e2e row is still GAP, and the reason is identity, not rendering.** The script deep-links to
+`conv_634a202ae6c5` — the exact conversation in the founder's screenshot — and reads no citation row.
+That screenshot was taken as `mac@wednesday.is`; **chats are per-user scoped and the harness signs in as
+`demo-bank`, so it sees an empty page.** The script is right and is looking at a conversation it is not
+permitted to see.
+
+To promote: point `CONV_ROUTE` at a conversation owned by the harness identity, or seed one. Two
+corrections belong here, both mine:
+- I reported "only 3 messages in the entire database have citations". That was my own `LIMIT 3` reported
+  as a finding about the product. It was **30**.
+- I deployed the renderer fix as though it addressed the founder's screenshot. It did not — the data did.
+  The renderer work is correct and independent.
+
 ## The identity ceiling — why some rows CANNOT be promoted yet
 
 Every demo identity configured on the box is a **viewer**:

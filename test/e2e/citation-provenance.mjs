@@ -10,13 +10,27 @@
 import { signIn, type, verdict, waitFor, OUT } from './lib.mjs';
 
 const ROW = 'citation-provenance';
-const { browser, page } = await signIn('/work/chat');
+const { browser, page } = await signIn(
+  // DEEP-LINK, no navigation guessing. This is the exact conversation from the founder's screenshot
+  // (the ₹41,346.44 Training-quota answer) and its stored citation was repaired by
+  // scripts/fix-seeded-citations.sql. Clicking through a sidebar added a failure mode that had nothing
+  // to do with the claim under test.
+  process.env.CONV_ROUTE || '/work/chat/conv_634a202ae6c5',
+);
 
-// A grounded answer needs a knowledge-bearing conversation. Prefer a project chat if one is offered.
-const project = page.getByText(/Reimbursement queries|KYC re-verification/i).first();
-if (await project.count()) {
-  await project.click();
-  await page.waitForTimeout(3000);
+// TWO WAYS a citation row can exist, and both must be checked because they fail differently:
+//   (a) an EXISTING answer whose stored citations render — this is what the seed fix repaired;
+//   (b) a NEW answer produced by live retrieval.
+// Opening a stored conversation is tried first: it needs no model call, so it isolates rendering +
+// stored data from retrieval. My first version only did (b), which meant a 90s model timeout and a
+// broken renderer produced the identical verdict.
+const stored = page
+  .getByRole('link', { name: /claim|policy|KYC|reimbursement|collection|Meera/i })
+  .or(page.getByRole('button', { name: /claim|policy|KYC|reimbursement|collection|Meera/i }))
+  .first();
+if ((await stored.count()) > 0) {
+  await stored.click({ timeout: 10000 }).catch(() => {}); // a missing entry point is not a throw
+  await page.waitForTimeout(4000);
 }
 
 const composer = page.locator('textarea[aria-label="Message Off Grid AI"]');
@@ -26,8 +40,13 @@ if (!(await composer.count())) {
   process.exit(1);
 }
 
-await type(composer, 'What is the reimbursement limit for Training? Cite the policy.');
-await composer.press('Enter');
+// Only send a new message if the stored conversation showed no citation row — otherwise the stored
+// artifact is the thing under test and a model call would just add latency and noise.
+const already = await page.locator('li').filter({ has: page.locator('span', { hasText: /^\[\d+\]$/ }) }).count();
+if (!already) {
+  await type(composer, 'What is the reimbursement limit for Training? Cite the policy.');
+  await composer.press('Enter');
+}
 
 // The artifact: an <li> containing a [n] marker.
 const row = page.locator('li').filter({ has: page.locator('span', { hasText: /^\[\d+\]$/ }) }).first();

@@ -60,3 +60,30 @@ export async function waitFor(fn, ms = 60000, step = 2000) {
   }
   return false;
 }
+
+/**
+ * Run a ledger row so that ANY failure becomes a verdict.
+ *
+ * Three times this session a row threw a TimeoutError instead of reporting — a mis-scoped locator, a
+ * disabled control, a missing element — and each time the stack trace hid the finding. The rule "a
+ * timeout IS a verdict" is only real if the harness enforces it, not if each script has to remember,
+ * so every row is wrapped here rather than trusted to be careful.
+ *
+ * `fn` receives { page, browser } and returns true to pass. A throw is a GAP naming the failure.
+ */
+export async function row(name, route, fn, who) {
+  let ctx;
+  try {
+    ctx = await signIn(route, who);
+    const pass = await fn(ctx);
+    return pass;
+  } catch (e) {
+    const msg = String(e?.message ?? e).split('\n')[0].slice(0, 120);
+    await ctx?.page?.screenshot({ path: `${OUT}/${name}-threw.png`, fullPage: true }).catch(() => {});
+    // A throw says the SCRIPT could not see the thing, which is not the same as the product lacking it.
+    verdict(name, false, `script error (not a product verdict): ${msg}`);
+    return false;
+  } finally {
+    await ctx?.browser?.close().catch(() => {});
+  }
+}
