@@ -23,12 +23,39 @@ const scalar = ApiReference({
 // DNS lookups that go nowhere. Same defect class as the vendored script: the page must not reach out.
 // Declaring the font stack up front means the @font-face requests are never made, and the reference reads
 // in the console's own type (Menlo for code, system sans for prose) instead of a half-loaded Inter.
+// Also hidden: the third-party chrome the reference renders around OUR api — a "Powered by Scalar"
+// credit in the sidebar, and the vendor's hosted-product controls (Ask AI, Generate MCP, Deploy,
+// Configure, Share) which do nothing on an on-prem deployment. Two reasons, both firm: this console
+// never exposes the name of an engine underneath it, and a control that cannot work is worse than no
+// control in front of a buyer.
 const FONT_OVERRIDE = `<style>
 :root, .scalar-app, .scalar-api-reference {
   --scalar-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --scalar-font-code: Menlo, ui-monospace, SFMono-Regular, monospace;
 }
-</style>`;
+/* Vendor credit + hosted-product controls. Matched on the link target and on button text so a class
+   rename in a future bundle cannot silently bring them back. */
+a[href*="scalar.com"] { display: none !important; }
+</style>
+<script>
+(function () {
+  // The remaining controls carry no stable selector, so they are matched by their own label — the one
+  // thing that will not change — once the reference has mounted.
+  var HIDE = ['Ask AI', 'Generate MCP', 'Deploy', 'Configure', 'Share', 'Developer Tools'];
+  function strip() {
+    var nodes = document.querySelectorAll('button, a, [role="button"]');
+    for (var i = 0; i < nodes.length; i++) {
+      var label = (nodes[i].textContent || '').trim();
+      // Hide the control itself — never an ancestor, which on one bundle version took the whole
+      // toolbar (and the endpoint list with it) off the page.
+      if (HIDE.indexOf(label) !== -1) nodes[i].style.display = 'none';
+    }
+  }
+  new MutationObserver(strip).observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('DOMContentLoaded', strip);
+  setTimeout(strip, 1200);
+})();
+</script>`;
 
 // Scalar returns its OWN HTML document, so it never runs through the React root layout where
 // <PostHog/> lives — this page would otherwise have no analytics. Inject the PostHog bootstrap into
