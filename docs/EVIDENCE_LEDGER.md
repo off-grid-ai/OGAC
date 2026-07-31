@@ -404,8 +404,33 @@ POST /v1/admin/apps/compile → 200
 
 Two independent observations: the API returns a complete spec, and the page still shows the empty "Build a
 new app" state ninety seconds later. **This is a real defect on §10 Flow 3 / §15 — the product's core
-promise — and it is a RENDER/STATE defect, not a compile defect.** Check whether the response is applied to
-component state at all, and whether an error in parsing it is being swallowed.
+promise — and it is a RENDER/STATE defect, not a compile defect.**
+
+`AppBuilder.compile()` (src/components/build/AppBuilder.tsx:218) is itself correct:
+
+```ts
+const data = (await res.json()) as { spec: AppSpec; gaps: string[] };
+setSpec(data.spec);
+setGaps(data.gaps ?? []);
+setParam('phase', 'refine');      // ← router navigation
+```
+
+**HYPOTHESIS WITH A MECHANISM (not yet confirmed):** `spec` is LOCAL component state and `setParam` pushes
+a route change. If the client component remounts on that navigation, the spec set one line earlier is
+discarded — producing exactly what was observed: a 200 with a full spec, then the empty *describe* phase
+still on screen 90 seconds later. The captured page text is the describe copy ("Build a new app · Describe
+the process…"), so the surface is showing phase=describe after a compile that succeeded.
+
+This is the shape CLAUDE.md's navigation rule warns about from the other side: navigation belongs in the
+URL, and anything that must survive it cannot live in local `useState`.
+
+**Confirm before changing code** — I have been wrong on this row twice already:
+1. Does the URL actually carry `?phase=refine` after the click? (Read `page.url()` post-compile.)
+2. Does the component remount? (A `console.count()` in the body, or React DevTools.)
+3. If both hold, the fix is to derive the spec from a source that survives navigation — persist the
+   compiled spec server-side and read it by id, or lift it above the remount boundary. **Do not "fix" it
+   by removing the `setParam`,** which would take the navigation back out of the URL and break the rule
+   that made this diagnosable.
 
 ### The false pass I caught on the way, and why it matters more than the finding
 
