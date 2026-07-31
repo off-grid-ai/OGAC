@@ -70,6 +70,32 @@ My `must` pattern demanded role words in `main`'s innerText and did not find the
 the page has a Roles column. Four of my "candidate defects" this session have now resolved to my own
 instrument. That ratio is the useful number here — not the 15.
 
+## The final four, each re-run AS AN ADMIN — three distinct causes
+
+```
+GAP  flow3-natural-language-app  compileRequestFired=true — no plan or question after 90s
+GAP  flow6-review-approve        items=0 — the review queue is genuinely empty
+GAP  flow8-compliance-export     no generate control on ANY of 4 governance evidence routes
+GAP  citation-provenance         deep-linked conversation belongs to another user
+```
+
+**Flow 8 is now a real absence, not my targeting.** As an admin I checked `/governance/evidence`,
+`/governance/evidence/export`, `/governance/reports` and `/governance/regulatory`. None offers a control
+that generates an evidence pack; `/evidence/export` is about EXPORTERS (Splunk / Purview / Grafana), a
+different thing entirely. §10 Flow 8 — "select a regulation or period → collect runs, policies, approvals,
+versions, sources and evaluations → generate a SIGNED evidence pack" — appears to have **no surface**.
+That is the largest genuine product gap this ledger has found, and it is a §11 non-negotiable
+("Regulatory evidence", "Immutable audit trail", signed and archived). Worth confirming against the
+router before building, but four admin-authenticated routes is real evidence.
+
+**Flow 6 is a DATA condition, not a defect.** `items=0` persists as admin, so the review queue is empty
+because nothing is pending — not because the surface is broken. Seed a run that pauses for approval and
+this row becomes judgeable. Until then it is honestly unproven.
+
+**Row 1 needs a conversation the harness OWNS.** Chats are per-user scoped; the repaired citations sit on
+seeded users' conversations and the deep-linked one belongs to `mac@wednesday.is`. Point `CONV_ROUTE` at a
+conversation owned by the run identity, or seed one for `demo-editor`.
+
 ## The identity ceiling is LIFTED
 
 `demo-editor@getoffgridai.co` now exists in the Keycloak `offgrid` realm with the `admin` realm role and

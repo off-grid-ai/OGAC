@@ -3,10 +3,10 @@
 // merely offers a button is WIRED, not this flow.
 import { signIn, verdict, waitFor, OUT } from './lib.mjs';
 const ROW = 'flow8-compliance-export';
-const { browser, page } = await signIn('/governance/evidence/export');
+const { browser, page } = await signIn(process.env.PACK_ROUTE || '/governance/evidence');
 const gen = page.getByRole('button', { name: /generate|export|create pack|build pack/i }).first();
 if (!(await gen.count())) {
-  verdict(ROW, false, 'no generate/export control on /governance/evidence/export');
+  verdict(ROW, false, `no generate/export control on ${process.env.PACK_ROUTE || '/governance/evidence'}`);
   await page.screenshot({ path: `${OUT}/${ROW}.png` }).catch(() => {});
   await browser.close(); process.exit(1);
 }
