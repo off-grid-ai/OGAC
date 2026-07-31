@@ -60,8 +60,13 @@ let ok = await waitFor(async () => {
   // TYPED INTO THE TEXTAREA — and passed while compileRequestFired was false and nothing had been
   // produced. It graded the question, not the answer. The proof of Flow 3 is OUTPUT STRUCTURE that cannot
   // exist unless compile ran: numbered steps, or a clarifying question.
-  return /\bstep\s*[12]\b/i.test(t)
-    || /clarif|which data source should|what value is the cut-off|who should review this/i.test(t);
+  // ASSERT THE RESULT REGION, NOT THE PAGE. The static header ("Build a new app · Describe the process
+  // you want automated…") renders in BOTH phases, and my sample only ever read the first ~170 characters
+  // — so a fully rendered plan below the fold looked identical to an empty page. Flow 3 was reported
+  // broken twice on that basis and shipped two unnecessary fixes. Match the artifacts a compile produces.
+  return /the steps/i.test(t)
+    && (/read from a data source|\bstep\s*[12]\b/i.test(t)
+      || /clarif|which data source does this step read|what value is the cut-off|who should review this/i.test(t));
 }, 90000);
 const t = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
 await page.screenshot({ path: `${OUT}/${ROW}.png`, fullPage: true }).catch(() => {});

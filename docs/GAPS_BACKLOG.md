@@ -1924,7 +1924,32 @@ table but browses `bharatunion-onprem-console`. The data lives under `org_bharat
 cross-tenant citation links (`fix-citation-tenancy.sql`) were both found the same way — a surface
 rendering nothing while the database held the rows.
 
-## G-197 — Flow 3: compiled spec never reaches the screen (OPEN, cause narrowed, one fix already failed)
+## G-197 — RESOLVED: Flow 3 WORKS. The defect was my assertion, plus a missing progress state.
+
+**Verified by screenshot** (`scratchpad/compile-result.png`), which is the gate the founder set. A plain
+sentence compiles into a full plan: a named app ("Training Reimbursement Claim Quota"), a written summary,
+the inheritance banner (7 connectors · 23 data domains · 4 tools · 3 KB docs · guardrails on · policy v10),
+numbered steps with bound data sources, and an honest advisory — *"Added a read of 'reimbursement quota'
+before 'Check claim against quota' — that step reasons about it, and nothing was fetching it."*
+
+**What was actually wrong:**
+1. **No visible progress.** Compile takes 15–40s on local models and the only feedback was the button
+   re-wording itself, so it read as a dead click. FIXED: spinner + "this runs on your own hardware and
+   usually takes 20–40 seconds."
+2. **My assertion read the wrong region.** The static header ("Build a new app · Describe the process you
+   want automated…") renders in BOTH phases and my sample only ever showed the first ~170 characters — so
+   a fully rendered plan below the fold looked identical to an empty page.
+
+**Cost of that mistake:** I called the product's core promise broken twice, shipped two unnecessary fixes
+(draft persistence, handler reordering — both sound, neither needed), and wrote a gap entry asserting a
+functional defect that did not exist. **The screenshot settled in one look what four rounds of scripted
+assertion got wrong.** When a script and an image disagree, the image wins.
+
+The e2e row still reports GAP because the locator cannot reach the result region; that is a harness
+limitation and is NOT a claim about the product. Left honest rather than loosened until it passes — a
+green row I had to weaken to get is worth less than a red one next to a screenshot.
+
+### Superseded investigation below
 
 **§10 Flow 3 / §15 — the product's core promise.** Describe a process in plain language → get a plan.
 
