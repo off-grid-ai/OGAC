@@ -59,7 +59,12 @@ export function AppsList({
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="line-clamp-2 text-xs text-muted-foreground">{app.summary || '—'}</p>
+              {/* Three lines. At two, every one of six cards cut off mid-word ("classify by IRDAI…",
+                  "lapse-ris…", "sum-…") — a grid where no card finishes a sentence tells a reader
+                  nothing about what any app does. Full text on hover. */}
+              <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground" title={app.summary || undefined}>
+                {app.summary || '—'}
+              </p>
               <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground/70">
                 <span className="rounded border border-border px-1.5 py-0.5">{app.trigger.kind}</span>
                 <span className="rounded border border-border px-1.5 py-0.5">
