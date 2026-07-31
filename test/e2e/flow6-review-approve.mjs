@@ -16,7 +16,10 @@ const stake = /amount at stake|what you're approving|why/i.test(bodyText);
 // on the item detail, which is also what §10 Flow 6 describes (see pending item → understand it → act).
 // Asserting an Approve button on the LIST demanded a design the product deliberately does not have, and
 // reported the flow broken twice for it.
-const item = page.getByRole('link', { name: /overdue|delinquency|claim|account|review/i }).first();
+// The card's entry point is literally "Review now →" (see scratchpad/review-queue.png). Matching the
+// card TITLE instead picked up the sidebar's "Reviews" nav item and navigated away — the same nav-item
+// trap as Flow 3. Note /build/review redirects to /solutions/reviews, which is canonical.
+const item = page.getByRole('link', { name: /^review now/i }).first();
 if ((await item.count()) > 0) {
   await item.click({ timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(5000);

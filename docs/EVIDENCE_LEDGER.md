@@ -111,11 +111,30 @@ Only `actions=0` fails, and each attempt to fix it was another locator error:
 3. clicked a `link` matching /overdue|claim|review/ → landed on **`/solutions/reviews`**, i.e. I matched a
    NAV item, exactly the trap that cost me two Flow 3 verdicts.
 
-**To finish this row:** identify the queue item's real element (inspect the rendered card in
-`scratchpad/review-queue.png`), open it, and assert the act controls on the DETAIL page — and note that
-`/build/review` and `/solutions/reviews` both exist, so establish which is canonical before asserting.
-**Nothing here suggests a product defect.** The honest gate is GAP because the script cannot yet reach the
-control, not because the control is missing.
+**The card, read from `scratchpad/review-queue.png`** — and it is a genuinely good surface:
+
+```
+AWAITING YOU 2 · YOU CAN APPROVE 2 · ABOVE YOUR LIMIT 0 · APPS INVOLVED 1
+
+DELINQUENCY INTERVENTION            [✓ You can approve]
+Approve Overdue account — Kavya Reddy, ₹27,200?
+  7/29/2026, 5:00:47 AM
+Review now →
+```
+
+Named case, the amount at stake in ₹, when it arrived, and an explicit authority badge. `/build/review`
+redirects to `/solutions/reviews`, which is canonical.
+
+**Row stays GAP after a FOURTH locator attempt, and I am stopping rather than trying a fifth.** Clicking
+`link[name=/^review now/i]` leaves the URL on `/solutions/reviews`, so the detail is still not reached.
+Remaining possibilities, none yet tested: the element is not `role=link`; the click races the
+`/build/review` → `/solutions/reviews` redirect; or the detail opens in a panel without a URL change
+(which would itself violate the navigation-in-the-URL rule and is worth checking FIRST).
+
+**Nothing here suggests a product defect** — four of five assertions pass and the screenshot shows a
+surface that satisfies §8G. The gate is GAP because my script cannot reach the control, and that
+distinction is the point of this ledger. Four failed locators on one row is my signal to stop and hand
+over rather than keep spending on it.
 
 **Row 1 — VERIFIED by the script.**
 
