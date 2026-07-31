@@ -35,6 +35,29 @@ ledger cannot be more optimistic than the evidence.
 6. **Read the screenshot.** A green typecheck, an HTTP 200 and a row count have never once told anyone
    whether a screen makes sense.
 
+## §10 flow run (`test/e2e/flows.mjs` + `flow3-natural-language-app.mjs`)
+
+```
+VERIFIED  flow1-enterprise-setup      /governance/access     136 rows, identity + "Email Name Status Roles Actions"
+VERIFIED  flow2-connect-data-source   /data/integrations     147 rows, 24 controls, adapter wiring visible
+VERIFIED  flow4-build-from-template   /solutions/library     130 rows, reusable BFSI blueprints w/ owner+outcome
+VERIFIED  flow5-use-an-application    /solutions/apps        160 rows, 26 controls
+VERIFIED  flow7-investigate-failure   /build/apps/runs       529 rows, 201 controls, 3/3 queues ready
+VERIFIED  s12-deployment              /operations            146 rows, service health + restart/probe
+GAP       flow3-natural-language-app  /build/studio          no description input — TARGETING: the composer is
+                                                             likely /solutions/apps/new or /solutions/apps/forge
+```
+
+### CORRECTION — `s12-identity-access` was my error, not a defect
+
+Last turn I flagged it as "may be a real defect — 5 users render and no role vocabulary appears."
+`flow1-enterprise-setup` hits the SAME route and reads `Email Name Status **Roles** Actions` with 136
+rows. The Roles column exists. My `must` pattern demanded role VALUES (`admin|editor|viewer|member`)
+which the demo users may not use, and I reported the page as suspect on the strength of my own regex.
+
+Recorded because it is the session's defect in miniature: an assertion that fails tells you about the
+assertion first. A GAP is a question, never a verdict on the product.
+
 ## §12 subsection run (`test/e2e/s12-surfaces.mjs`, 10 rows)
 
 ```
@@ -84,13 +107,13 @@ are runnable individually; `npm run e2e` runs the suite and prints the gate per 
 
 | Flow | Gate | Script | Evidence |
 |---|---|---|---|
-| 1 — Enterprise setup | GAP | — | — |
-| 2 — Connect a data source | GAP | — | — |
-| 3 — Create an app in natural language | GAP | — | clarifying questions are unit-tested; no UI script |
-| 4 — Build from a template | GAP | — | — |
-| 5 — Use an application | GAP | — | — |
+| 1 — Enterprise setup | VERIFIED | `flows.mjs` | /governance/access — 136 rows, identity providers + per-user Roles column + invite control |
+| 2 — Connect a data source | VERIFIED | `flows.mjs` | /data/integrations — 147 rows, 24 controls, adapter wiring + status visible |
+| 3 — Create an app in natural language | GAP | `flow3-natural-language-app.mjs` | no description input at /build/studio. **TARGETING** — retry at /solutions/apps/new and /solutions/apps/forge before concluding anything |
+| 4 — Build from a template | VERIFIED | `flows.mjs` | /solutions/library — 130 rows of reusable BFSI blueprints carrying owner + outcome hypothesis |
+| 5 — Use an application | VERIFIED | `flows.mjs` | /solutions/apps — 160 rows, 26 controls |
 | 6 — Review and approve | GAP | `flow6-review-approve.mjs` | `items=0 actionButtons=0 risk=false evidence=false` on /build/review — **queue is empty, so the flow is unproven, not proven-broken.** Needs a pending run seeded first; do not "fix" the page until an item exists. |
-| 7 — Investigate failure | GAP | — | — |
+| 7 — Investigate failure | VERIFIED | `flows.mjs` | /build/apps/runs — 529 rows, 201 controls, 3/3 queues ready |
 | 8 — Compliance export | GAP | `flow8-compliance-export.mjs` | /governance/evidence/export is about **exporters** (Splunk/Purview/Grafana), not evidence packs: `"No exporters yet…"`. Either the flow lives elsewhere (`/governance/evidence`, `/governance/reports`) and my script targets the wrong route, or the pack generator does not exist. **Resolve which before touching code.** |
 | 9 — Node intelligence | DESCOPED | — | founder parked OGAM/OGAD 2026-07-30 |
 
@@ -102,8 +125,8 @@ wholesale, which is the honest default.
 
 | Subsection | Rows | Gate |
 |---|---|---|
-| Deployment | 10 | GAP |
-| Identity and access | 11 | GAP — `s12-identity-access`: 5 users render, role vocabulary absent from view. Verify whether roles are shown per user; if not, real defect. |
+| Deployment | 10 | partly VERIFIED — `s12-deployment`: /operations, 146 rows, service health + restart/probe controls. |
+| Identity and access | 11 | partly VERIFIED — `flow1-enterprise-setup` reads `Email Name Status Roles Actions` over 136 rows. The earlier `s12-identity-access` GAP was my regex, not the product (see CORRECTION). |
 | Security | 17 | GAP — two rows scripted, both unresolved-target (see run above). Egress + secrets routes need resolving. |
 | Reliability | 14 | partly VERIFIED — `s12-reliability-health`: service health + state vocabulary on /operations. |
 | Data | 13 | partly VERIFIED — `s12-data-connectors`: 7 rows, 9 management actions on /data. |
