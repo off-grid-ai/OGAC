@@ -4,6 +4,8 @@
 // test/workspace-grid.test.ts.
 
 /** Compact relative-time label for a card's "updated" meta ("just now", "3d", "2mo", "1y"). */
+import { decodeArtifactText } from '@/lib/artifact-text';
+
 export function relativeTime(iso: string, now: number = Date.now()): string {
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return '';
@@ -30,7 +32,13 @@ export function initials(title: string): string {
 
 /** Collapse a prompt/instruction body to a single-line preview, trimmed to `max` chars. */
 export function preview(text: string | null | undefined, max = 160): string {
-  const one = (text ?? '').replace(/\s+/g, ' ').trim();
+  // Decode escaped bodies BEFORE flattening. Prompt content stored JSON-escaped rendered as literal
+  // "\n" in the card on the suraksha tenant — the same defect found in artifact previews, on a second
+  // surface. Fixed HERE rather than in each caller: preview() is the one place both the prompt library
+  // and the starter library flatten a body, so one rule covers both and anything added later.
+  const one = decodeArtifactText(text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (one.length <= max) return one;
   return `${one.slice(0, max - 1).trimEnd()}…`;
 }
