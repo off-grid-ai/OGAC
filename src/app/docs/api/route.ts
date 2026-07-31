@@ -45,7 +45,9 @@ a[href*="scalar.com"] { display: none !important; }
   function strip() {
     var nodes = document.querySelectorAll('button, a, [role="button"]');
     for (var i = 0; i < nodes.length; i++) {
-      var label = (nodes[i].textContent || '').trim();
+      // Whitespace-normalised: "Generate MCP" survived an exact trim() match because the control wraps
+      // an icon and a trailing arrow, so its textContent carried extra spacing.
+      var label = (nodes[i].textContent || '').replace(/\\s+/g, ' ').trim();
       // Hide the control itself — never an ancestor, which on one bundle version took the whole
       // toolbar (and the endpoint list with it) off the page.
       if (HIDE.indexOf(label) !== -1) nodes[i].style.display = 'none';
