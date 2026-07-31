@@ -856,8 +856,21 @@ async function putArtifactBody(
 }
 // Hydrate the body: prefer SeaweedFS (codeKey), fall back to the legacy `code` column for rows
 // written before the migration.
+// THE ROOT CAUSE of the black artifact previews (live, 2026-07-31). Every seeded artifact carries a
+// `codeKey`, and this returned '' whenever the object read missed — so the body the DB still holds was
+// discarded and the viewer rendered an EMPTY artifact: a black rectangle for html/svg, mermaid's "Syntax
+// error in text" for an empty diagram, and React's "No default export found" fallback. Four different
+// symptoms, one cause, and none of them said anything was wrong.
+//
+// The object store stays the source of truth when it HAS the object (bodies are externalised to keep the
+// row small). A miss is not authority to return nothing while a body sits in the row — it means the
+// object was never uploaded (seeded rows) or the store is unreachable, and the correct answer is the text
+// we have. `getObjectText` throwing is treated the same way, for the same reason.
 async function bodyOf(row: { codeKey?: string | null; code?: string | null }): Promise<string> {
-  if (row.codeKey) return (await getObjectText(row.codeKey)) ?? '';
+  if (row.codeKey) {
+    const external = await getObjectText(row.codeKey).catch(() => null);
+    if (external) return external;
+  }
   return row.code ?? '';
 }
 

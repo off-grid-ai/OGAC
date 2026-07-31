@@ -69,10 +69,20 @@ for (const { kind, id } of IDS) {
   await page.goto(`${BASE}/work/artifacts?artifact=${id}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(5000); // mermaid/babel need a beat after load
 
-  const frame = page.frames().find((f) => f !== page.mainFrame());
+  // THE PANEL's iframe, addressed through the panel element — not `frames().find(f => f !== main)`,
+  // which returned the FIRST grid thumbnail and made all four artifacts report the same numbers (a
+  // mermaid thumbnail's error graphic) regardless of which one was open.
+  const panelFrame = await page
+    .locator('aside iframe[title="artifact"]')
+    .first()
+    .elementHandle()
+    .then((h) => h?.contentFrame() ?? null)
+    .catch(() => null);
+  const frame = panelFrame;
   if (!frame) {
-    console.log(`${kind}/${id} NO FRAME`);
+    console.log(`${kind}/${id} NO PANEL FRAME (is the artifact id valid for this tenant?)`);
     allOk = false;
+    await page.screenshot({ path: `${OUT}/artifact-${kind}-${id}-noframe.png` });
     continue;
   }
   const probe = await frame
