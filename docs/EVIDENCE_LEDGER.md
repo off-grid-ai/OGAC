@@ -40,6 +40,36 @@ corrections belong here, both mine:
 - I deployed the renderer fix as though it addressed the founder's screenshot. It did not — the data did.
   The renderer work is correct and independent.
 
+## A flaw in MY pass condition — read this before trusting any `acts=` number
+
+`s12-surfaces.mjs` and `flows.mjs` require `acts > 0` — a management control must be present — because
+CLAUDE.md says a read-only dashboard is not a finished feature. **But the harness signs in as a VIEWER,
+and a viewer is never shown write controls.** So:
+
+- Every `acts=0` GAP may be the product correctly hiding a control from an unauthorised identity, NOT a
+  missing feature. `s12-security-secrets` (`/governance/secrets/mounts`, 5 mounts, `acts=0`) is exactly
+  this shape and is hereby **downgraded from "candidate defect" to GAP (identity ceiling)**.
+- Worse in the other direction: a row that PASSED on `acts > 0` proves only that *something* matching the
+  regex was clickable to a viewer. It is weaker evidence than it looks.
+
+So `acts` is not a valid CRUD assertion under a viewer identity, and no row's gate should be read as
+"full CRUD verified" today. That claim needs the editor credential below. Recorded rather than quietly
+left, because a ledger whose pass conditions are wrong in a knowable way is exactly the thing this
+document was built to stop.
+
+### `s12-identity-access` — CLEARED, my assertion again (fourth time)
+
+Roles exist and are populated. From the `user` table:
+
+```
+mac@wednesday.is admin/default · priya.sharma@bharatunion.example admin/org_bharat
+arjun.menon@surakshalife.example member/org_suraksha · kavya.reddy@… member · rohan.iyer@… member
+```
+
+My `must` pattern demanded role words in `main`'s innerText and did not find them; the roles are real and
+the page has a Roles column. Four of my "candidate defects" this session have now resolved to my own
+instrument. That ratio is the useful number here — not the 15.
+
 ## The identity ceiling — why some rows CANNOT be promoted yet
 
 Every demo identity configured on the box is a **viewer**:
