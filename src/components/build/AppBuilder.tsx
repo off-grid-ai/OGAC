@@ -869,6 +869,15 @@ function DescribePhase({
                   We only bind steps to data sources your org has declared — never a fabricated one.
                 </p>
                 {!canCreate ? <p>{accessMessage}</p> : null}
+                {compiling ? (
+                  // Say how long, in the author's terms. "This is taking a while" is the single most
+                  // common reason a demo has to be talked over; a stated expectation removes it, and
+                  // it is honest — the work really does run on-prem, which is the whole point.
+                  <p aria-live="polite" className="text-xs text-muted-foreground">
+                    Reading your description and drafting the steps — this runs on your own hardware and
+                    usually takes 20–40 seconds.
+                  </p>
+                ) : null}
               </div>
               <Button
                 onClick={onCompile}
@@ -876,8 +885,23 @@ function DescribePhase({
                 className="self-start gap-1.5 sm:self-auto"
               >
                 <Sparkle className="size-4" />
-                {compiling ? 'Carving steps…' : 'Build the steps'}
-                {!compiling ? <ArrowRight className="size-4" /> : null}
+                {compiling ? (
+                  <>
+                    {/* A spinner, not just a label change. Compile runs on a local model and takes
+                        20–40s; a button that merely re-words itself reads as a hang, and the author
+                        cannot tell a slow model from a dead click. */}
+                    <span
+                      aria-hidden
+                      className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+                    />
+                    Carving steps…
+                  </>
+                ) : (
+                  <>
+                    Build the steps
+                    <ArrowRight className="size-4" />
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>
