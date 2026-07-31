@@ -1892,3 +1892,34 @@ anyone writes it down as a defect.
 
 **Consequence:** the citation-footer verification is still unproven, but it is unblocked — the harness
 can now drive a real message.
+
+## G-196 — the founder's own account sees empty Workspace pages on a tenant host
+
+**Found 2026-07-30, by the founder clicking four things and finding four empty pages.**
+
+**Not broken features.** Signed in as `demo-bank@getoffgridai.co` on bharatunion:
+`GET /api/v1/prompts` → 200 with 4 prompts, and the page renders them. `listPrompts` is correct
+(`visibility='org' OR owner=caller`, org-scoped), and all 4 seeded prompts are `visibility='org'`.
+
+**The actual problem is identity vs host.** `mac@wednesday.is` has `org_id = 'default'` in the `user`
+table but browses `bharatunion-onprem-console`. The data lives under `org_bharat` (4 prompts, 8 artifacts,
+15 projects) owned by `demo-bank@…`. So every per-user or per-org Workspace surface renders empty for him:
+
+| Surface | Rows in org_bharat | Why he sees none |
+|---|---|---|
+| Prompts | 4 (`visibility=org`) | his session org ≠ org_bharat |
+| Artifacts | 8 | scoped strictly to `user_id` — by design |
+| Projects | 15 | same |
+
+**Two separate decisions, and they should not be conflated:**
+1. **Tenant resolution** — should a user whose home org is `default` be able to browse a tenant host at
+   all? Today they get a silently empty console, which is the worst answer. Either bind the session to the
+   host's tenant, or refuse with an explanation. See the existing note on host-vs-signed-in-org ambiguity;
+   this is that class, surfacing as emptiness.
+2. **Demo seeding** — artifacts and projects are legitimately per-user, so a demo shown to a buyer needs
+   rows owned by whoever will actually sign in. Seeding them only under `demo-bank` means any other login
+   sees an empty product.
+
+**Related, same session:** the empty-transcript threading defect (`fix-chat-threading.sql`) and the
+cross-tenant citation links (`fix-citation-tenancy.sql`) were both found the same way — a surface
+rendering nothing while the database held the rows.
