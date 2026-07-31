@@ -181,7 +181,30 @@ export class KeycloakAdminClient {
     if (first !== undefined) params.set('first', String(first));
     if (max !== undefined) params.set('max', String(max));
     const qs = params.toString() ? `?${params}` : '';
-    return this.fetchJson<KcUser[]>(`/users${qs}`);
+    const users = await this.fetchJson<KcUser[]>(`/users${qs}`);
+
+    // ATTACH ROLE MAPPINGS. Keycloak's /users does NOT return them, so `realmRoles` was always
+    // undefined and the Users table rendered an empty Roles column for every person — on the console's
+    // access-control page, where "who can do what" is the entire question being asked. The type declared
+    // the field, the table rendered it, and nothing ever filled it.
+    //
+    // One extra call per user, bounded by the page size the caller already asked for. Failures degrade to
+    // no roles for that row rather than failing the whole list — a partial answer beats a blank page.
+    return Promise.all(
+      users.map(async (u) => {
+        if (!u.id) return u;
+        try {
+          const roles = await this.listUserRoles(u.id);
+          return {
+            ...u,
+            // default-roles-* is Keycloak plumbing every account carries; showing it buries the real ones.
+            realmRoles: roles.map((r) => r.name).filter((n) => !n.startsWith('default-roles')),
+          };
+        } catch {
+          return u;
+        }
+      }),
+    );
   }
 
   async getUser(id: string): Promise<KcUser | null> {
