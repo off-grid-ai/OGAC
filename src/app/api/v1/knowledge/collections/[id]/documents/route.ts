@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { extractDocumentText, isRefusal } from '@/lib/document-text';
 import { publicUrlFor, saveFile } from '@/lib/files';
 import { addDocument, getCollection, listDocuments } from '@/lib/org-knowledge';
 import { currentOrgId } from '@/lib/tenancy';
@@ -54,11 +55,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const bytes = Buffer.from(await f.arrayBuffer());
       const mime = f.type || 'application/octet-stream';
       name = f.name || name;
-      // Client may pre-extract text (PDF/docx); for text/* fall back to the raw bytes.
-      const textFallback = mime.startsWith('text/') ? bytes.toString('utf8') : '';
-      content = typeof formContent === 'string' && formContent.trim()
-        ? formContent
-        : textFallback;
+      // Extract the text SERVER-SIDE (pdfjs for PDFs), so a PDF no longer indexes its container bytes
+      // as if they were prose. A client-supplied `content` still wins — the browser may have extracted
+      // a format we cannot read here — but the fallback is real extraction, not raw bytes.
+      if (typeof formContent === 'string' && formContent.trim()) {
+        content = formContent;
+      } else {
+        const extracted = await extractDocumentText(name, mime, new Uint8Array(bytes)).catch((e) => ({
+          refused: true as const,
+          reason: `Could not read ${name}: ${(e as Error).message}`,
+        }));
+        if (isRefusal(extracted)) {
+          return NextResponse.json({ error: 'unsupported', reason: extracted.reason }, { status: 415 });
+        }
+        content = extracted.text;
+      }
       const saved = await saveFile({ name, mime, bytes, visibility: 'public', owner: session.user.email });
       file = { url: publicUrlFor(saved.id), mime };
     } else if (typeof formContent === 'string') {

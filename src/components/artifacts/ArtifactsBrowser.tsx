@@ -142,9 +142,23 @@ export function ArtifactsBrowser() {
     else toast.error(f.message);
   }
 
+  // Copy AND show the URL, with a way to open it. "Link copied" alone tells you nothing about where the
+  // link goes — and a clipboard write can silently fail in a browser that has not granted permission,
+  // leaving a success toast over an empty clipboard.
   function copyLink(id: string) {
-    void navigator.clipboard.writeText(`${window.location.origin}/artifacts/${id}/view`);
-    toast.success('Link copied');
+    const url = `${window.location.origin}/artifacts/${id}/view`;
+    navigator.clipboard.writeText(url).then(
+      () =>
+        toast.success('Share link copied', {
+          description: url,
+          action: { label: 'Open', onClick: () => window.open(url, '_blank', 'noopener') },
+        }),
+      () =>
+        toast.info('Copy was blocked by the browser — here is the link', {
+          description: url,
+          action: { label: 'Open', onClick: () => window.open(url, '_blank', 'noopener') },
+        }),
+    );
   }
 
   async function revert(a: ArtifactRow, version: number) {

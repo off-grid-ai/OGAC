@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { explainResponse } from '@/lib/api-failure';
 import { noteDocumentName } from '@/lib/knowledge-note';
+import { SUPPORTED_UPLOAD_ACCEPT } from '@/lib/upload-formats';
 import { accentHue, initials, relativeTime } from '@/lib/workspace-grid';
 import { ShareDialog } from './ShareDialog';
 
@@ -184,11 +185,31 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
     return false;
   }
 
+  // Files go up as multipart so the SERVER extracts the text — a PDF read here with file.text() indexes
+  // its container bytes and reports a healthy chunk count, which is worse than refusing it.
+  async function uploadFile(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    const r = await fetch(`/api/v1/chat/projects/${projectId}/documents`, {
+      method: 'POST',
+      body: form,
+    });
+    if (r.ok) {
+      const { chunks, pages } = await r.json();
+      toast.success(
+        `${file.name} · ${chunks} chunks embedded${pages ? ` from ${pages} page${pages === 1 ? '' : 's'}` : ''}`,
+      );
+      return;
+    }
+    const failure = await explainResponse(r, `add ${file.name}`);
+    (failure.refusal ? toast.info : toast.error)(failure.message);
+  }
+
   async function upload(files: FileList | null) {
     if (!files) return;
     setBusy(true);
     for (const f of Array.from(files)) {
-      await addDocument(f.name, await f.text());
+      await uploadFile(f);
     }
     setBusy(false);
     await loadDocs();
@@ -438,13 +459,13 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
               <div>
                 <CardTitle className="text-sm">Knowledge ({docs.length})</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Text/markdown files, embedded so project chats retrieve and cite them.
+                  PDF, text or Markdown — embedded so this project&rsquo;s chats retrieve and cite them.
                 </p>
               </div>
               <input
                 ref={fileRef}
                 type="file"
-                accept=".txt,.md,.markdown,.csv,.json,text/*"
+                accept={SUPPORTED_UPLOAD_ACCEPT}
                 multiple
                 hidden
                 onChange={(e) => upload(e.target.files)}

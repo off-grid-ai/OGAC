@@ -14,7 +14,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
-import { postKnowledgeDocument } from '@/lib/knowledge-intake';
+import { SUPPORTED_UPLOAD_ACCEPT } from '@/lib/upload-formats';
+import { postKnowledgeDocument, postKnowledgeFile } from '@/lib/knowledge-intake';
 import { noteDocumentName } from '@/lib/knowledge-note';
 
 // A small "quick add document" affordance on each collection card in the Knowledge LIST. It is a
@@ -72,7 +73,16 @@ export function QuickAddDocument({
   }
 
   async function upload(file: File) {
-    await index(file.name, await file.text());
+    setBusy(true);
+    const result = await postKnowledgeFile(collectionId, file);
+    setBusy(false);
+    if (result.ok) {
+      toast.success(`Indexed "${file.name}" (${result.chunks} chunks)`);
+      setOpen(false);
+      router.refresh();
+    } else {
+      (result.failure.refusal ? toast.info : toast.error)(result.failure.message);
+    }
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -104,7 +114,7 @@ export function QuickAddDocument({
               <input
                 ref={fileRef}
                 type="file"
-                accept=".txt,.md,.markdown,.csv,.json,text/*"
+                accept={SUPPORTED_UPLOAD_ACCEPT}
                 disabled={busy}
                 className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
                 onChange={(e) => {

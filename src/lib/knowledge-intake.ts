@@ -36,3 +36,28 @@ export async function postKnowledgeDocument(
   const body = (await res.json().catch(() => ({}))) as { chunks?: number };
   return { ok: true, chunks: body.chunks ?? 0 };
 }
+
+/**
+ * Upload a FILE into a collection. Sent as multipart so the server does the extraction — a PDF read with
+ * `file.text()` in the browser indexes its container bytes, which is how a document ends up "indexed"
+ * with unreadable content. The original file is stored too, so the doc preview can link to it.
+ */
+export async function postKnowledgeFile(collectionId: string, file: File): Promise<IntakeResult> {
+  const form = new FormData();
+  form.append('file', file);
+  let res: Response;
+  try {
+    res = await fetch(`/api/v1/knowledge/collections/${collectionId}/documents`, {
+      method: 'POST',
+      body: form,
+    });
+  } catch {
+    return {
+      ok: false,
+      failure: { kind: 'broken', message: 'Could not reach the server.', refusal: false },
+    };
+  }
+  if (!res.ok) return { ok: false, failure: await explainResponse(res, `index "${file.name}"`) };
+  const body = (await res.json().catch(() => ({}))) as { chunks?: number };
+  return { ok: true, chunks: body.chunks ?? 0 };
+}

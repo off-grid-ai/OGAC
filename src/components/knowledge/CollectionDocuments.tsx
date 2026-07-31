@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { explainResponse } from '@/lib/api-failure';
-import { postKnowledgeDocument } from '@/lib/knowledge-intake';
+import { SUPPORTED_UPLOAD_ACCEPT } from '@/lib/upload-formats';
+import { postKnowledgeDocument, postKnowledgeFile } from '@/lib/knowledge-intake';
 import { noteDocumentName } from '@/lib/knowledge-note';
 
 interface Doc {
@@ -65,7 +66,17 @@ export function CollectionDocuments({
   }
 
   async function upload(file: File) {
-    await index(file.name, await file.text());
+    // Multipart, so the SERVER extracts the text (pdfjs for PDFs). Reading it here with file.text()
+    // is what indexed a PDF's container bytes as prose.
+    setBusy(true);
+    const result = await postKnowledgeFile(collectionId, file);
+    setBusy(false);
+    if (result.ok) {
+      toast.success(`Indexed "${file.name}" (${result.chunks} chunks)`);
+      router.refresh();
+    } else {
+      (result.failure.refusal ? toast.info : toast.error)(result.failure.message);
+    }
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -116,7 +127,7 @@ export function CollectionDocuments({
             <input
               ref={fileRef}
               type="file"
-              accept=".txt,.md,.markdown,.csv,.json,text/*"
+              accept={SUPPORTED_UPLOAD_ACCEPT}
               hidden
               onChange={(e) => {
                 const f = e.target.files?.[0];
