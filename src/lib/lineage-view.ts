@@ -6,6 +6,8 @@
 // The network read lives in a thin reader (readLineageView, below); this file never fetches.
 
 // ── Raw Marquez shapes (only the fields we read; everything optional/defensive) ───────────────
+import { lineageLabel } from '@/lib/lineage-labels';
+
 export interface RawNamespace {
   name?: string;
   ownerName?: string;
@@ -115,7 +117,11 @@ const OPAQUE_ID_RE = /^(?:([a-z]{2,3})-)?([0-9a-f]{6,}(?:-[0-9a-f]{3,})*)$/i;
  * returned unchanged. The caller keeps the raw id as the tooltip. Pure, zero-IO.
  */
 export function lineageNodeLabel(rawName: string | null | undefined): string {
-  const raw = (rawName ?? '').trim();
+  // Strip internal codenames and OSS engine names FIRST — the emitters write things like
+  // "Knowledge base (Brain)" and "brain.retrieve.qdrant", and a buyer must never learn our internal
+  // architecture from a provenance screen. Done here, inside the one label function every lineage
+  // surface already calls, rather than at each render site.
+  const raw = lineageLabel(rawName);
   if (!raw) return '(unnamed)';
   const m = OPAQUE_ID_RE.exec(raw);
   if (!m) return raw; // a genuine human-readable name — leave it be
