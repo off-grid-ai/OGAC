@@ -1,6 +1,8 @@
 // PURE operator views for AI quality. This module owns the performance-window and release-gate
 // portfolio projections; it has no database, network, or framework imports.
 
+import { scorePercent } from '@/lib/eval-score-scale';
+
 export type PerformanceStatus = 'insufficient' | 'stable' | 'warning' | 'degraded';
 
 export interface QualityRunInput {
@@ -20,9 +22,20 @@ export interface QualityPerformanceView {
   trend: { label: string; score: number; runId: string }[];
 }
 
+/**
+ * A score as a PERCENTAGE, whichever scale it was stored on.
+ *
+ * This used to clamp to 0..100 and treat every value as already a percentage — so an evaluator that
+ * stores 0-1 (faithfulness:grounding writes 0.087) rendered as 0.1% instead of 8.7%, and the mean
+ * averaged those fractions against golden's 87.8 as though the units matched. See eval-score-scale.ts
+ * for the measured evidence.
+ *
+ * Unusable values still collapse to 0 here because every downstream field in this view is a number; the
+ * distinction between "unmeasurable" and "zero" is preserved in eval-score-scale's meanScore for callers
+ * that can represent null.
+ */
 function finiteScore(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(100, value));
+  return scorePercent(value) ?? 0;
 }
 
 function mean(values: number[]): number {

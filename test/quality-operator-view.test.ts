@@ -24,9 +24,13 @@ test('performance view reports insufficient history without inventing a baseline
   assert.equal(empty.latestScore, null);
   assert.equal(empty.currentMean, null);
 
+  // CONTRACT CHANGED DELIBERATELY. This previously asserted that a score of 120 CLAMPS to 100 — i.e. a
+  // writer bug became a perfect quality score, on the same numbers the release gate reads. An
+  // out-of-range value is now rejected (see eval-score-scale.ts), so it contributes 0 rather than
+  // claiming 100%. Understating a broken score is safe; overstating it can ship a failing model.
   const partial = buildQualityPerformance([run('new', 120, 2), run('old', Number.NaN, 1)]);
-  assert.equal(partial.latestScore, 100);
-  assert.equal(partial.currentMean, 50);
+  assert.equal(partial.latestScore, 0);
+  assert.equal(partial.currentMean, 0);
   assert.equal(partial.baselineMean, null);
   assert.deepEqual(
     partial.trend.map((point) => point.runId),
