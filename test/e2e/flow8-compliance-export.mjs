@@ -14,7 +14,7 @@
 import { signIn, verdict, OUT } from './lib.mjs';
 
 const ROW = 'flow8-compliance-export';
-const { browser, page } = await signIn(process.env.PACK_ROUTE || '/governance/regulatory');
+const { browser, page } = await signIn(process.env.PACK_ROUTE || '/governance/regulatory', 'editor');
 await page.waitForTimeout(2500);
 
 const controls = await page.getByRole('link', { name: /download|dpia/i }).count();

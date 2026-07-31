@@ -6,7 +6,7 @@
 // anything less means the sentence went nowhere.
 import { signIn, type, verdict, waitFor, OUT } from './lib.mjs';
 const ROW = 'flow3-natural-language-app';
-const { browser, page } = await signIn('/build/studio/new');
+const { browser, page } = await signIn('/build/studio/new', 'editor');
 await page.waitForTimeout(2500);
 const box = page.locator('textarea').first();
 if (!(await box.count())) {

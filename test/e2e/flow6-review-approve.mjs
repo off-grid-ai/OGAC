@@ -2,7 +2,7 @@
 // The artifact is the review queue's item detail — a queue you cannot act from is not this flow.
 import { signIn, verdict, OUT } from './lib.mjs';
 const ROW = 'flow6-review-approve';
-const { browser, page } = await signIn('/build/review');
+const { browser, page } = await signIn('/build/review', 'editor');
 const bodyText = ((await page.locator('main').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
 
 // §8G says the reviewer must see WHAT the system wants to do, WHY, and WHAT IS AT STAKE, and be able to

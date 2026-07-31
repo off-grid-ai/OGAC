@@ -20,7 +20,19 @@ export async function type(locator, text) {
 }
 
 /** Sign in through the real credentials form and land on `route`. */
-export async function signIn(route = '/overview', who = process.env.DEMO_USER || 'demo-bank@getoffgridai.co') {
+// Known identities. A row declares WHICH ONE it needs, because the right identity is part of the claim:
+// "a viewer can read the audit trail" and "an editor can compile an app" are different rows, and running
+// the whole suite as one identity made flow8 pass while citation-provenance regressed (that chat is owned
+// by the viewer). DEMO_USER still overrides everything for ad-hoc runs.
+export const IDENTITIES = {
+  viewer: { user: 'demo-bank@getoffgridai.co', pass: 'OffGridDemo2026!' },
+  editor: { user: 'demo-editor@getoffgridai.co', pass: 'OffGridEditor2026!' },
+};
+
+export async function signIn(route = '/overview', who = 'viewer') {
+  const known = IDENTITIES[who];
+  const user = process.env.DEMO_USER || known?.user || who;
+  const pass = process.env.DEMO_PASS || known?.pass || IDENTITIES.viewer.pass;
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
   const page = await ctx.newPage();
@@ -29,8 +41,8 @@ export async function signIn(route = '/overview', who = process.env.DEMO_USER ||
     timeout: 30000,
   });
   // fill() is correct HERE: the signin form is uncontrolled and this is not the behaviour under test.
-  await page.fill('input[name=username]', who);
-  await page.fill('input[name=password]', process.env.DEMO_PASS || 'OffGridDemo2026!');
+  await page.fill('input[name=username]', user);
+  await page.fill('input[name=password]', pass);
   await page.getByRole('button', { name: /^sign in$/i }).click();
   await page.waitForTimeout(4000);
   // Navigate EXPLICITLY: the post-login redirect resolves to the canonical host and drops callbackUrl,

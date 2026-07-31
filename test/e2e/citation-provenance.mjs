@@ -13,7 +13,7 @@ const ROW = 'citation-provenance';
 // NAVIGATE BY CLICKING, never by deep link. `/work/chat/<id>` silently loads a DIFFERENT conversation
 // (logged separately as a real defect), so a deep-linked run asserts against the wrong page — it produced
 // two false "no citation row" verdicts before I noticed the URL bar disagreed with my intent.
-const { browser, page } = await signIn('/work/chat');
+const { browser, page } = await signIn('/work/chat', 'viewer');
 await page.waitForTimeout(3500);
 
 const target = process.env.CHAT_TITLE || 'KYC re-verification questions';
@@ -59,7 +59,20 @@ const href = linked ? await link.first().getAttribute('href') : null;
 
 // Three independent failures, each reported by what was READ.
 const named = !/unnamed document/i.test(text);
-const followable = linked && !!href && /^\/(data\/knowledge|work\/projects)\//.test(href);
+// FOLLOW THE LINK. Matching the href STRING against a pattern is a proxy, and it passed this row while
+// the link 404'd — the founder clicked one and got "Page not found". A citation is only followable if the
+// destination actually RESOLVES for this user, so fetch it in-session and require a 200 with real content
+// rather than the not-found shell.
+let followable = false;
+let dest = 'none';
+if (linked && href) {
+  dest = await page.evaluate(async (h) => {
+    const r = await fetch(h, { redirect: 'follow' });
+    const body = await r.text();
+    return `${r.status}${/page not found|route doesn't exist/i.test(body) ? ' NOT-FOUND-PAGE' : ''}`;
+  }, href);
+  followable = dest === '200';
+}
 const honestScore = !/\b0%\b/.test(text); // a cited source is never 0% relevant
 
 await row.screenshot({ path: `${OUT}/${ROW}.png` }).catch(() => {});
@@ -68,7 +81,7 @@ const pass = named && followable && honestScore;
 verdict(
   ROW,
   pass,
-  `row="${text}" href=${href ?? 'none'} | named=${named} followable=${followable} honestScore=${honestScore}`,
+  `row="${text}" href=${href ?? 'none'} resolves=${dest} | named=${named} followable=${followable} honestScore=${honestScore}`,
 );
 await browser.close();
 process.exit(pass ? 0 : 1);
