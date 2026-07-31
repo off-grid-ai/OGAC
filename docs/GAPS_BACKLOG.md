@@ -2098,3 +2098,22 @@ pointing at it — turning a cosmetic duplication into a broken app, which is ex
 duplicate system pipelines were deduped without repointing references first. The fix must: (1) pick a
 canonical id per (org, label), (2) repoint `apps.steps` / agent step bindings that reference the others,
 (3) only then delete. Verify against a run afterwards, not just against the list.
+
+## G-204 — the review queue shows 2 of 33 pending decisions, so the demo understates it
+
+`/solutions/reviews` as demo-bank reads "AWAITING YOU 2 · APPS INVOLVED 1", and both cards are the same app
+and the same action ("Approve Overdue account — …"). A reviewer queue where every row is identical reads as
+a single hard-coded example.
+
+The data is richer than the page suggests: **33 `awaiting_human` runs across 10 apps** in org_bharat —
+Reimbursement Approval (7), Expense Claim Approval (6), KYC & Re-KYC (5), Motor Claim FNOL (5), Personal
+Loan Underwriting (3+2), Fraud Screening (2), Delinquency Intervention (2), and others.
+
+**The page is CORRECT** — it shows what this identity is the approver for, which is the right rule for a
+governance product; "everything pending anywhere" would be the wrong queue. The demo problem is that
+demo-bank is only an approver on one app.
+
+**Fix by assignment, not by widening the query:** make demo-bank (and demo-insurer) an approver on a
+handful of apps spanning different decision types — a claim, a KYC escalation, a loan exception, an expense
+over quota — so the queue demonstrates range while still showing only what is genuinely theirs. Do NOT
+"fix" this by showing runs the user cannot act on; that would break the one promise the page makes.
