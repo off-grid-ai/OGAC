@@ -35,6 +35,31 @@ ledger cannot be more optimistic than the evidence.
 6. **Read the screenshot.** A green typecheck, an HTTP 200 and a row count have never once told anyone
    whether a screen makes sense.
 
+## §12 subsection run (`test/e2e/s12-surfaces.mjs`, 10 rows)
+
+```
+VERIFIED  s12-observability-traces  /insights/ai            TRACE RECORDS 100, governed count, 4 rows
+VERIFIED  s12-model-operations      /runtime                gateway/provider + readiness state
+VERIFIED  s12-agent-operations      /build/agent-runs       203 rows, 3/3 queues ready, re-probe control
+VERIFIED  s12-data-connectors       /data                   7 rows, 9 management actions
+VERIFIED  s12-reliability-health    /operations             service health + state vocabulary
+VERIFIED  s12-policy-decisions      /governance/policies/decision-logs  DECISIONS 1 ALLOWED 0 DENIED 1
+GAP       s12-identity-access       /governance/access      5 users render; role vocabulary not in view
+GAP       s12-security-egress       /governance/egress      15 rows but page is CLOUD-MODEL egress, not
+                                                            network destination allowlists; acts=0
+GAP       s12-security-secrets      /governance/secrets/overview  REACHABLE Yes + SEAL STATUS render, but
+                                                            no create/rotate control on the overview
+GAP       s12-developer-experience  /docs                   user docs, not the API surface
+```
+
+**Three of those four GAPs are almost certainly MY TARGETING, not the product** — and saying so is the
+point of the two-cause rule above. `/docs` is user documentation; the API surface is the sidebar's "API
+docs & playground". Secrets create/rotate lives on the sub-pages (`/mounts`, `/keys`), not the overview.
+`/governance/egress` governs which outside MODELS may be used, which is a different claim from §12's
+network egress control. Each needs its route resolved before a single line of product code is touched.
+`s12-identity-access` is the one to check first — 5 users render, so if roles genuinely are not shown
+next to a user, that IS a defect worth fixing.
+
 ## Current run
 
 ```
@@ -78,16 +103,16 @@ wholesale, which is the honest default.
 | Subsection | Rows | Gate |
 |---|---|---|
 | Deployment | 10 | GAP |
-| Identity and access | 11 | GAP |
-| Security | 17 | GAP |
-| Reliability | 14 | GAP |
-| Data | 13 | GAP |
-| Model operations | 17 | GAP |
-| Agent operations | 14 | GAP |
+| Identity and access | 11 | GAP — `s12-identity-access`: 5 users render, role vocabulary absent from view. Verify whether roles are shown per user; if not, real defect. |
+| Security | 17 | GAP — two rows scripted, both unresolved-target (see run above). Egress + secrets routes need resolving. |
+| Reliability | 14 | partly VERIFIED — `s12-reliability-health`: service health + state vocabulary on /operations. |
+| Data | 13 | partly VERIFIED — `s12-data-connectors`: 7 rows, 9 management actions on /data. |
+| Model operations | 17 | partly VERIFIED — `s12-model-operations`: gateway/provider + readiness on /runtime. |
+| Agent operations | 14 | partly VERIFIED — `s12-agent-operations`: 203 runs, 3/3 queues ready, re-probe + cancel controls. |
 | Evaluation | 15 | **partly VERIFIED** — `s12-evaluation.mjs`: `definitions=46 score=true threshold=true runControl=2`. Golden datasets / quality thresholds / release-gate surface all render measured values. Remaining rows in the subsection still GAP. |
-| Observability | 13 | GAP |
+| Observability | 13 | partly VERIFIED — `s12-observability-traces`: TRACE RECORDS 100 with governed split on /insights/ai. |
 | Compliance | 10 | **partly VERIFIED** — `s12-audit-trail.mjs`: `rows=50 attributed=true`, 200 events / 7 actors / 38 actions, each row carrying actor+action+outcome. "Immutable or append-only audit trail" is evidenced. Remaining rows still GAP. |
-| Developer experience | 15 | GAP |
+| Developer experience | 15 | GAP — `s12-developer-experience` targeted /docs (user docs). Retarget at the API playground. |
 
 ### Row 1 — Citation provenance (§8I "Cited", §12 Observability "Data lineage", §9 "Trust through visibility")
 
