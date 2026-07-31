@@ -29,11 +29,35 @@ export default async function CollectionDetailPage({
   const collection = await getCollection(id, orgId);
   if (!collection) notFound();
 
-  // Enforce the same permission-aware visibility as the list — a non-admin can only view a
-  // collection their role is allowed to retrieve.
+  // Enforce the same permission-aware visibility as the list — a non-admin can only view a collection
+  // their role is allowed to retrieve.
+  //
+  // A REFUSAL IS NOT A MISSING PAGE. This used to notFound(), and a chat citation links here — so a
+  // reviewer clicking the source behind an answer got "Page not found. That route doesn't exist." They
+  // conclude the product is broken, when in fact the source exists and their role may not read it. In a
+  // regulated console those are opposite facts with opposite next actions: file a bug, versus ask for
+  // access. The collection is only NAMED (which the citation already revealed) — no contents are shown.
   if (!isAdmin) {
     const visible = await listCollections(role, orgId);
-    if (!visible.some((c) => c.id === id)) notFound();
+    if (!visible.some((c) => c.id === id)) {
+      return (
+        <div className="w-full p-6">
+          <div className="mx-auto max-w-2xl rounded-lg border border-amber-500/40 bg-amber-500/5 p-6">
+            <h1 className="font-mono text-lg font-semibold">Restricted source</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{collection.name}</span> exists in this
+              workspace, but your role ({role}) is not permitted to read it. Nothing is wrong — the
+              answer that cited it was allowed to use it on your behalf, while the underlying documents
+              stay restricted.
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Ask a workspace administrator for access to this collection if you need to review the
+              source directly.
+            </p>
+          </div>
+        </div>
+      );
+    }
   }
 
   const docs = await listDocuments(id, orgId);
