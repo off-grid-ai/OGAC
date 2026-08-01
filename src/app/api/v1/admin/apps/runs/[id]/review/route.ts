@@ -18,6 +18,8 @@ import { assertSolutionRuntimeBinding } from '@/lib/solution-blueprints-store';
 import { solutionErrorResponse } from '@/lib/solution-http';
 import { currentOrgId } from '@/lib/tenancy';
 import { captureHitlCorrection } from '@/lib/feedback-store';
+import { escalateAppRun } from '@/lib/app-run-store';
+import { planEscalation } from '@/lib/review-escalation';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,13 +51,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const orgId = await currentOrgId();
 
   const body = (await req.json().catch(() => ({}))) as {
-    decision?: 'approve' | 'reject';
+    decision?: 'approve' | 'reject' | 'escalate';
     output?: string;
     note?: string;
     stepId?: string;
+    /** Who the escalation goes to — an email, a role, or a team the org understands. */
+    to?: string;
   };
-  if (body.decision !== 'approve' && body.decision !== 'reject') {
-    return NextResponse.json({ error: 'decision must be approve|reject' }, { status: 400 });
+  if (
+    body.decision !== 'approve' &&
+    body.decision !== 'reject' &&
+    body.decision !== 'escalate'
+  ) {
+    return NextResponse.json({ error: 'decision must be approve|reject|escalate' }, { status: 400 });
   }
 
   const run = await getAppRunView(id, orgId);
@@ -68,6 +76,39 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       { error: `run is ${run.status}, not awaiting a human decision` },
       { status: 409 },
     );
+  }
+
+  // ESCALATE — ROADMAP §10 Flow 6 step 4, and the capability this panel already CLAIMED ("you can
+  // reject or escalate this") while offering only Reject and Approve. A hand-off, not a decision: the
+  // run stays paused at the same step, the chain records who passed it on and why, and no authority is
+  // granted — the point is to put the decision in front of someone who has it.
+  if (body.decision === 'escalate') {
+    const plan = planEscalation(run.status, {
+      from: gate.user.email ?? 'unknown',
+      to: body.to ?? null,
+      reason: body.note ?? '',
+      at: new Date().toISOString(),
+    });
+    if (!plan.ok) return NextResponse.json({ error: plan.reason }, { status: 400 });
+    const applied = await escalateAppRun(id, orgId, plan.record);
+    if (!applied) {
+      return NextResponse.json(
+        { error: 'This run is no longer awaiting a decision.' },
+        { status: 409 },
+      );
+    }
+    auditFromSession(gate, orgId, {
+      action: 'app.run.escalated',
+      resource: `app_run:${id}`,
+      outcome: 'ok',
+    });
+    return NextResponse.json({
+      ok: true,
+      decision: 'escalate',
+      stepId: applied.stepId,
+      escalations: applied.chain,
+      by: gate.user.email,
+    });
   }
 
   // HITL APPROVAL AUTHORITY — an approver must hold the authority the consumer's access policy

@@ -12,6 +12,7 @@ import { db } from '@/db';
 import { appRuns } from '@/db/schema';
 import type { AppRun as AppRunRow } from '@/db/schema';
 import type { AppRunState, StepState } from '@/lib/app-run-plan';
+import { appendEscalation, type EscalationRecord } from '@/lib/review-escalation';
 
 const DEFAULT_ORG = 'default';
 
@@ -109,6 +110,34 @@ export async function markAppRunCancelled(
     )
     .returning({ id: appRuns.id });
   return updated.length > 0;
+}
+
+// ─── escalate — hand the pending decision on, WITHOUT deciding it ────────────────────────────────
+//
+// ROADMAP §10 Flow 6 step 4. The run stays `awaiting_human`: an escalation is a hand-off, not an
+// outcome, and treating it as one would resume a workflow nobody approved. The chain is written onto
+// the awaiting STEP so the next reviewer opens the item and reads why it reached them.
+//
+// Returns the applied record, or null when there is no step awaiting a human — the caller then reports
+// that honestly rather than pretending an escalation happened.
+export async function escalateAppRun(
+  id: string,
+  orgId: string,
+  record: EscalationRecord,
+): Promise<{ stepId: string; chain: EscalationRecord[] } | null> {
+  const run = await getAppRun(id, orgId);
+  if (!run || run.status !== 'awaiting_human') return null;
+  const steps = run.steps ?? [];
+  const index = steps.findIndex((s) => s.status === 'awaiting_human');
+  if (index < 0) return null;
+
+  const chain = appendEscalation(steps[index].escalations, record);
+  const next = steps.map((s, i) => (i === index ? { ...s, escalations: chain } : s));
+  await db
+    .update(appRuns)
+    .set({ steps: next as never })
+    .where(and(eq(appRuns.id, id), eq(appRuns.orgId, orgId), eq(appRuns.status, 'awaiting_human')));
+  return { stepId: steps[index].id, chain };
 }
 
 // ─── reads (back the status / review / analytics screens) ────────────────────────────────────────

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowBendUpRight,
   Check,
   CheckCircle,
   FileText,
@@ -23,7 +24,10 @@ import { Label } from '@/components/ui/label';
 import { type ReviewDetail } from '@/lib/review-inbox';
 
 // The reviewer's terminal decision — approve or reject.
-type ReviewOutcome = 'approve' | 'reject';
+// ROADMAP §10 Flow 6 step 4 names four: approve, EDIT, reject, ESCALATE. Two existed. The panel even
+// told reviewers "you can reject or escalate this" beside two buttons — a capability claimed and not
+// offered, which §11's honest-product-state rule forbids outright.
+type ReviewOutcome = 'approve' | 'reject' | 'escalate';
 
 // Pick one of three values by the run's decided outcome — approved / rejected / undecided.
 // A tiny pure selector so the outcome→tone/label mappings read as flat lookups, not nested ternaries.
@@ -67,6 +71,11 @@ export function ReviewDecision({
 }>) {
   const router = useRouter();
   const [note, setNote] = useState('');
+  // EDIT: the reviewer's corrected version of what the app proposes to do. Empty means "approve as
+  // proposed"; anything else is sent as the step's output, and the review route captures it as a
+  // golden case, so a correction teaches the evaluation set instead of evaporating.
+  const [edited, setEdited] = useState<string | null>(null);
+  const [escalateTo, setEscalateTo] = useState('');
   const [busy, setBusy] = useState<ReviewOutcome | null>(null);
   const [resolved, setResolved] = useState<ReviewOutcome | null>(null);
   const [authBlocked, setAuthBlocked] = useState<string | null>(null);
@@ -77,6 +86,10 @@ export function ReviewDecision({
       toast.error('Please add a reason before rejecting.');
       return;
     }
+    if (decision === 'escalate' && !note.trim()) {
+      toast.error('Say why you are escalating — the next reviewer needs to know.');
+      return;
+    }
     setBusy(decision);
     setAuthBlocked(null);
     try {
@@ -85,7 +98,12 @@ export function ReviewDecision({
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ decision, ...(note.trim() ? { note: note.trim() } : {}) }),
+          body: JSON.stringify({
+            decision,
+            ...(note.trim() ? { note: note.trim() } : {}),
+            ...(decision === 'approve' && edited?.trim() ? { output: edited.trim() } : {}),
+            ...(decision === 'escalate' && escalateTo.trim() ? { to: escalateTo.trim() } : {}),
+          }),
         },
       );
       const data = (await res.json().catch(() => ({}))) as {
@@ -103,9 +121,17 @@ export function ReviewDecision({
         toast.error(data.error ?? 'The decision could not be applied.');
         return;
       }
-      setResolved(decision);
+      // An escalation is a HAND-OFF, not a resolution: the run stays paused, so the panel must not
+      // present it as decided.
+      if (decision !== 'escalate') setResolved(decision);
       toast.success(
-        decision === 'approve' ? 'Approved — the run continues.' : 'Rejected — the run halts.',
+        decision === 'approve'
+          ? edited?.trim()
+            ? 'Approved with your edit — the run continues with the corrected output.'
+            : 'Approved — the run continues.'
+          : decision === 'reject'
+            ? 'Rejected — the run halts.'
+            : 'Escalated — the run stays paused and the next reviewer sees your reason.',
       );
       router.refresh();
     } catch (e) {
@@ -373,6 +399,25 @@ export function ReviewDecision({
               </div>
             ) : (
               <>
+                {/* WHY THIS REACHED YOU. An escalated item that looks like every other item makes the
+                    hand-off worthless — the reason the last reviewer could not decide is the first thing
+                    the next one needs. */}
+                {detail.escalations.length ? (
+                  <div className="rounded-md border border-primary/40 bg-primary/[0.06] p-3 text-xs">
+                    <p className="font-medium text-foreground">
+                      Escalated to you{detail.escalations.length > 1 ? ` · ${detail.escalations.length} hand-offs` : ''}
+                    </p>
+                    <ul className="mt-1.5 space-y-1">
+                      {detail.escalations.map((e) => (
+                        <li key={`${e.at}-${e.from}`} className="text-muted-foreground">
+                          <span className="text-foreground">{e.from}</span>
+                          {e.to ? ` → ${e.to}` : ' → a higher authority'} — {e.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
                 {!detail.canApprove ? (
                   <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/[0.06] p-3 text-xs">
                     <Lock className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-500" />
@@ -410,23 +455,90 @@ export function ReviewDecision({
                   />
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* EDIT — Flow 6 step 4's second verb. A reviewer who mostly agrees should not have to
+                    reject and start again: correct the wording, approve the corrected version, and the
+                    correction becomes a golden case for the next evaluation run. */}
+                {detail.canApprove ? (
+                  edited === null ? (
+                    <button
+                      type="button"
+                      onClick={() => setEdited(detail.draftOutput ?? '')}
+                      className="self-start text-xs text-primary underline decoration-dotted underline-offset-2"
+                    >
+                      Edit what this will do before approving
+                    </button>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Your corrected version
+                      </Label>
+                      <textarea
+                        value={edited}
+                        onChange={(e) => setEdited(e.target.value)}
+                        rows={6}
+                        className="w-full rounded-md border border-primary/40 bg-background p-2 font-mono text-xs text-foreground"
+                      />
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] text-muted-foreground">
+                          Approving sends this instead, and keeps it as a correction to learn from.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setEdited(null)}
+                          className="text-[11px] text-muted-foreground underline"
+                        >
+                          Discard edit
+                        </button>
+                      </div>
+                    </div>
+                  )
+                ) : null}
+
+                {/* ESCALATE — a hand-off, not a decision. Offered to EVERY reviewer, because the person
+                    who most needs it is the one who cannot approve. */}
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Escalate to (optional)
+                  </Label>
+                  <input
+                    value={escalateTo}
+                    onChange={(e) => setEscalateTo(e.target.value)}
+                    placeholder="A person, role or team — e.g. regional.credit@bharatunion.co.in"
+                    className="w-full rounded-md border border-border bg-background p-2 text-sm text-foreground"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
                     onClick={() => decide('reject')}
                     disabled={busy !== null}
-                    className="flex-1 gap-1.5 text-destructive"
+                    className="min-w-[8rem] flex-1 gap-1.5 text-destructive"
                   >
                     <X className="size-4" /> {busy === 'reject' ? 'Rejecting…' : 'Reject'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => decide('escalate')}
+                    disabled={busy !== null}
+                    className="min-w-[8rem] flex-1 gap-1.5"
+                    title="Hand this decision on — the run stays paused"
+                  >
+                    <ArrowBendUpRight className="size-4" />{' '}
+                    {busy === 'escalate' ? 'Escalating…' : 'Escalate'}
                   </Button>
                   <Button
                     onClick={() => decide('approve')}
                     disabled={busy !== null || !detail.canApprove}
                     title={detail.canApprove ? undefined : 'Above your approval authority'}
-                    className="flex-1 gap-1.5"
+                    className="min-w-[8rem] flex-1 gap-1.5"
                   >
                     <Check className="size-4" weight="bold" />{' '}
-                    {busy === 'approve' ? 'Approving…' : 'Approve'}
+                    {busy === 'approve'
+                      ? 'Approving…'
+                      : edited?.trim()
+                        ? 'Approve with edit'
+                        : 'Approve'}
                   </Button>
                 </div>
               </>

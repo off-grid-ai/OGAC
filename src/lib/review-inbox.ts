@@ -118,6 +118,12 @@ export interface ReviewDetail {
   actionReceipt: ActionReceipt | null;
   actionBoundaryReady: boolean | null;
   actionBoundaryBlockedReason: string | null;
+  /**
+   * WHO handed this decision on, and why. An escalation keeps the run paused, so the next reviewer must
+   * open the item and read what the previous one could not decide — otherwise an escalated item is
+   * indistinguishable from an ordinary one and the hand-off means nothing.
+   */
+  escalations: { from: string; to: string | null; reason: string; at: string }[];
 }
 
 export function actionEvidenceForReview(
@@ -454,6 +460,7 @@ export function buildReviewDetail(
     stepLabel: pending?.label ?? 'Awaiting decision',
     draftOutput: draft,
     recommendation: draft,
+    escalations: pending?.escalations ?? [],
     citations: (trace?.citations ?? []).map((c) => ({
       title: c.title || c.ref,
       snippet: c.snippet,

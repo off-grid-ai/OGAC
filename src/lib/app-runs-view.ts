@@ -30,6 +30,8 @@ export interface AppRunStepRow {
    */
   prompt?: string;
   reviewer?: string;
+  /** The hand-off chain on a human step (ROADMAP §10 Flow 6 step 4 — "escalates"). */
+  escalations?: { from: string; to: string | null; reason: string; at: string }[];
   /** SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered). */
   wouldPerform?: { sink: string; recipient?: string; subject?: string; payloadPreview: string };
   actionImpact?: import('@/lib/action-contract').ActionImpact;

@@ -1102,6 +1102,10 @@ export const appRuns = pgTable('app_runs', {
       detail?: string;
       childRunId?: string; // agent-step child agentRuns.id, for lineage
       reviewer?: string; // authenticated reviewer identity for a human decision
+      // HAND-OFF CHAIN (ROADMAP §10 Flow 6: "approves, edits, rejects, or escalates"). An escalation is
+      // not a decision — the run stays paused at this step — so it lives ON the step as a chain: who
+      // handed it on, to whom, and why. Repeated escalations append, so the trail is visible.
+      escalations?: { from: string; to: string | null; reason: string; at: string }[];
       // SHADOW mode: what a side-effecting sink WOULD have done (intercepted, not delivered).
       wouldPerform?: {
         sink: string;
