@@ -10,8 +10,8 @@ import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '@/compo
 import { Textarea } from '@/components/ui/textarea';
 import { explainResponse } from '@/lib/api-failure';
 import { SUPPORTED_UPLOAD_ACCEPT } from '@/lib/upload-formats';
+import { KnowledgeTextSheet } from '@/components/knowledge/KnowledgeTextSheet';
 import { postKnowledgeDocument, postKnowledgeFile } from '@/lib/knowledge-intake';
-import { noteDocumentName } from '@/lib/knowledge-note';
 
 interface Doc {
   id: string;
@@ -40,18 +40,18 @@ interface Preview {
 // Reading a document is not an admin action either — that is how a citation gets checked.
 export function CollectionDocuments({
   collectionId,
+  collectionName = 'this collection',
   documents,
   isAdmin,
 }: Readonly<{
   collectionId: string;
+  collectionName?: string;
   documents: Doc[];
   isAdmin: boolean;
 }>) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
-  const [noteName, setNoteName] = useState('');
-  const [noteText, setNoteText] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -87,14 +87,9 @@ export function CollectionDocuments({
     if (fileRef.current) fileRef.current.value = '';
   }
 
-  async function saveNote() {
-    const body = noteText.trim();
-    if (!body) return;
-    if (await index(noteDocumentName(body, noteName), body)) {
-      setNoteName('');
-      setNoteText('');
-      setNoteOpen(false);
-    }
+  // The composer is the shared side panel — the same one the project knowledge panel uses.
+  async function saveNote(docName: string, body: string): Promise<boolean> {
+    return index(docName, body);
   }
 
   async function open(doc: Doc) {
@@ -157,44 +152,11 @@ export function CollectionDocuments({
               variant="outline"
               disabled={busy}
               className="gap-1.5"
-              onClick={() => setNoteOpen((o) => !o)}
+              onClick={() => setNoteOpen(true)}
             >
               <NotePencil className="size-4" /> Add text
             </Button>
           </div>
-          {noteOpen ? (
-            <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-3">
-              <Input
-                className="h-8 text-sm"
-                value={noteName}
-                placeholder="Title (optional — taken from the first line)"
-                onChange={(e) => setNoteName(e.target.value)}
-              />
-              <Textarea
-                rows={6}
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                placeholder="Paste the text this collection should know — a policy clause, a circular, a decision…"
-                className="text-sm"
-              />
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setNoteOpen(false);
-                    setNoteText('');
-                    setNoteName('');
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button size="sm" disabled={busy || !noteText.trim()} onClick={saveNote}>
-                  {busy ? 'Indexing…' : 'Index text'}
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </div>
       }
 
@@ -237,6 +199,14 @@ export function CollectionDocuments({
           ))}
         </div>
       )}
+
+      <KnowledgeTextSheet
+        open={noteOpen}
+        onOpenChange={setNoteOpen}
+        target={collectionName}
+        busy={busy}
+        onSave={saveNote}
+      />
 
       <Sheet open={preview !== null} onOpenChange={(o) => !o && setPreview(null)}>
         <SheetContent side="right" className="flex w-full max-w-2xl flex-col gap-0 p-0">

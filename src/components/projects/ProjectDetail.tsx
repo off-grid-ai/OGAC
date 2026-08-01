@@ -24,6 +24,7 @@ import { explainResponse } from '@/lib/api-failure';
 import { noteDocumentName } from '@/lib/knowledge-note';
 import { SUPPORTED_UPLOAD_ACCEPT } from '@/lib/upload-formats';
 import { accentHue, initials, relativeTime } from '@/lib/workspace-grid';
+import { KnowledgeTextSheet } from '@/components/knowledge/KnowledgeTextSheet';
 import { ShareDialog } from './ShareDialog';
 
 interface Doc {
@@ -76,8 +77,6 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
   // meeting is text someone has in their clipboard, and making them save a .txt first is friction for
   // exactly the non-technical operator this surface is for.
   const [noteOpen, setNoteOpen] = useState(false);
-  const [noteName, setNoteName] = useState('');
-  const [noteText, setNoteText] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const canManage = access === 'owner';
   const canEdit = access === 'owner' || access === 'edit';
@@ -215,18 +214,13 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
     await loadDocs();
   }
 
-  async function saveNote() {
-    const body = noteText.trim();
-    if (!body) return;
+  // The composer lives in the side panel (KnowledgeTextSheet) and hands back the derived name + text.
+  async function saveNote(docName: string, body: string): Promise<boolean> {
     setBusy(true);
-    const ok = await addDocument(noteDocumentName(body, noteName), body);
+    const ok = await addDocument(docName, body);
     setBusy(false);
-    if (ok) {
-      setNoteName('');
-      setNoteText('');
-      setNoteOpen(false);
-      await loadDocs();
-    }
+    if (ok) await loadDocs();
+    return ok;
   }
 
   async function openDoc(docId: string, name: string) {
@@ -254,8 +248,11 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
   const hue = accentHue(projectId);
   const displayName = loaded ? name || 'Project' : 'Loading…';
 
+  // FULL WIDTH, top-left. This page was `mx-auto max-w-6xl`, which on a wide screen left roughly a third
+  // of the viewport empty on each side — the most repeated piece of design feedback on this product. The
+  // console shell already pads; a page fills what it is given.
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
+    <div className="w-full space-y-6">
       <Link
         href="/work/projects"
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
@@ -330,8 +327,8 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
       ) : null}
 
       {/* Two-column workspace: instructions + chats on the left, knowledge + memory on the right */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid gap-6 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="space-y-6 lg:col-span-2 xl:col-span-3">
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm">Instructions</CardTitle>
@@ -475,7 +472,7 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
                   size="sm"
                   variant="outline"
                   disabled={busy}
-                  onClick={() => setNoteOpen((o) => !o)}
+                  onClick={() => setNoteOpen(true)}
                   className="gap-1.5"
                 >
                   <NotePencil className="size-3.5" /> Add text
@@ -493,41 +490,6 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {/* Paste text as knowledge. Same embed path as a file — a clause someone copied out of an
-                  email should not require saving a .txt first. */}
-              {noteOpen ? (
-                <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-2.5">
-                  <Input
-                    className="h-8 text-xs"
-                    value={noteName}
-                    placeholder="Title (optional — taken from the first line)"
-                    onChange={(e) => setNoteName(e.target.value)}
-                  />
-                  <Textarea
-                    value={noteText}
-                    onChange={(e) => setNoteText(e.target.value)}
-                    rows={6}
-                    placeholder="Paste the text this project should know — a policy clause, a decision, an email…"
-                    className="text-xs"
-                  />
-                  <div className="flex items-center justify-end gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setNoteOpen(false);
-                        setNoteText('');
-                        setNoteName('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={saveNote} disabled={busy || !noteText.trim()}>
-                      {busy ? 'Embedding…' : 'Save to knowledge'}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">
@@ -640,6 +602,14 @@ export function ProjectDetail({ projectId }: Readonly<{ projectId: string }>) {
           </Card>
         </div>
       </div>
+
+      <KnowledgeTextSheet
+        open={noteOpen}
+        onOpenChange={setNoteOpen}
+        target={displayName}
+        busy={busy}
+        onSave={saveNote}
+      />
 
       {/* Document preview. A side panel rather than a route: this is a quick look at a source, not a place
           with its own sub-resources — and the reviewer's context is the project they are standing in. */}

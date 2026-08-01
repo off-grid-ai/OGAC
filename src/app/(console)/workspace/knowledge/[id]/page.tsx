@@ -136,7 +136,12 @@ export default async function CollectionDetailPage({
             </p>
           </CardHeader>
           <CardContent>
-            <CollectionDocuments collectionId={id} documents={documents} isAdmin={isAdmin} />
+            <CollectionDocuments
+              collectionId={id}
+              collectionName={collection.name}
+              documents={documents}
+              isAdmin={isAdmin}
+            />
           </CardContent>
         </Card>
       </div>
