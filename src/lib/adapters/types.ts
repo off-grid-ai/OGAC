@@ -5,6 +5,7 @@
 // behind SSO, or it has no UI at all (headless). This is what keeps the OSS swappable and in
 // sync without us maintaining a fork.
 import type { DriftAttribution } from '@/lib/drift-run';
+import type { EvalResult } from '@/lib/evals';
 
 export type Capability =
   | 'inference'
@@ -223,6 +224,13 @@ export interface EvalRunResult {
   total: number;
   passed: number;
   startedAt: string;
+  /**
+   * The per-row EVIDENCE behind the score — one row per golden case, per metric, or per assertion,
+   * depending on what the engine actually measures (see eval-evidence.ts). §11 requires every important
+   * action to leave an understandable record, and a pass rate nobody can drill into is not one; 64 of
+   * 84 stored runs carried a number with nothing behind it because this field did not exist.
+   */
+  results?: EvalResult[];
   detail?: Record<string, unknown>;
 }
 

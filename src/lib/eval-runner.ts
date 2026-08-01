@@ -9,6 +9,7 @@ import {
 } from '@/lib/eval-geval';
 import { loadJudgeRouting } from '@/lib/eval-judge-resolve';
 import { heuristicScore, metricsToEvalResults, rollupMetrics, scoreMetric, type MetricScore } from '@/lib/eval-metrics';
+import { unavailableEvidence } from '@/lib/eval-evidence';
 import { capEvalSamples } from '@/lib/eval-sampling';
 import type { EvalEngine } from '@/lib/eval-templates';
 import { listGoldenCases, recordEvalRun, type EvalRun } from '@/lib/evals';
@@ -377,7 +378,17 @@ async function unavailableRun(
   const engineTag = `${def.metric}:unavailable`;
   // PA-12: tag the run with the eval def's pipeline binding so Drift is per-pipeline exact.
   await recordEvalRun(
-    { id, engine: engineTag, score: 0, total: 0, passed: 0, pipelineId: def.pipelineId },
+    {
+      id,
+      engine: engineTag,
+      score: 0,
+      total: 0,
+      passed: 0,
+      // A run with no cases AND no rows is indistinguishable from one nobody looked at. The reason it
+      // could not score IS the evidence, so it is stored as a row rather than lost to a log line.
+      results: unavailableEvidence(reason),
+      pipelineId: def.pipelineId,
+    },
     orgId,
   );
   return {

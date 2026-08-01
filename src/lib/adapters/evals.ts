@@ -16,6 +16,7 @@ import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 // sidecar against OUR gateway; each falls back to golden if its tool is unavailable, so selecting
 // one is never a hard dependency.
 const execFileAsync = promisify(execFile);
+import { promptfooEvidence, ragasEvidence, type PromptfooCase } from '@/lib/eval-evidence';
 import { GATEWAY_URL, gatewayHeadersAsync } from '@/lib/gateway';
 import { getServiceCredential } from '@/lib/service-credentials';
 import { chooseGatewayAuth, type ServiceCredential } from '@/lib/service-credentials-lib';
@@ -106,7 +107,10 @@ export const goldenEvals: EvalsPort = {
 
 // ── promptfoo (assertion matrix via its CLI, against our gateway) ─────────────
 interface PromptfooSummary {
-  results?: { stats?: { successes?: number; failures?: number } };
+  results?: {
+    stats?: { successes?: number; failures?: number };
+    results?: PromptfooCase[];
+  };
 }
 
 function promptfooConfig(
@@ -160,6 +164,8 @@ async function runPromptfoo(): Promise<EvalRunResult> {
       total,
       passed,
       startedAt: iso(),
+      // promptfoo's own per-assertion rows are the evidence; storing only its stats threw them away.
+      results: promptfooEvidence(summary.results?.results),
     };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
@@ -330,6 +336,10 @@ async function runRagas(judge: JudgeRouting, orgId: string): Promise<EvalRunResu
     total,
     passed,
     startedAt: iso(),
+    // EVIDENCE. Ragas scores per METRIC over the dataset, not per case, so the honest evidence row is
+    // one per metric — including the ones the sidecar omitted, which are recorded as "not returned"
+    // rather than as a zero. Without this a failing ragas run stored a score and nothing else.
+    results: ragasEvidence(RAGAS_METRIC_SET, metrics),
     detail: { ...summary.attribution, faithfulness: summary.faithfulness },
   };
 }

@@ -41,6 +41,10 @@ export async function POST(req: Request) {
         score: result.score,
         total: result.total,
         passed: result.passed,
+        // PERSIST THE EVIDENCE, not only the number. This route stored score + attribution and dropped
+        // `results`, so a ragas or promptfoo run through it recorded a pass rate nobody could drill
+        // into — the same defect the eval-def runner already fixed on its own path.
+        results: result.results,
         // Persist the engine attribution (Ragas records version + judge routing + returned/omitted
         // metrics in detail) so the retained run proves HOW it was produced, not just its score.
         attribution: result.detail ?? null,
