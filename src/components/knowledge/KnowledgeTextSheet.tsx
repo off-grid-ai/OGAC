@@ -71,7 +71,7 @@ export function KnowledgeTextSheet({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Paste the text…"
-            className="min-h-0 flex-1 resize-none font-mono text-xs leading-relaxed"
+            className="min-h-0 flex-1 resize-none rounded-md border border-border bg-background p-3 font-mono text-xs leading-relaxed"
           />
           <div className="flex shrink-0 items-center justify-between gap-2">
             <span className="text-[11px] text-muted-foreground">

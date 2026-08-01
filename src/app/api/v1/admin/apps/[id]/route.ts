@@ -112,7 +112,12 @@ export async function PATCH(req: Request, { params }: Ctx) {
         { status: 422 },
       );
     }
-    const updated = await updateApp(id, orgId, patch);
+    // Stamp WHO made the edit onto the frozen version — history that cannot name the author is a
+    // timestamp, not an audit trail.
+    const updated = await updateApp(id, orgId, {
+      ...patch,
+      editedBy: patch.editedBy ?? gate.user.email ?? '',
+    });
     if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 });
     // Reconcile the schedule after every update so editing the cron / trigger / published flag takes
     // effect immediately (published+schedule+cron → register/replace; otherwise → tear down).

@@ -17,7 +17,8 @@ export type AppTab =
   | 'quality'
   | 'access'
   | 'schedule'
-  | 'controls';
+  | 'controls'
+  | 'history';
 
 /**
  * `primary`  — a real destination in the nav. THREE of them, deliberately.
@@ -76,6 +77,12 @@ const TAB_META: { tab: AppTab; label: string; hint: string; group: AppTabGroup }
     hint: 'Set when this runs on its own — a recurring time, timezone, and the next fire',
   },
   {
+    tab: 'history',
+    group: 'settings',
+    label: 'History',
+    hint: 'Every version of this app, what changed, and the way back to any of them',
+  },
+  {
     tab: 'controls',
     group: 'settings',
     label: 'Safety',
@@ -119,6 +126,7 @@ export function activeTabForPath(pathname: string, appId: string): AppTab | null
     'access',
     'schedule',
     'controls',
+    'history',
   ];
   return (known as string[]).includes(seg) ? (seg as AppTab) : 'work';
 }

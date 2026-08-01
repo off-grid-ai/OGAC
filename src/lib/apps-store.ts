@@ -9,6 +9,8 @@ import { and, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
 import { apps, customAgents, type App } from '@/db/schema';
 import { materializedAgentBindings, materializedAgentIds } from '@/lib/app-agent-ownership';
+import type { AppSnapshot } from '@/lib/app-version-diff';
+import { deleteAppVersions, recordAppVersion } from '@/lib/app-versions-store';
 import {
   type AppSpec,
   type AppStep,
@@ -240,7 +242,9 @@ export type AppSpecInput = Pick<
 > & { published?: boolean; slug?: string; pipelineId?: string | null };
 
 // A patch on an existing app — any subset of the mutable fields.
-export type AppPatch = Partial<AppSpecInput>;
+// `editedBy` and `versionNote` are metadata ABOUT the edit, not part of the spec — they are recorded on
+// the frozen version so history reads as "Ravi rewrote the notice wording" rather than as a timestamp.
+export type AppPatch = Partial<AppSpecInput> & { editedBy?: string; versionNote?: string };
 
 // ─── Row ↔ AppSpec mapping ─────────────────────────────────────────────────────
 function toAppSpec(row: App): AppSpec {
@@ -302,6 +306,23 @@ export class AppAgentOwnershipError extends Error {
 }
 
 // ─── createApp ─────────────────────────────────────────────────────────────────
+// The fields a version must carry to explain a change and to restore one. Deliberately not the whole
+// row: ids, timestamps and ownership are properties of the app, not of a version of it.
+function snapshotOfApp(spec: AppSpec): AppSnapshot {
+  return {
+    title: spec.title,
+    summary: spec.summary,
+    visibility: spec.visibility,
+    pipelineId: spec.pipelineId ?? null,
+    slug: spec.slug ?? null,
+    published: spec.published,
+    trigger: spec.trigger,
+    inputForm: spec.inputForm ?? null,
+    steps: spec.steps as unknown as AppSnapshot['steps'],
+    edges: spec.edges,
+  };
+}
+
 export async function createApp(
   orgId: string,
   ownerId: string,
@@ -333,7 +354,13 @@ export async function createApp(
       edges: spec.edges,
     })
     .returning();
-  return toAppSpec(row);
+  const created = toAppSpec(row);
+  // Freeze v1 at creation, so an app's history starts where the app does rather than at its first EDIT
+  // — otherwise the original state, the one a rollback most often wants, is the only one never captured.
+  await recordAppVersion(created.id, created.orgId, snapshotOfApp(created), ownerId, 'Created').catch(
+    () => null,
+  );
+  return created;
 }
 
 // ─── getApp — by id, org-scoped ─────────────────────────────────────────────────
@@ -523,6 +550,20 @@ export async function updateApp(
       .where(and(eq(apps.id, id), eq(apps.orgId, scopedOrgId)))
       .returning();
     return row ? toAppSpec(row) : null;
+  }).then(async (updated) => {
+    // Freeze AFTER the transaction commits: a snapshot of a change that rolled back would be a lie in
+    // the history, and recordAppVersion no-ops when nothing meaningful changed, so a save that only
+    // touched updatedAt does not inflate the list.
+    if (updated) {
+      await recordAppVersion(
+        updated.id,
+        updated.orgId,
+        snapshotOfApp(updated),
+        patch.editedBy ?? '',
+        patch.versionNote,
+      ).catch(() => null);
+    }
+    return updated;
   });
 }
 
@@ -626,6 +667,8 @@ export async function deleteApp(id: string, orgId: string): Promise<void> {
     }
     await tx.delete(apps).where(and(eq(apps.id, id), eq(apps.orgId, scopedOrgId)));
   });
+  // No orphan snapshots: history belongs to the app, and an app id can be reused by a later create.
+  await deleteAppVersions(id, scopedOrgId).catch(() => undefined);
 }
 
 // ─── publishApp — mint a slug + mark published, org-scoped ─────────────────────

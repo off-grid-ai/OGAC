@@ -1236,6 +1236,31 @@ export const dataDomains = pgTable('data_domains', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('data_domains_org_idx').on(t.orgId), index('data_domains_connector_idx').on(t.connectorId)]);
 
+// ─── App versions — every published change to an app, and the way back ─────────
+//
+// ROADMAP §10 Flow 7 ("investigate failure") has two steps the console could not do: "compares with
+// previous versions" and "rolls out or rolls back". PIPELINES had version history and a rollback route;
+// APPS had neither — and an app run is what an operator is usually investigating. §11 also names
+// "reversal" as part of human control for consequential actions.
+//
+// Deliberately modelled on `pipeline_versions` (append-only, full snapshot per version, note + author)
+// so the two entities behave the same way and one mental model covers both. The snapshot is the whole
+// AppSpec at that version, which is what makes a diff and a rollback possible without reconstructing
+// history from an audit trail.
+export const appVersions = pgTable('app_versions', {
+  id: text('id').primaryKey(),
+  appId: text('app_id').notNull(),
+  orgId: text('org_id').notNull().default('default'),
+  version: integer('version').notNull(),
+  snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull().default({}),
+  note: text('note').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text('created_by').notNull().default(''),
+}, (t) => [index('app_versions_app_idx').on(t.appId), index('app_versions_org_idx').on(t.orgId)]);
+
+export type AppVersion = typeof appVersions.$inferSelect;
+export type NewAppVersion = typeof appVersions.$inferInsert;
+
 // ─── App run controls (SHADOW MODE + BLAST-RADIUS) — the BFSI trust dials ──────
 // Per-app safety controls a cautious operator sets so an autonomous app/agent can be trusted to act:
 //   • enabled          — kill-switch. false ⇒ the app is DISABLED, every run denied at run start.
