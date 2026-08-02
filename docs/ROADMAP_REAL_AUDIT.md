@@ -105,6 +105,18 @@ against evidence rather than against a reading of the spec.
 > MEASURES, linking to that app's Quality tab, and every app in both tenants has its own set (12/12 and
 > 6/6, 62 app-bound checks).
 >
+> **§11 honest state — one vocabulary, applied.** The doc names seven states and each was handled
+> somewhere, differently, which was the gap. `honest-state.ts` is now the single rule and `StateBadge`
+> the single renderer; the adapter catalog is the first consumer (it owned its own four labels and
+> collapsed failed-OPEN into failed-CLOSED — opposite facts to a reviewer). Fail mode is decided where
+> it is known: guardrails/PII/policy/secrets fail CLOSED, everything else fails OPEN.
+>
+> Reading that page after wiring it found one more: **Inference reported "NOT SET UP" while the gateway
+> was serving models on the same screen** — "configured" was derived from whether an adapter has an
+> embeddable UI, which inference (native) never has. Live now: 18/18 capabilities report `Live`,
+> because all 18 health probes currently succeed on this box. The discriminating states are decided by
+> the pure rule and will render the moment a probe fails.
+>
 > **Still open, honestly:** the `default` dev org carries debris (G-207); one masking corruption is
 > deliberately NOT repaired because undoing it means guessing (the placeholder swallowed a key/value
 > separator, and a first attempt wrote invalid JSON); bearer requests still resolve to `default`
