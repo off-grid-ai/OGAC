@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AppQualityPanel } from '@/components/build/AppQualityPanel';
+import { SuggestedChecks } from '@/components/build/SuggestedChecks';
 import { getApp } from '@/lib/apps-store';
 import { listEvalDefs } from '@/lib/eval-defs';
 import { listGoldenCases } from '@/lib/evals';
@@ -46,12 +47,18 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
   ]);
 
   return (
-    <AppQualityPanel
-      appId={id}
-      appTitle={app.title}
-      evals={evals}
-      golden={golden}
-      libraryEvals={libraryEvals}
-    />
+    <div className="space-y-6">
+      {/* ROADMAP §10 Flow 3 ("generates the app and tests … generates or updates evaluations"): checks
+          derived from this app's own design, offered for a person to accept. Above the panel because a
+          new app's evaluation set is empty and this is what fills it. */}
+      <SuggestedChecks appId={id} appTitle={app.title} />
+      <AppQualityPanel
+        appId={id}
+        appTitle={app.title}
+        evals={evals}
+        golden={golden}
+        libraryEvals={libraryEvals}
+      />
+    </div>
   );
 }
