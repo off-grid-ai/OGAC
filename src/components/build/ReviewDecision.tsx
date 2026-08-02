@@ -18,10 +18,12 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ActionReviewEvidence } from '@/components/actions/ActionReviewEvidence';
+import { Markdown } from '@/components/chat/Markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { type ReviewDetail } from '@/lib/review-inbox';
+import { snippetFields, snippetHeadline, snippetRowCount } from '@/lib/source-snippet';
 
 // The reviewer's terminal decision — approve or reject.
 // ROADMAP §10 Flow 6 step 4 names four: approve, EDIT, reject, ESCALATE. Two existed. The panel even
@@ -186,10 +188,13 @@ export function ReviewDecision({
     'text-amber-700 dark:text-amber-400',
   );
 
+  // min-w-0 on BOTH tracks. Without it a grid track refuses to shrink below its widest content, so the
+  // long source rows in the left column pushed the DECISION column past the right edge — the buttons a
+  // reviewer is here to press were literally off-screen at 1600px.
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
+    <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
       {/* ── LEFT: the decision, the draft, the why ── */}
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
         {/* The decision being asked — or, once decided, its recorded outcome (state-aware header). */}
         <div className={`rounded-lg border p-5 ${headerTone}`}>
           <div
@@ -238,8 +243,10 @@ export function ReviewDecision({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="whitespace-pre-wrap rounded-md border border-border/60 bg-muted/30 p-3 text-sm leading-relaxed text-foreground">
-              {detail.draftOutput}
+            {/* The app writes markdown, so the reviewer was reading '**41,346.44**' and '✅ **Answer:'
+                on the surface where a decision gets made. Rendered with the same renderer chat uses. */}
+            <div className="prose prose-sm max-w-none rounded-md border border-border/60 bg-muted/30 p-3 leading-relaxed dark:prose-invert">
+              <Markdown>{detail.draftOutput}</Markdown>
             </div>
           </CardContent>
         </Card>
@@ -280,10 +287,45 @@ export function ReviewDecision({
                       {c.scorePct !== null ? ` · ${c.scorePct}%` : ''}
                     </span>
                   </div>
+                  {/* A source is EVIDENCE on this screen, so it is read, not dumped. When the snippet
+                      carries a data row it renders as field/value pairs (the same humanised labels the
+                      run trace uses); prose snippets are shown as prose. */}
                   {c.snippet ? (
-                    <p className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">
-                      {c.snippet}
-                    </p>
+                    (() => {
+                      const fields = snippetFields(c.snippet);
+                      const rows = snippetRowCount(c.snippet);
+                      if (!fields.length) {
+                        return (
+                          <p className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">
+                            {c.snippet}
+                          </p>
+                        );
+                      }
+                      return (
+                        <div className="mt-1.5 space-y-1">
+                          <p className="text-[11px] text-muted-foreground">
+                            {snippetHeadline(c.snippet)}
+                          </p>
+                          <dl className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
+                            {fields.map((f) => (
+                              <div key={f.label} className="flex min-w-0 items-baseline gap-1.5">
+                                <dt className="shrink-0 text-[11px] text-muted-foreground">
+                                  {f.label}
+                                </dt>
+                                <dd className="min-w-0 truncate text-[11px] font-medium text-foreground">
+                                  {f.value}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                          {rows && rows > 1 ? (
+                            <p className="text-[10px] text-muted-foreground">
+                              First of {rows} rows — the full set is on the run trace.
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })()
                   ) : null}
                 </div>
               ))}
@@ -293,7 +335,7 @@ export function ReviewDecision({
       </div>
 
       {/* ── RIGHT: trust signals, context, the actions ── */}
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
         {/* Trust: faithfulness + guardrail/PII notes. */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
