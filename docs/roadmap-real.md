@@ -1,3 +1,47 @@
+> ## STATUS — where the product stands against this document
+>
+> This file is the PRODUCT DEFINITION and is not edited by implementation work. This block is the only
+> addition: a pointer to what has been verified, so a reader is not left guessing which of the promises
+> below are real.
+>
+> **Evidence lives in [`ROADMAP_REAL_AUDIT.md`](ROADMAP_REAL_AUDIT.md)** — one row per flow, each stating
+> what was exercised on the live box and what the artifact said. A gate is only promoted by someone who
+> ran it and read the output.
+>
+> **§10 — the nine user flows (2026-08-02).** Flows 1, 2, 3, 5, 6, 7 and 8 have been walked end to end
+> on the live deployment. Flow 4 (build from a template) is wired but its adoption has not been watched;
+> Flow 9 (node intelligence) is out of scope by the founder's decision. Four product defects were found
+> and fixed in the walking: an on-prem operator could not connect their own private-network database;
+> every reviewer correction was written to the platform org so no tenant ever learned from it; masking
+> turned a claim number into `EXP-[PHONE]` in the reviewer's evidence; and the decision buttons sat
+> off-screen at 1600px.
+>
+> **§12 — the 160 technical table stakes (2026-08-02).** Probed for the first time with a replayable
+> harness (`scripts/verify-table-stakes.mjs`): **108 present · 0 absent · 40 not establishable from
+> inside one install** (deployment topology, CI scanning, SLAs, and settings this box does not enable —
+> SSO providers activate from env and are unset here). Per category:
+>
+> | | present | not probeable |
+> |---|---|---|
+> | Observability | 13 | 0 |
+> | Evaluation | 14 | 1 |
+> | Data | 12 | 1 |
+> | Models | 13 | 4 |
+> | Agents | 11 | 3 |
+> | Compliance | 10 | 1 |
+> | Security | 10 | 6 |
+> | DevEx | 8 | 6 |
+> | Identity | 7 | 4 |
+> | Reliability | 7 | 7 |
+> | Deployment | 3 | 7 |
+>
+> "Not probeable" is a deliberate third verdict. Twenty of these first read as ABSENT because the probe
+> used route names typed from what the surfaces are CALLED rather than enumerated from `src/app/api`,
+> and forty-five more because the harness tripped our own rate limiter. Both were the instrument, not
+> the product; recording either would have manufactured sixty-five fake gaps.
+>
+> ---
+
 OGAC Product Definition
 1. What OGAC is
 
