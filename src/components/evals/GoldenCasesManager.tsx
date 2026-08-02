@@ -38,12 +38,20 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 
+interface CaseOwnersView {
+  apps: { id: string; title: string; via: 'app' | 'pipeline' }[];
+  pipelineName: string | null;
+  unattached: boolean;
+}
+
 interface GoldenCase {
   id: string;
   name: string;
   query: string;
   expected: string;
   suite: string;
+  /** Which apps this check actually measures — the API resolves it directly and via the pipeline. */
+  owners?: CaseOwnersView;
 }
 
 type Draft = { id?: string; name: string; query: string; expected: string; suite: string };
@@ -195,7 +203,10 @@ export function GoldenCasesManager() {
                 <TableHead>Name</TableHead>
                 <TableHead>Query</TableHead>
                 <TableHead>Expected</TableHead>
-                <TableHead>Suite</TableHead>
+                {/* WHAT BREAKS IF THIS FAILS. The column was "Suite" and showed
+                    `pipeline:pl_seed_org_bharat_kyc-verification` — an id, about an entity the reader
+                    is not looking at. Founder: "quality needs to be more tightly coupled to apps." */}
+                <TableHead>Measures</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -217,9 +228,41 @@ export function GoldenCasesManager() {
                     {c.expected}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-[10px]">
-                      {c.suite}
-                    </Badge>
+                    {c.owners?.apps.length ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {c.owners.apps.slice(0, 2).map((a) => (
+                          <Link
+                            key={a.id}
+                            href={`/solutions/apps/${encodeURIComponent(a.id)}/quality`}
+                            title={
+                              a.via === 'pipeline'
+                                ? `Runs on ${c.owners?.pipelineName ?? 'the same pipeline'}, so this check measures it`
+                                : 'This check was written for this app'
+                            }
+                          >
+                            <Badge
+                              variant="outline"
+                              className="border-primary/40 text-[10px] text-primary hover:bg-primary/10"
+                            >
+                              {a.title}
+                            </Badge>
+                          </Link>
+                        ))}
+                        {c.owners.apps.length > 2 ? (
+                          <span className="text-[10px] text-muted-foreground">
+                            +{c.owners.apps.length - 2}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      // Honest about the two different "no app" states: reusable vs bound to a
+                      // pipeline nothing runs on yet.
+                      <span className="text-[10px] text-muted-foreground">
+                        {c.owners?.pipelineName
+                          ? `${c.owners.pipelineName} — no app runs on it yet`
+                          : 'Reusable · not attached'}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import { listApps } from '@/lib/apps-store';
 import { requireAdmin } from '@/lib/authz';
+import { ownersForCase } from '@/lib/golden-case-owners';
+import { listPipelines } from '@/lib/pipelines';
 import { addGoldenCase, listGoldenCases } from '@/lib/evals';
 import { validateGoldenCase } from '@/lib/evals-golden';
 import { currentOrgId } from '@/lib/tenancy';
@@ -23,7 +26,22 @@ export async function GET(req: Request) {
   } else if (appRaw !== null) {
     filter = { orgId, appId: appRaw === 'none' ? null : appRaw };
   }
-  return NextResponse.json({ object: 'list', data: await listGoldenCases(filter) });
+  const cases = await listGoldenCases(filter);
+  // WHICH APPS EACH CASE MEASURES. Founder, live: "quality needs to be more tightly coupled to apps,
+  // else what's the point — right now it seems standalone." The list showed a raw suite chip
+  // (`pipeline:pl_seed_org_bharat_kyc-verification`) and never named an app, so a reader could not
+  // answer the only question that matters about a check: what breaks if it fails. A case reaches an
+  // app directly (app_id) or THROUGH its pipeline — the second is the common case and was invisible.
+  const [apps, pipelines] = await Promise.all([
+    listApps(orgId).catch(() => []),
+    listPipelines(orgId).catch(() => []),
+  ]);
+  const pipelineNames = new Map(pipelines.map((p) => [p.id, p.name]));
+  const appLikes = apps.map((a) => ({ id: a.id, title: a.title, pipelineId: a.pipelineId ?? null }));
+  return NextResponse.json({
+    object: 'list',
+    data: cases.map((c) => ({ ...c, owners: ownersForCase(c, appLikes, pipelineNames) })),
+  });
 }
 
 export async function POST(req: Request) {

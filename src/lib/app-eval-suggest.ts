@@ -46,14 +46,24 @@ export function suggestEvalsForApp(spec: AppSpecLike): SuggestedEval[] {
   const actions = spec.steps.filter((s) => s.kind === 'action');
   const subject = clean(spec.title || 'this app');
 
+  // ONE CHECK PER DOMAIN, not per step. Live, an app with two steps reading the same source produced
+  // two identical "Cites bhdom_accounts" rows — the same assertion twice, which makes the list look
+  // machine-generated and teaches an operator to skim it. The steps that read it are named in the
+  // rationale instead, because WHICH steps depend on the source is the useful part.
+  const byDomain = new Map<string, typeof reads>();
   for (const step of reads) {
+    const key = String(step.domain);
+    byDomain.set(key, [...(byDomain.get(key) ?? []), step]);
+  }
+  for (const [domain, steps] of byDomain) {
+    const names = steps.map((s) => `"${clean(s.label ?? s.id)}"`).join(' and ');
     out.push({
-      key: `grounding:${step.id}`,
+      key: `grounding:${domain}`,
       kind: 'grounding',
-      name: `Cites ${step.domain}`,
+      name: `Cites ${domain}`,
       query: `${subject}: which source did this answer come from?`,
-      expected: String(step.domain),
-      rationale: `Step "${clean(step.label ?? step.id)}" reads ${step.domain}. An answer that does not rest on that source is ungrounded, whatever it says.`,
+      expected: domain,
+      rationale: `${steps.length === 1 ? 'Step' : 'Steps'} ${names} read ${domain}. An answer that does not rest on that source is ungrounded, whatever it says.`,
     });
   }
 
