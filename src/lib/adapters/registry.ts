@@ -1,3 +1,4 @@
+import { stateFromProbe, type HonestState } from '@/lib/honest-state';
 import { CACHE_PORTS } from './cache';
 import { DRIFT_PORTS } from './drift';
 import { EVALS_PORTS } from './evals';
@@ -134,6 +135,12 @@ export interface CapabilityBinding {
   // UI tell "not configured yet" (calm) apart from "configured but down" (a real problem) —
   // both otherwise surface as healthy===false. Adapters with no remote to reach report undefined.
   configured?: boolean;
+  /**
+   * The canonical §11 state for this capability, decided by the one shared rule (honest-state.ts).
+   * `healthy` + `configured` are kept for callers that already read them; new surfaces should render
+   * this, so "not configured" cannot look like an outage on one page and like silence on another.
+   */
+  state?: HonestState;
 }
 
 // Wrap a port array (whose adapters expose health()) into registry entries.
@@ -175,6 +182,12 @@ const ALL: Record<Capability, RegEntry[]> = {
 };
 
 // One row per capability — active adapter + swappable alternatives + live health (when probed).
+// Capabilities whose failure STOPS work rather than letting it through. Guardrails, PII and policy
+// are enforcement: if they cannot run, the run is denied. Everything else (observability, analytics,
+// evals) fails open — work continues, it is simply not recorded or scored, which is a different and
+// less dangerous fact that the badge must not conflate.
+const FAIL_CLOSED_CAPABILITIES = new Set<string>(['guardrails', 'pii', 'policy', 'secrets']);
+
 export async function listBindings(withHealth = false): Promise<CapabilityBinding[]> {
   const caps = Object.keys(ALL) as Capability[];
   return Promise.all(
@@ -191,6 +204,18 @@ export async function listBindings(withHealth = false): Promise<CapabilityBindin
         alternatives: entries.map((e) => e.meta).filter((m) => m.id !== active.meta.id),
         healthy,
         configured,
+        // ROADMAP §11 names seven states the UI must distinguish, and this surface was rendering its
+        // own ad-hoc version of three of them. One vocabulary decides it (honest-state.ts) so
+        // "not configured" cannot read as an outage here and as silence somewhere else.
+        //
+        // FAIL MODE MATTERS: an unreachable guardrail fails CLOSED (the run is stopped), an
+        // unreachable observability sink fails OPEN (work continues unrecorded). Those are opposite
+        // facts and a single red badge for both is exactly what §11 forbids.
+        state: stateFromProbe({
+          configured,
+          reachable: healthy,
+          failMode: FAIL_CLOSED_CAPABILITIES.has(capability) ? 'closed' : 'open',
+        }),
       };
     }),
   );

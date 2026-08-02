@@ -4,6 +4,8 @@ import { Plugs, PlugsConnected } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
+import { StateBadge } from '@/components/ui/StateBadge';
+import { stateFromProbe } from '@/lib/honest-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ADAPTER_CATEGORIES,
@@ -21,16 +23,14 @@ const RENDER: Record<string, string> = {
   embed: 'bg-muted text-muted-foreground',
 };
 
-function healthLabel(
-  healthy: boolean | undefined,
-  configured: boolean | undefined,
-): { text: string; cls: string } {
-  if (healthy === undefined) return { text: 'n/a', cls: 'bg-muted text-muted-foreground' };
-  if (healthy) return { text: 'reachable', cls: 'bg-primary/10 text-primary' };
-  // healthy === false: distinguish "never wired up" (calm) from "wired but down" (real problem).
-  if (configured === false) return { text: 'not configured', cls: 'bg-muted text-muted-foreground' };
-  return { text: 'unreachable', cls: 'bg-amber-500/10 text-amber-600' };
-}
+// This surface used to own its own three-state vocabulary (n/a · reachable · not configured ·
+// unreachable). ROADMAP §11 names SEVEN states and requires the UI to distinguish them — most
+// importantly failed-OPEN from failed-CLOSED, which "unreachable" collapsed into one amber pill. A
+// guardrail that cannot run STOPS the work; an observability sink that cannot run lets it continue
+// unrecorded. Those are opposite facts to a compliance reviewer.
+//
+// The state now comes from the one shared rule (honest-state.ts, decided in the registry where the
+// fail mode is known) and renders through the one shared badge.
 
 // The adapter catalog — "Configure every underlying service." Given how many capability ports
 // exist, a single flat grid is hard to scan, so the cards are grouped by function behind a scoped
@@ -103,7 +103,7 @@ export function AdapterCatalog({ bindings }: Readonly<{ bindings: CapabilityBind
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {shown.map((b) => {
-          const health = healthLabel(b.healthy, b.configured);
+          const state = b.state ?? stateFromProbe({ configured: b.configured, reachable: b.healthy });
           const envKey = `OFFGRID_ADAPTER_${b.capability.toUpperCase()}`;
           const Icon = b.healthy ? PlugsConnected : Plugs;
           return (
@@ -114,9 +114,7 @@ export function AdapterCatalog({ bindings }: Readonly<{ bindings: CapabilityBind
                     <Icon className="size-5 text-primary" />
                     <CardTitle className="text-sm capitalize">{b.capability}</CardTitle>
                   </div>
-                  <Badge variant="secondary" className={health.cls}>
-                    {health.text}
-                  </Badge>
+                  <StateBadge state={state} subject={b.active.vendor ?? b.capability} />
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
