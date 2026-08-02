@@ -359,6 +359,21 @@ export function ReviewDecision({
                   />
                 </div>
               ) : null}
+              {/* A number under a heading called "Trust checks", surrounded by green ticks, does not
+                  tell a reviewer that 40% is BAD. Say it in words at the point of decision — §11's
+                  honest-state rule is about not implying a control is working when it is not. */}
+              {detail.faithfulnessPct !== null && detail.faithfulnessPct < 50 ? (
+                <p className="mt-1.5 text-[11px] text-destructive">
+                  Weakly grounded — much of this answer is not directly supported by the sources below.
+                  Read them before approving.
+                </p>
+              ) : null}
+              {detail.faithfulnessPct === null ? (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  Not scored — grounding was not measured for this run, so treat the answer as unchecked
+                  rather than as verified.
+                </p>
+              ) : null}
             </div>
             {detail.guardrailNotes.length > 0 ? (
               <ul className="space-y-1.5">
@@ -390,14 +405,39 @@ export function ReviewDecision({
           <CardContent className="space-y-3">
             {detail.inputPairs.length > 0 ? (
               <dl className="divide-y divide-border/60 text-xs">
-                {detail.inputPairs.map((p) => (
-                  <div key={p.key} className="flex items-start justify-between gap-3 py-1.5">
-                    <dt className="text-muted-foreground">{p.key}</dt>
-                    <dd className="max-w-[60%] break-words text-right font-medium text-foreground">
-                      {p.value}
-                    </dd>
-                  </div>
-                ))}
+                {detail.inputPairs.map((p) => {
+                  // A value that is itself a JSON object ("Case: {\"fy\":\"2025-2026\",…}") was printed
+                  // verbatim, so the request panel showed a wall of JSON next to the decision buttons.
+                  // Same treatment as the sources: readable fields, one per line.
+                  const nested = snippetFields(p.value, 10);
+                  if (nested.length) {
+                    return (
+                      <div key={p.key} className="py-1.5">
+                        <dt className="mb-1 text-muted-foreground">{p.key}</dt>
+                        <dd className="space-y-0.5">
+                          {nested.map((f) => (
+                            <div key={f.label} className="flex items-baseline justify-between gap-3">
+                              <span className="shrink-0 text-[11px] text-muted-foreground">
+                                {f.label}
+                              </span>
+                              <span className="min-w-0 truncate text-right text-[11px] font-medium text-foreground">
+                                {f.value}
+                              </span>
+                            </div>
+                          ))}
+                        </dd>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={p.key} className="flex items-start justify-between gap-3 py-1.5">
+                      <dt className="text-muted-foreground">{p.key}</dt>
+                      <dd className="max-w-[60%] break-words text-right font-medium text-foreground">
+                        {p.value}
+                      </dd>
+                    </div>
+                  );
+                })}
               </dl>
             ) : (
               <p className="text-[11px] text-muted-foreground">No input recorded.</p>

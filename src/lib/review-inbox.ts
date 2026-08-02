@@ -350,23 +350,32 @@ export function faithfulnessPct(trace: ReviewAgentTrace | null): number | null {
 export function guardrailNotesFrom(trace: ReviewAgentTrace | null): string[] {
   if (!trace) return [];
   const notes: string[] = [];
+  // De-duplicated: `guardrail-rules` and `injection` share one sentence, so a run that ran both printed
+  // "All content guardrails passed." TWICE in the trust panel. A repeated line reads as a rendering bug
+  // on the surface whose entire job is to look trustworthy.
+  const seen = new Set<string>();
+  const push = (note: string) => {
+    if (seen.has(note)) return;
+    seen.add(note);
+    notes.push(note);
+  };
   for (const c of trace.checks) {
     if (c.name === 'grounding') continue; // surfaced separately as faithfulness
     if (c.name === 'pii') {
       const detailSuffix = c.detail ? ` (${c.detail})` : '';
-      notes.push(
+      push(
         c.verdict === 'redacted'
           ? `Sensitive data was detected and masked before the model saw it${detailSuffix}.`
           : 'No sensitive personal data was exposed.',
       );
     } else if (c.name === 'guardrail-rules' || c.name === 'injection') {
-      notes.push(
+      push(
         c.verdict === 'pass'
           ? 'All content guardrails passed.'
           : `A content guardrail flagged this: ${c.detail ?? c.verdict}.`,
       );
     } else {
-      notes.push(`${c.name}: ${c.verdict}${c.detail ? ` — ${c.detail}` : ''}`);
+      push(`${c.name}: ${c.verdict}${c.detail ? ` — ${c.detail}` : ''}`);
     }
   }
   return notes;

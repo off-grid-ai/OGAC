@@ -27,6 +27,10 @@ const PROTECTED_PATTERNS: { name: string; re: RegExp }[] = [
   { name: 'REFERENCE', re: /\b[A-Z]{2,5}-\d{2,4}(?:-\d{1,8})+\b/g },
   // A year-prefixed serial used by several Indian insurers: 2025/MOT/00042.
   { name: 'REFERENCE', re: /\b(?:19|20)\d{2}\/[A-Z]{2,6}\/\d{2,8}\b/g },
+  // A FISCAL YEAR — "2025-2026", "2025-26". Live, this came through as "Fy [PHONE]": eight digits with
+  // a dash is a plausible phone number to a generic recognizer, and a financial year is the least
+  // personal value in a BFSI record.
+  { name: 'FISCAL_YEAR', re: /\b(?:19|20)\d{2}-(?:(?:19|20)\d{2}|\d{2})\b/g },
 ];
 
 export interface ProtectedText {
