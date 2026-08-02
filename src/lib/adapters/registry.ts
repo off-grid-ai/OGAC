@@ -195,9 +195,16 @@ export async function listBindings(withHealth = false): Promise<CapabilityBindin
       const entries = ALL[capability];
       const active = pick(capability, entries);
       const healthy = withHealth && active.health ? await active.health() : undefined;
-      // A health-probed adapter is "configured" when its env-derived embedUrl is set. Adapters
-      // that reach no remote (no health probe) leave this undefined — the UI treats them as n/a.
-      const configured = active.health ? Boolean(active.meta.embedUrl) : undefined;
+      // "Configured" means an operator has wired this capability to something — NOT that it has an
+      // embeddable UI. Deriving it from `embedUrl` alone reported the flagship capability as NOT SET
+      // UP while the gateway was demonstrably serving models, because inference is native and embeds
+      // nothing. §11 forbids exactly that: a state that misrepresents whether a control is active.
+      //
+      // An adapter that answered its health probe IS configured, whatever it renders as. Only when a
+      // probe fails does the embed URL (or its absence) tell us whether anyone ever wired it up.
+      const configured = active.health
+        ? healthy === true || Boolean(active.meta.embedUrl)
+        : undefined;
       return {
         capability,
         active: active.meta,
