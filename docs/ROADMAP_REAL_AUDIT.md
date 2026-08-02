@@ -72,6 +72,44 @@ against evidence rather than against a reading of the spec.
 > carry real Indian BFSI policy text and real vectors (`scripts/reindex-knowledge.mts`, replayable). Verified
 > after: 0 placeholders, 0 unindexed documents, 0 chunks without a vector.
 
+> ### Session 3 — 2026-08-01/02, working the spec top to bottom
+>
+> Every row below was exercised on the live box and the ARTIFACT was read, not the status code.
+>
+> | Row | Was | Now | Evidence |
+> |---|---|---|---|
+> | Flow 7 · compares with previous versions | 🔴 apps had no versions | ✅ | `app_versions` + a pure diff in an operator's words; History tab |
+> | Flow 7 · rolls out or rolls back | 🔴 nothing rolled an app back | ✅ | edit → v2 with the change described → rollback → **exact restore** → v3 appended, nothing erased |
+> | Flow 6 · approves/edits/rejects/**escalates** | 🔶 edit + escalate absent (and the panel CLAIMED escalate) | ✅ | reasonless escalation refused; run stays `awaiting_human`; chain persists; second hand-off appends |
+> | Flow 5 · feedback is collected | ❓ | ✅ | 25 golden cases → capture → 26, correction stored as `expected` |
+> | Flow 6 · feedback enters the evaluation system | ❓ | ✅ **after fixing a real bug** | every correction was written to the `default` org, so no tenant ever learned from it — while the API answered `captured: true` |
+> | Flow 3 · generates tests / evaluations | 🔶 | ✅ | compiling a brief produced neither; checks are now derived from the app's own spec and accepted by a person |
+> | Flow 8 · generates evidence pack | 🔶 never generated end to end | ✅ | 3-page signed PDF for **Bharat Union Bank**: 138 runs, 83 completed, 35 paused, **99 (72%) provenance-signed**, 8 approvals, 27 eval runs per suite with dates |
+> | Flow 8 · collects runs/approvals/evaluations | 🔶 | ✅ | the pack carried only control posture; those sections were added |
+> | Flow 1 · time to a working environment | ❓ unmeasured | ✅ measured | all ten steps reachable, **13.3s** of machine time, throwaway tenant created and deleted (`scripts/time-flow1-setup.mjs`) |
+> | Flow 2 · walked as a flow | 🔶 | ✅ 12/12 | `scripts/walk-flow2-source.mjs`; step 2 needed a real product change (below) |
+> | §11 · observability — eval evidence | 🔴 64 of 84 runs had no per-case results | ✅ | every engine now stores per-row evidence; a run that could not score stores WHY |
+>
+> **Product changes this required, not just verification:**
+> - **An on-prem operator could not connect their own database.** Flow 2 step 2 refused every private
+>   address (SSRF guard). Correct for a hosted control plane, wrong for the deployment this product is
+>   FOR — the seeded connectors only worked because the seed bypassed the form. Now deployment-aware
+>   (`OFFGRID_ALLOW_PRIVATE_CONNECTOR_HOSTS`), and the refusal names the setting.
+> - **Feedback never reached the tenant.** See the table row — the loop reported success throughout.
+> - **Masking ate the evidence.** Claim `EXP-2025-00001` reached the reviewer as `EXP-[PHONE]`, a
+>   fiscal year as `Fy [PHONE]`. Business references are now protected across the guardrail path.
+> - **The decision buttons were off-screen at 1600px** (a grid track without `min-w-0`).
+>
+> **Founder feedback closed the same session:** quality read as standalone — the golden-case list showed
+> `pipeline:pl_seed_org_bharat_kyc-verification` and never named an app. It now names what each check
+> MEASURES, linking to that app's Quality tab, and every app in both tenants has its own set (12/12 and
+> 6/6, 62 app-bound checks).
+>
+> **Still open, honestly:** the `default` dev org carries debris (G-207); one masking corruption is
+> deliberately NOT repaired because undoing it means guessing (the placeholder swallowed a key/value
+> separator, and a first attempt wrote invalid JSON); bearer requests still resolve to `default`
+> instead of the subdomain's tenant (G-F1), which is why several verifications had to run on the box.
+
 ## OUT OF SCOPE (founder, 2026-07-30) — "we'll tackle later"
 
 Explicitly descoped until the founder says otherwise. **Do not work these, and do not count them as gaps:**
