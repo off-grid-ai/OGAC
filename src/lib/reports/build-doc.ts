@@ -12,6 +12,14 @@ import type { Analytics } from '@/lib/analytics-types';
 import type { Compliance, Status } from '@/lib/compliance';
 import type { ComplianceActivity } from '@/lib/compliance-activity';
 import type { RegulatorSpec } from '@/lib/reports-spec';
+import type { OperationalEvidence } from '@/lib/reports/evidence-reader';
+import {
+  approvalsSection,
+  enforcementSection,
+  evaluationsSection,
+  periodPhrase,
+  runsSection,
+} from '@/lib/reports/evidence-sections';
 import type {
   ComplianceArtifact,
   FramingRollup,
@@ -327,10 +335,29 @@ export function buildRegulatorDoc(input: RegulatorDocInput, meta: DocMetaInput):
 export interface ComplianceDocInput {
   compliance: Compliance;
   governance: GovernanceLine[];
+  /** What the system DID in the period (Flow 8 step 2). Absent ⇒ those sections are omitted. */
+  evidence?: OperationalEvidence;
+  /** Actions that were blocked or denied — the proof that enforcement is real, not configured. */
+  enforcement?: { ts: string; actor: string; action: string; outcome: string; resource: string }[];
 }
 
 export function buildComplianceDoc(input: ComplianceDocInput, meta: DocMetaInput): ReportDoc {
   const { compliance: c } = input;
+  // ROADMAP §10 Flow 8 step 2 requires the pack to carry what the system DID — runs, approvals,
+  // evaluations, enforcement — not only what its controls are configured to be. Those sections are
+  // built purely from already-read facts and appear between the controls and the attestation, which is
+  // the order a regulator reads in: what you promise, what you did, what you refused, who signed.
+  const period = input.evidence
+    ? periodPhrase(input.evidence.from, input.evidence.to)
+    : 'the reporting period';
+  const operational: ReportSection[] = input.evidence
+    ? [
+        runsSection(input.evidence.runs, period),
+        approvalsSection(input.evidence.approvals, period),
+        evaluationsSection(input.evidence.evaluations, period),
+        ...(input.enforcement ? [enforcementSection(input.enforcement, period)] : []),
+      ]
+    : [];
   const sections: ReportSection[] = [
     {
       heading: 'Posture summary',
@@ -347,6 +374,7 @@ export function buildComplianceDoc(input: ComplianceDocInput, meta: DocMetaInput
     },
     frameworkSection(c, c.frameworks.map((f) => f.id)),
     controlsSection(c),
+    ...operational,
     governanceSection(input.governance),
     {
       heading: 'Attestation',

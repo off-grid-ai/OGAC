@@ -23,6 +23,7 @@ import {
   type DocMetaInput,
   type EvalCaseLine,
 } from '@/lib/reports/build-doc';
+import { readOperationalEvidence } from '@/lib/reports/evidence-reader';
 import type { ReportDoc } from '@/lib/reports/model';
 import { renderReportDoc } from '@/lib/reports/render';
 import {
@@ -100,7 +101,12 @@ async function assembleDoc(id: string, orgId: string | undefined, now: string): 
       {
         spec,
         compliance,
-        governance: governance.map((g) => ({ title: g.title, kind: g.kind, status: g.status, owner: g.owner })),
+        governance: governance.map((g: { title: string; kind: string; status: string; owner: string }) => ({
+          title: g.title,
+          kind: g.kind,
+          status: g.status,
+          owner: g.owner,
+        })),
         residency: residencyFrom(policy, routes),
         datasets: datasets.map((d) => ({ name: d.name, classification: d.classification, source: d.source, rows: d.rows })),
         deviceCount: devices.length,
@@ -117,9 +123,25 @@ async function assembleDoc(id: string, orgId: string | undefined, now: string): 
   }
 
   if (id === 'compliance') {
-    const [compliance, governance] = await Promise.all([computeCompliance(), listGovernance(orgId)]);
+    // Flow 8 step 2: the pack collects runs, approvals and evaluations for the period alongside the
+    // control posture. Read best-effort — a pack that fails to generate teaches a compliance team to
+    // stop asking for it, and each section states "none recorded in <period>" rather than going quiet.
+    const [compliance, governance, evidence] = await Promise.all([
+      computeCompliance(),
+      listGovernance(orgId),
+      readOperationalEvidence(orgId ?? 'default').catch(() => undefined),
+    ]);
     return buildComplianceDoc(
-      { compliance, governance: governance.map((g) => ({ title: g.title, kind: g.kind, status: g.status, owner: g.owner })) },
+      {
+        compliance,
+        governance: governance.map((g: { title: string; kind: string; status: string; owner: string }) => ({
+          title: g.title,
+          kind: g.kind,
+          status: g.status,
+          owner: g.owner,
+        })),
+        evidence,
+      },
       baseMeta({
         title: 'Compliance Evidence Pack',
         subtitle: 'DPDP · EU AI Act · ISO/IEC 42001 · GDPR',
