@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
+import { hostPolicyFromEnv } from '@/lib/connector-policy';
 import {
   validateConnectorCreate,
   persistConnectorSecret,
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as ConnectorCreateInput | null;
   if (!body) return NextResponse.json({ error: 'invalid body' }, { status: 400 });
 
-  const result = validateConnectorCreate(body);
+  const result = validateConnectorCreate(body, hostPolicyFromEnv());
   if (!result.ok || !result.value) {
     return NextResponse.json({ error: result.errors.join(' ') || 'invalid connector' }, { status: 400 });
   }

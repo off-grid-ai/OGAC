@@ -105,6 +105,13 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
+// One sentence for the refusal, naming the setting that changes it — "blocked" with no way forward is
+// the kind of dead end an operator cannot act on.
+const PRIVATE_HOST_REFUSAL =
+  'Host must be a public address — private and loopback addresses are blocked to stop the server being ' +
+  'used to reach its own network. On an on-prem deployment where your databases are on private ' +
+  'addresses, set OFFGRID_ALLOW_PRIVATE_CONNECTOR_HOSTS=true.';
+
 // Only safe URL-authority characters for host; a bad host would corrupt the endpoint string.
 const HOST_RE = /^[A-Za-z0-9.\-_]+$/;
 
@@ -127,7 +134,13 @@ export function buildSqlEndpoint(def: ConnectorTypeDef, input: {
   return `${def.scheme}://${hostPort}${path}`;
 }
 
-function validateSql(def: ConnectorTypeDef, input: SqlConnectorInput, name: string, description: string): CreateValidation {
+function validateSql(
+  def: ConnectorTypeDef,
+  input: SqlConnectorInput,
+  name: string,
+  description: string,
+  policy: ConnectorHostPolicy = { allowPrivateHosts: false },
+): CreateValidation {
   const errors: string[] = [];
   const host = str(input.host);
   const database = str(input.database);
@@ -144,7 +157,9 @@ function validateSql(def: ConnectorTypeDef, input: SqlConnectorInput, name: stri
   else if (!HOST_RE.test(host)) errors.push('Host contains invalid characters.');
   // SSRF: refuse a loopback / link-local / metadata / RFC-1918 host — the server would otherwise
   // open a connection into the private control plane. (G-ADV-DATA-2)
-  else if (!isPublicHost(host)) errors.push('Host must be a public address (private/loopback hosts are blocked).');
+  else if (!policy.allowPrivateHosts && !isPublicHost(host)) {
+    errors.push(PRIVATE_HOST_REFUSAL);
+  }
   if (!database) errors.push('A database name is required.');
   if (!user) errors.push('A username is required.');
   if (!password) errors.push('A password is required.');
@@ -164,7 +179,13 @@ function validateSql(def: ConnectorTypeDef, input: SqlConnectorInput, name: stri
   };
 }
 
-function validateRest(def: ConnectorTypeDef, input: RestConnectorInput, name: string, description: string): CreateValidation {
+function validateRest(
+  def: ConnectorTypeDef,
+  input: RestConnectorInput,
+  name: string,
+  description: string,
+  policy: ConnectorHostPolicy = { allowPrivateHosts: false },
+): CreateValidation {
   const errors: string[] = [];
   const baseUrl = str(input.baseUrl);
   const apiKey = str(input.apiKey);
@@ -183,7 +204,7 @@ function validateRest(def: ConnectorTypeDef, input: RestConnectorInput, name: st
     // SSRF: refuse a loopback / link-local / metadata / RFC-1918 endpoint — the REST test/resources
     // path would otherwise fetch() the internal control plane. (G-ADV-DATA-2)
     if (u && !isPublicEndpointHost(baseUrl)) {
-      errors.push('Base URL must be a public address (private/loopback hosts are blocked).');
+      if (!policy.allowPrivateHosts) errors.push(PRIVATE_HOST_REFUSAL.replace('Host', 'Base URL'));
     }
   }
   if (errors.length) return { ok: false, value: null, errors };
@@ -295,7 +316,29 @@ function validateS3(
 }
 
 // Validate + normalize a proposed create. Pure — the single gate the POST route goes through.
-export function validateConnectorCreate(input: ConnectorCreateInput): CreateValidation {
+/**
+ * ON-PREM DEPLOYMENTS REACH PRIVATE HOSTS BY DESIGN. The SSRF guard below refuses RFC-1918 / loopback
+ * hosts, which is right for a hosted control plane and wrong for the deployment this product is FOR:
+ * a bank's Postgres lives at 10.x.x.x behind their firewall, and blocking it means an operator cannot
+ * connect their own database through the console — the seeded connectors only work because the seed
+ * bypassed this form.
+ *
+ * So the rule becomes deployment-aware rather than absent. It stays ON unless the deployment declares
+ * itself private (OFFGRID_ALLOW_PRIVATE_CONNECTOR_HOSTS=true), and the refusal names the setting so an
+ * operator is not left guessing why a valid address is rejected.
+ */
+export interface ConnectorHostPolicy {
+  allowPrivateHosts: boolean;
+}
+
+export function hostPolicyFromEnv(env: NodeJS.ProcessEnv = process.env): ConnectorHostPolicy {
+  return { allowPrivateHosts: env.OFFGRID_ALLOW_PRIVATE_CONNECTOR_HOSTS === 'true' };
+}
+
+export function validateConnectorCreate(
+  input: ConnectorCreateInput,
+  policy: ConnectorHostPolicy = { allowPrivateHosts: false },
+): CreateValidation {
   const name = str(input.name);
   const def = connectorTypeDef(str(input.type));
   if (!def) return { ok: false, value: null, errors: ['Unknown connector type.'] };
@@ -305,10 +348,10 @@ export function validateConnectorCreate(input: ConnectorCreateInput): CreateVali
   const description = str(input.description);
   const base =
     def.family === 'sql'
-      ? validateSql(def, input, name, description)
+      ? validateSql(def, input, name, description, policy)
       : def.family === 's3'
         ? validateS3(def, input, name, description)
-        : validateRest(def, input, name, description);
+        : validateRest(def, input, name, description, policy);
   // A missing name is reported alongside the type-specific errors so the user sees everything at once.
   if (!name) {
     return { ok: false, value: null, errors: ['A connector name is required.', ...base.errors] };
