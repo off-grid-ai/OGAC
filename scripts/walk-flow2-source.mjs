@@ -62,7 +62,7 @@ await step('2. Authenticate (create a connection)', async () => {
     host: process.env.FLOW2_HOST || '127.0.0.1',
     port: Number(process.env.FLOW2_PORT || 5432),
     database: process.env.FLOW2_DB || 'offgrid',
-    username: process.env.FLOW2_USER || 'offgrid',
+    user: process.env.FLOW2_USER || 'offgrid',
     password: process.env.FLOW2_PASSWORD || 'offgrid',
   });
   connectorId = r.body?.id ?? r.body?.connector?.id ?? null;
@@ -112,11 +112,16 @@ await step('6. Select sync scope (bind a data domain)', async () => {
 
 await step('7. Test retrieval', async () => {
   if (!connectorId) return { verdict: 'SKIPPED', note: 'no connector' };
-  const r = await call('GET', `/api/v1/admin/connectors/${connectorId}`);
-  const records = r.body?.records ?? r.body?.connector?.records;
+  // The real probe is POST /connectors/[id]/test — enumerated from src/app/api, not guessed. My first
+  // walk did GET on the connector row and got a 405, because that route only exposes PATCH and DELETE:
+  // a finding about the probe, not the product. Third time this exact mistake has cost a step.
+  const r = await call('POST', `/api/v1/admin/connectors/${connectorId}/test`);
+  const reached = r.body?.ok ?? r.body?.reachable;
   return {
     verdict: r.ok ? 'OK' : 'GAP',
-    note: r.ok ? `connector reports ${records ?? 'no'} record(s) after sync` : `GET → ${r.status}`,
+    note: r.ok
+      ? `test probe: ${JSON.stringify(r.body).slice(0, 90)}`
+      : `POST /test → ${r.status} ${JSON.stringify(r.body).slice(0, 70)}`,
   };
 });
 

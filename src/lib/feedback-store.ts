@@ -24,10 +24,15 @@ export interface CaptureResult {
 async function persist(
   mapped: FeedbackMapResult,
   pipelineId: string | null,
+  orgId: string | null,
 ): Promise<CaptureResult> {
   if (!mapped.ok) return { captured: false, reason: mapped.reason };
-  // Attach to the pipeline (pipeline_id) so THIS pipeline's next eval run scores against it.
-  const gc = await addGoldenCase(mapped.value, { pipelineId });
+  // ORG-STAMPED. Verified live 2026-08-02: a correction made on an org_bharat run was written with
+  // org_id 'default', because this seam never took an org — so `listGoldenCases('org_bharat')` could
+  // not see it and that tenant's next eval run was never measured against its own reviewer's
+  // correction. The API answered { captured: true, goldenId } throughout, which is the worst version
+  // of this bug: the learning loop reported success while the feedback went somewhere nobody reads.
+  const gc = await addGoldenCase(mapped.value, { pipelineId, orgId: orgId ?? undefined });
   return { captured: true, goldenId: gc.id };
 }
 
@@ -35,14 +40,16 @@ async function persist(
 export async function captureHitlCorrection(
   correction: HitlCorrection,
   pipelineId: string | null,
+  orgId: string | null = null,
 ): Promise<CaptureResult> {
-  return persist(hitlCorrectionToGolden(correction), pipelineId);
+  return persist(hitlCorrectionToGolden(correction), pipelineId, orgId);
 }
 
 /** Capture a chat thumb (👍/👎+correction) as a golden case for the conversation's bound pipeline. */
 export async function captureChatThumb(
   feedback: ChatThumbFeedback,
   pipelineId: string | null,
+  orgId: string | null = null,
 ): Promise<CaptureResult> {
-  return persist(chatThumbToGolden(feedback), pipelineId);
+  return persist(chatThumbToGolden(feedback), pipelineId, orgId);
 }

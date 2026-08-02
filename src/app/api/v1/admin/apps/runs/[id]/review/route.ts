@@ -256,6 +256,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const res = await captureHitlCorrection(
       { input: query, correctedOutput: body.output, note: body.note, decision: body.decision },
       pipelineId,
+      // The reviewer's org — without it the correction landed in 'default' and this tenant's evals
+      // never saw the feedback they gave.
+      orgId,
     );
     feedbackCaptured = res.captured;
   } catch {

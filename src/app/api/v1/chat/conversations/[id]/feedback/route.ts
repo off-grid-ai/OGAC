@@ -23,7 +23,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { id } = await params;
-  const convo = await getConversation(userId, await currentOrgId(), id);
+  const orgId = await currentOrgId();
+  const convo = await getConversation(userId, orgId, id);
   if (!convo) return NextResponse.json({ error: 'conversation not found' }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as {
@@ -42,6 +43,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const result = await captureChatThumb(
     { rating: body.rating, query: body.query, answer: body.answer, correction: body.correction },
     pipelineId,
+    // Same fix as the review path: a thumb captured without an org lands in 'default', where the
+    // tenant that gave the feedback can never be measured against it.
+    orgId,
   );
   return NextResponse.json(result);
 }
