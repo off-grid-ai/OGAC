@@ -3,12 +3,29 @@ import { newSuggestions, suggestEvalsForApp, type SuggestedEval } from '@/lib/ap
 import { getApp } from '@/lib/apps-store';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
+import { listDomains } from '@/lib/data-domains-store';
 import { addGoldenCase, listGoldenCases } from '@/lib/evals';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
 type Ctx = { params: Promise<{ id: string }> };
+
+type SpecStep = { id: string; kind: string; label?: string; domain?: string };
+
+/**
+ * Steps with their domain rendered as the LABEL an operator declared, not its id. A check that reads
+ * "Cites dom_6fe4f965-919" is unreadable and unreviewable; "Cites customer data" is the same assertion
+ * in the words the org chose. Falls back to the id when a binding no longer resolves — silently
+ * dropping an unresolvable domain would hide a broken step.
+ */
+async function stepsWithDomainLabels(steps: SpecStep[], orgId: string): Promise<SpecStep[]> {
+  const domains = await listDomains(orgId).catch(() => []);
+  const label = new Map(domains.map((d) => [d.id, d.label]));
+  return steps.map((s) =>
+    s.domain ? { ...s, domain: label.get(s.domain) ?? s.domain } : s,
+  );
+}
 
 // ─── Evaluations derived from an app's own design (ROADMAP §10 Flow 3) ─────────────────────────────
 //
@@ -34,7 +51,7 @@ export async function GET(req: Request, { params }: Ctx) {
     title: app.title,
     summary: app.summary,
     pipelineId: app.pipelineId ?? null,
-    steps: app.steps as { id: string; kind: string; label?: string; domain?: string }[],
+    steps: await stepsWithDomainLabels(app.steps as SpecStep[], orgId),
   });
   return NextResponse.json({
     object: 'list',
@@ -65,7 +82,7 @@ export async function POST(req: Request, { params }: Ctx) {
     title: app.title,
     summary: app.summary,
     pipelineId: app.pipelineId ?? null,
-    steps: app.steps as { id: string; kind: string; label?: string; domain?: string }[],
+    steps: await stepsWithDomainLabels(app.steps as SpecStep[], orgId),
   });
   const chosen = suggestions.filter((s: SuggestedEval) => keys.includes(s.key));
   if (!chosen.length) {
