@@ -197,6 +197,10 @@ export function GoldenCasesManager() {
             No golden cases yet. Add one to build the evaluation set.
           </p>
         ) : (
+          // The Measures column pushed the table past the card, clipping Actions off the right edge —
+          // a delete control you cannot see or reach. Wide tables scroll inside their own container;
+          // the page body never scrolls sideways.
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -288,6 +292,7 @@ export function GoldenCasesManager() {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </CardContent>
 
