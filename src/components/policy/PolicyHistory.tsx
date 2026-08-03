@@ -104,15 +104,27 @@ export function PolicyHistory({
               Showing the current version instead.
             </p>
           ) : null}
-          <ul className="space-y-1.5">
+          <ul className="space-y-2.5">
+            {/* NAME FIRST. The name is what the org calls the rule ("Loan decisions need a human");
+                the condition underneath is how it is enforced. Showing only the condition made the
+                panel read as machine attributes. */}
             {shown.rules.map((r) => (
               <li key={r.name} className="text-xs">
-                <span className={r.enabled ? 'text-foreground' : 'text-muted-foreground line-through'}>
-                  {describeRule(r)}
-                </span>
-                {!r.enabled ? (
-                  <span className="ml-1 text-[11px] text-destructive">not enforced</span>
-                ) : null}
+                <p
+                  className={
+                    r.enabled
+                      ? 'font-medium text-foreground'
+                      : 'font-medium text-muted-foreground line-through'
+                  }
+                >
+                  {r.name}
+                  {!r.enabled ? (
+                    <span className="ml-1.5 text-[11px] font-normal text-destructive no-underline">
+                      not enforced
+                    </span>
+                  ) : null}
+                </p>
+                <p className="text-[11px] text-muted-foreground">{describeRule(r)}</p>
               </li>
             ))}
             {!shown.rules.length ? (

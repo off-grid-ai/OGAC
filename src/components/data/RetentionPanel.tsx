@@ -90,12 +90,21 @@ export function RetentionPanel({
   return (
     <div className="space-y-4">
       <Card className="shadow-sm">
-        <CardHeader className="flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm">How long records are kept</CardTitle>
-          <Button onClick={sweep} disabled={busy !== null} size="sm" className="gap-1.5">
-            <Play className="size-4" />
-            {busy === 'sweep' ? 'Applying…' : 'Apply retention now'}
-          </Button>
+        <CardHeader className="pb-2">
+          {/* The action sits beside the title, not stretched across the card — a full-width green bar
+              reads as a banner, not a button you are meant to consider before pressing. */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-sm">How long records are kept</CardTitle>
+            <Button
+              onClick={sweep}
+              disabled={busy !== null}
+              size="sm"
+              className="w-auto shrink-0 gap-1.5 self-start"
+            >
+              <Play className="size-4" />
+              {busy === 'sweep' ? 'Applying…' : 'Apply retention now'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-3">
           {RETAINABLE_CLASSES.map((c) => {

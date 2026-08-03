@@ -199,7 +199,21 @@ export function AccessReviewPanel({
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-foreground">{s.name || s.email}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm text-foreground">{s.name || s.email}</p>
+                    {/* THE ROLE, ON EVERY ROW. It is the thing being certified — it was only visible
+                        on rows that happened to carry a role-based flag. */}
+                    <Badge
+                      variant="outline"
+                      className={
+                        s.role === 'admin'
+                          ? 'shrink-0 border-destructive/50 bg-destructive/10 text-[10px] text-destructive'
+                          : 'shrink-0 text-[10px]'
+                      }
+                    >
+                      {s.role}
+                    </Badge>
+                  </div>
                   <p className="truncate text-xs text-muted-foreground">{s.email}</p>
                   {/* WHY THIS ROW DESERVES A LOOK. Without it every row reads the same and gets waved through. */}
                   {flag ? (
@@ -215,8 +229,8 @@ export function AccessReviewPanel({
                   ) : (
                     <p className="mt-1 text-[11px] text-muted-foreground/70">
                       {activityAvailable
-                        ? `Active, ${s.role} — nothing unusual`
-                        : `${s.role} — usage unknown`}
+                        ? 'Used recently — nothing unusual'
+                        : 'Usage unknown'}
                     </p>
                   )}
                 </div>

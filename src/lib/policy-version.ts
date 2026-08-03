@@ -66,11 +66,30 @@ const OPERATOR_WORDS: Record<string, string> = {
   lt: 'is below',
 };
 
+// Attribute keys are code identifiers (pii_type, data_class). Printing them raw is how a governance
+// surface ends up unreadable to the person who has to sign it off.
+const ATTRIBUTE_WORDS: Record<string, string> = {
+  pii_type: 'the personal data type',
+  data_class: 'the data classification',
+  action: 'the action',
+  model: 'the model',
+  provider: 'the provider',
+  role: 'the role',
+  team: 'the team',
+  purpose: 'the purpose',
+  destination: 'the destination',
+  region: 'the region',
+};
+
+function attributeWords(a: string): string {
+  return ATTRIBUTE_WORDS[a] ?? a.replace(/_/g, ' ');
+}
+
 /** One rule as a sentence — this is what a compliance officer reads in the history, not JSON. */
 export function describeRule(r: VersionedRule): string {
   const op = OPERATOR_WORDS[r.operator] ?? r.operator;
-  const verb = r.effect === 'allow' ? 'Allow' : 'Deny';
-  return `${verb} when ${r.attribute} ${op} ${r.value}`;
+  const verb = r.effect === 'allow' ? 'Allow' : 'Block';
+  return `${verb} when ${attributeWords(r.attribute)} ${op} ${r.value.replace(/_/g, ' ')}`;
 }
 
 /** What changed between two versions, in operator language. Empty means the two are equivalent. */
