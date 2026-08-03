@@ -16,10 +16,10 @@ export const dynamic = 'force-dynamic';
 export default async function RunsPage({
   searchParams,
 }: Readonly<{
-  searchParams: Promise<{ kind?: string; status?: string; q?: string }>;
+  searchParams: Promise<{ kind?: string; status?: string; q?: string; sensitivity?: string; basis?: string }>;
 }>) {
   await requireModuleForUser('runs');
-  const { kind: kindRaw, status: statusRaw, q: qRaw } = await searchParams;
+  const { kind: kindRaw, status: statusRaw, q: qRaw, sensitivity, basis } = await searchParams;
   const orgId = await currentOrgId();
 
   const all = await listAllRuns(orgId);
@@ -27,7 +27,7 @@ export default async function RunsPage({
   const kind = parseKind(kindRaw);
   const status = parseStatus(statusRaw);
   const q = qRaw ?? '';
-  const page = paginate(filterRuns(all, { kind, status, q }), 0, 200);
+  const page = paginate(filterRuns(all, { kind, status, q, sensitivity, basis }), 0, 200);
 
   const initial = {
     data: page.rows,

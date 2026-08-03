@@ -61,6 +61,8 @@ async function readAppRuns(orgId: string): Promise<AppRunSource[]> {
         finishedAt: r.finishedAt,
         title: titleById.get(r.appId) ?? null,
         actor: appRunActor(r.input),
+        dataClassification: (r as { dataClassification?: string | null }).dataClassification ?? null,
+        lawfulBasis: (r as { lawfulBasis?: string | null }).lawfulBasis ?? null,
       }));
   } catch {
     return [];
@@ -103,6 +105,8 @@ async function readAgentRuns(orgId: string): Promise<AgentRunSource[]> {
       // Agent runs record no explicit finish; leave null so the pure layer reports duration unknown.
       finishedAt: null,
       actor: '',
+      dataClassification: r.dataClassification ?? null,
+      lawfulBasis: r.lawfulBasis ?? null,
     }));
   } catch {
     return [];

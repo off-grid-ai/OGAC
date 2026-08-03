@@ -44,6 +44,15 @@ export interface RunRow {
   /** Deep-link to the run's detail. App runs reuse the per-app run page; agent/chat use the
    *  generic Operations run detail. Computed by the mapper so the row is self-describing. */
   href: string;
+  /**
+   * GOVERNANCE, IN THE LIST. Both stamps were on the run DETAIL only, so answering "which runs read
+   * confidential data without a recorded lawful basis" meant opening runs one at a time. Null means
+   * NOT RECORDED, which is never rendered as a blank — a blank reads as compliance.
+   */
+  dataClassification: string | null;
+  lawfulBasis: string | null;
+  /** True when this run read a source with no recorded lawful basis — the row an auditor wants. */
+  basisGap: boolean;
 }
 
 /**
@@ -141,6 +150,26 @@ export function sumStepMs(
 
 // ─── Source row shapes the mappers accept (mirror the DB rows; kept local so this stays import-free) ─
 
+/**
+ * The governance fields of a run row, derived once for the app and agent mappers.
+ *
+ * `basisGap` is the whole point of putting this in the list: it is true only when the stamp EXISTS
+ * and reports an ungrounded source. A run with no stamp at all is "not recorded" — not a gap — since
+ * calling it a gap would flag every run that predates the stamp as a compliance failure.
+ */
+function governanceOf(src: { dataClassification?: string | null; lawfulBasis?: string | null }): {
+  dataClassification: string | null;
+  lawfulBasis: string | null;
+  basisGap: boolean;
+} {
+  const lawfulBasis = src.lawfulBasis ?? null;
+  return {
+    dataClassification: src.dataClassification ?? null,
+    lawfulBasis,
+    basisGap: Boolean(lawfulBasis && /no basis|no lawful basis/i.test(lawfulBasis)),
+  };
+}
+
 export interface AppRunSource {
   id: string;
   appId: string;
@@ -153,6 +182,8 @@ export interface AppRunSource {
   actor?: string | null;
   /** Resolved app title; falls back to the app id. */
   title?: string | null;
+  dataClassification?: string | null;
+  lawfulBasis?: string | null;
 }
 
 export interface AgentRunSource {
@@ -171,6 +202,8 @@ export interface AgentRunSource {
   /** Agent runs record no explicit finish; the reader may pass one, else duration is unknown. */
   finishedAt?: string | null;
   actor?: string | null;
+  dataClassification?: string | null;
+  lawfulBasis?: string | null;
 }
 
 export interface ChatRunSource {
@@ -214,6 +247,7 @@ export function fromAppRun(src: AppRunSource): RunRow {
     pipeline: src.appId,
     actor: (src.actor ?? '').trim(),
     href: `/solutions/apps/${encodeURIComponent(src.appId)}/runs/${encodeURIComponent(src.id)}`,
+    ...governanceOf(src),
   };
 }
 
@@ -233,6 +267,7 @@ export function fromAgentRun(src: AgentRunSource): RunRow {
     pipeline: src.agentId,
     actor: (src.actor ?? '').trim(),
     href: `/operations/runs/${encodeURIComponent(runKey('agent', src.id))}`,
+    ...governanceOf(src),
   };
 }
 
@@ -253,6 +288,11 @@ export function fromChatRun(src: ChatRunSource): RunRow {
     pipeline: (src.model ?? '').trim() || 'chat',
     actor: (src.actor ?? '').trim(),
     href: `/operations/runs/${encodeURIComponent(runKey('chat', src.runId))}`,
+    // Chat turns bind no declared data source, so there is nothing to stamp — reported as not
+    // recorded rather than as a gap, because a gap implies something should have been there.
+    dataClassification: null,
+    lawfulBasis: null,
+    basisGap: false,
   };
 }
 
@@ -304,6 +344,13 @@ export interface RunFilter {
   kind?: RunKind | 'all';
   status?: RunStatus | 'all';
   q?: string;
+  /**
+   * GOVERNANCE FILTERS — the audit question the list exists to answer. Without them, "which runs read
+   * confidential data with no recorded lawful basis" meant opening runs one at a time.
+   */
+  sensitivity?: string;
+  /** 'missing' → only runs whose stamp names a source with no recorded lawful basis. */
+  basis?: string;
 }
 
 export function filterRuns(rows: RunRow[], f: RunFilter): RunRow[] {
@@ -311,6 +358,8 @@ export function filterRuns(rows: RunRow[], f: RunFilter): RunRow[] {
   return rows.filter((r) => {
     if (f.kind && f.kind !== 'all' && r.kind !== f.kind) return false;
     if (f.status && f.status !== 'all' && r.status !== f.status) return false;
+    if (f.sensitivity && f.sensitivity !== 'all' && r.dataClassification !== f.sensitivity) return false;
+    if (f.basis === 'missing' && !r.basisGap) return false;
     if (q) {
       const hay = `${r.name} ${r.pipeline} ${r.actor} ${r.id} ${r.rawStatus}`.toLowerCase();
       if (!hay.includes(q)) return false;

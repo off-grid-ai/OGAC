@@ -63,6 +63,14 @@ const KIND_TABS: { id: RunKind | 'all'; label: string }[] = [
   { id: 'chat', label: 'Chat' },
 ];
 
+// Same tone vocabulary as the domain cards — one classification, one colour, everywhere.
+const CLASSIFICATION_TONE: Record<string, string> = {
+  restricted: 'border-destructive/50 bg-destructive/10 text-destructive',
+  confidential: 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-500',
+  internal: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+  public: 'border-border bg-muted text-muted-foreground',
+};
+
 function statusToneClasses(status: RunStatus): string {
   switch (status) {
     case 'running':
@@ -113,6 +121,10 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
   const kind = (params.get('kind') as RunKind | 'all' | null) ?? 'all';
   const status = (params.get('status') as RunStatus | 'all' | null) ?? 'all';
   const q = params.get('q') ?? '';
+  // Governance filters, URL-driven like the rest — so a link to "confidential runs with no recorded
+  // basis" is shareable, and Back steps out of it.
+  const sensitivity = params.get('sensitivity') ?? 'all';
+  const basisFilter = params.get('basis') ?? 'all';
 
   const [resp, setResp] = useState<RunsResponse>(initial);
   const [live, setLive] = useState(false);
@@ -139,6 +151,9 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
       if (kind !== 'all') sp.set('kind', kind);
       if (status !== 'all') sp.set('status', status);
       if (q) sp.set('q', q);
+      // Carried into the poll, or a live refresh would silently widen the filter the operator set.
+      if (sensitivity !== 'all') sp.set('sensitivity', sensitivity);
+      if (basisFilter !== 'all') sp.set('basis', basisFilter);
       sp.set('limit', '200');
       const res = await fetch(`/api/v1/admin/runs?${sp.toString()}`, { cache: 'no-store' });
       if (!res.ok) return;
@@ -146,7 +161,7 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
     } catch {
       /* transient — keep last known state; next tick retries */
     }
-  }, [kind, status, q]);
+  }, [kind, status, q, sensitivity, basisFilter]);
 
   // Refetch whenever the URL filters change (server passes only the first render's initial).
   useEffect(() => {
@@ -241,6 +256,27 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
           ))}
         </div>
 
+        {/* GOVERNANCE FILTERS. The audit question — "which runs read sensitive data, and which of
+            those cannot say why we were allowed to" — is now two clicks, not an inspection of every
+            run in turn. */}
+        <div className="inline-flex flex-wrap gap-1">
+          {(['restricted', 'confidential'] as const).map((level) => (
+            <FilterChip
+              key={level}
+              active={sensitivity === level}
+              onClick={() => setParam('sensitivity', sensitivity === level ? 'all' : level)}
+            >
+              Read {level}
+            </FilterChip>
+          ))}
+          <FilterChip
+            active={basisFilter === 'missing'}
+            onClick={() => setParam('basis', basisFilter === 'missing' ? 'all' : 'missing')}
+          >
+            No lawful basis
+          </FilterChip>
+        </div>
+
         {/* Free-text query */}
         <div className="relative ml-auto min-w-[14rem] flex-1 sm:max-w-xs">
           <MagnifyingGlass className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -269,6 +305,10 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
               <th className="px-3 py-2 font-medium">Duration</th>
               <th className="px-3 py-2 font-medium">Pipeline</th>
               <th className="px-3 py-2 font-medium">Actor</th>
+              {/* WHAT IT TOUCHED, AND WHETHER WE WERE ALLOWED TO. Both were on the run DETAIL only,
+                  so "which runs read confidential data without a recorded lawful basis" meant
+                  opening runs one at a time. */}
+              <th className="px-3 py-2 font-medium">Data</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
@@ -298,6 +338,33 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
                 <td className="max-w-[10rem] truncate px-3 py-2 text-xs text-muted-foreground" title={r.actor}>
                   {r.actor || '—'}
                 </td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-1">
+                    {r.dataClassification ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] ${CLASSIFICATION_TONE[r.dataClassification] ?? ''}`}
+                        title={`This run read ${r.dataClassification} data`}
+                      >
+                        {r.dataClassification}
+                      </Badge>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground/60" title="No classified source was read, or this run predates the stamp">
+                        —
+                      </span>
+                    )}
+                    {/* A gap is only a gap when the stamp EXISTS and names an ungrounded source. */}
+                    {r.basisGap ? (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/50 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-500"
+                        title={r.lawfulBasis ?? ''}
+                      >
+                        no basis
+                      </Badge>
+                    ) : null}
+                  </div>
+                </td>
                 <td className="px-3 py-2 text-right">
                   <Link
                     href={r.href}
@@ -310,8 +377,8 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
             ))}
             {resp.data.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-12 text-center text-sm text-muted-foreground">
-                  {q || kind !== 'all' || status !== 'all'
+                <td colSpan={9} className="px-3 py-12 text-center text-sm text-muted-foreground">
+                  {q || kind !== 'all' || status !== 'all' || sensitivity !== 'all' || basisFilter !== 'all'
                     ? 'No runs match these filters.'
                     : 'No runs yet. Run an app, agent, or chat and it will appear here.'}
                 </td>

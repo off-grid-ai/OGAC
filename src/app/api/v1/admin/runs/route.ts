@@ -35,7 +35,9 @@ export async function GET(req: Request) {
 
   const all = await listAllRuns(orgId);
   const summary = summarizeRuns(all);
-  const filtered = filterRuns(all, { kind, status, q });
+  const sensitivity = url.searchParams.get('sensitivity') ?? undefined;
+  const basis = url.searchParams.get('basis') ?? undefined;
+  const filtered = filterRuns(all, { kind, status, q, sensitivity, basis });
   const page = paginate(filtered, offset, limit);
 
   return NextResponse.json({
