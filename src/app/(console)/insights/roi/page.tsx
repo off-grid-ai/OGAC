@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { requireModuleForUser } from '@/lib/module-access';
-import { formatHours, formatUsd, resolveRoiSettings } from '@/lib/roi';
+import { formatHours, formatAmount, resolveRoiSettings } from '@/lib/roi';
 import { computeOrgRoiRollup } from '@/lib/roi-reader';
 import { getOrgRoiDefault } from '@/lib/roi-settings-store';
 import { currentOrgId } from '@/lib/tenancy';
@@ -54,11 +54,11 @@ export default async function RoiPage() {
     { label: 'Hours saved', value: formatHours(t.hoursSaved), icon: Clock, estimate: true },
     {
       label: 'Value of time saved',
-      value: formatUsd(t.grossValue),
+      value: formatAmount(t.grossValue),
       icon: CurrencyDollar,
       estimate: true,
     },
-    { label: 'AI cost', value: formatUsd(t.actualAiCost), icon: CurrencyDollar, estimate: false },
+    { label: 'AI cost', value: formatAmount(t.actualAiCost), icon: CurrencyDollar, estimate: false },
   ];
 
   return (
@@ -117,7 +117,7 @@ export default async function RoiPage() {
                     t.netValue >= 0 ? 'text-primary' : 'text-destructive'
                   }`}
                 >
-                  {formatUsd(t.netValue)}
+                  {formatAmount(t.netValue)}
                 </div>
               </div>
             </div>
@@ -174,17 +174,17 @@ export default async function RoiPage() {
                               {formatHours(d.hoursSaved)}
                             </TableCell>
                             <TableCell className="text-right tabular-nums text-foreground">
-                              {formatUsd(d.grossValue)}
+                              {formatAmount(d.grossValue)}
                             </TableCell>
                             <TableCell className="text-right tabular-nums text-muted-foreground">
-                              {formatUsd(d.actualAiCost)}
+                              {formatAmount(d.actualAiCost)}
                             </TableCell>
                             <TableCell
                               className={`text-right font-medium tabular-nums ${
                                 d.netValue >= 0 ? 'text-primary' : 'text-destructive'
                               }`}
                             >
-                              {formatUsd(d.netValue)}
+                              {formatAmount(d.netValue)}
                             </TableCell>
                           </TableRow>
                         ))

@@ -167,7 +167,7 @@ export function actionEvidenceForReview(
 // ─── amount / threshold formatting (USD) ──────────────────────────────────────────────────────────
 // A plain Intl 'en-US' currency formatter produces "$500,000". Non-numeric / absent ⇒ null (no amount
 // to show). One place, reused by the decision line, the at-a-glance label, and the input rows.
-export function formatUsd(value: unknown): string | null {
+export function formatAmount(value: unknown): string | null {
   let n = Number.NaN;
   if (typeof value === 'number') n = value;
   else if (typeof value === 'string' && value.trim() !== '') n = Number(value);
@@ -229,7 +229,7 @@ function readAmount(input: Record<string, unknown>): { key: string; value: unkno
 // reads as a sentence, never "Approve undefined".
 export function decisionQuestion(app: ReviewAppLike, input: Record<string, unknown>): string {
   const amount = readAmount(input);
-  const amountLabel = amount ? formatUsd(amount.value) : null;
+  const amountLabel = amount ? formatAmount(amount.value) : null;
   const requester = readStr(input, REQUESTER_KEYS);
   const subject = readStr(input, SUBJECT_KEYS);
   const noun = subject ?? app.title;
@@ -241,7 +241,7 @@ export function decisionQuestion(app: ReviewAppLike, input: Record<string, unkno
 // ─── amountLabelFor — the money at a glance (or null) ─────────────────────────────────────────────
 export function amountLabelFor(input: Record<string, unknown>): string | null {
   const amount = readAmount(input);
-  return amount ? formatUsd(amount.value) : null;
+  return amount ? formatAmount(amount.value) : null;
 }
 
 // ─── requestedByFor — who requested the run, best-effort ──────────────────────────────────────────
@@ -404,8 +404,8 @@ export function policyContextFrom(app: ReviewAppLike, input: Record<string, unkn
     'This step is configured to require a person to sign off before the run continues.';
   if (approval?.thresholdAttribute && approval.maxThreshold !== undefined) {
     const raw = input[approval.thresholdAttribute];
-    const amountLabel = formatUsd(raw);
-    const limitLabel = formatUsd(approval.maxThreshold);
+    const amountLabel = formatAmount(raw);
+    const limitLabel = formatAmount(approval.maxThreshold);
     if (amountLabel && limitLabel) {
       return `This ${approval.thresholdAttribute} of ${amountLabel} is above the ${limitLabel} auto-approval limit, so it needs a manager's decision.`;
     }
@@ -425,7 +425,7 @@ export function inputPairs(input: Record<string, unknown>): { key: string; value
     if (raw === undefined || raw === null) continue;
     let value: string;
     if (AMOUNT_KEYS.has(key)) {
-      value = formatUsd(raw) ?? String(raw);
+      value = formatAmount(raw) ?? String(raw);
     } else if (typeof raw === 'object') {
       value = JSON.stringify(raw);
     } else {

@@ -18,9 +18,17 @@
 
 // ─── defaults (sensible, editable, clearly an estimate in the UI) ────────────────────────────────
 /** Default minutes saved per completed run when the creator hasn't set an estimate. Conservative. */
+import { DEFAULT_CURRENCY, formatMoney, type CurrencyCode } from '@/lib/money';
+
 export const DEFAULT_MINUTES_SAVED_PER_RUN = 15;
-/** Default fully-loaded cost per staff hour, in $ (USD) — a sensible knowledge-worker rate. */
-export const DEFAULT_LOADED_COST_PER_HOUR = 75;
+/**
+ * Default fully-loaded cost per staff hour, in the org's currency.
+ *
+ * Was 75 with a $ in front of it, on a tenant that is an Indian bank. ₹2,500/hr is a realistic loaded
+ * cost for the BFSI knowledge worker whose time these apps save — roughly ₹40L a year all-in. It is an
+ * ESTIMATE the operator is meant to change, and every surface labels it as one.
+ */
+export const DEFAULT_LOADED_COST_PER_HOUR = 2_500;
 
 // ─── input / output shapes ───────────────────────────────────────────────────────────────────────
 export interface RoiInput {
@@ -342,15 +350,20 @@ export function validateRoiSettingsInput(body: unknown): RoiSettingsValidation {
   };
 }
 
-// ─── formatting helpers ($ / hours) — shared by every ROI surface so units read consistently ──────
-/** Compact $ (USD) formatting: $1,234 with en-US grouping; negatives shown with a leading −. */
-export function formatUsd(n: number): string {
-  const v = Number.isFinite(n) ? Math.round(n) : 0;
-  const abs = Math.abs(v).toLocaleString('en-US');
-  return v < 0 ? `−$${abs}` : `$${abs}`;
+// ─── formatting helpers (money / hours) — shared by every ROI surface so units read consistently ───
+/**
+ * Compact money in the org's currency.
+ *
+ * Was `formatUsd`, hard-wired to a dollar sign and en-US grouping, on tenants whose every claim amount
+ * is in rupees. The name mattered as much as the output: code called formatUsd while the product was
+ * sold in India, so nobody reading it noticed the mismatch. Indian grouping (₹1,13,858) comes from
+ * money.ts, which also avoids toLocaleString for the SSR/hydration reason recorded there.
+ */
+export function formatAmount(n: number, currency: CurrencyCode = DEFAULT_CURRENCY): string {
+  return formatMoney(Number.isFinite(n) ? n : 0, currency);
 }
 
-/** Hours with one decimal + a thousands separator (en-US grouping), e.g. "13,520.0 hrs". */
+/** Hours with one decimal + a thousands separator, e.g. "13,520.0 hrs". */
 export function formatHours(n: number): string {
   const v = Number.isFinite(n) ? n : 0;
   return `${v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} hrs`;

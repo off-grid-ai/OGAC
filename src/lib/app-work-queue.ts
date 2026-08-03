@@ -15,6 +15,7 @@
 // instruction that only a privileged user could carry out.
 
 import { toCaseCandidate } from '@/lib/app-case-candidates';
+import { DEFAULT_CURRENCY, formatMoney } from '@/lib/money';
 import { caseRecordFrom } from '@/lib/connector-filter';
 
 /** A run reduced to what the work screen needs. The caller maps its store rows onto this. */
@@ -206,18 +207,18 @@ const MAX_SUBJECT = 120;
 /**
  * Group a whole number with thousands separators, WITHOUT toLocaleString.
  *
- * "Amount: 361030" reads as an unfinished field; "Amount: 361,030" reads as money. toLocaleString is
- * avoided deliberately — it formats in the server's locale during SSR and the browser's on hydration,
- * which is exactly the mismatch that broke this page's first deploy. No currency symbol is added: this
- * module is generic and cannot know the tenant's currency, and guessing one would be a lie on the
- * screen.
+ * "Amount: 361030" reads as an unfinished field; "Amount: ₹3,61,030" reads as money. Delegates to
+ * money.ts, which groups the Indian way for INR and avoids toLocaleString for the SSR/hydration reason
+ * recorded there.
+ *
+ * A currency symbol IS added now. This module previously refused to, on the grounds that it could not
+ * know the tenant's currency — but the effect was rows reading "₹37,562" beside a bare "41,346.44" on
+ * the same screen, because a sibling code path did add one. One inconsistent screen is worse than one
+ * assumed default, and the default is now stated in one place.
  */
 function groupDigits(value: number): string {
   if (!Number.isFinite(value)) return String(value);
-  const negative = value < 0;
-  const [whole, fraction] = Math.abs(value).toString().split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${negative ? '-' : ''}${grouped}${fraction ? `.${fraction}` : ''}`;
+  return formatMoney(value, DEFAULT_CURRENCY, { decimals: !Number.isInteger(value) });
 }
 
 /**

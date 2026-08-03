@@ -1,3 +1,4 @@
+import { currencySymbol, DEFAULT_CURRENCY, formatMoney } from '@/lib/money';
 // ─── App-reports aggregation (Builder Epic Phase 4B) — PURE, zero-IO ──────────────────────────────
 //
 // The analytics half of the builder lifecycle (screen 5). Given a set of app-run views (from
@@ -36,6 +37,11 @@ export interface ReportMetrics {
   // Cost / tokens (only when carried in run provenance/step detail; 0 when absent).
   totalTokens: number;
   totalCostUsd: number;
+  /**
+   * How many runs actually carried an attributed cost. Zero means the total is not a measurement, and
+   * the tile must say so rather than rendering a zero that reads as "free".
+   */
+  costAttributedRuns: number;
 }
 
 // ─── Human-step outcome vocabulary ────────────────────────────────────────────────────────────────
@@ -62,6 +68,7 @@ export function computeReportMetrics(runs: AppRunView[]): ReportMetrics {
   let runsWithException = 0;
   let totalTokens = 0;
   let totalCostUsd = 0;
+  let costAttributedRuns = 0;
 
   const durations: number[] = [];
 
@@ -101,6 +108,7 @@ export function computeReportMetrics(runs: AppRunView[]): ReportMetrics {
     const cost = runCost(run);
     totalTokens += cost.tokens;
     totalCostUsd += cost.usd;
+    if (cost.usd > 0 || cost.tokens > 0) costAttributedRuns += 1;
 
     const dur = runDurationMs(run);
     if (dur !== null) durations.push(dur);
@@ -125,6 +133,7 @@ export function computeReportMetrics(runs: AppRunView[]): ReportMetrics {
     avgDurationMs: durations.length ? Math.round(mean(durations)) : null,
     totalTokens,
     totalCostUsd: round2(totalCostUsd),
+    costAttributedRuns,
   };
 }
 
@@ -301,7 +310,7 @@ export function buildReportStats(m: ReportMetrics): ReportStatTile[] {
     },
     {
       label: 'Cost',
-      value: fmtCostUsd(m.totalCostUsd),
+      value: fmtCost(m.totalCostUsd, m.costAttributedRuns ?? 0),
       tone: 'default',
     },
   ];
@@ -323,12 +332,20 @@ export function fmtApprovalRate(m: Pick<ReportMetrics, 'approvals' | 'rejections
 }
 
 /**
- * Cost tile value. Cost is always summable (absent per-run figures contribute 0), so it is always a
- * real number — a run set that cost nothing reads "$0.00", never a dash. A non-finite value (should
- * never happen given round2) degrades to "n/a" rather than "$NaN".
+ * Cost tile value.
+ *
+ * Two things were wrong. It rendered a DOLLAR figure to tenants whose every amount is in rupees; and it
+ * rendered `$0.00` for a run set with no attributed cost at all — measured on this tenant, cost is
+ * attributed on a small fraction of ledger events and the demo runs on free models. A zero reads as
+ * "this is free", which is a claim we cannot make, and the reader cannot tell it from "we never looked".
+ *
+ * So an unattributed total says so, and a real zero says WHY it is zero.
  */
-export function fmtCostUsd(usd: number): string {
-  return Number.isFinite(usd) ? `$${usd.toFixed(2)}` : 'n/a';
+export function fmtCost(total: number, attributedRuns: number): string {
+  if (!Number.isFinite(total)) return 'n/a';
+  if (attributedRuns === 0) return 'Not measured';
+  if (total === 0) return `${currencySymbol(DEFAULT_CURRENCY)}0 — no chargeable calls`;
+  return formatMoney(total, DEFAULT_CURRENCY, { decimals: total < 100 });
 }
 
 function fmtInt(n: number): string {

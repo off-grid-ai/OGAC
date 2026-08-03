@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { type AppRoi, formatHours, formatUsd } from '@/lib/roi';
+import { type AppRoi, formatHours, formatAmount } from '@/lib/roi';
 import { usePagination } from '@/lib/use-pagination';
 
 // ─── Top apps by value — paginated, URL-driven, drills into each app's Reports (ROI card) ─────────
@@ -46,17 +46,17 @@ export function RoiTopApps({ apps }: Readonly<{ apps: AppRoi[] }>) {
                     {formatHours(a.hoursSaved)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-foreground">
-                    {formatUsd(a.grossValue)}
+                    {formatAmount(a.grossValue)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {formatUsd(a.actualAiCost)}
+                    {formatAmount(a.actualAiCost)}
                   </TableCell>
                   <TableCell
                     className={`text-right font-medium tabular-nums ${
                       a.netValue >= 0 ? 'text-primary' : 'text-destructive'
                     }`}
                   >
-                    {formatUsd(a.netValue)}
+                    {formatAmount(a.netValue)}
                   </TableCell>
                   <TableCell>
                     <Link

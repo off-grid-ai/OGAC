@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { type AppRoi, formatHours, formatUsd } from '@/lib/roi';
+import { type AppRoi, formatHours, formatAmount } from '@/lib/roi';
 
 // ─── Per-app ROI card — the value story for ONE app ────────────────────────────────────────────────
 // Shows the four headline numbers (real runs, est. hours saved, est. $ value, ACTUAL AI cost) and the
@@ -147,14 +147,14 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
           <Metric
             icon={CurrencyDollar}
             label="Value of time saved"
-            value={formatUsd(roi.grossValue)}
-            sub={`@ ${formatUsd(roi.loadedCostPerHour)}/hr loaded cost`}
+            value={formatAmount(roi.grossValue)}
+            sub={`@ ${formatAmount(roi.loadedCostPerHour)}/hr loaded cost`}
             estimate
           />
           <Metric
             icon={CurrencyDollar}
             label="AI cost"
-            value={formatUsd(roi.actualAiCost)}
+            value={formatAmount(roi.actualAiCost)}
             sub="actual gateway spend"
             estimate={false}
           />
@@ -172,7 +172,7 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
                   netTone === 'good' ? 'text-primary' : 'text-destructive'
                 }`}
               >
-                {formatUsd(roi.netValue)}
+                {formatAmount(roi.netValue)}
               </div>
             </div>
           </div>
@@ -224,7 +224,7 @@ export function AppRoiCard({ appId, initial, orgDefault, hasOverride }: Readonly
                 />
                 {orgDefault ? (
                   <p className="text-xs text-muted-foreground">
-                    Org default: {formatUsd(orgDefault.loadedCostPerHour)}/hr
+                    Org default: {formatAmount(orgDefault.loadedCostPerHour)}/hr
                   </p>
                 ) : null}
               </div>

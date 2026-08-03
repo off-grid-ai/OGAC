@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
+import { formatMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -205,7 +206,8 @@ export function AppControlsEditor({
                   ${usage.spentTodayUsd.toFixed(2)}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  spent today{spendCapUsd ? ` of $${spendCapUsd} cap` : ' (no cap)'}
+                  {/* The cap is money in the org's currency, not dollars. */}
+                  spent today{spendCapUsd ? ` of ${formatMoney(Number(spendCapUsd))} cap` : ' (no cap)'}
                 </div>
               </div>
               <div className="rounded-md border border-border/60 p-3 text-xs text-muted-foreground">
