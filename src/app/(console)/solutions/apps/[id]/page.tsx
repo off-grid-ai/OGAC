@@ -11,7 +11,9 @@ import { listAppRuns } from '@/lib/app-run-store';
 import {
   buildAppWorkQueue,
   caseLabel,
+  caseRecommendation,
   caseTrail,
+  NO_RECOMMENDATION,
   runSubject,
   statusLabel,
   type WorkRun,
@@ -48,6 +50,7 @@ function Row({
   // Formatted DETERMINISTICALLY, never with toLocaleString: that renders in the server's locale and
   // timezone and then again in the browser's, and the two disagree — which is exactly the hydration
   // mismatch (React #418) this page shipped with on first deploy.
+  const recommendation = caseRecommendation(run.outcome);
   const parsed = Date.parse(run.startedAt);
   const when = Number.isNaN(parsed)
     ? null
@@ -83,9 +86,40 @@ function Row({
         )}
       </span>
       {pendingStepId ? (
-        <span className="mt-2.5 flex justify-end">
-          <CaseDecision runId={run.id} stepId={pendingStepId} />
-        </span>
+        <>
+          {/* WHAT THE AI CONCLUDED. The row said "AI assessed it" beside Reject and Approve — it
+              reported that an assessment happened and never what it decided, so the two most
+              prominent controls on the screen asked for a judgement the reader had no basis to make.
+              Where nothing was recorded we say that, rather than implying there is something to read. */}
+          <span
+            className={`mt-2 block text-xs leading-relaxed ${
+              recommendation.text
+                ? recommendation.leaning === 'decline'
+                  ? 'text-destructive'
+                  : recommendation.leaning === 'unclear'
+                    ? 'text-amber-700 dark:text-amber-500'
+                    : 'text-foreground'
+                : 'text-muted-foreground'
+            }`}
+          >
+            {recommendation.text ? (
+              <>
+                <b className="font-medium">The AI says:</b> {recommendation.text}
+              </>
+            ) : (
+              NO_RECOMMENDATION
+            )}
+          </span>
+          <span className="mt-2.5 flex items-center justify-between gap-3">
+            {/* The row is a link, but the arrow above is suppressed to make room for the decision —
+                so a waiting case was clickable with nothing to say so. This is that affordance. */}
+            <span className="inline-flex items-center gap-1 text-xs text-primary underline">
+              See the full case
+              <ArrowRight className="size-3" />
+            </span>
+            <CaseDecision runId={run.id} stepId={pendingStepId} />
+          </span>
+        </>
       ) : null}
     </Link>
   );
@@ -123,6 +157,8 @@ export default async function AppWorkPage({
         ((r as { steps?: { id?: string; status?: string }[] }).steps ?? []).find(
           (st) => st.status === 'awaiting_human',
         )?.id ?? null,
+      // The model's own words, for the recommendation line on a waiting row.
+      outcome: (r as { outcome?: string | null }).outcome ?? null,
       // A person declining a case halts the run the same way a failure does; only this tells them apart.
       declined: isDeclinedByPerson(
         (r as { steps?: { kind?: string; status?: string; detail?: string }[] }).steps,

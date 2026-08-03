@@ -28,6 +28,8 @@ export interface WorkRun {
   subject?: string | null;
   /** True when a person DECLINED it — a decision, not a breakdown. See isDeclinedByPerson. */
   declined?: boolean;
+  /** The run's aggregate result — the model's own words, where it recorded any. */
+  outcome?: string | null;
 }
 
 /** How work reaches this app, expressed for someone who does not know what a webhook is. */
@@ -377,3 +379,61 @@ export function caseTrail(
 
   return parts.length > 0 ? parts.join(' · ') : null;
 }
+
+// ─── What the AI actually concluded ──────────────────────────────────────────────────────────────────
+//
+// The waiting row read "read 2 sources · AI assessed it" beside Reject and Approve. It says the
+// assessment HAPPENED and never says what it CONCLUDED — so the two most prominent controls on the
+// screen ask for a decision the reader has no basis to make. Measured on this tenant: some waiting runs
+// carry the model's reasoning in their outcome, and some carry an empty string.
+
+/** Shape of a recommendation as the row needs it. */
+export interface CaseRecommendation {
+  /** A short line to show. Null when the run genuinely recorded nothing. */
+  text: string | null;
+  /** Which way it leans, when that can be read off the text. Drives tone, never the decision. */
+  leaning: 'approve' | 'decline' | 'unclear' | null;
+}
+
+const APPROVE_HINT = /\b(approve|approved|eligible|within quota|pass(?:es|ed)?|allow(?:ed)?|cashless)\b/i;
+const DECLINE_HINT = /\b(reject|decline|declined|ineligible|exceeds|over quota|fail(?:s|ed)?|freeze|high[- ]risk)\b/i;
+const UNCLEAR_HINT = /\b(unclear|cannot determine|do not contain|insufficient|not enough|ambiguous|needs? more)\b/i;
+
+/**
+ * The first sentence of the model's own words, and which way it leans.
+ *
+ * Deliberately the model's TEXT, trimmed — not a label this module invents. Turning a paragraph of
+ * reasoning into "Approve" would put a decision in the product's mouth that the model did not make,
+ * and the person signing it off would be approving our paraphrase.
+ *
+ * `leaning` is read from the wording and used ONLY to tone the line. An 'unclear' reading is checked
+ * first: text that says it cannot determine something often also contains the word "approve", and
+ * reading that as a recommendation to approve is the most dangerous mistake available here.
+ */
+export function caseRecommendation(outcome: string | null | undefined): CaseRecommendation {
+  const raw = (outcome ?? '').trim();
+  if (!raw) return { text: null, leaning: null };
+  // Strip markdown emphasis so the row does not render literal asterisks.
+  const clean = raw.replace(/[*_`#>]/g, '').replace(/\s+/g, ' ').trim();
+  if (!clean) return { text: null, leaning: null };
+
+  // First sentence, or a hard trim when the model wrote no sentence break.
+  const firstStop = clean.search(/[.!?](\s|$)/);
+  const sentence = firstStop > 20 ? clean.slice(0, firstStop + 1) : clean.slice(0, 160);
+  const text = sentence.length < clean.length ? `${sentence.trim()}` : sentence.trim();
+
+  let leaning: CaseRecommendation['leaning'] = 'unclear';
+  if (UNCLEAR_HINT.test(clean)) leaning = 'unclear';
+  else if (DECLINE_HINT.test(clean)) leaning = 'decline';
+  else if (APPROVE_HINT.test(clean)) leaning = 'approve';
+
+  return { text, leaning };
+}
+
+/**
+ * What to tell someone when no recommendation was recorded.
+ *
+ * "AI assessed it" is worse than silence: it implies there is an assessment to read. This says the
+ * plain truth and points at the only thing that will actually help them.
+ */
+export const NO_RECOMMENDATION = 'No recommendation was recorded — open the case to see the evidence.';
