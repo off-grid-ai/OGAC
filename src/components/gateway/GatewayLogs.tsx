@@ -19,6 +19,8 @@ import { modelLabel } from '@/lib/model-catalog';
 
 interface LogsResponse {
   available: boolean;
+  /** Why it could not answer, when it could not. Absent on success. */
+  message?: string;
   total: number;
   size: number;
   from: number;
@@ -223,8 +225,13 @@ export function GatewayLogs() {
       </CardHeader>
       <CardContent>
         {!available ? (
+          // THE REAL REASON. This said "the OpenSearch history sink is offline" for every failure,
+          // including a 401 from a store that was up and answering — a cause that was false, and one
+          // that sends an operator to restart a healthy service instead of fixing a credential. The
+          // server now classifies it; naming the engine is also dropped, since the reader cannot act
+          // on which product stores the logs.
           <div className="py-8 text-center text-xs text-muted-foreground">
-            Logs unavailable — the OpenSearch history sink is offline.
+            {data?.message ?? 'Logs cannot be read right now, and the reason was not reported.'}
           </div>
         ) : (
           <>

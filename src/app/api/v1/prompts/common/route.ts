@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { opensearchFetch } from '@/lib/opensearch-http';
+import { classifySinkStatus, sinkUnreachable } from '@/lib/sink-unavailable';
 import { requireUser } from '@/lib/authz';
 
 export const dynamic = 'force-dynamic';
@@ -31,14 +33,18 @@ export async function GET(req: NextRequest) {
   };
 
   try {
-    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
+    // Same raw-unauthenticated-fetch bug as the gateway logs route: with auth on, this 401s and the
+    // surface silently shows nothing. Both go through the brokered helper now.
+    const r = await opensearchFetch(`/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
       cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
-    if (!r.ok) return NextResponse.json({ available: false }, { status: 200 });
+    if (!r.ok) {
+      return NextResponse.json(classifySinkStatus(r.status, 'The prompt history'), { status: 200 });
+    }
     const data = await r.json();
     const hits: { _source: { input?: unknown; '@timestamp'?: string } }[] = data?.hits?.hits ?? [];
 
@@ -61,6 +67,6 @@ export async function GET(req: NextRequest) {
     const common = [...agg.values()].sort((a, b) => b.count - a.count).slice(0, 25);
     return NextResponse.json({ available: true, common });
   } catch {
-    return NextResponse.json({ available: false }, { status: 200 });
+    return NextResponse.json(sinkUnreachable('The prompt history'), { status: 200 });
   }
 }

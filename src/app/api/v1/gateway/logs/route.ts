@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { analyticsScopeFilters } from '@/lib/analytics-aggs';
+import { opensearchFetch } from '@/lib/opensearch-http';
+import { classifySinkStatus, sinkUnreachable } from '@/lib/sink-unavailable';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -65,19 +67,29 @@ export async function GET(req: NextRequest) {
   const { size, from } = body;
 
   try {
-    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
+    // AUTHED, via the shared helper. This was a RAW fetch sending only a content-type — no
+    // Authorization header at all — which is precisely why the surface read "the OpenSearch history
+    // sink is offline" while OpenSearch was up and answering 401. opensearch-http.ts exists to broker
+    // that credential and its own header comment records that raw call sites break once auth is on.
+    // This one was never migrated.
+    const r = await opensearchFetch(`/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
       cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
-    if (!r.ok) return NextResponse.json({ available: false }, { status: 200 });
+    // WHY it could not answer, not just that it could not. Every non-OK status used to collapse into
+    // available:false, which the UI rendered as "offline" — a cause that was false, and one that sends
+    // an operator to restart a healthy service instead of fixing a credential.
+    if (!r.ok) {
+      return NextResponse.json(classifySinkStatus(r.status, 'The log store'), { status: 200 });
+    }
     const data = await r.json();
     const hits = (data?.hits?.hits ?? []).map((h: { _source: Record<string, unknown> }) => h._source);
     const total = data?.hits?.total?.value ?? hits.length;
     return NextResponse.json({ available: true, total, size, from, hits });
   } catch {
-    return NextResponse.json({ available: false }, { status: 200 });
+    return NextResponse.json(sinkUnreachable('The log store'), { status: 200 });
   }
 }
