@@ -2,6 +2,7 @@
 
 import {
   ArrowCounterClockwise,
+  ArrowSquareOut,
   ClockCounterClockwise,
   Cube,
   Globe,
@@ -150,7 +151,7 @@ export function ArtifactsBrowser() {
   // link goes — and a clipboard write can silently fail in a browser that has not granted permission,
   // leaving a success toast over an empty clipboard.
   function copyLink(id: string) {
-    const url = `${window.location.origin}/artifacts/${id}/view`;
+    const url = `${window.location.origin}/shared/artifacts/${id}`;
     navigator.clipboard.writeText(url).then(
       () =>
         toast.success('Share link copied', {
@@ -184,6 +185,10 @@ export function ArtifactsBrowser() {
   }
 
   const live = active && isLiveKind(active.kind);
+  // Read on the client only: window does not exist during SSR, and rendering the host from a header
+  // during SSR then replacing it on hydration is the mismatch this codebase has hit twice.
+  const [origin, setOrigin] = useState('');
+  useEffect(() => setOrigin(window.location.origin), []);
 
   return (
     <div className="flex gap-6">
@@ -275,7 +280,7 @@ export function ArtifactsBrowser() {
                   className="gap-1"
                   onClick={() => copyLink(active.id)}
                 >
-                  <LinkSimple className="size-3" /> Link
+                  <LinkSimple className="size-3" /> Copy link
                 </Button>
               ) : null}
               <button
@@ -287,6 +292,38 @@ export function ArtifactsBrowser() {
               </button>
             </div>
           </div>
+          {/* THE LINK, VISIBLE. "Where is the link?" was the founder's question, and it was fair: the
+              URL existed only inside a toast fired by a button that itself only appeared once the
+              artifact was published AND opened. A share link you have to hunt for is not a share link,
+              and a toast is not a place a URL lives. It is on the surface now, selectable, with a way to
+              open it — and when the artifact is NOT published it says what to do instead of hiding. */}
+          {active.published ? (
+            <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
+              <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Anyone with this link
+              </span>
+              <a
+                href={`/shared/artifacts/${active.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-0 flex-1 truncate font-mono text-[11px] text-primary underline"
+                title="Open this artifact in a new tab"
+              >
+                {origin}/shared/artifacts/{active.id}
+              </a>
+              <button
+                onClick={() => copyLink(active.id)}
+                className="shrink-0 text-[11px] text-muted-foreground underline hover:text-foreground"
+              >
+                Copy
+              </button>
+            </div>
+          ) : (
+            <div className="border-b border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+              Not shared yet — press <b className="text-foreground">Publish</b> to get a link anyone can
+              open without signing in.
+            </div>
+          )}
           <div className="min-h-0 flex-1 overflow-auto">
             {live ? (
               <iframe
@@ -374,10 +411,19 @@ function ArtifactCard({
               {decodeArtifactText(a.code).slice(0, 400)}
             </pre>
           )}
+          {/* The badge IS the link. It previously only announced that a link existed somewhere, which is
+              how "where is the link?" happens — you had to open the artifact to find it. */}
           {a.published ? (
-            <span className="absolute right-2 top-2 rounded bg-primary px-1.5 py-0.5 text-[9px] font-medium uppercase text-primary-foreground">
-              live
-            </span>
+            <a
+              href={`/shared/artifacts/${a.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Open the shared link in a new tab"
+              className="absolute right-2 top-2 inline-flex items-center gap-1 rounded bg-primary px-1.5 py-0.5 text-[9px] font-medium uppercase text-primary-foreground no-underline hover:bg-primary/90"
+            >
+              live <ArrowSquareOut className="size-2.5" />
+            </a>
           ) : null}
         </div>
         <div className="flex items-center gap-2 p-3">

@@ -105,13 +105,25 @@ export const IA_ROUTE_MIGRATIONS = Object.freeze([
   { from: '/operations/messaging', to: '/operations/configuration/messaging', children: true },
 ]);
 
+/**
+ * Redirects that must be evaluated BEFORE the IA migrations.
+ *
+ * `/artifacts/:path*` → `/work/artifacts/:path*` moved artifacts under Work, and it also swallowed the
+ * PUBLIC share route at /artifacts/:id/view — 308-ing every published link into the authenticated
+ * console, where no page exists, which rendered blank and re-navigated forever. Next applies redirects
+ * in array order, so this specific rule has to come first. Links already sent to people keep working.
+ */
+export const PUBLIC_SHARE_REDIRECTS = Object.freeze([
+  { source: '/artifacts/:id/view', destination: '/shared/artifacts/:id', permanent: true },
+]);
+
 export function nextRedirects(migrations = IA_ROUTE_MIGRATIONS) {
-  return migrations.flatMap(({ from, to, children }) => {
+  return [...PUBLIC_SHARE_REDIRECTS].concat(migrations.flatMap(({ from, to, children }) => {
     const rules = [{ source: from, destination: to, permanent: true }];
     if (children)
       rules.push({ source: `${from}/:path*`, destination: `${to}/:path*`, permanent: true });
     return rules;
-  });
+  }));
 }
 
 export function canonicalPath(pathname, migrations = IA_ROUTE_MIGRATIONS) {

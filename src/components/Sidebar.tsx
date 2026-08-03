@@ -18,6 +18,7 @@ import {
 import { sidebarActiveIdForPath, sidebarSectionIdForPath, sidebarSections } from '@/modules/groups';
 import { MODULE_ICONS } from '@/modules/icons';
 import { activeTabForPath, lifecycleTabs } from '@/lib/app-lifecycle';
+import { WaitingBadge } from '@/components/WaitingBadge';
 
 const ACTIVE_NAV_ITEM = 'border-primary/30 bg-primary/10 font-medium text-foreground';
 const INACTIVE_NAV_ITEM =
@@ -163,6 +164,10 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                       <SectionIcon className="size-3.5" />
                     </span>
                     <span className="min-w-0 flex-1 truncate">{section.label}</span>
+                    {/* ALSO ON THE SECTION, WHEN COLLAPSED. The badge on "My tasks" is inside Work, which
+                        collapses — so on a collapsed sidebar the one signal that work arrived would have
+                        been hidden behind a disclosure. A count nobody can see is not a notification. */}
+                    {section.id === 'work' && !expanded ? <WaitingBadge /> : null}
                     {containsActiveItem && !expanded ? (
                       <span
                         className="size-1.5 shrink-0 rounded-full bg-primary"
@@ -284,6 +289,10 @@ export function SidebarNav({ onNavigate }: Readonly<{ onNavigate?: () => void }>
                         aria-hidden="true"
                       />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {/* HOW SOMEONE LEARNS WORK ARRIVED. Nothing in the product told a person a case
+                          was waiting on them — output sinks deliver results, nothing tells a human they
+                          are needed — so cases sat for ten days. Visible from every page now. */}
+                      {item.id === 'my-tasks' ? <WaitingBadge /> : null}
                       {item.comingSoon ? (
                         <span
                           className={cn(

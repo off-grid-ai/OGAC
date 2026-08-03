@@ -1076,7 +1076,7 @@ export async function revertArtifact(userId: string, orgId: string, id: string, 
   return next;
 }
 
-// Toggle publish state. Published artifacts render at the read-only /artifacts/[id]/view route.
+// Toggle publish state. Published artifacts render at the read-only /shared/artifacts/[id] route.
 export async function setArtifactPublished(
   userId: string,
   orgId: string,

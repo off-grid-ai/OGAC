@@ -25,6 +25,10 @@ export const PUBLIC_PREFIX = [
   '/api/auth',
   '/api/waitlist', // public request-access capture from the signin page
   '/app/', // deployed Studio apps — public shareable surfaces
+  // Published artifacts. A "share link" that redirects the recipient to /signin is not a share link,
+  // and this prefix was missing, so every one of them bounced. Publishing is the opt-in; an
+  // unpublished id 404s at the page.
+  '/shared/',
   '/api/v1/app/', // their public run endpoint
   '/api/v1/triggers/', // public webhook ingress — authed by its own per-trigger HMAC signature, not a session
   '/api/v1/status', // public service status (uptime monitors)
