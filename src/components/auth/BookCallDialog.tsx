@@ -14,7 +14,11 @@ import {
 // (?embed=true) rather than their JS snippet, so no third-party script loads — the auth-page CSP
 // only needs frame-src for cal.com (see next.config.mjs), script-src stays 'self'. The iframe is
 // mounted only once the dialog opens, so a sign-in visitor pays nothing until they ask to book.
-const CAL_EMBED = 'https://cal.com/mohammed-ali-chherawalla-jlvdhw?embed=true&theme=auto';
+// The DISCOVERY-OGAC event type, not the generic booking page: a visitor who clicks "Book a call" from
+// the console lands on the call that is actually about this product, with its own duration and
+// questions, rather than on a general calendar they then have to choose from.
+const CAL_EMBED =
+  'https://cal.com/mohammed-ali-chherawalla-jlvdhw/discovery-ogac?embed=true&theme=auto';
 
 // Reused on the signin page (default "Book a call", outline) AND the marketing landing (label
 // "Book a demo", primary emerald CTA) — one booking dialog, no duplication. The trigger's label +
