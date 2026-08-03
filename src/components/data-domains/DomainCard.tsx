@@ -205,6 +205,9 @@ export function DomainCard({
           connectorId: domain.connectorId,
           resource: domain.resource,
           aliasesRaw: formatAliases(domain.aliases),
+          // Without this the edit form opened with an empty grade and SAVING would clear it — an edit
+          // to a label would silently un-classify the domain.
+          classification: domain.classification ?? '',
         }}
         submitUrl={`/api/v1/admin/data-domains/${domain.id}`}
         method="PATCH"

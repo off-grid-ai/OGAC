@@ -24,6 +24,8 @@ export interface DomainDraft {
   connectorId: string;
   resource: string;
   aliasesRaw: string;
+  /** Sensitivity of what this rule reaches. Empty = unclassified, which is a real state, not a default. */
+  classification?: string | null;
 }
 
 // The shared create/edit form for a data-domain rule, rendered inside a URL-driven Sheet. It owns
@@ -56,6 +58,7 @@ export function DomainFormPanel({
   const [connectorId, setConnectorId] = useState(initial.connectorId);
   const [resource, setResource] = useState(initial.resource);
   const [aliasesRaw, setAliasesRaw] = useState(initial.aliasesRaw);
+  const [classification, setClassification] = useState(initial.classification ?? '');
   const [errors, setErrors] = useState<DomainFormResult['errors']>({});
   const [busy, setBusy] = useState(false);
 
@@ -66,6 +69,7 @@ export function DomainFormPanel({
       setConnectorId(initial.connectorId);
       setResource(initial.resource);
       setAliasesRaw(initial.aliasesRaw);
+      setClassification(initial.classification ?? '');
       setErrors({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,7 +87,10 @@ export function DomainFormPanel({
     const res = await fetch(submitUrl, {
       method,
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(result.value),
+      // Sent alongside the validated rule. An empty string CLEARS the grade — a domain nobody has
+      // graded must be able to go back to unclassified rather than being stuck at whatever was picked
+      // once by mistake.
+      body: JSON.stringify({ ...result.value, classification }),
     });
     setBusy(false);
     if (res.ok) {
@@ -108,6 +115,29 @@ export function DomainFormPanel({
       }
     >
       <div className="space-y-4">
+        {/* SENSITIVITY. Without this the grade could only be set through the API — the column existed,
+            the badge rendered, and nobody using the console could actually classify anything. */}
+        <div className="space-y-1.5">
+          <Label htmlFor="domain-classification" className="text-xs">
+            Sensitivity of this data
+          </Label>
+          <select
+            id="domain-classification"
+            value={classification}
+            onChange={(e) => setClassification(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Unclassified — nobody has graded this yet</option>
+            <option value="public">Public — no restriction</option>
+            <option value="internal">Internal — staff only, no personal data</option>
+            <option value="confidential">Confidential — personal or financial data</option>
+            <option value="restricted">Restricted — identity documents, medical, KYC evidence</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground">
+            Every run inherits the highest grade it reads, so a report can answer &ldquo;which models
+            processed confidential data&rdquo;. Unclassified is never treated as public.
+          </p>
+        </div>
           <div className="space-y-1.5">
             <Label htmlFor="dom-label">Label</Label>
             <Input
