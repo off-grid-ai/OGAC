@@ -45,7 +45,10 @@ export function DomainDashboard({
       <div aria-labelledby={`${model.id}-posture-title`}>
         <div className="mb-3 flex items-baseline justify-between gap-4">
           <h2 id={`${model.id}-posture-title`} className="text-sm font-normal text-foreground">
-            Current posture and attention
+            {/* "Posture" is security jargon, and this heading sits over every section including the
+                one a department person uses. What the band actually is, in both cases, is the state of
+                things right now. */}
+            Where things stand
           </h2>
           <p className="text-xs text-muted-foreground">Current console records</p>
         </div>

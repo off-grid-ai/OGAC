@@ -57,11 +57,14 @@ interface DomainDefinition {
 
 const DOMAIN_DEFINITIONS: Record<DomainDashboardId, DomainDefinition> = {
   work: {
-    headline: 'Do more with governed company context',
+    // WAS "Do more with governed company context" / "…without needing to understand the platform
+    // underneath it" — a sentence that requires understanding the platform to parse, on the one page
+    // aimed at people who do not. It also sent them to chat, when what they came for is what needs them.
+    headline: 'Your work',
     summary:
-      'Use governed company context to do more of your work, without needing to understand the platform underneath it.',
-    primaryAction: { label: 'Open chat', href: '/work/chat' },
-    secondaryAction: { label: 'Browse projects', href: '/work/projects' },
+      'What needs a decision from you, and the apps that do your work. Your company’s rules are already applied — you do not set any of that up.',
+    primaryAction: { label: 'See what needs me', href: '/work/tasks' },
+    secondaryAction: { label: 'Open chat', href: '/work/chat' },
   },
   solutions: {
     headline: 'Turn high-value processes into governed AI',

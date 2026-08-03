@@ -5,7 +5,6 @@ import { AppsList } from '@/components/build/AppsList';
 import type { PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { filterSingleStepApps } from '@/lib/app-model';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { listApps } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -44,8 +43,6 @@ export default async function StudioPage() {
     if (String(r.status) === 'awaiting_human') waiting[r.appId] = (waiting[r.appId] ?? 0) + 1;
   }
 
-  const simpleAgents = filterSingleStepApps(apps);
-  const workflows = apps.length - simpleAgents.length;
 
   return (
     <PageFrame>
@@ -54,14 +51,17 @@ export default async function StudioPage() {
           <div>
             <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <Sparkle className="size-5 text-primary" />
-              Studio
+              Apps
             </h1>
+            {/* WAS SIX PLATFORM TERMS IN ONE SENTENCE — "policy gate, guardrails, model routing,
+                retrieval grounding, and tamper-evident provenance" — at the top of the surface for
+                people who explicitly do not want to know the platform. What they need to know is what
+                an app is and that the rules are already applied; not which components apply them. */}
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Build once, run everywhere. An app is anything you describe in plain language — a
-              one-step agent or a multi-step workflow, built the same way. Every app runs through
-              the same governed pipeline: policy gate, guardrails, model routing, retrieval
-              grounding, and tamper-evident provenance. Open an app to build, run, monitor, review,
-              and report on it.
+              An app does a piece of your work — describe it in plain language and it gets built.
+              Your company&apos;s rules about data, safety and who approves what are already applied
+              to every one, so you do not set any of that up. Open an app to run it, see what is
+              waiting, and check how it is doing.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -89,9 +89,11 @@ export default async function StudioPage() {
             value={Object.values(waiting).reduce((n, v) => n + v, 0)}
           />
           <Stat label="Apps" value={apps.length} />
-          <Stat label="Single-step agents" value={simpleAgents.length} />
-          <Stat label="Multi-step workflows" value={workflows} />
-          <Stat label="Published" value={apps.filter((app) => app.published).length} />
+          {/* Taxonomy an owner cannot act on ("single-step agents" / "multi-step workflows") replaced
+              by the two states they can: is it live, and is it a draft. */}
+          <Stat label="Live" value={apps.filter((app) => app.published).length} />
+          <Stat label="Drafts" value={apps.filter((app) => !app.published).length} />
+
         </div>
 
         {/* Apps — the unified builder's output. A single-step app IS an agent; a multi-step app is a
