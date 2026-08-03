@@ -1119,6 +1119,13 @@ export const appRuns = pgTable('app_runs', {
       finishedAt?: string;
     }[]
   >().notNull().default([]),
+  // WHICH VERSION OF THE APP PRODUCED THIS RUN.
+  //
+  // A CISO asked, live: "a bad version shipped — what did it touch, and can we reverse it?" App
+  // versions and rollback exist, but a run recorded nothing about the version it ran, so the only
+  // question that matters during an incident — WHICH RUNS CAME FROM THE BAD VERSION — could not be
+  // answered. Stamped at run start from the app's current version; null on runs that predate this.
+  appVersion: integer('app_version'),
   // Aggregated final output of the app run.
   outcome: text('outcome').notNull().default(''),
   // Detached provenance signature over the outcome — same shape as agentRuns.provenance.

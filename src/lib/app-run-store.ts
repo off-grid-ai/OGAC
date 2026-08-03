@@ -7,7 +7,7 @@
 // It never re-implements a scheduling rule. The orchestrator (app-run.ts) calls `upsertAppRunState`
 // on run start and after every step transition; the read helpers back the status/review screens.
 
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { appRuns } from '@/db/schema';
 import type { AppRun as AppRunRow } from '@/db/schema';
@@ -49,11 +49,25 @@ function aggregateOutcome(steps: StepState[]): string {
 // ─── upsertAppRunState — create the run row on first write, update it thereafter ─────────────────
 // Idempotent by runId (the app-run's primary key). Called on start (all steps queued) and after
 // every step transition. `orgId`/`appId` come from the pure state; `input` is the trigger/form input.
+// Self-migrating, like the other stores here, so the column exists without a separate migration step.
+let ensuredColumn: Promise<void> | null = null;
+async function ensureAppVersionColumn(): Promise<void> {
+  ensuredColumn ??= db
+    .execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS app_version integer;`)
+    .then(() => undefined)
+    .catch((e) => {
+      ensuredColumn = null;
+      throw e;
+    });
+  return ensuredColumn;
+}
+
 export async function upsertAppRunState(
   state: AppRunState,
   input: Record<string, unknown> = {},
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
+  await ensureAppVersionColumn();
   const finished =
     state.status === 'done' || state.status === 'error' || state.status === 'cancelled';
   const values = {
@@ -64,6 +78,8 @@ export async function upsertAppRunState(
     input,
     steps: toRowSteps(state.steps),
     outcome: aggregateOutcome(state.steps),
+    // The version that produced this run, so an incident can name the blast radius.
+    ...(state.appVersion != null ? { appVersion: state.appVersion } : {}),
     ...(finished ? { finishedAt: new Date() } : {}),
   };
   await db
@@ -75,6 +91,9 @@ export async function upsertAppRunState(
         status: values.status,
         steps: values.steps,
         outcome: values.outcome,
+        // Never overwritten with null on a later write: a resume must not erase the version the run
+        // actually started on.
+        ...(state.appVersion != null ? { appVersion: state.appVersion } : {}),
         ...(finished ? { finishedAt: new Date() } : {}),
       },
     });

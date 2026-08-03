@@ -179,6 +179,13 @@ export function AppRunStatus({ initial }: Readonly<{ initial: AppRunView }>) {
             <CardTitle className="text-sm">Run {run.id}</CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {done}/{total} steps · started {run.startedAt ? new Date(run.startedAt).toLocaleString() : '—'}
+              {/* WHICH VERSION PRODUCED THIS. A CISO's incident question — "a bad version shipped, what
+                  did it touch?" — is unanswerable unless the run says which version it ran. Older runs
+                  say so plainly rather than showing a blank. */}
+              {' · '}
+              <span title="The version of this app that produced this run">
+                {run.appVersion != null ? `app v${run.appVersion}` : 'version not recorded'}
+              </span>
               {polling ? (
                 <span className="ml-2 inline-flex items-center gap-1 text-sky-600 dark:text-sky-400">
                   <Spinner className="size-3" /> live

@@ -1311,13 +1311,27 @@ function dispatchSinkDelivery(
 // Convenience for non-durable / simple apps + tests. Drives the pure scheduler: repeatedly take the
 // next runnable steps, execute them, fold results into AppRunState, persist, and stop when the run
 // reaches a terminal state OR hits an awaiting_human step (the durable workflow owns the resume).
+/** The app's current version number, or null when it has no history yet. Never throws. */
+async function currentAppVersion(appId: string, orgId: string): Promise<number | null> {
+  try {
+    const { listAppVersions } = await import('@/lib/app-versions-store');
+    const history = await listAppVersions(appId, orgId);
+    return history[0]?.version ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function runApp(
   spec: AppSpec,
   input: Record<string, unknown>,
   ctx: AppRunContext,
   deps: AppRunDeps = defaultDeps(),
 ): Promise<AppRunOutcome> {
-  const state = initState(spec, ctx.runId);
+  // Stamp the app version this run executes. Best-effort: a version lookup must never stop a run, and
+  // a null simply means "unversioned", which is honest for an app that predates version history.
+  const appVersion = await currentAppVersion(spec.id, ctx.orgId);
+  const state = initState(spec, ctx.runId, appVersion);
   await deps.persist(state, input, ctx.orgId);
   // Every inference this app makes — agent steps, grounding, guardrail model calls — is attributed to
   // the app's tenant on the observability doc (G-GATEWAY-ATTR-SWEEP).

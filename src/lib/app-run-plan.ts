@@ -69,6 +69,12 @@ export interface AppRunState {
   appId: string;
   status: AppRunStatus;
   steps: StepState[];
+  /**
+   * The app version this run executes. Carried on the state so the persist seam writes it without the
+   * orchestrator having to thread it separately, and so a resumed run keeps the version it STARTED on
+   * rather than picking up whatever is current — the whole point is to know what actually ran.
+   */
+  appVersion?: number | null;
 }
 
 // ─── topoOrder — a stable topological order of the steps ─────────────────────────────────────────
@@ -222,14 +228,17 @@ export function planAdvance(spec: AppSpec, state: AppRunState): { runnable: AppS
 }
 
 // ─── initState — the initial AppRunState: every step queued, run queued ───────────────────────────
-export function initState(spec: AppSpec, runId: string): AppRunState {
+export function initState(spec: AppSpec, runId: string, appVersion?: number | null): AppRunState {
   const steps: StepState[] = topoOrder(spec).map((s) => ({
     id: s.id,
     kind: s.kind,
     label: s.label,
     status: 'queued' as StepRunStatus,
   }));
-  return { runId, appId: spec.id, status: 'queued', steps };
+  // The version is fixed HERE, at the start, and carried for the life of the run — including across a
+  // human pause that may last days. Reading it later would report whatever is current, which is the
+  // opposite of what an incident needs.
+  return { runId, appId: spec.id, status: 'queued', steps, appVersion: appVersion ?? null };
 }
 
 // ─── The reducer's step-result input (a subset of StepState the orchestrator produces) ──────────
@@ -346,6 +355,9 @@ export function rebuildAppRunState(
   appId: string,
   rowStatus: string,
   rowSteps: PersistedStepRow[],
+  // Carried through a resume so a run that paused for a human keeps the version it STARTED on. Without
+  // this the resume would persist a null and erase the stamp — the incident question again.
+  appVersion?: number | null,
 ): AppRunState {
   const steps: StepState[] = rowSteps.map((s) => {
     const status = KNOWN_STEP_STATUSES.has(s.status as StepRunStatus)
@@ -371,5 +383,5 @@ export function rebuildAppRunState(
   // 'cancelled' is set explicitly by the orchestrator and never re-derived; preserve it. Every other
   // aggregate status is recomputed from the per-step array so it is always consistent with the steps.
   const status: AppRunStatus = rowStatus === 'cancelled' ? 'cancelled' : deriveRunStatus(steps);
-  return { runId, appId, status, steps };
+  return { runId, appId, status, steps, appVersion: appVersion ?? null };
 }

@@ -49,9 +49,15 @@ Anthropic, OpenRouter, DeepSeek, Zhipu, On-Prem Cluster), inspectable per pipeli
 ### Partial — and the partials are where the risk sits
 
 **"Show every automated decision about a customer, with the human accountable."**
-91 completed runs, **71 passed through a human step, and exactly 1 records who decided.** The control
-ran; the accountable person is almost never captured. For an auditor this is the difference between "a
-human approved it" and "a human approved it — this human, at this time".
+**CORRECTED 2026-08-03 — I overstated this.** The counts were right (71 completed human steps, 1 naming
+a reviewer) but the conclusion was wrong. I then drove a real approval through the live resume path and
+the reviewer WAS recorded: `apprun_8b371023` → `reviewer: ravi.kumar@bharatunion.co.in`. So the product
+captures the accountable person; the 70 blanks are SEEDED rows whose human step was marked done without
+ever passing through the review route.
+
+That makes this a demo-data defect, not a compliance gap — but it is still a defect, because a CISO
+running exactly the query I ran would draw exactly the conclusion I drew. The seed now names a reviewer
+on every completed human step (`scripts/backfill-seeded-reviewers.mts`).
 
 **"Prove a control was active at the TIME of a run."**
 132 runs retain their own guardrail verdicts, which is genuinely good. But a run does not record which

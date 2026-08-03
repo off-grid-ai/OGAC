@@ -172,7 +172,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // steps to completion (or the next human pause), persisting per-step state as runApp does. This
     // is what makes Approve JUST WORK for a non-technical reviewer without the durable runtime.
     if (signal.reason === 'not_configured' || signal.reason === 'not_found') {
-      const paused = rebuildAppRunState(run.id, run.appId, run.status, run.steps);
+      // The run keeps the app version it STARTED on across the pause — see rebuildAppRunState.
+      const paused = rebuildAppRunState(
+        run.id,
+        run.appId,
+        run.status,
+        run.steps,
+        (run as { appVersion?: number | null }).appVersion ?? null,
+      );
       const runInput = run.input ?? {};
       const hasCrossSellSnapshot =
         typeof runInput === 'object' &&
