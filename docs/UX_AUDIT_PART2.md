@@ -5,6 +5,34 @@ persona actually has: land → find my app → see what needs me → decide a ca
 check it still works → know what it costs. Every finding below is from a screenshot I opened and
 judged, not from reading code. Ranked by how hard it blocks the persona.
 
+## STATUS — all 15 closed, verified live 2026-08-03
+
+Every finding below is fixed, deployed and checked on the live box as `demo-bank@`. Probes plus
+screenshots opened and judged. Commits `20729c90..5d8f2a88`.
+
+| # | Finding | Fix | Verified |
+|---|---|---|---|
+| 1 | Work section held chat, not their work | `/work/tasks` first in Work; `/work` leads with "Waiting on you" | "34 cases are waiting for you to decide", oldest-first |
+| 2 | List never said which app needs them | waiting badge + Live/Draft, attention-ordered | badge live on the grid |
+| 3 | Near-identical apps, build artifacts | `confusableTitles` warning; deleted the 0-run "(copy)" | warning renders |
+| 4 | Approving without the recommendation | model's own first sentence + "See the full case" | "The AI says: …", amber on unclear |
+| 5 | Failure never said why | `run-failure.ts` sentence first, JSON demoted | banner renders, detail preserved |
+| 6 | Run button, no last result | `lastRunPerCheck` + one verdict | verdict renders |
+| 7 | Dollars on an Indian tenant | `money.ts`, INR grouping, "Not measured" | ₹ throughout; 174 seeded rows swept |
+| 8 | Engine metric ids exposed | plain check descriptions | no `faithfulness`/`pii_leakage` on the page |
+| 9 | HITL / Step mix / Connector-Query | plain headings + step verbs | "Decisions people made" |
+| 10 | "Usually takes" a dash or 17 hours | `run-time-split.ts` work vs waiting | "44 sec of work" |
+| 11 | Cost read `$0.00` unmeasured | says "Not measured" | live |
+| 12 | Jargon walls | rewritten Apps + /work headers | plain header renders |
+| 13 | Other apps' cases under this app | prefix lifted to a "written for X" tag, deduped | renamed + tagged |
+| 14 | Delete beside Open; draft had no action | delete → Safety tab; "Draft — check it, then publish" | live |
+| 15 | No way to say "this was wrong" | affordance on the decision control | renders |
+
+Two things found by opening the screenshots afterwards, and also fixed: the app's own queue still
+showed three indistinguishable rows and a bare `41,346.44` (both now go through the shared rules), and
+four "misses" in my first verification run were my own case-sensitive probes against CSS-uppercased
+headings — not defects.
+
 **The bar** (from `APP_AS_PRODUCT.md`): a non-technical person in a department can use the surface
 unaided.
 
