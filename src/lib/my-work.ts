@@ -210,3 +210,48 @@ export function overdueNote(group: MyWorkGroup): string | null {
   }
   return null;
 }
+
+// ─── The apps list, ordered by what needs a person ───────────────────────────────────────────────────
+//
+// The list showed name, step count, trigger and audience — and neither of the two things that decide
+// whether a person opens a card: whether it is LIVE, and whether anything is waiting in it. The app's
+// own page opens with "2 cases are waiting for a person to decide"; the list one level up knew nothing,
+// so "what needs me?" meant opening twelve cards in turn.
+
+export interface AppListEntry {
+  id: string;
+  published: boolean;
+  /** Cases paused for a person in this app. */
+  waiting: number;
+}
+
+/** What the card should say about its state, in the owner's language. Null = say nothing. */
+export function appStateNote(entry: AppListEntry): { text: string; tone: 'attention' | 'draft' } | null {
+  if (entry.waiting > 0) {
+    return {
+      text: `${entry.waiting} waiting for a decision`,
+      tone: 'attention',
+    };
+  }
+  if (!entry.published) {
+    // Not a failure — a draft is a normal state — but a person should know before they open it that
+    // no work can reach it yet.
+    return { text: 'Draft — not live, no work reaches it yet', tone: 'draft' };
+  }
+  return null;
+}
+
+/**
+ * Order the list so the cards that need a person come first.
+ *
+ * Ties keep the caller's order (stable), so an alphabetical list stays alphabetical within each band.
+ * Drafts sink BELOW live apps with nothing waiting: a draft is the least urgent thing on the screen,
+ * and leaving them interleaved is what made the list read as twelve equivalent options.
+ */
+export function orderAppsByAttention<T extends AppListEntry>(entries: readonly T[]): T[] {
+  const band = (e: AppListEntry) => (e.waiting > 0 ? 0 : e.published ? 1 : 2);
+  return entries
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => band(a.e) - band(b.e) || b.e.waiting - a.e.waiting || a.i - b.i)
+    .map((x) => x.e);
+}

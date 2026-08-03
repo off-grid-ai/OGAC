@@ -6,6 +6,7 @@ import type { PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { filterSingleStepApps } from '@/lib/app-model';
+import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { listApps } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { resolveConsumerChips } from '@/lib/pipeline-chip';
@@ -33,6 +34,15 @@ export default async function StudioPage() {
   apps.forEach((a, i) => {
     appChips[a.id] = appChipList[i];
   });
+
+  // Cases paused for a person, per app — counted in ONE read for the whole grid rather than per card.
+  // Best-effort: a failed count leaves the cards without the badge, which is honest, rather than
+  // showing zero waiting and telling a person nothing needs them.
+  const runs = await listAppRunsView(undefined, orgId, 300).catch(() => []);
+  const waiting: Record<string, number> = {};
+  for (const r of runs) {
+    if (String(r.status) === 'awaiting_human') waiting[r.appId] = (waiting[r.appId] ?? 0) + 1;
+  }
 
   const simpleAgents = filterSingleStepApps(apps);
   const workflows = apps.length - simpleAgents.length;
@@ -71,7 +81,13 @@ export default async function StudioPage() {
         </div>
 
         {/* Stat band */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          {/* The count an owner actually acts on leads. The band opened with taxonomy counts
+              (single-step vs multi-step) which tell them nothing about their day. */}
+          <Stat
+            label="Waiting for a person"
+            value={Object.values(waiting).reduce((n, v) => n + v, 0)}
+          />
           <Stat label="Apps" value={apps.length} />
           <Stat label="Single-step agents" value={simpleAgents.length} />
           <Stat label="Multi-step workflows" value={workflows} />
@@ -82,7 +98,7 @@ export default async function StudioPage() {
           workflow. One "New app" front door opens the guided builder for both. */}
         <div>
           <h2 className="mb-2 text-sm font-medium text-foreground">Your apps</h2>
-          <AppsList apps={apps} chips={appChips} />
+          <AppsList apps={apps} chips={appChips} waiting={waiting} />
         </div>
       </div>
     </PageFrame>

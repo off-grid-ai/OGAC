@@ -1,8 +1,9 @@
-import { ArrowSquareOut, Play, Sparkle } from '@phosphor-icons/react/dist/ssr';
+import { ArrowSquareOut, Clock, Play, Sparkle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
+import { appStateNote, orderAppsByAttention } from '@/lib/my-work';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { isSimpleAgent, type AppSpec } from '@/lib/app-model';
 
@@ -23,10 +24,13 @@ const VIS_LABEL: Record<string, string> = {
 export function AppsList({
   apps,
   chips,
+  waiting,
 }: Readonly<{
   apps: AppSpec[];
   /** The resolved "Runs on: <pipeline>" chip per app id (page resolves them in one batch). */
   chips?: Record<string, PipelineChipData>;
+  /** Cases paused for a person, per app id. The page counts them in one read. */
+  waiting?: Record<string, number>;
 }>) {
   if (apps.length === 0) {
     return (
@@ -44,10 +48,22 @@ export function AppsList({
     );
   }
 
+  // Cards that need a person come first; drafts sink below live apps with nothing waiting. Without
+  // this the grid read as twelve equivalent options with no clue which one to open.
+  const ordered = orderAppsByAttention(
+    apps.map((app) => ({
+      app,
+      id: app.id,
+      published: Boolean(app.published),
+      waiting: waiting?.[app.id] ?? 0,
+    })),
+  );
+
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {apps.map((app) => {
+      {ordered.map(({ app, ...entry }) => {
         const shape = isSimpleAgent(app) ? 'agent' : `${app.steps.length} steps`;
+        const note = appStateNote(entry);
         return (
           <Card key={app.id} className="shadow-sm">
             <CardHeader className="pb-2">
@@ -59,6 +75,22 @@ export function AppsList({
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* THE TWO THINGS THAT DECIDE WHETHER TO OPEN THIS CARD: is it live, and is anything
+                  waiting in it. Neither was on the card, so "what needs me?" meant opening each one.
+                  Waiting work is a LINK — the point of knowing is to go and do it. */}
+              {note ? (
+                note.tone === 'attention' ? (
+                  <Link
+                    href="/work/tasks"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/20 dark:text-amber-500"
+                  >
+                    <Clock className="size-3.5" />
+                    {note.text}
+                  </Link>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">{note.text}</p>
+                )
+              ) : null}
               {/* Three lines. At two, every one of six cards cut off mid-word ("classify by IRDAI…",
                   "lapse-ris…", "sum-…") — a grid where no card finishes a sentence tells a reader
                   nothing about what any app does. Full text on hover. */}
