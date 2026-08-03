@@ -5,6 +5,7 @@ import { listApps } from '@/lib/apps-store';
 import { runSubject } from '@/lib/app-work-queue';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
+import { activeCover } from '@/lib/cover-store';
 import { daysWaiting } from '@/lib/my-work';
 import { listUsers } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
@@ -23,10 +24,13 @@ export const dynamic = 'force-dynamic';
 // POST → send, and report per recipient. A delivery that fails says why rather than being swallowed.
 
 async function gather(orgId: string) {
-  const [apps, runs, users] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  const [apps, runs, users, cover] = await Promise.all([
     listApps(orgId).catch(() => []),
     listAppRunsView(undefined, orgId, 300).catch(() => []),
     listUsers(orgId).catch(() => []),
+    // Cover in force today: someone away is not nudged, and whoever covers them is.
+    activeCover(today, orgId).catch(() => []),
   ]);
   const titleById = new Map(apps.map((a) => [a.id, a.title]));
   const now = new Date();
@@ -43,7 +47,11 @@ async function gather(orgId: string) {
       daysWaiting: daysWaiting(String(r.startedAt ?? ''), now),
     }));
 
-  return { cases, recipients: digestRecipients(users) };
+  return {
+    cases,
+    recipients: digestRecipients(users, cover),
+    cover: cover.map((c) => ({ away: c.away, coveredBy: c.coveredBy, until: c.until })),
+  };
 }
 
 export async function GET(req: Request) {
@@ -53,10 +61,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const consoleUrl = `${url.protocol}//${url.host}`;
 
-  const { cases, recipients } = await gather(orgId);
+  const { cases, recipients, cover } = await gather(orgId);
   const message = buildDigest(cases, consoleUrl);
 
   return NextResponse.json({
+    // Shown in the preview so an operator can see WHY a name is on or off the list.
+    coverInForce: cover,
     // Null message is the normal, quiet case: nothing has waited long enough to interrupt anyone.
     wouldSend: message !== null,
     recipients: recipients.map((r) => r.email),

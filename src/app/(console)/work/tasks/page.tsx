@@ -15,6 +15,9 @@ import {
   type AppSummary,
   type WaitingCase,
 } from '@/lib/my-work';
+import { auth } from '@/auth';
+import { CoverPanel } from '@/components/work/CoverPanel';
+import { listCover } from '@/lib/cover-store';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -61,6 +64,15 @@ export default async function MyTasksPage() {
   const now = new Date();
   const work = buildMyWork(cases, summaries, now);
 
+  // WHO IS COVERING. With no cover recorded, a person on leave means their cases sit unwatched — which
+  // is what the ten-day-old cases on this tenant were. Best-effort: a failed read hides the panel rather
+  // than blocking the queue, which is the more important thing on this page.
+  const today = now.toISOString().slice(0, 10);
+  const cover = await listCover(orgId).catch(() => null);
+  const session = await auth();
+  const role = (session?.user as { role?: string } | undefined)?.role ?? '';
+  const canEdit = role === 'admin' || role === 'compliance';
+
   return (
     <PageFrame>
       <div className="w-full space-y-6">
@@ -72,6 +84,21 @@ export default async function MyTasksPage() {
               : 'When something needs a person, it appears here.'}
           </p>
         </div>
+
+        {cover ? (
+          <CoverPanel
+            initial={cover.map((c) => ({
+              id: c.id,
+              away: c.away,
+              coveredBy: c.coveredBy,
+              from: c.from,
+              until: c.until,
+              note: c.note,
+            }))}
+            today={today}
+            canEdit={canEdit}
+          />
+        ) : null}
 
         {work.groups.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

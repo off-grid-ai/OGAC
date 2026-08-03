@@ -29,8 +29,21 @@ export interface DigestRecipient {
  */
 export function digestRecipients(
   users: readonly { email?: string | null; role?: string | null }[],
+  /**
+   * Cover in force today. Someone away is dropped from the list and whoever covers them is added.
+   *
+   * Nudging a person on leave about work they cannot do is how a team learns to ignore these messages,
+   * and then the real ones get ignored too. Adding the cover is the other half — an absence with cover
+   * named should move the nudge, not silence it.
+   */
+  cover: readonly { away: string; coveredBy: string }[] = [],
 ): DigestRecipient[] {
   const canDecide = new Set(['admin', 'compliance', 'editor', 'member', 'lead']);
+  const away = new Set(cover.map((c) => c.away.trim().toLowerCase()).filter(Boolean));
+  const standIns = cover
+    .map((c) => c.coveredBy.trim().toLowerCase())
+    .filter((e) => e.includes('@'));
+
   const seen = new Set<string>();
   const out: DigestRecipient[] = [];
   for (const u of users) {
@@ -38,9 +51,17 @@ export function digestRecipients(
     const role = (u.role ?? '').trim().toLowerCase();
     if (!email || !email.includes('@')) continue;
     if (!canDecide.has(role)) continue;
+    if (away.has(email)) continue;
     if (seen.has(email)) continue;
     seen.add(email);
     out.push({ email, role });
+  }
+  // A named stand-in is told even if their own role would not have put them on the list: they were
+  // explicitly asked to cover, which is a stronger signal than a role table.
+  for (const s of standIns) {
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push({ email: s, role: 'covering' });
   }
   return out;
 }
