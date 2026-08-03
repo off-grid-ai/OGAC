@@ -21,6 +21,8 @@ interface LogsResponse {
   available: boolean;
   /** Why it could not answer, when it could not. Absent on success. */
   message?: string;
+  /** When the window is empty: how many calls exist outside it. Null when not checked. */
+  olderTotal?: number | null;
   total: number;
   size: number;
   from: number;
@@ -239,6 +241,15 @@ export function GatewayLogs() {
               <span>
                 {total} match{total === 1 ? '' : 'es'}
                 {loading ? ' · loading…' : ''}
+                {/* An empty WINDOW is not an empty store. The explorer defaults to 15 minutes and the
+                    newest call here was hours old, so a working surface read as broken. */}
+                {!loading && total === 0 && (data?.olderTotal ?? 0) > 0 ? (
+                  <span className="text-foreground">
+                    {' '}
+                    — nothing in this time range, but {data?.olderTotal?.toLocaleString()} call
+                    {data?.olderTotal === 1 ? '' : 's'} exist outside it. Widen the range.
+                  </span>
+                ) : null}
               </span>
               <span className="flex items-center gap-1.5">
                 <button

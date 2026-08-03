@@ -25,6 +25,18 @@ const STATUS_RANGE: Record<string, { gte: number; lte: number }> = {
 // Pure: translate the explorer's query params (+ the resolved org scope filters) into the
 // OpenSearch request body. No I/O — org is passed in already resolved. Behavior-identical to the
 // previous inline construction; unit-testable in isolation.
+/**
+ * The same params with every time bound removed.
+ *
+ * Used only to answer "is there data outside the window I am looking at?" — so the count is directly
+ * comparable to the in-window one rather than being a different question.
+ */
+function withoutTimeWindow(p: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(p);
+  for (const k of ['sinceMs', 'tFrom', 'tTo']) next.delete(k);
+  return next;
+}
+
 function buildSearchBody(p: URLSearchParams, scopeFilters: unknown[]) {
   const q = p.get('q')?.trim();
   const size = Math.min(Number(p.get('size')) || 50, 200);
@@ -88,7 +100,31 @@ export async function GET(req: NextRequest) {
     const data = await r.json();
     const hits = (data?.hits?.hits ?? []).map((h: { _source: Record<string, unknown> }) => h._source);
     const total = data?.hits?.total?.value ?? hits.length;
-    return NextResponse.json({ available: true, total, size, from, hits });
+
+    // NOTHING IN THE WINDOW IS NOT NOTHING AT ALL. The explorer defaults to the last 15 minutes, and the
+    // newest gateway call on this tenant was hours old — so a working surface rendered "0 matches" and
+    // read as broken. When the window is empty, count what exists OUTSIDE it (same org scope, same
+    // filters, no time bound) so the surface can say the data is there and how to reach it.
+    let olderTotal: number | null = null;
+    if (total === 0) {
+      const untimed = buildSearchBody(
+        withoutTimeWindow(req.nextUrl.searchParams),
+        [...analyticsScopeFilters(await currentOrgId())],
+      );
+      const c = await opensearchFetch(`/${OS_INDEX}/_search`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...untimed, size: 0 }),
+        cache: 'no-store',
+        timeoutMs: 5000,
+      }).catch(() => null);
+      if (c?.ok) {
+        const cd = await c.json();
+        olderTotal = cd?.hits?.total?.value ?? 0;
+      }
+    }
+
+    return NextResponse.json({ available: true, total, size, from, hits, olderTotal });
   } catch {
     return NextResponse.json(sinkUnreachable('The log store'), { status: 200 });
   }
