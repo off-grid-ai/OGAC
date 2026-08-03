@@ -8,6 +8,7 @@ import {
   buildReportStats,
   computeReportMetrics,
   stepKindBreakdown,
+  stepKindLabel,
 } from '@/lib/app-reports';
 import { progress } from '@/lib/app-runs-view';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
@@ -72,7 +73,8 @@ export default async function AppReportsTab({ params }: Readonly<{ params: Promi
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-md border border-border p-4">
           <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Human decisions (HITL)
+            {/* "HITL" is unexplained jargon on a page for a department head. */}
+            Decisions people made
           </h2>
           <div className="flex items-baseline gap-4">
             <Metric value={metrics.approvals} label="approved" tone="text-primary" />
@@ -90,13 +92,21 @@ export default async function AppReportsTab({ params }: Readonly<{ params: Promi
             <Row label="Failed" value={metrics.failed} />
             <Row label="Cancelled" value={metrics.cancelled} />
             <Row label="In flight" value={metrics.running} />
-            <Row label="Exception rate" value={`${Math.round(metrics.exceptionRate * 100)}%`} />
+            {/* "Exceptions" already appears in the band above; a second, differently-worded copy of
+                the same fact reads as two metrics. This one names what it measures. */}
+            <Row
+              label="Share that could not finish"
+              value={`${Math.round(metrics.exceptionRate * 100)}%`}
+            />
           </dl>
         </div>
 
         <div className="rounded-md border border-border p-4">
           <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Step mix
+            {/* Was "Step mix" listing "Connector-Query 4, Agent 2, Human 2, Output 2" — the
+                platform's own taxonomy on a business report. A department head does not know what a
+                Connector-Query is, and could not act on it if they did. */}
+            What this app does each time
           </h2>
           {Object.keys(kinds).length === 0 ? (
             <p className="text-sm text-muted-foreground">No steps recorded yet.</p>
@@ -105,7 +115,7 @@ export default async function AppReportsTab({ params }: Readonly<{ params: Promi
               {Object.entries(kinds)
                 .sort((a, b) => b[1] - a[1])
                 .map(([kind, count]) => (
-                  <Row key={kind} label={kind} value={count} />
+                  <Row key={kind} label={stepKindLabel(kind)} value={count} />
                 ))}
             </dl>
           )}

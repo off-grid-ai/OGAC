@@ -1,4 +1,5 @@
 import { currencySymbol, DEFAULT_CURRENCY, formatMoney } from '@/lib/money';
+import { describeMs, splitRunTime, type TimedStep } from '@/lib/run-time-split';
 // ─── App-reports aggregation (Builder Epic Phase 4B) — PURE, zero-IO ──────────────────────────────
 //
 // The analytics half of the builder lifecycle (screen 5). Given a set of app-run views (from
@@ -34,6 +35,10 @@ export interface ReportMetrics {
   // Throughput + latency.
   throughputPerDay: number; // runs / span-in-days (≥1 day floor), 0 when no dated runs
   avgDurationMs: number | null; // mean wall-clock of terminal, timestamped runs; null when none
+  /** Median time the SYSTEM worked, excluding waiting on a person. Null when no step timings exist. */
+  typicalWorkingMs: number | null;
+  /** Median time cases sat waiting on a person. Null when unknown, 0 when they never waited. */
+  typicalWaitingMs: number | null;
   // Cost / tokens (only when carried in run provenance/step detail; 0 when absent).
   totalTokens: number;
   totalCostUsd: number;
@@ -131,6 +136,7 @@ export function computeReportMetrics(runs: AppRunView[]): ReportMetrics {
     exceptionRate: totalRuns > 0 ? runsWithException / totalRuns : 0,
     throughputPerDay: computeThroughputPerDay(runs),
     avgDurationMs: durations.length ? Math.round(mean(durations)) : null,
+    ...splitTotals(runs),
     totalTokens,
     totalCostUsd: round2(totalCostUsd),
     costAttributedRuns,
@@ -304,8 +310,16 @@ export function buildReportStats(m: ReportMetrics): ReportStatTile[] {
     },
     { label: 'Throughput / day', value: String(m.throughputPerDay), tone: 'default' },
     {
-      label: 'Avg duration',
-      value: m.avgDurationMs === null ? '—' : fmtMs(m.avgDurationMs),
+      // Same split as the app page: a blended duration is dominated by human waiting (measured at a
+      // 17-hour average here), so it answered "is this fast?" with a number about queue habits. Null
+      // reads as "not measured" rather than a bare dash, which looks like a rendering fault.
+      label: 'Time per case',
+      value:
+        m.typicalWorkingMs === null
+          ? 'Not measured'
+          : m.typicalWaitingMs && m.typicalWaitingMs > 0
+            ? `${describeMs(m.typicalWorkingMs)} + ${describeMs(m.typicalWaitingMs)} waiting`
+            : describeMs(m.typicalWorkingMs),
       tone: 'default',
     },
     {
@@ -364,4 +378,54 @@ function mean(xs: number[]): number {
 }
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * What a step DOES, for a reader who does not know the platform's taxonomy.
+ *
+ * The report listed "Connector-Query 4, Agent 2, Human 2, Output 2" under "Step mix". Those are the
+ * builder's internal kinds; a department head does not know what a Connector-Query is and could not act
+ * on it if they did. An unknown kind falls back to itself rather than to a wrong guess.
+ */
+export function stepKindLabel(kind: string): string {
+  const map: Record<string, string> = {
+    'connector-query': 'Reads company data',
+    agent: 'AI assesses the case',
+    human: 'A person decides',
+    guardrail: 'Safety check',
+    output: 'Produces the result',
+    action: 'Takes an action',
+    transform: 'Reshapes the data',
+    branch: 'Chooses a path',
+  };
+  return map[kind.toLowerCase()] ?? kind;
+}
+
+/**
+ * Median working and waiting time across the run set.
+ *
+ * Reuses the one splitter so the app page's "Usually takes" and this report's "Time per case" can never
+ * disagree — two numbers describing the same thing differently is worse than one.
+ */
+function splitTotals(runs: readonly AppRunView[]): {
+  typicalWorkingMs: number | null;
+  typicalWaitingMs: number | null;
+} {
+  const splits = runs.map((r) =>
+    splitRunTime(
+      (r as { steps?: TimedStep[] }).steps,
+      String(r.startedAt ?? ''),
+      (r as { finishedAt?: string | null }).finishedAt ?? null,
+    ),
+  );
+  const med = (xs: (number | null)[]): number | null => {
+    const v = xs.filter((x): x is number => x !== null).sort((a, b) => a - b);
+    if (v.length === 0) return null;
+    const mid = Math.floor(v.length / 2);
+    return v.length % 2 ? v[mid] : Math.round((v[mid - 1] + v[mid]) / 2);
+  };
+  return {
+    typicalWorkingMs: med(splits.map((s) => s.workingMs)),
+    typicalWaitingMs: med(splits.map((s) => s.waitingMs)),
+  };
 }

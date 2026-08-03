@@ -11,6 +11,8 @@
 //
 // Zero-IO so every counting and wording rule is unit-testable. The caller supplies the runs.
 
+import { splitRunTime, typicalTime, type TimedStep } from '@/lib/run-time-split';
+
 export interface DashboardRun {
   status: string;
   startedAt: string;
@@ -19,6 +21,11 @@ export interface DashboardRun {
   neededPerson?: boolean;
   /** True when a person DECLINED it. Counted as handled, not as a failure. */
   declined?: boolean;
+  /**
+   * The run's steps, with their own timings — so working time can be told apart from the time the case
+   * sat in someone's queue. Without this the tile blended the two and averaged 17 hours.
+   */
+  steps?: readonly TimedStep[];
 }
 
 export interface DashboardMetric {
@@ -107,6 +114,10 @@ export function buildAppDashboard(input: AppDashboardInput): AppDashboard {
   const waiting = input.runs.filter((r) => r.status === WAITING);
   const neededPerson = inWindow.filter((r) => r.neededPerson === true);
 
+  const typical = typicalTime(
+    completed.map((r) => splitRunTime(r.steps, r.startedAt, r.finishedAt ?? null)),
+  );
+
   const durations = completed
     .map((r) => {
       const start = Date.parse(r.startedAt);
@@ -143,13 +154,13 @@ export function buildAppDashboard(input: AppDashboardInput): AppDashboard {
       tone: failed.length > 0 ? 'attention' : 'neutral',
     },
     {
+      // WORK AND WAITING, SEPARATED. A single blended figure is dominated by however long a person took
+      // to get round to the case, so it answered "is this saving us time?" with 17 hours and read as a
+      // dash whenever timings were missing. Both halves are stated, and the wait is named as the part
+      // worth shortening rather than looking like the system being slow.
       label: 'Usually takes',
-      value: describeDurationMs(medianMs(durations)),
-      // Median stated plainly, because "typical" is what the reader means by this number.
-      detail:
-        durations.length > 0
-          ? 'The typical time from arriving to finished.'
-          : 'No finished cases yet to measure.',
+      value: typical.value,
+      detail: typical.detail,
       tone: 'neutral',
     },
     {

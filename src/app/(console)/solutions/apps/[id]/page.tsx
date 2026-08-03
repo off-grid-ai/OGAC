@@ -175,7 +175,9 @@ export default async function AppWorkPage({
     // hydration mismatch (React #418) this screen hit on deploy. A minute is far finer than any figure here.
     nowMs: Math.floor(Date.now() / 60_000) * 60_000,
     runs: rows.map((r) => {
-      const steps = (r as { steps?: { kind?: string; status?: string }[] }).steps ?? [];
+      const steps =
+        (r as { steps?: { kind?: string; status?: string; startedAt?: string; finishedAt?: string }[] })
+          .steps ?? [];
       return {
         status: String(r.status),
         startedAt:
@@ -185,6 +187,8 @@ export default async function AppWorkPage({
             ? ((r as { finishedAt: Date }).finishedAt).toISOString()
             : ((r as { finishedAt?: string | null }).finishedAt ?? null),
         neededPerson: steps.some((s) => s.kind === 'human' && s.status !== 'queued'),
+        // Carried through so working time can be told apart from time spent waiting on a person.
+        steps,
       };
     }),
   });
