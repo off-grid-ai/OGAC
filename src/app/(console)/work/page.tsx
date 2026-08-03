@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
 import { PageFrame } from '@/components/PageFrame';
+import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { listArtifacts, listConversations, listProjects } from '@/lib/chat';
 import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { currentOrgId } from '@/lib/tenancy';
@@ -20,8 +21,35 @@ export default async function WorkPage() {
       ])
     : [null, null, null];
 
+  // Counted from the same read the tasks page uses, so the number here and the list there cannot
+  // disagree. Unavailable is reported as such rather than as zero — a failed read must never present
+  // as "nothing needs you".
+  const waitingRuns = await safeWithTimeout(
+    () => listAppRunsView(undefined, orgId, 300),
+    1500,
+    null,
+  );
+  const waiting = waitingRuns
+    ? waitingRuns.filter((r) => String(r.status) === 'awaiting_human').length
+    : null;
+
   const model = buildDomainDashboard('work', {
     facts: [
+      // WHAT NEEDS THEM, FIRST. This page led with counts of projects, conversations and artifacts —
+      // platform objects. The one thing a department person comes here to find out is whether anything
+      // is waiting on them, and it was only answerable by opening each app in turn.
+      {
+        label: 'Waiting on you',
+        value: waiting == null ? 'Unavailable' : waiting.toLocaleString(),
+        description:
+          waiting == null
+            ? 'Case records did not respond.'
+            : waiting === 0
+              ? 'Nothing needs a decision from a person right now.'
+              : `${waiting === 1 ? 'A case is' : 'Cases are'} paused for someone to decide. Oldest first.`,
+        href: '/work/tasks',
+        state: waiting == null ? 'attention' : waiting > 0 ? 'attention' : 'good',
+      },
       {
         label: 'Projects',
         value: projects ? projects.length.toLocaleString() : 'Unavailable',

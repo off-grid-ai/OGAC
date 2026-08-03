@@ -5,6 +5,7 @@ export type IaSectionId =
 
 export type CanonicalOwnerId =
   | 'overview'
+  | 'my-tasks'
   | 'chat'
   | 'projects'
   | 'prompts'
@@ -163,6 +164,15 @@ export const CANONICAL_OWNERS: readonly CanonicalOwner[] = [
     placement: 'sidebar',
   },
 
+  {
+    id: 'my-tasks',
+    section: 'work',
+    label: 'My tasks',
+    description: 'Cases waiting for you to decide, across every app.',
+    route: '/work/tasks',
+    gate: 'studio',
+    placement: 'sidebar',
+  },
   {
     id: 'chat',
     section: 'work',

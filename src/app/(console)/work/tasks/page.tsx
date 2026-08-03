@@ -1,0 +1,173 @@
+import { ArrowRight, CheckCircle, Clock, Play } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
+import { PageFrame } from '@/components/PageFrame';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { listAppRunsView } from '@/lib/app-runs-view-reader';
+import { runSubject } from '@/lib/app-work-queue';
+import { listApps } from '@/lib/apps-store';
+import { requireModuleForUser } from '@/lib/module-access';
+import {
+  buildMyWork,
+  caseLabel,
+  overdueNote,
+  waitedFor,
+  type AppSummary,
+  type WaitingCase,
+} from '@/lib/my-work';
+import { currentOrgId } from '@/lib/tenancy';
+
+export const dynamic = 'force-dynamic';
+
+// ─── What needs me ──────────────────────────────────────────────────────────────────────────────────
+//
+// A department person's first question is "what needs me today?", and the product could only answer it
+// one app at a time — with a dozen apps that meant opening a dozen pages. Worse, the section named
+// "Work" held Chat, Projects, Prompts, Artifacts and Files, while the apps that do their actual job
+// lived under "Solutions". Someone looking for their work would not look in a section named after a
+// sales word, and the one named after their work did not contain it.
+//
+// This is that answer, first in the Work section. Pure logic in my-work.ts.
+export default async function MyTasksPage() {
+  await requireModuleForUser('studio');
+  const orgId = await currentOrgId();
+  const [apps, runs] = await Promise.all([
+    listApps(orgId).catch(() => []),
+    listAppRunsView(undefined, orgId, 300).catch(() => []),
+  ]);
+
+  const titleById = new Map(apps.map((a) => [a.id, a.title]));
+  const cases: WaitingCase[] = runs
+    .filter((r) => String(r.status) === 'awaiting_human')
+    // A run whose app has been deleted cannot be acted on — sending someone to a dead page is worse
+    // than leaving it out, and it is counted nowhere else either.
+    .filter((r) => titleById.has(r.appId))
+    .map((r) => ({
+      runId: r.id,
+      appId: r.appId,
+      appTitle: titleById.get(r.appId) ?? r.appId,
+      subject: runSubject((r as { input?: unknown }).input),
+      waitingSince: String(r.startedAt ?? ''),
+      // Straight to where the evidence is, so the decision is made having seen the case.
+      href: `/solutions/apps/${encodeURIComponent(r.appId)}/runs/${encodeURIComponent(r.id)}`,
+    }));
+
+  const summaries: AppSummary[] = apps.map((a) => ({
+    id: a.id,
+    title: a.title,
+    published: Boolean((a as { published?: boolean }).published),
+  }));
+
+  const now = new Date();
+  const work = buildMyWork(cases, summaries, now);
+
+  return (
+    <PageFrame>
+      <div className="w-full space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">{work.headline}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {work.totalWaiting > 0
+              ? 'Oldest first — the case that has waited longest is the one that needs you most.'
+              : 'When something needs a person, it appears here.'}
+          </p>
+        </div>
+
+        {work.groups.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {work.groups.map((g) => {
+              const note = overdueNote(g);
+              return (
+                <Card key={g.appId} className={note ? 'border-amber-500/40 shadow-sm' : 'shadow-sm'}>
+                  <CardHeader className="pb-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <CardTitle className="text-sm">
+                        <Link
+                          href={`/solutions/apps/${encodeURIComponent(g.appId)}`}
+                          className="hover:text-primary hover:underline"
+                        >
+                          {g.appTitle}
+                        </Link>
+                      </CardTitle>
+                      <Badge variant="outline" className="shrink-0 text-[10px]">
+                        {g.cases.length} waiting
+                      </Badge>
+                    </div>
+                    {/* Quiet when nothing is wrong: a row of green ticks trains people to stop reading. */}
+                    {note ? (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-500">{note}</p>
+                    ) : null}
+                  </CardHeader>
+                  <CardContent className="space-y-1.5">
+                    {g.cases.map((c) => (
+                      <Link
+                        key={c.runId}
+                        href={c.href}
+                        className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 hover:border-primary/50 hover:bg-muted/40"
+                      >
+                        <span className="min-w-0">
+                          {/* Never the run id: "Case proof_msd05iih" tells a person nothing they can act on. */}
+                          <span className="block truncate text-sm text-foreground">
+                            {caseLabel(c, now)}
+                          </span>
+                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Clock className="size-3" />
+                            waiting {waitedFor(c.waitingSince, now)}
+                          </span>
+                        </span>
+                        <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                      </Link>
+                    ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <Card className="shadow-sm">
+            <CardContent className="flex items-center gap-2 py-5">
+              <CheckCircle className="size-4 text-primary" weight="fill" />
+              <p className="text-sm text-muted-foreground">
+                Nothing is waiting for a decision right now.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AND WHAT CAN I START? The other half of the question, and only published apps — sending
+            someone to run a draft is a dead end. */}
+        {work.idle.length > 0 ? (
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Ready when you need them</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Nothing of yours is waiting in these — open one to start a case.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {work.idle.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/solutions/apps/${encodeURIComponent(a.id)}`}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2.5 hover:border-primary/50 hover:bg-muted/40"
+                >
+                  <span className="truncate text-sm text-foreground">{a.title}</span>
+                  <Play className="size-3.5 shrink-0 text-muted-foreground" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {work.isEmpty ? (
+          <Card className="shadow-sm">
+            <CardContent className="py-5">
+              <p className="text-sm text-muted-foreground">
+                Nothing is set up for you yet. Someone who builds apps needs to publish one before work
+                can reach you here.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
+    </PageFrame>
+  );
+}
