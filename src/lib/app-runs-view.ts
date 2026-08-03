@@ -60,6 +60,9 @@ export interface AppRunView {
   appVersion?: number | null;
   /** The policy version in force when this ran; null on runs predating the history. */
   policyVersion?: number | null;
+  /** The most sensitive grade this run read. Absent from the view until now, so the run list's Data
+   *  column had no grade to render even for a stamped run. */
+  dataClassification?: string | null;
   /** Why we were permitted to process what this run read; null = no personal-data source read. */
   lawfulBasis?: string | null;
 }
@@ -164,6 +167,9 @@ export interface AppRunRowLike {
   appVersion?: number | null;
   /** The policy version in force when this ran; null on runs predating the history. */
   policyVersion?: number | null;
+  /** The most sensitive grade this run read. Absent from the view until now, so the run list's Data
+   *  column had no grade to render even for a stamped run. */
+  dataClassification?: string | null;
   /** Why we were permitted to process what this run read; null = no personal-data source read. */
   lawfulBasis?: string | null;
 }
@@ -182,6 +188,7 @@ export function toAppRunView(row: AppRunRowLike): AppRunView {
     finishedAt: row.finishedAt ? new Date(row.finishedAt).toISOString() : null,
     appVersion: (row as { appVersion?: number | null }).appVersion ?? null,
     policyVersion: (row as { policyVersion?: number | null }).policyVersion ?? null,
+    dataClassification: (row as { dataClassification?: string | null }).dataClassification ?? null,
     lawfulBasis: (row as { lawfulBasis?: string | null }).lawfulBasis ?? null,
   };
 }
