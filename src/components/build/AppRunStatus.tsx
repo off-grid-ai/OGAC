@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { stepKindChip } from '@/lib/app-run-progress';
 import {
   ArrowClockwise,
@@ -186,6 +187,23 @@ export function AppRunStatus({ initial }: Readonly<{ initial: AppRunView }>) {
               <span title="The version of this app that produced this run">
                 {run.appVersion != null ? `app v${run.appVersion}` : 'version not recorded'}
               </span>
+              {/* AND UNDER WHICH POLICY. Rules are edited in place, so a reviewer looking at this run
+                  months later would otherwise judge it against today's rules. The link opens the
+                  rules AS THEY WERE, not as they are. */}
+              {' · '}
+              {run.policyVersion != null ? (
+                <Link
+                  href={`/governance/policies/history?v=${run.policyVersion}`}
+                  className="hover:text-primary hover:underline"
+                  title="The policy rules that were in force when this run happened"
+                >
+                  policy v{run.policyVersion}
+                </Link>
+              ) : (
+                <span title="This run predates policy history — we will not claim which rules applied">
+                  policy version not recorded
+                </span>
+              )}
               {polling ? (
                 <span className="ml-2 inline-flex items-center gap-1 text-sky-600 dark:text-sky-400">
                   <Spinner className="size-3" /> live

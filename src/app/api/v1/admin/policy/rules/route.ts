@@ -22,7 +22,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: result.errors.join('; ') }, { status: 400 });
   }
   const orgId = await currentOrgId();
-  const created = await createPolicyRule(result.value, orgId);
+  // The actor is carried into the version history — 'who changed the policy' is the first
+  // question asked about a policy change, and an unattributed history cannot answer it.
+  const created = await createPolicyRule(result.value, orgId, gate.user?.email ?? '');
   auditFromSession(gate, orgId, {
     action: 'policy.change',
     resource: `policy-rule:${(created as { id?: string }).id ?? 'rule'}`,

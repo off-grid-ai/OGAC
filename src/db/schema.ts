@@ -1129,6 +1129,13 @@ export const appRuns = pgTable('app_runs', {
   // question that matters during an incident — WHICH RUNS CAME FROM THE BAD VERSION — could not be
   // answered. Stamped at run start from the app's current version; null on runs that predate this.
   appVersion: integer('app_version'),
+  // WHICH POLICY WAS IN FORCE WHEN THIS RAN.
+  //
+  // policy_rules is edited in place. So a run reviewed months later was being judged against
+  // today's rules, and "what did the policy say when this was approved?" had no answer at all.
+  // Stamped at run start from policy_versions; null on runs that predate the history, which must
+  // read as "not recorded" rather than be attributed to the earliest version we happen to hold.
+  policyVersion: integer('policy_version'),
   // Aggregated final output of the app run.
   outcome: text('outcome').notNull().default(''),
   // Detached provenance signature over the outcome — same shape as agentRuns.provenance.

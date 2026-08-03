@@ -7,6 +7,7 @@ import {
   type PolicyRuleInput,
   toOpaDocument,
 } from '@/lib/policy-rules-policy';
+import { recordPolicyVersion } from '@/lib/policy-versions-store';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
 
 // Console-owned policy-rule store (I/O adapter). The pure rules live in policy-rules-policy.ts; this
@@ -91,9 +92,24 @@ export async function getPolicyRule(
   return row ? toRule(row) : null;
 }
 
+// ─── Every change to the ruleset mints a version ───────────────────────────────────────────────────
+//
+// policy_rules is edited in place, so "what did the policy say in March?" had no answer at all. The
+// snapshot is taken HERE rather than in the routes, so a second route (or a script) editing rules
+// cannot leave a hole in the history. It never throws: failing to write history must not fail the
+// policy change itself, and a missing version reads as "not recorded" downstream.
+async function snapshot(orgId: string, changedBy: string): Promise<void> {
+  try {
+    await recordPolicyVersion(await listPolicyRules(orgId), changedBy, orgId);
+  } catch {
+    /* history is best-effort; enforcement is not blocked on it */
+  }
+}
+
 export async function createPolicyRule(
   input: PolicyRuleInput,
   orgId: string = DEFAULT_ORG,
+  changedBy = '',
 ): Promise<PolicyRule> {
   await ensurePolicyRulesSchema();
   const id = `pol_${randomUUID().slice(0, 8)}`;
@@ -104,6 +120,7 @@ export async function createPolicyRule(
   `);
   const created = await getPolicyRule(id, orgId);
   if (!created) throw new Error('policy rule vanished after insert');
+  await snapshot(orgId, changedBy);
   return created;
 }
 
@@ -114,6 +131,7 @@ export async function updatePolicyRule(
   id: string,
   patch: Partial<PolicyRuleInput> & { enabled?: boolean },
   orgId: string = DEFAULT_ORG,
+  changedBy = '',
 ): Promise<PolicyRule | null> {
   await ensurePolicyRulesSchema();
   const sets = [];
@@ -130,15 +148,22 @@ export async function updatePolicyRule(
   await db.execute(sql`
     UPDATE policy_rules SET ${sql.join(sets, sql`, `)} WHERE id = ${id} AND org_id = ${orgId};
   `);
+  await snapshot(orgId, changedBy);
   return getPolicyRule(id, orgId);
 }
 
-export async function deletePolicyRule(id: string, orgId: string = DEFAULT_ORG): Promise<boolean> {
+export async function deletePolicyRule(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+  changedBy = '',
+): Promise<boolean> {
   await ensurePolicyRulesSchema();
   const res = await db.execute(sql`
     DELETE FROM policy_rules WHERE id = ${id} AND org_id = ${orgId} RETURNING id;
   `);
-  return (res.rows as unknown[]).length > 0;
+  const deleted = (res.rows as unknown[]).length > 0;
+  if (deleted) await snapshot(orgId, changedBy);
+  return deleted;
 }
 
 export interface PushResult {

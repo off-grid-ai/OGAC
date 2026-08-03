@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
+import { PolicyHistory } from '@/components/policy/PolicyHistory';
 import { PolicyRulesManager } from '@/components/policy/PolicyRulesManager';
 import { PolicyTemplatesPanel } from '@/components/policy/PolicyTemplatesPanel';
 import { RegoModulesManager } from '@/components/policy/RegoModulesManager';
@@ -16,6 +17,7 @@ import {
 import { requireModuleForUser } from '@/lib/module-access';
 import { listModules } from '@/lib/opa-policy';
 import { listPolicyRules } from '@/lib/policy-rules';
+import { listPolicyVersions } from '@/lib/policy-versions-store';
 import { readDecisions, readPolicyStatus } from '@/lib/policy-view';
 import { currentOrgId } from '@/lib/tenancy';
 import { contextualDestination, contextualModule } from '@/modules/contextual-navigation';
@@ -33,7 +35,11 @@ function policyEngineLabel(id: string): string {
 
 export default async function PolicyDestinationPage({
   params,
-}: Readonly<{ params: Promise<{ destination: string }> }>) {
+  searchParams,
+}: Readonly<{
+  params: Promise<{ destination: string }>;
+  searchParams: Promise<{ v?: string }>;
+}>) {
   await requireModuleForUser('policy');
   const { destination: rawDestination } = await params;
   const destination = contextualDestination(
@@ -44,6 +50,21 @@ export default async function PolicyDestinationPage({
 
   if (destination.id === 'overview') return <PolicyOverview />;
   if (destination.id === 'templates') return <PolicyTemplatesPanel />;
+
+  // The immutable trail. Rules are edited in place, so this is the only place the question "what did
+  // the policy say when this decision was made?" can be answered.
+  if (destination.id === 'history') {
+    // ?v=<n> arrives from a run ("policy v7") — the reader wants the rules AS THEY WERE for that
+    // run, so the target version is opened rather than making them hunt for it in the list.
+    const { v } = await searchParams;
+    const focus = Number.parseInt(v ?? '', 10);
+    return (
+      <PolicyHistory
+        versions={await listPolicyVersions(await currentOrgId())}
+        focusVersion={Number.isFinite(focus) ? focus : null}
+      />
+    );
+  }
 
   if (destination.id === 'rules') {
     const orgId = await currentOrgId();

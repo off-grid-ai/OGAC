@@ -17,7 +17,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: result.errors.join('; ') }, { status: 400 });
   }
   const orgId = await currentOrgId();
-  const updated = await updatePolicyRule(id, result.value, orgId);
+  const updated = await updatePolicyRule(id, result.value, orgId, gate.user?.email ?? '');
   if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 });
   auditFromSession(gate, orgId, {
     action: 'policy.change',
@@ -32,7 +32,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (gate instanceof NextResponse) return gate;
   const { id } = await params;
   const orgId = await currentOrgId();
-  const ok = await deletePolicyRule(id, orgId);
+  const ok = await deletePolicyRule(id, orgId, gate.user?.email ?? '');
   if (!ok) return NextResponse.json({ error: 'not found' }, { status: 404 });
   auditFromSession(gate, orgId, {
     action: 'policy.change',

@@ -58,6 +58,8 @@ export interface AppRunView {
   finishedAt: string | null;
   /** The app version that produced this run — null for runs that predate version stamping. */
   appVersion?: number | null;
+  /** The policy version in force when this ran; null on runs predating the history. */
+  policyVersion?: number | null;
 }
 
 // ─── Tone vocabulary — the design tokens' status colours, chosen by pure rule ─────────────────────
@@ -158,6 +160,8 @@ export interface AppRunRowLike {
   startedAt?: Date | string | null;
   finishedAt?: Date | string | null;
   appVersion?: number | null;
+  /** The policy version in force when this ran; null on runs predating the history. */
+  policyVersion?: number | null;
 }
 
 // ─── Row → view mapper (pure) ─────────────────────────────────────────────────────────────────────
@@ -173,5 +177,6 @@ export function toAppRunView(row: AppRunRowLike): AppRunView {
     startedAt: row.startedAt ? new Date(row.startedAt).toISOString() : null,
     finishedAt: row.finishedAt ? new Date(row.finishedAt).toISOString() : null,
     appVersion: (row as { appVersion?: number | null }).appVersion ?? null,
+    policyVersion: (row as { policyVersion?: number | null }).policyVersion ?? null,
   };
 }

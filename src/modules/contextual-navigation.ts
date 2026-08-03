@@ -61,6 +61,7 @@ export type ContextualDestinationId =
   | 'templates'
   | 'modules'
   | 'decisions'
+  | 'history'
   | 'users'
   | 'invitations'
   | 'clients'
@@ -274,6 +275,14 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
         label: 'Decisions',
         description: 'Policy decision history.',
         route: '/governance/policies/decisions',
+      },
+      {
+        // Rules are edited in place, so "what did the policy say when this was approved?" had no
+        // answer. This is that answer: every change, what it changed, and who made it.
+        id: 'history',
+        label: 'History',
+        description: 'Every change to the rules, and what it changed.',
+        route: '/governance/policies/history',
       },
     ],
   },

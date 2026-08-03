@@ -12,6 +12,7 @@ import { db } from '@/db';
 import { appRuns } from '@/db/schema';
 import type { AppRun as AppRunRow } from '@/db/schema';
 import type { AppRunState, StepState } from '@/lib/app-run-plan';
+import { currentPolicyVersion } from '@/lib/policy-versions-store';
 import { appendEscalation, type EscalationRecord } from '@/lib/review-escalation';
 
 const DEFAULT_ORG = 'default';
@@ -56,6 +57,7 @@ async function ensureAppVersionColumn(): Promise<void> {
     .execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS app_version integer;`)
     .then(() => db.execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS data_classification text;`))
     .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS classification text;`))
+    .then(() => db.execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS policy_version integer;`))
     .then(() => undefined)
     .catch((e) => {
       ensuredColumn = null;
@@ -70,6 +72,7 @@ export async function upsertAppRunState(
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
   await ensureAppVersionColumn();
+  const policyVersion = await currentPolicyVersion(orgId).catch(() => 0);
   const finished =
     state.status === 'done' || state.status === 'error' || state.status === 'cancelled';
   const values = {
@@ -84,6 +87,11 @@ export async function upsertAppRunState(
     ...(state.appVersion != null ? { appVersion: state.appVersion } : {}),
     // The sensitivity of what it read, so "which models saw Confidential data" is a query.
     ...(state.dataClassification != null ? { dataClassification: state.dataClassification } : {}),
+    // WHICH POLICY WAS IN FORCE. Rules are edited in place, so without this a run reviewed months
+    // later is judged against today's policy — which may have been rewritten since. Set on the
+    // insert only (absent from the `set` clause below) so a mid-flight policy change cannot
+    // retroactively re-attribute a run that already started under the old one.
+    ...(policyVersion > 0 ? { policyVersion } : {}),
     ...(finished ? { finishedAt: new Date() } : {}),
   };
   await db
