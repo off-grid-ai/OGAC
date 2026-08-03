@@ -1,10 +1,11 @@
 'use client';
 
 import { CheckCircle, Plus, XCircle } from '@phosphor-icons/react';
-import { publicLabel } from '@/lib/lineage-labels';
+import { overallVerdict, type CheckRunSummary } from '@/lib/quality-plain';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { QualityCheckRow } from '@/components/quality/QualityCheckRow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,16 +25,33 @@ export function AppQualityPanel({
   evals,
   golden,
   libraryEvals,
+  lastRuns,
+  now,
 }: Readonly<{
   appId: string;
   appTitle: string;
   evals: EvalDef[];
   golden: GoldenCase[];
   libraryEvals: EvalDef[];
+  /** Most recent recorded run per check, read on the server — see QualityCheckRow. */
+  lastRuns?: Record<string, CheckRunSummary>;
+  /** Passed from the server so the "3 days ago" stamps do not shift on hydration. */
+  now?: string;
 }>) {
   const router = useRouter();
   const [running, setRunning] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, RunResult>>({});
+  const at = useMemo(() => (now ? new Date(now) : new Date(0)), [now]);
+  // THE ANSWER THIS TAB EXISTS FOR, which it could not give. A never-run check is deliberately not
+  // counted as passing: "we never checked" and "we checked and it was fine" are different answers.
+  const overall = useMemo(
+    () =>
+      overallVerdict(
+        evals.map((d) => ({ id: d.id, threshold: d.threshold, direction: d.direction })),
+        lastRuns ?? {},
+      ),
+    [evals, lastRuns],
+  );
   const [gq, setGq] = useState('');
   const [ge, setGe] = useState('');
   const [adding, setAdding] = useState(false);
@@ -122,50 +140,35 @@ export function AppQualityPanel({
           <span className="text-xs text-muted-foreground">{evals.length} attached</span>
         </CardHeader>
         <CardContent className="space-y-2">
+          {/* IS THIS APP OK RIGHT NOW? The question the tab exists for, which it could not answer. */}
+          <div
+            className={`rounded-md border px-3 py-2 text-xs ${
+              overall.verdict === 'passing'
+                ? 'border-primary/40 bg-primary/[0.05] text-foreground'
+                : overall.verdict === 'failing'
+                  ? 'border-destructive/40 bg-destructive/[0.05] text-foreground'
+                  : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+            }`}
+          >
+            {overall.sentence}
+          </div>
           {evals.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No evals yet. Attach one from the library below, or create one from the Evals catalog and
               attach it here.
             </p>
           ) : (
-            evals.map((d) => {
-              const res = results[d.id];
-              const pct = res?.run && res.run.total > 0 ? Math.round((res.run.passed / res.run.total) * 100) : null;
-              return (
-                <div
-                  key={d.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-foreground">{d.name}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {d.metric} · {publicLabel(d.engine)} · threshold {d.threshold} · {d.direction}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    {pct !== null ? (
-                      <span className="flex items-center gap-1 text-xs">
-                        {pct >= Math.round(d.threshold * 100) ? (
-                          <CheckCircle className="size-4 text-primary" weight="fill" />
-                        ) : (
-                          <XCircle className="size-4 text-destructive" weight="fill" />
-                        )}
-                        {pct}% {res?.computedBy ? `· ${res.computedBy}` : ''}
-                      </span>
-                    ) : null}
-                    <Button size="sm" variant="outline" onClick={() => runEval(d)} disabled={running === d.id}>
-                      {running === d.id ? (
-                        <>
-                          <Spinner /> Running…
-                        </>
-                      ) : (
-                        'Run'
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })
+            evals.map((d) => (
+              <QualityCheckRow
+                key={d.id}
+                check={{ id: d.id, name: d.name, metric: d.metric, threshold: d.threshold, direction: d.direction }}
+                lastRun={lastRuns?.[d.id]}
+                justRan={results[d.id]}
+                running={running === d.id}
+                now={at}
+                onRun={() => runEval(d)}
+              />
+            ))
           )}
         </CardContent>
       </Card>

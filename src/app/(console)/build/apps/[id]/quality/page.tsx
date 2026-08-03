@@ -3,7 +3,8 @@ import { AppQualityPanel } from '@/components/build/AppQualityPanel';
 import { SuggestedChecks } from '@/components/build/SuggestedChecks';
 import { getApp } from '@/lib/apps-store';
 import { listEvalDefs } from '@/lib/eval-defs';
-import { listGoldenCases } from '@/lib/evals';
+import { listEvalRuns, listGoldenCases } from '@/lib/evals';
+import { lastRunPerCheck } from '@/lib/quality-plain';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -35,7 +36,7 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
   const scope = app.pipelineId?.trim()
     ? { pipelineId: app.pipelineId, appId: undefined }
     : { appId: id, pipelineId: undefined };
-  const [evals, golden, libraryEvals] = await Promise.all([
+  const [evals, golden, libraryEvals, pastRuns] = await Promise.all([
     listEvalDefs(scope),
     listGoldenCases(scope),
     // ORG-WIDE LIBRARY = unattached to BOTH an app and a pipeline. `listEvalDefs(null)` is the legacy
@@ -44,7 +45,23 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
     // already attached. That is the four identical "Hallucination / Faithfulness" chips. It would also
     // have grown by 21 the moment the per-pipeline dedupe cleared `app_id`.
     listEvalDefs({ pipelineId: null }), // → pipeline_id IS NULL AND app_id IS NULL
+    // THE LAST RESULT PER CHECK. The tab had a Run button and no last result: the display existed but
+    // was filled only by clicking Run in that session, so opening the tab could never answer "is this
+    // app OK right now?". Read here, best-effort — a failed read leaves the checks reading "never run",
+    // which is honest, rather than implying a pass.
+    listEvalRuns(200, orgId).catch(() => []),
   ]);
+
+  const lastRuns = lastRunPerCheck(
+    evals.map((d) => ({ id: d.id, metric: d.metric, pipelineId: app.pipelineId ?? null })),
+    pastRuns.map((r) => ({
+      engine: r.engine,
+      passed: r.passed,
+      total: r.total,
+      startedAt: String(r.startedAt ?? ''),
+      pipelineId: (r as { pipelineId?: string | null }).pipelineId ?? null,
+    })),
+  );
 
   return (
     <div className="space-y-6">
@@ -58,6 +75,8 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
         evals={evals}
         golden={golden}
         libraryEvals={libraryEvals}
+        lastRuns={lastRuns}
+        now={new Date().toISOString()}
       />
     </div>
   );
