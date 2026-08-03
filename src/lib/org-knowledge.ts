@@ -210,16 +210,28 @@ export async function addDocument(
     mime: file?.mime ?? null,
   });
   if (pieces.length) {
-    await db.insert(orgKnowledgeChunks).values(
-      pieces.map((c, i) => ({
-        id: rid(),
-        docId,
-        collectionId,
-        content: c,
-        position: i,
-        embedding: vectors[i] ?? null,
-      })),
-    );
+    const rows = pieces.map((c, i) => ({
+      id: rid(),
+      docId,
+      collectionId,
+      content: c,
+      position: i,
+      embedding: vectors[i] ?? null,
+    }));
+    await db.insert(orgKnowledgeChunks).values(rows);
+    // SUBJECT INDEX. Record which people this text mentions, as salted fingerprints, so an erasure
+    // request can find the embedded copies later. Best-effort: indexing a document must not fail
+    // because the index write did, but a gap here means a person we cannot erase, so it is logged.
+    try {
+      const { indexChunkSubjects } = await import('@/lib/subject-index-store');
+      await indexChunkSubjects(
+        orgId,
+        'org',
+        rows.map((r) => ({ chunkId: r.id, docId, containerId: collectionId, content: r.content })),
+      );
+    } catch (e) {
+      console.error('[subject-index] org document not indexed for erasure:', (e as Error).message);
+    }
   }
   return { id: docId, chunks: pieces.length };
 }

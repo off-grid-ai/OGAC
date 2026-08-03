@@ -79,16 +79,28 @@ export async function addDocument(
     size: content.length,
   });
   if (pieces.length) {
-    await db.insert(chatChunks).values(
-      pieces.map((content, i) => ({
-        id: rid(),
-        docId,
-        projectId,
-        content,
-        position: i,
-        embedding: vectors[i] ?? null,
-      })),
-    );
+    const rows = pieces.map((content, i) => ({
+      id: rid(),
+      docId,
+      projectId,
+      content,
+      position: i,
+      embedding: vectors[i] ?? null,
+    }));
+    await db.insert(chatChunks).values(rows);
+    // Same subject index as the org corpus — a project's knowledge is just as erasable, and leaving it
+    // out would mean an erasure that reports success while a copy survives in a project.
+    try {
+      const { indexChunkSubjects } = await import('@/lib/subject-index-store');
+      const { orgIdForProject } = await import('@/lib/rag-org');
+      await indexChunkSubjects(
+        await orgIdForProject(projectId),
+        'project',
+        rows.map((r) => ({ chunkId: r.id, docId, containerId: projectId, content: r.content })),
+      );
+    } catch (e) {
+      console.error('[subject-index] project document not indexed for erasure:', (e as Error).message);
+    }
   }
   return { id: docId, chunks: pieces.length };
 }
