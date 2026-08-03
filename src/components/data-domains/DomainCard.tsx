@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { explainResponse } from '@/lib/api-failure';
+import { basisLabel } from '@/lib/lawful-basis';
 
 import { describeDeleteImpact, describeUsage, type DomainUsage } from '@/lib/data-domain-usage';
 import { formatAliases } from '@/lib/data-domains-ui';
@@ -166,6 +167,24 @@ export function DomainCard({
                 }
               >
                 {domain.classification ?? 'unclassified'}
+              </Badge>
+              {/* WHY WE MAY PROCESS IT. The grade was settable in the form and invisible in the list —
+                  so a DPO could fill in 23 domains and have no way to see the result, or spot the
+                  ones still missing. A missing basis is loud, not neutral. */}
+              <Badge
+                variant="outline"
+                className={
+                  domain.lawfulBasis
+                    ? 'border-border bg-muted text-muted-foreground'
+                    : 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-500'
+                }
+                title={
+                  domain.lawfulBasis
+                    ? `We process this on the basis of: ${basisLabel(domain.lawfulBasis)}${domain.purpose ? ` · for: ${domain.purpose}` : ' · no purpose stated'}`
+                    : 'Nobody has recorded why we are permitted to process this. Runs reading it are flagged.'
+                }
+              >
+                {basisLabel(domain.lawfulBasis)}
               </Badge>
               <Badge variant="secondary" className="bg-primary/10 text-primary">
                 {domain.connectorName}

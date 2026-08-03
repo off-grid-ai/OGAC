@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AddDomainButton } from '@/components/data-domains/AddDomainButton';
 import { DomainCard } from '@/components/data-domains/DomainCard';
 import { SuggestStartersButton } from '@/components/data-domains/SuggestStartersButton';
@@ -22,9 +23,15 @@ export const dynamic = 'force-dynamic';
 // resource. The NL builder and the retrieval router then route a phrase to the right system BY
 // RULE (deterministic, no-guess). This surface is the full CRUD over those rules, plus a
 // "test resolve" box so the operator can confirm a phrase binds where they expect.
-export default async function DataDomainsPage() {
+export default async function DataDomainsPage({
+  searchParams,
+}: Readonly<{ searchParams: Promise<{ basis?: string; grade?: string }> }>) {
   await requireModuleForUser('data-domains');
   const org = await currentOrgId();
+  // URL-DRIVEN FILTERS. The governance overview says "8 of 23 sources record no lawful basis" — that
+  // number was a dead end, because finding the 8 among 23 near-identical cards meant reading every
+  // one. ?basis=missing / ?grade=unclassified is the way in, and it is a route so it is shareable.
+  const { basis, grade } = await searchParams;
   // Apps + pipelines are read ONCE for the whole grid (not per card) and the reverse edge is computed
   // in pure code — the page shows which rules the org actually runs on, which is the only way to tell
   // two similar-looking rules apart, and what a Delete would break.
@@ -45,6 +52,13 @@ export default async function DataDomainsPage() {
     );
   };
 
+  const shown = domains.filter((d) => {
+    if (basis === 'missing' && d.lawfulBasis) return false;
+    if (grade === 'unclassified' && d.classification) return false;
+    return true;
+  });
+  const filtered = shown.length !== domains.length;
+
   const connectorOptions = connectors.map((c) => ({ id: c.id, name: c.name, type: c.type }));
   const connectorName = (id: string) => connectors.find((c) => c.id === id)?.name ?? id;
   const proposals = proposeStarterDomains(
@@ -64,6 +78,16 @@ export default async function DataDomainsPage() {
         </CardContent>
       </Card>
     );
+  } else if (shown.length === 0 && filtered) {
+    domainsBody = (
+      <Card className="shadow-sm">
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Nothing matches that filter — every rule here records what this view was looking for.
+          </p>
+        </CardContent>
+      </Card>
+    );
   } else if (domains.length === 0) {
     domainsBody = (
       <Card className="shadow-sm">
@@ -78,7 +102,7 @@ export default async function DataDomainsPage() {
   } else {
     domainsBody = (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {domains.map((d) => (
+        {shown.map((d) => (
           <DomainCard
             key={d.id}
             domain={{
@@ -119,6 +143,27 @@ export default async function DataDomainsPage() {
               <AddDomainButton connectors={connectorOptions} />
             </div>
           </div>
+
+          {/* WHAT THIS VIEW IS SHOWING. A silently-filtered list that looks like the whole list is how
+              an operator concludes they have 8 data sources instead of 23. */}
+          {filtered ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Showing the <b>{shown.length}</b> of {domains.length} rule
+                {domains.length === 1 ? '' : 's'} that{' '}
+                {basis === 'missing'
+                  ? 'do not record why we are permitted to process them'
+                  : 'nobody has classified'}
+                .
+              </p>
+              <Link
+                href="/data/domains"
+                className="text-xs font-medium text-foreground underline hover:text-primary"
+              >
+                Show all {domains.length}
+              </Link>
+            </div>
+          ) : null}
 
           <TestResolveBox
             domains={domains.map((d) => ({

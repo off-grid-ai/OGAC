@@ -63,6 +63,7 @@ export type ContextualDestinationId =
   | 'decisions'
   | 'history'
   | 'review'
+  | 'retention'
   | 'users'
   | 'invitations'
   | 'clients'
@@ -439,6 +440,15 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
         label: 'Export',
         description: 'Evidence exports.',
         route: '/governance/evidence/export',
+      },
+      {
+        // Proof that data was deleted when we said it would be IS evidence. It only lived under
+        // Data → Catalog → Governance, below a stat band, where nobody answering an audit question
+        // would look for it.
+        id: 'retention',
+        label: 'Retention',
+        description: 'How long records are kept, and proof they were deleted.',
+        route: '/governance/evidence/retention',
       },
     ],
   },

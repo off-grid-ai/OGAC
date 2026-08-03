@@ -4,6 +4,7 @@ import { Plus, Trash, UploadSimple } from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -90,12 +91,27 @@ export function PolicyRulesManager({ rules }: Readonly<{ rules: PolicyRule[] }>)
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Console-owned allow/deny entries, evaluated deny-first by ascending priority. Push
-          compiles the enabled set into a policy data document and reloads the policy engine.
-        </p>
-        <div className="flex gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-3xl space-y-1">
+          <p className="text-sm text-muted-foreground">
+            Console-owned allow/deny entries, evaluated deny-first by ascending priority. Push
+            compiles the enabled set into a policy data document and reloads the policy engine.
+          </p>
+          {/* SAY THAT EDITS ARE RECORDED. Someone changing a rule that governs live decisions should
+              know a version is minted and that past runs stay judged against the rules they ran
+              under — otherwise the history is a feature nobody knows exists. */}
+          <p className="text-xs text-muted-foreground">
+            Every change is recorded as a new version — runs stay linked to the rules they actually
+            ran under.{' '}
+            <Link
+              href="/governance/policies/history"
+              className="font-medium text-foreground underline hover:text-primary"
+            >
+              See the change history
+            </Link>
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
           <PushButton count={rules.filter((r) => r.enabled).length} />
           <Button size="sm" onClick={() => setEditing('new')}>
             <Plus className="size-4" /> Add rule
