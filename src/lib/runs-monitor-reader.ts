@@ -45,7 +45,13 @@ async function readAppRuns(orgId: string): Promise<AppRunSource[]> {
     // On demo tenants `listApps` has already dropped `[autotest]` apps, so a run whose app is no
     // longer visible is a QA artifact — exclude it (and any autotest-actor run) so Reports/Review
     // never surface autotest rows. Non-demo tenants keep every run (behaviour-preserving).
-    const hideOnDemo = isDemoTenantOrg(orgId);
+    //
+    // A FAILED APP LOOKUP MUST NOT EMPTY THE LIST. listApps is caught to [] above, and the
+    // "unknown app ⇒ hide" rule then hid EVERY app run — measured live: the same list showed 171
+    // runs on one load and 284 on the next, silently dropping 113. An operator cannot tell that from
+    // "there were no app runs". So the QA filter only applies when the app inventory actually
+    // resolved; with no inventory we show the runs and let the title fall back to the app id.
+    const hideOnDemo = isDemoTenantOrg(orgId) && titleById.size > 0;
     return runs
       .filter((r) => {
         if (!hideOnDemo) return true;
