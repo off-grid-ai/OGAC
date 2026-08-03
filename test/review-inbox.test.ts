@@ -7,7 +7,7 @@ import {
   childRunIdForReview,
   decisionQuestion,
   faithfulnessPct,
-  formatUsd,
+  formatAmount,
   guardrailNotesFrom,
   humanizeKey,
   inputPairs,
@@ -54,14 +54,14 @@ function run(p: Partial<AppRunView> = {}): AppRunView {
   };
 }
 
-// ─── formatUsd ────────────────────────────────────────────────────────────────────────────────────
-test('formatUsd: en-US grouping for numbers + numeric strings, null otherwise', () => {
-  assert.equal(formatUsd(500000), '$500,000');
-  assert.equal(formatUsd('500000'), '$500,000');
-  assert.equal(formatUsd('  '), null);
-  assert.equal(formatUsd('abc'), null);
-  assert.equal(formatUsd(undefined), null);
-  assert.equal(formatUsd(null), null);
+// ─── formatAmount ────────────────────────────────────────────────────────────────────────────────────
+test('formatAmount: en-US grouping for numbers + numeric strings, null otherwise', () => {
+  assert.equal(formatAmount(500000), '$500,000');
+  assert.equal(formatAmount('500000'), '$500,000');
+  assert.equal(formatAmount('  '), null);
+  assert.equal(formatAmount('abc'), null);
+  assert.equal(formatAmount(undefined), null);
+  assert.equal(formatAmount(null), null);
 });
 
 // ─── decisionQuestion ──────────────────────────────────────────────────────────────────────────────

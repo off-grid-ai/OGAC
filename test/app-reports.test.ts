@@ -7,7 +7,7 @@ import {
   computeReportMetrics,
   computeThroughputPerDay,
   fmtApprovalRate,
-  fmtCostUsd,
+  fmtCost,
   runCost,
   runDurationMs,
   singleRunSummary,
@@ -202,11 +202,15 @@ test('buildReportStats: failed tile is bad only when non-zero; approval tile rea
   assert.equal(withFail.find((t) => t.label === 'Failed')?.tone, 'bad');
 });
 
-test('buildReportStats: Cost tile shows $0.00 for a real zero, never a dash', () => {
-  // Completed runs that carry no cost figures → total cost is a real 0, so the tile reads "$0.00".
+test('buildReportStats: an UNATTRIBUTED cost says so, and never renders a zero it did not measure', () => {
+  // The rule changed deliberately (UX finding 11). This tile used to read "$0.00" for a run set with
+  // no attributed cost at all — measured on the live tenant, cost lands on a small fraction of ledger
+  // events and the demo runs on free models. A zero reads as "this is free", which is a claim we
+  // cannot make, and the reader cannot tell it apart from "we never looked".
   const stats = buildReportStats(computeReportMetrics([run({ status: 'done' })]));
   const cost = stats.find((t) => t.label === 'Cost');
-  assert.equal(cost?.value, '$0.00');
+  assert.equal(cost?.value, 'Not measured');
+  // The original invariant still holds: never a bare dash, which reads as a rendering fault.
   assert.notEqual(cost?.value, '—');
 });
 
@@ -238,11 +242,14 @@ test('fmtApprovalRate: decisions render a percentage; zero decisions render n/a'
   assert.equal(fmtApprovalRate({ approvals: 0, rejections: 0, approvalRate: 0 }), 'n/a');
 });
 
-test('fmtCostUsd: a real zero is "$0.00"; a genuine number formats; non-finite degrades to n/a', () => {
-  assert.equal(fmtCostUsd(0), '$0.00'); // real zero — never a dash
-  assert.equal(fmtCostUsd(12.5), '$12.50');
-  assert.equal(fmtCostUsd(0.1), '$0.10');
-  assert.equal(fmtCostUsd(Number.NaN), 'n/a'); // absent/undefined figure
+test('fmtCost: unmeasured says so, a genuine zero explains itself, real money is in rupees', () => {
+  // Renamed from fmtCostUsd: it was emitting a dollar sign to tenants whose every amount is in
+  // rupees, and the NAME hid that from everyone reading the code.
+  assert.equal(fmtCost(0, 0), 'Not measured'); // nothing attributed — not the same as free
+  assert.equal(fmtCost(0, 3), '₹0 — no chargeable calls'); // real zero, and WHY it is zero
+  assert.equal(fmtCost(12.5, 3), '₹12.50'); // small amounts keep their paise
+  assert.equal(fmtCost(113858, 9), '₹1,13,858'); // Indian grouping, not ₹113,858
+  assert.equal(fmtCost(Number.NaN, 3), 'n/a'); // absent/undefined figure
 });
 
 test('empty input yields all-zero metrics without dividing by zero', () => {

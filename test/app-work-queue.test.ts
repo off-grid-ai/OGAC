@@ -189,20 +189,32 @@ test('identifiers are NEVER grouped — only quantities are', () => {
   assert.equal(runSubject({ premium: 145000 }), 'Premium: 145,000');
 });
 
-test('large numbers are grouped so an amount reads as money, not as a raw field', () => {
-  assert.equal(runSubject({ amount: 361030 }), 'Amount: 361,030');
+test('amounts read as money in the org currency, grouped the Indian way', () => {
+  // Grouping is now the INR convention (last three, then twos) and carries the symbol — see the
+  // currency test below for why that rule changed.
+  assert.equal(runSubject({ amount: 361030 }), 'Amount: ₹3,61,030');
   // A numeric STRING is still a number to the reader.
-  assert.equal(runSubject({ amount: '37562' }), 'Amount: 37,562');
-  assert.equal(runSubject({ amount: -1234567 }), 'Amount: -1,234,567');
-  assert.equal(runSubject({ total_value: 9876543 }), 'Total value: 9,876,543');
-  assert.equal(runSubject({ amount: 1234.56 }), 'Amount: 1,234.56');
-  // Short numbers and identifier-named fields are left alone.
+  assert.equal(runSubject({ amount: '37562' }), 'Amount: ₹37,562');
+  assert.equal(runSubject({ amount: -1234567 }), 'Amount: −₹12,34,567');
+  assert.equal(runSubject({ total_value: 9876543 }), 'Total value: ₹98,76,543');
+  assert.equal(runSubject({ amount: 1234.56 }), 'Amount: ₹1,234.56');
+  // Short numbers and identifier-named fields are left alone — never formatted as money.
   assert.equal(runSubject({ code: 404 }), 'Code: 404');
 });
 
-test('no currency symbol is invented — this module cannot know the tenant currency', () => {
+test('an amount carries the org currency — one screen must not show two conventions', () => {
+  // THIS CONTRACT WAS REVERSED DELIBERATELY, and the reason is measured, not theoretical.
+  //
+  // The rule used to be "never invent a symbol, this module cannot know the tenant currency". Sound in
+  // isolation, and wrong in effect: a sibling path (the case picker, app-case-candidates) DID add one,
+  // so the live queue rendered "₹37,562" directly above a bare "41,346.44" for the same kind of value.
+  // A reader cannot tell whether the second number is a different currency, a count, or a bug.
+  //
+  // One inconsistent screen is worse than one stated default. The default now lives in exactly one
+  // place (src/lib/money.ts DEFAULT_CURRENCY) and both paths go through it.
   const subject = runSubject({ amount: 500000 }) ?? '';
-  assert.doesNotMatch(subject, /[₹$€£]/);
+  assert.match(subject, /₹/);
+  assert.equal(subject, 'Amount: ₹5,00,000');
 });
 
 test('caseLabel distinguishes rows that have no summarisable input', () => {

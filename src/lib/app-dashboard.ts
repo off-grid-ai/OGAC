@@ -61,19 +61,15 @@ function medianMs(values: readonly number[]): number | null {
   return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid];
 }
 
-/** A duration a person reads without converting anything. */
-export function describeDurationMs(ms: number | null): string {
-  if (ms === null || !Number.isFinite(ms) || ms < 0) return '—';
-  if (ms < 1000) return 'under a second';
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'}`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours} hour${hours === 1 ? '' : 's'}`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'}`;
-}
+/**
+ * A duration a person reads without converting anything.
+ *
+ * Re-exported from run-time-split so the split tile and this one cannot word the same quantity two
+ * ways. The definition moved THERE rather than staying here because this module already imports that
+ * one, and the reverse would be an import cycle — which in this codebase means a production-only TDZ
+ * crash that local builds hide.
+ */
+export { describeDurationMs } from '@/lib/run-time-split';
 
 /** A whole percentage, or null when there is nothing to divide by. */
 function percent(part: number, whole: number): number | null {

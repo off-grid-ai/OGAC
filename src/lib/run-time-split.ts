@@ -96,17 +96,29 @@ export interface TypicalTime {
   detail: string;
 }
 
-/** Duration in words. Seconds below a minute, because "0.1 min" is not how anyone says it. */
-export function describeMs(ms: number): string {
+/**
+ * Duration in words.
+ *
+ * This module first shipped its OWN wording ("2 min") while app-dashboard already had one
+ * ("2 minutes") — two vocabularies for the same quantity, which a test caught immediately. The
+ * formatter lives here now and app-dashboard re-exports it, so there is one wording and no import
+ * cycle (app-dashboard depends on this module, not the other way round).
+ */
+export function describeDurationMs(ms: number | null): string {
+  if (ms === null || !Number.isFinite(ms) || ms < 0) return '—';
   if (ms < 1000) return 'under a second';
-  const secs = Math.round(ms / 1000);
-  if (secs < 60) return `${secs} sec`;
-  const mins = Math.round(secs / 60);
-  if (mins < 60) return `${mins} min`;
-  const hours = ms / 3_600_000;
-  if (hours < 48) return `${hours.toFixed(hours < 10 ? 1 : 0)} hours`;
-  return `${Math.round(hours / 24)} days`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'}`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} hour${hours === 1 ? '' : 's'}`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'}`;
 }
+
+/** Alias kept for readers of this module; same one wording. */
+export const describeMs = describeDurationMs;
 
 /**
  * The "Usually takes" tile, split.
@@ -117,17 +129,23 @@ export function describeMs(ms: number): string {
 export function typicalTime(splits: readonly TimeSplit[]): TypicalTime {
   const work = median(splits.map((s) => s.workingMs).filter((v): v is number => v !== null));
   const wait = median(splits.map((s) => s.waitingMs).filter((v): v is number => v !== null));
+  const wall = median(splits.map((s) => s.wallMs).filter((v): v is number => v !== null));
 
-  if (work === null && wait === null) {
-    return {
-      value: 'Not measured',
-      detail: 'No finished case has recorded step timings yet, so we will not guess at a duration.',
-    };
-  }
   if (work === null) {
+    // NO STEP TIMINGS. Fall back to the wall clock and SAY it is the whole elapsed time — an early
+    // version of this returned "under a second" here, because a run with no human step reports zero
+    // waiting and that zero became the answer. A caught-in-test reminder that an absent measurement
+    // must never be rendered as a small one.
+    if (wall === null) {
+      return {
+        value: 'Not measured',
+        detail: 'No finished case has recorded timings yet, so we will not guess at a duration.',
+      };
+    }
     return {
-      value: describeMs(wait ?? 0),
-      detail: 'That is time spent waiting for a person. The system’s own time was not recorded.',
+      value: describeMs(wall),
+      detail:
+        'Start to finish, including any time spent waiting for a person — this app does not record per-step timings, so the two cannot be told apart.',
     };
   }
   if (wait === null || wait === 0) {

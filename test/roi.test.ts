@@ -8,7 +8,7 @@ import {
   computeAppRoi,
   computeRoi,
   formatHours,
-  formatUsd,
+  formatAmount,
   resolveRoiSettings,
   rollupRoi,
   validateRoiSettingsInput,
@@ -224,13 +224,18 @@ test('rollupRoi: single named department, no Unassigned present', () => {
 });
 
 // ─── formatting helpers ────────────────────────────────────────────────────────────────────────────
-test('formatUsd: en-US grouping, $ prefix, negative sign', () => {
-  assert.equal(formatUsd(123456), '$123,456');
-  assert.equal(formatUsd(1234), '$1,234');
-  assert.equal(formatUsd(0), '$0');
-  assert.equal(formatUsd(-4400), '−$4,400');
-  assert.equal(formatUsd(-1234), '−$1,234');
-  assert.equal(formatUsd(NaN), '$0');
+test('formatAmount: the org currency, Indian grouping, a true minus sign', () => {
+  // Renamed from formatUsd and re-pointed at the org currency. The old name was the real problem: the
+  // code said USD while the product ships to Indian banks, so nobody reading it saw the mismatch.
+  // INR groups the last three digits then twos, which is immediately visible to an Indian reader.
+  assert.equal(formatAmount(123456), '₹1,23,456');
+  assert.equal(formatAmount(1234), '₹1,234');
+  assert.equal(formatAmount(0), '₹0');
+  assert.equal(formatAmount(-4400), '−₹4,400'); // a true minus, not a hyphen
+  assert.equal(formatAmount(-1234), '−₹1,234');
+  assert.equal(formatAmount(NaN), '₹0');
+  // Still able to render another currency explicitly, with that market's grouping.
+  assert.equal(formatAmount(123456, 'USD'), '$123,456');
 });
 
 test('formatHours: one decimal + hrs suffix', () => {
