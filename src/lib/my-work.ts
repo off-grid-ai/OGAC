@@ -255,3 +255,60 @@ export function orderAppsByAttention<T extends AppListEntry>(entries: readonly T
     .sort((a, b) => band(a.e) - band(b.e) || b.e.waiting - a.e.waiting || a.i - b.i)
     .map((x) => x.e);
 }
+
+// ─── "Which one of these do I use?" ──────────────────────────────────────────────────────────────────
+//
+// The demo tenant carries "Expense Claim Approval (fidelity check)", "Expense Claim Approval Process",
+// "Reimbursement Approval" and "Reimbursement Approval (copy)"; also "Personal Loan Underwriting" and
+// "Personal Loan Underwriting Assist". A person cannot tell which one to run, and picking wrong is
+// silent — they only find out when the wrong process happens.
+//
+// Deleting the near-duplicates would fix this tenant and not the problem: any org that duplicates an
+// app to try a change lands in the same place. So the list SAYS SO instead. A warning is the right
+// strength here — we cannot know that two similar names are actually redundant, and blocking or hiding
+// one on a name match would eventually hide the app somebody needed.
+
+/** Words too common to make two names similar. */
+const STOPWORDS = new Set([
+  'the', 'and', 'a', 'an', 'of', 'for', 'to', 'with', 'process', 'copy', 'new', 'v2', 'test', 'draft',
+  'assist', 'check', 'approval', 'verification',
+]);
+
+function significantWords(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, ' ')
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length > 2 && !STOPWORDS.has(w)),
+  );
+}
+
+/**
+ * Titles that a reader could confuse, keyed by app id.
+ *
+ * Similarity is on the SIGNIFICANT words only: "Reimbursement Approval" vs "Reimbursement Approval
+ * (copy)" differ by a parenthetical and the word "copy", neither of which tells anyone which to use.
+ * "Fraud Screening" vs "Fraud Alert Triage" share only "fraud" and are genuinely different jobs, so
+ * they are deliberately NOT flagged — a warning on every card would be noise, and noise gets ignored.
+ */
+export function confusableTitles(
+  apps: readonly { id: string; title: string }[],
+): Record<string, string[]> {
+  const words = apps.map((a) => ({ ...a, words: significantWords(a.title) }));
+  const out: Record<string, string[]> = {};
+  for (const a of words) {
+    if (a.words.size === 0) continue;
+    const twins: string[] = [];
+    for (const b of words) {
+      if (b.id === a.id || b.words.size === 0) continue;
+      const shared = [...a.words].filter((w) => b.words.has(w)).length;
+      // Confusable when one name's significant words are entirely contained in the other's — that is
+      // what "X" vs "X Process" and "X" vs "X (copy)" actually look like.
+      const contained = shared === Math.min(a.words.size, b.words.size);
+      if (contained && shared > 0) twins.push(b.title);
+    }
+    if (twins.length) out[a.id] = twins;
+  }
+  return out;
+}

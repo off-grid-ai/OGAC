@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
-import { appStateNote, orderAppsByAttention } from '@/lib/my-work';
+import { appStateNote, confusableTitles, orderAppsByAttention } from '@/lib/my-work';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { isSimpleAgent, type AppSpec } from '@/lib/app-model';
 
@@ -50,6 +50,8 @@ export function AppsList({
 
   // Cards that need a person come first; drafts sink below live apps with nothing waiting. Without
   // this the grid read as twelve equivalent options with no clue which one to open.
+  // Names a reader could confuse with another app's. Computed once for the grid.
+  const confusable = confusableTitles(apps.map((a) => ({ id: a.id, title: a.title })));
   const ordered = orderAppsByAttention(
     apps.map((app) => ({
       app,
@@ -64,6 +66,7 @@ export function AppsList({
       {ordered.map(({ app, ...entry }) => {
         const shape = isSimpleAgent(app) ? 'agent' : `${app.steps.length} steps`;
         const note = appStateNote(entry);
+        const twins = confusable[app.id];
         return (
           <Card key={app.id} className="shadow-sm">
             <CardHeader className="pb-2">
@@ -90,6 +93,16 @@ export function AppsList({
                 ) : (
                   <p className="text-[11px] text-muted-foreground">{note.text}</p>
                 )
+              ) : null}
+              {/* WHICH ONE DO I USE? Picking the wrong near-identical app is silent — you find out
+                  when the wrong process happens. A warning, not a block: we cannot know two similar
+                  names are actually redundant, and hiding one on a name match would eventually hide
+                  the app somebody needed. */}
+              {twins?.length ? (
+                <p className="rounded-md border border-border bg-muted/50 px-2 py-1 text-[11px] text-muted-foreground">
+                  Easy to confuse with {twins.length === 1 ? twins[0] : `${twins.length} similarly named apps`}
+                  {' '}— check this is the one you want.
+                </p>
               ) : null}
               {/* Three lines. At two, every one of six cards cut off mid-word ("classify by IRDAI…",
                   "lapse-ris…", "sum-…") — a grid where no card finishes a sentence tells a reader
