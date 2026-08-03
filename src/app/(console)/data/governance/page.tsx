@@ -1,6 +1,6 @@
 import { ShieldCheck, Warning } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { RtbfForm } from '@/components/data-catalog/RtbfForm';
+import { ErasureForm } from '@/components/data/ErasureForm';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -243,9 +243,18 @@ export async function DataGovernanceContent({
 
           {/* RTBF. */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-1">
-              <RtbfForm />
-            </div>
+            <Card className="shadow-sm lg:col-span-1">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Erase a person</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* ONE erasure surface. There were two — this page had a form that filed a durable
+                    request but could not find the copies embedded in documents and run records, and
+                    /data had one that found them but filed nothing. Two answers to the same legal
+                    question is worse than either. */}
+                <ErasureForm />
+              </CardContent>
+            </Card>
             <Card className="shadow-sm lg:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Erasure requests</CardTitle>

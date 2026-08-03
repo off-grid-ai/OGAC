@@ -11,6 +11,7 @@ import {
 import { deriveAssetPosture } from '@/lib/data-classification';
 import { resolveRtbfScope, type RtbfAsset } from '@/lib/data-rtbf';
 import { planErasure, propagateErasure, summarizeErasure, type StepResult } from '@/lib/erasure';
+import { eraseEmbeddedCopies, erasureProven } from '@/lib/erasure-embedded';
 import { executeErasureStep } from '@/lib/erasure-execute';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -56,6 +57,12 @@ export async function POST(req: Request) {
   for (const step of plan.steps) results.push(await executeErasureStep(step));
   const report = summarizeErasure(plan.subject, results, plan.deferred);
 
+  // EMBEDDED COPIES. This path recorded a durable request and propagated to external planes, but
+  // never cleared the copies inside indexed documents and run records — so a request could be filed
+  // as 'completed' while the person was still retrievable. Same shared helper as /erasure.
+  const embedded = await eraseEmbeddedCopies(org, subject);
+  const proven = erasureProven(embedded, report.deferred ?? []);
+
   // Propagate to the external planes (vector index, data lake, device replicas) for REAL — each
   // configured target's delete runs now; unreachable ones are honestly deferred with a reason.
   const requestedBy = gate.user?.email ?? '';
@@ -65,7 +72,9 @@ export async function POST(req: Request) {
   const record = await recordErasureRequest(
     {
       subject: plan.subject,
-      status: report.status, // 'completed' | 'partial'
+      // The durable record must not read 'completed' while copies are still retrievable — that is
+      // the one field a DPO would rely on in an audit, so it is gated on the re-queried proof.
+      status: proven ? report.status : 'partial',
       erasedRows: report.erasedRows,
       requestedBy,
       completedAt: new Date(),
@@ -77,6 +86,7 @@ export async function POST(req: Request) {
         deferredCount: scope.deferredCount,
         propagated: propagation.propagated,
         propagationDeferred: propagation.deferred,
+        embedded,
       },
     },
     org,
@@ -88,5 +98,18 @@ export async function POST(req: Request) {
     outcome: report.status === 'completed' ? 'ok' : 'error',
   });
 
-  return NextResponse.json({ request: record, report, scope, propagation }, { status: 201 });
+  return NextResponse.json(
+    {
+      request: record,
+      report: {
+        ...report,
+        embedded,
+        proven,
+        embeddedRemaining: embedded.reduce((n, e) => n + e.remaining, 0),
+      },
+      scope,
+      propagation,
+    },
+    { status: 201 },
+  );
 }

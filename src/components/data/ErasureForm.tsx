@@ -26,6 +26,12 @@ interface Report {
   embeddedRemaining?: number;
 }
 
+interface Propagated {
+  target: string;
+  ok?: boolean;
+  reason?: string;
+}
+
 // ─── Right to erasure — FIND, then ERASE, then PROVE ───────────────────────────────────────────────
 //
 // This was a text box and an "Erase subject" button that deleted irreversibly on first click and
@@ -42,6 +48,7 @@ export function ErasureForm() {
   const [subject, setSubject] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [propagation, setPropagation] = useState<Propagated[] | null>(null);
   const [busy, setBusy] = useState<'find' | 'erase' | null>(null);
 
   async function find() {
@@ -64,7 +71,10 @@ export function ErasureForm() {
 
   async function erase() {
     setBusy('erase');
-    const res = await fetch('/api/v1/admin/erasure', {
+    // The DURABLE path: it files an auditable erasure request and propagates to the external planes
+    // (vector index, lake, device replicas), as well as running the console-plane deletes. The other
+    // route does the deletes without filing anything, which is not what answering a legal request is.
+    const res = await fetch('/api/v1/admin/erasure-requests', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ subject }),
@@ -75,11 +85,19 @@ export function ErasureForm() {
       (f.refusal ? toast.info : toast.error)(f.message);
       return;
     }
-    const data = (await res.json()) as Report;
-    setReport(data);
+    const data = (await res.json()) as {
+      report?: Report;
+      propagation?: { propagated?: Propagated[]; deferred?: Propagated[] };
+    };
+    setReport(data.report ?? null);
+    setPropagation([
+      ...(data.propagation?.propagated ?? []).map((p) => ({ ...p, ok: true })),
+      ...(data.propagation?.deferred ?? []).map((p) => ({ ...p, ok: false })),
+    ]);
     setPreview(null);
-    toast[data.proven ? 'success' : 'warning'](
-      data.proven ? 'Erased — no copies remain' : 'Erased in part — see what is left',
+    const proven = data.report?.proven;
+    toast[proven ? 'success' : 'warning'](
+      proven ? 'Erased — no copies remain' : 'Erased in part — see what is left',
     );
   }
 
@@ -201,6 +219,19 @@ export function ErasureForm() {
               Not reachable from here: {report.deferred.join(', ')}
             </p>
           ) : null}
+          {/* The systems OUTSIDE this console the erasure was pushed to. A DPO answering a request
+              has to be able to name them — and name the ones that did not take it. */}
+          {propagation?.length ? (
+            <p className="text-muted-foreground">
+              Pushed to{' '}
+              {propagation
+                .map((p) => `${p.target}${p.ok ? '' : ` (waiting${p.reason ? ` — ${p.reason}` : ''})`}`)
+                .join(', ')}
+            </p>
+          ) : null}
+          <p className="text-[11px] text-muted-foreground">
+            Filed as an erasure request — it appears in the request log with this evidence attached.
+          </p>
         </div>
       ) : null}
     </div>

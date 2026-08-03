@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { planErasure } from '@/lib/erasure';
-import { extractSubjects, describeMatches } from '@/lib/subject-index';
-import { findChunksForSubject } from '@/lib/subject-index-store';
+import { findEmbeddedCopies, typeSubject } from '@/lib/erasure-embedded';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -29,27 +28,14 @@ export async function POST(req: Request) {
   // Row-level stores, from the existing pure planner (nothing is executed).
   const plan = planErasure(subject, orgId);
 
-  // Embedded copies. The identifier is TYPED by the same rules the index used when writing it — an
-  // email searched as a reference would find nothing and wrongly report "no copies".
-  const typed = extractSubjects(subject);
-  const searched = typed.length ? typed : [{ type: 'REFERENCE' as const, value: subject }];
-  const embedded = [];
-  for (const t of searched) {
-    const matches = await findChunksForSubject(orgId, t.type, t.value).catch(() => []);
-    if (!matches.length) continue;
-    embedded.push({
-      type: t.type,
-      masked: matches[0].masked,
-      chunks: matches.filter((m) => m.source !== 'run').length,
-      runs: new Set(matches.filter((m) => m.source === 'run').map((m) => m.containerId)).size,
-      summary: describeMatches(t.type, matches[0].masked, matches.length),
-    });
-  }
+  // Embedded copies — the retrieval chunks and run records that mention the person. Shared with the
+  // erasure routes so the find step can never disagree with what the erase step will actually reach.
+  const embedded = await findEmbeddedCopies(orgId, subject);
 
   return NextResponse.json({
     subject,
     // What the identifier was recognised AS — so a DPO can see we searched for a PAN, not a string.
-    recognisedAs: searched.map((t) => t.type),
+    recognisedAs: typeSubject(subject).map((t) => t.type),
     stores: plan.steps.map((s) => ({ store: s.store, table: s.table })),
     deferred: plan.deferred,
     embedded,

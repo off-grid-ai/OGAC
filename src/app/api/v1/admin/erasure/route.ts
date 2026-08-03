@@ -3,8 +3,7 @@ import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { planErasure, summarizeErasure, type StepResult } from '@/lib/erasure';
 import { executeErasureStep } from '@/lib/erasure-execute';
-import { extractSubjects } from '@/lib/subject-index';
-import { eraseSubjectFromChunks } from '@/lib/subject-index-store';
+import { eraseEmbeddedCopies, erasureProven } from '@/lib/erasure-embedded';
 import { currentOrgId } from '@/lib/tenancy';
 
 // DSAR / right-to-erasure. The erasure PLAN (which subject-bearing tables/columns to match, and HOW
@@ -38,13 +37,7 @@ export async function POST(req: Request) {
   // EMBEDDED COPIES — the half that did not exist. Retrieval chunks are deleted; run records are
   // redacted in place so the decision trail survives (see subject-index-store). Each result carries
   // `remaining`, re-queried AFTER the work, which is the proof the DPO actually needs.
-  const typed = extractSubjects(subject);
-  const searched = typed.length ? typed : [{ type: 'REFERENCE' as const, value: subject }];
-  const embedded = [];
-  for (const t of searched) {
-    const r = await eraseSubjectFromChunks(orgId, t.type, t.value).catch(() => null);
-    if (r && r.matched > 0) embedded.push({ type: t.type, ...r });
-  }
+  const embedded = await eraseEmbeddedCopies(orgId, subject);
   const embeddedRemaining = embedded.reduce((n, e) => n + e.remaining, 0);
 
   auditFromSession(gate, orgId, {
@@ -56,9 +49,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ...report,
     embedded,
-    // A single honest verdict for the surface: the erasure is only proven when NOTHING is left, and a
-    // deferred store means we cannot claim completeness whatever the row counts say.
-    proven: embeddedRemaining === 0 && report.status === 'completed',
+    proven: erasureProven(embedded, report.deferred ?? []),
     embeddedRemaining,
   });
 }
