@@ -29,6 +29,11 @@ export interface DataDomain {
   connectorId: string;
   resource: string;
   opHints?: Record<string, unknown>;
+  /**
+   * Sensitivity of the data this rule reaches (public | internal | confidential | restricted).
+   * Null = nobody has graded it, which is reported as unclassified and never floored to public.
+   */
+  classification?: string | null;
 }
 
 export interface RankedDomain {

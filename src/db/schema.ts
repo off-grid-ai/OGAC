@@ -1119,6 +1119,9 @@ export const appRuns = pgTable('app_runs', {
       finishedAt?: string;
     }[]
   >().notNull().default([]),
+  // The MOST SENSITIVE classification this run actually read, derived from the domains its steps bound.
+  // This is what makes "which models processed Confidential data" a query rather than an investigation.
+  dataClassification: text('data_classification'),
   // WHICH VERSION OF THE APP PRODUCED THIS RUN.
   //
   // A CISO asked, live: "a bad version shipped — what did it touch, and can we reverse it?" App
@@ -1243,6 +1246,17 @@ export const dataDomains = pgTable('data_domains', {
   connectorId: text('connector_id').notNull(),
   resource: text('resource').notNull(), // table / path / object within the connector
   opHints: jsonb('op_hints').$type<Record<string, unknown>>(),
+  // SENSITIVITY OF WHAT THIS RULE REACHES (public | internal | confidential | restricted).
+  //
+  // Classification already existed — on `data_assets`, which catalogues the WAREHOUSE. Apps do not read
+  // the warehouse; they read DATA DOMAINS bound to operational connectors, and the two inventories were
+  // never joined (measured: 0 of 16 assets carry a domain_id, and no name match exists between
+  // `bharatunion.dim_customer` and `bhcon_corebank/customers`). So a CISO asking "which models saw
+  // Confidential data" hit a broken join, not a missing feature.
+  //
+  // Classifying the domain closes that chain, because the domain is the thing an app actually binds to.
+  // Null means UNCLASSIFIED and is reported as such — never silently treated as public.
+  classification: text('classification'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('data_domains_org_idx').on(t.orgId), index('data_domains_connector_idx').on(t.connectorId)]);

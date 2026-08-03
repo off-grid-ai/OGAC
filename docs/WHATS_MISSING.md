@@ -19,22 +19,45 @@ they are the kind of error that manufactures fake findings:
 ## Part 1 — The CISO / DPO
 
 Twelve questions, in the form a security or privacy officer actually asks them.
-**2 answered · 7 partial · 3 cannot be answered at all.**
+**Originally 2 answered · 7 partial · 3 unanswerable. After the fixes below: 3 answered · 7 partial ·
+2 unanswerable**, and the biggest one (erasure) moved from unanswerable to proven.
 
 ### Cannot be answered
 
-**1. "Which models processed data classified Confidential or above?"**
-There is no classification anywhere. `data_assets` records id, name, source, connector, domain, kind,
-owner, description, row count, freshness and sync state — and no sensitivity field. So nothing can be
-labelled Confidential in the first place, and the question is unanswerable by construction, not by
-omission of a report. Sixteen assets are catalogued; none of them can be graded.
+**1. "Which models processed data classified Confidential or above?" — CLOSED 2026-08-03, and I had
+the cause wrong.**
+I wrote "there is no classification anywhere". Wrong twice: classification EXISTED (a
+`data_classifications` table, 23 rows over 12 assets, with a working CRUD manager) — but on the
+WAREHOUSE catalogue, which apps never read. Apps read DATA DOMAINS bound to operational connectors, and
+the two inventories were never joined: 0 of 16 assets carry a `domain_id`, and no name match exists
+between `bharatunion.dim_customer` and `bhcon_corebank/customers`. The question failed on a broken join,
+and my probe (which looked for a column on `data_assets`) reported it as a missing feature.
 
-**2. "A customer demands erasure. Prove every copy is gone, including embeddings."**
-Zero erasure requests and zero tombstones exist, against 27 embedded chunks for this tenant. More
-fundamentally: **nothing links a data subject to the chunks that contain them.** Deletion from a source
-table would leave the vector copy in place with no way to find it. This is the single most expensive gap
-in the list — DPDP and GDPR both turn on it, and "we deleted the row" is not an answer when the model
-was trained on, or retrieves from, a copy.
+Fixed by grading the thing apps actually bind to. Domains now carry a level, a run inherits the HIGHEST
+level it read (highest, not average — one restricted field makes it a restricted run), and unclassified
+stays unclassified rather than being floored to public. 36 demo domains graded the way a BFSI data
+office would: identity documents and claim evidence `restricted`, customer/financial `confidential`,
+reference and pricing `internal`.
+
+**Answered live:** `qwen3-vl-8b` processed confidential-or-above data on **15 of 18 attributed runs**;
+37 of the last 40 runs read confidential or restricted data. The remaining half of the answer is that
+22 older runs carry no model attribution at all.
+
+**2. "A customer demands erasure. Prove every copy is gone, including embeddings." — CLOSED, PROVEN.**
+Originally: nothing linked a data subject to the chunks containing them, so deleting a source row left
+the embedded copy in place, unfindable.
+
+Measuring before building changed the design. The knowledge corpus holds almost no personal data (0
+identifiers across 27 chunks — it is policy text); RUN RECORDS hold nearly all of it (134 identifiers
+across 72 runs). An index over the vector store alone would have found nothing and reported success.
+
+So retrieval copies are DELETED and run evidence is REDACTED IN PLACE — a regulator needs the decision
+trail to survive, and both DPDP and GDPR permit retention under legal obligation, but the personal data
+must go. The index stores a salted FINGERPRINT, never the identifier: a table holding every PAN in the
+corpus would be a worse breach than the one it fixes.
+
+**Proven live:** `EXP-2025-00001` found in 11 records → 0 copies remain, 0 index rows, 11 audit records
+preserved with an `[ERASED:REFERENCE]` marker, and 32 other subjects still findable.
 
 **3. "On what lawful basis was this personal data processed?"**
 No consent or lawful-basis record anywhere in the schema. For a BFSI buyer under DPDP this is a required

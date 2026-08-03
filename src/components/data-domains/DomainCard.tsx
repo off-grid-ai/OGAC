@@ -25,9 +25,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { explainResponse } from '@/lib/api-failure';
+
 import { describeDeleteImpact, describeUsage, type DomainUsage } from '@/lib/data-domain-usage';
 import { formatAliases } from '@/lib/data-domains-ui';
 import { panelHref, withPanelParams } from '@/lib/url-panel';
+
+// One tone per level, most sensitive loudest. 'unclassified' is deliberately NOT the same neutral grey
+// as 'public' — an ungraded source must not read as a safe one.
+const CLASSIFICATION_TONE: Record<string, string> = {
+  restricted: 'border-destructive/50 bg-destructive/10 text-destructive',
+  confidential: 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-500',
+  internal: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+  public: 'border-border bg-muted text-muted-foreground',
+  unclassified: 'border-dashed border-muted-foreground/50 bg-transparent text-muted-foreground',
+};
+
 
 export interface DomainLite {
   id: string;
@@ -36,6 +48,8 @@ export interface DomainLite {
   connectorId: string;
   connectorName: string;
   resource: string;
+  /** Sensitivity of what this rule reaches; null = nobody has graded it. */
+  classification?: string | null;
 }
 
 // One declared domain rule as a card, with row-level management: edit (URL-driven side panel,
@@ -133,7 +147,22 @@ export function DomainCard({
             <p className="text-xs text-muted-foreground/60">No aliases</p>
           )}
           <div className="mt-auto space-y-2">
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {/* WHAT SENSITIVITY THIS REACHES. Classification existed on the warehouse catalogue,
+                  which apps never read — so a CISO's "which models saw Confidential data" hit a
+                  broken join. Grading the DOMAIN closes it, because the domain is what apps bind to.
+                  Ungraded says so plainly instead of looking safe. */}
+              <Badge
+                variant="outline"
+                className={CLASSIFICATION_TONE[domain.classification ?? 'unclassified'] ?? CLASSIFICATION_TONE.unclassified}
+                title={
+                  domain.classification
+                    ? `Data reached through this rule is classified ${domain.classification}`
+                    : 'Nobody has classified what this rule reaches — it is not treated as public'
+                }
+              >
+                {domain.classification ?? 'unclassified'}
+              </Badge>
               <Badge variant="secondary" className="bg-primary/10 text-primary">
                 {domain.connectorName}
               </Badge>

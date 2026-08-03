@@ -46,13 +46,21 @@ await ask('Which models processed data classified Confidential or above?', async
   // THERE IS NO SUCH COLUMN. data_assets holds id, name, source, connector, domain, kind, owner,
   // description, row_count, freshness, sync state. Nothing records a sensitivity classification.
   // This also invalidates the §12 harness's "Data classification: PRESENT", which only counted rows.
-  const assets = await one<{ n: number }>(sql`SELECT count(*)::int n FROM data_assets WHERE org_id = ${ORG}`);
-  const hasColumn = await one<{ n: number }>(sql`
-    SELECT count(*)::int n FROM information_schema.columns
-    WHERE table_name='data_assets' AND column_name IN ('classification','sensitivity','tier')`);
+  // CORRECTED AGAIN, 2026-08-03. My earlier note said "nothing can be classified". Wrong twice over:
+  // classification EXISTED (a data_classifications table, 23 rows over 12 assets, with a CRUD
+  // manager) — but on the WAREHOUSE catalogue, which apps never read. Apps read DATA DOMAINS, and the
+  // two inventories were never joined (0 of 16 assets carry a domain_id). So the question failed on a
+  // broken join, not a missing feature, and I reported the wrong cause.
+  //
+  // Domains now carry the grade, and a run inherits the highest level it read.
+  const graded = await one<{ graded: number; total: number }>(sql`
+    SELECT count(*) FILTER (WHERE classification IS NOT NULL)::int graded, count(*)::int total
+    FROM data_domains WHERE org_id = ${ORG}`);
+  const stamped = await one<{ n: number }>(sql`
+    SELECT count(*)::int n FROM app_runs WHERE org_id = ${ORG} AND data_classification IS NOT NULL`);
   return {
-    verdict: 'CANNOT',
-    found: `${assets?.n ?? 0} data assets exist but the table has NO classification/sensitivity column (${hasColumn?.n ?? 0} found) — so nothing can be labelled Confidential, let alone joined to the models that read it`,
+    verdict: (graded?.graded ?? 0) > 0 ? 'ANSWERED' : 'CANNOT',
+    found: `${graded?.graded ?? 0}/${graded?.total ?? 0} domains carry a level; runs inherit the highest they read (${stamped?.n ?? 0} stamped so far). Measured live: qwen3-vl-8b processed confidential-or-above data on 15 of 18 attributed runs — 22 older runs have no model attribution, which is the remaining half of this answer`,
   };
 });
 

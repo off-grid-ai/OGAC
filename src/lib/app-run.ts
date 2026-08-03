@@ -1311,6 +1311,34 @@ function dispatchSinkDelivery(
 // Convenience for non-durable / simple apps + tests. Drives the pure scheduler: repeatedly take the
 // next runnable steps, execute them, fold results into AppRunState, persist, and stop when the run
 // reaches a terminal state OR hits an awaiting_human step (the durable workflow owns the resume).
+/**
+ * The most sensitive classification this app's steps can read, resolved from the DOMAINS they bind.
+ * Computed once at run start: it is a property of the spec, and recomputing it later would report
+ * today's classification against yesterday's run. Never throws — a run must not fail because a
+ * classification lookup did.
+ */
+async function runDataClassification(spec: AppSpec, orgId: string): Promise<string | null> {
+  try {
+    const bound = (spec.steps ?? [])
+      .filter((s) => s.kind === 'connector-query')
+      .map((s) => (s as { domain?: string }).domain)
+      .filter((d): d is string => Boolean(d));
+    if (!bound.length) return null;
+    const { listDomains } = await import('@/lib/data-domains-store');
+    const { runSensitivity } = await import('@/lib/run-sensitivity');
+    const domains = await listDomains(orgId);
+    const read = domains.filter((d) => bound.includes(d.id) || bound.includes(d.label));
+    return runSensitivity(
+      read.map((d) => ({
+        label: d.label,
+        classification: (d as { classification?: string | null }).classification ?? null,
+      })),
+    ).level;
+  } catch {
+    return null;
+  }
+}
+
 /** The app's current version number, or null when it has no history yet. Never throws. */
 async function currentAppVersion(appId: string, orgId: string): Promise<number | null> {
   try {
@@ -1332,6 +1360,7 @@ export async function runApp(
   // a null simply means "unversioned", which is honest for an app that predates version history.
   const appVersion = await currentAppVersion(spec.id, ctx.orgId);
   const state = initState(spec, ctx.runId, appVersion);
+  state.dataClassification = await runDataClassification(spec, ctx.orgId);
   await deps.persist(state, input, ctx.orgId);
   // Every inference this app makes — agent steps, grounding, guardrail model calls — is attributed to
   // the app's tenant on the observability doc (G-GATEWAY-ATTR-SWEEP).

@@ -75,6 +75,8 @@ export interface AppRunState {
    * rather than picking up whatever is current — the whole point is to know what actually ran.
    */
   appVersion?: number | null;
+  /** The most sensitive classification this run reads — fixed at start, like the version. */
+  dataClassification?: string | null;
 }
 
 // ─── topoOrder — a stable topological order of the steps ─────────────────────────────────────────

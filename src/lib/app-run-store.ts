@@ -54,6 +54,8 @@ let ensuredColumn: Promise<void> | null = null;
 async function ensureAppVersionColumn(): Promise<void> {
   ensuredColumn ??= db
     .execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS app_version integer;`)
+    .then(() => db.execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS data_classification text;`))
+    .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS classification text;`))
     .then(() => undefined)
     .catch((e) => {
       ensuredColumn = null;
@@ -80,6 +82,8 @@ export async function upsertAppRunState(
     outcome: aggregateOutcome(state.steps),
     // The version that produced this run, so an incident can name the blast radius.
     ...(state.appVersion != null ? { appVersion: state.appVersion } : {}),
+    // The sensitivity of what it read, so "which models saw Confidential data" is a query.
+    ...(state.dataClassification != null ? { dataClassification: state.dataClassification } : {}),
     ...(finished ? { finishedAt: new Date() } : {}),
   };
   await db
@@ -94,6 +98,7 @@ export async function upsertAppRunState(
         // Never overwritten with null on a later write: a resume must not erase the version the run
         // actually started on.
         ...(state.appVersion != null ? { appVersion: state.appVersion } : {}),
+        ...(state.dataClassification != null ? { dataClassification: state.dataClassification } : {}),
         ...(finished ? { finishedAt: new Date() } : {}),
       },
     });

@@ -5,6 +5,7 @@ import {
   isGovernedKafkaDomain,
 } from '@/lib/adapters/kafka-source-onboarding';
 import { requireAdmin } from '@/lib/authz';
+import { normalizeLevel } from '@/lib/data-classification';
 import { getConnector } from '@/lib/connector-detail';
 import { deleteDomain, getDomain, updateDomain } from '@/lib/data-domains-store';
 import { parseAliases } from '@/lib/data-domains-ui';
@@ -35,6 +36,8 @@ interface DomainPatch {
   resource?: string;
   aliases?: string[];
   opHints?: Record<string, unknown> | null;
+  /** Sensitivity of what this rule reaches; null clears the grade. */
+  classification?: string | null;
 }
 
 // Pure: validate + build the partial-update patch from the request body. Field-level validation on
@@ -72,6 +75,12 @@ function buildDomainPatch(
       body.opHints && typeof body.opHints === 'object'
         ? (body.opHints as Record<string, unknown>)
         : null;
+  }
+  if (body.classification !== undefined) {
+    // An explicit empty string CLEARS the grade back to unclassified; anything else is normalised
+    // through the shared vocabulary so a typo cannot become a level the sensitivity rule misreads.
+    const raw = typeof body.classification === 'string' ? body.classification.trim() : '';
+    patch.classification = raw ? normalizeLevel(raw) : null;
   }
   return { ok: true, patch };
 }

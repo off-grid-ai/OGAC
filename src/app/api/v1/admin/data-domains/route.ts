@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { isGovernedKafkaConnector } from '@/lib/adapters/kafka-source-onboarding';
 import { requireAdmin } from '@/lib/authz';
+import { normalizeLevel } from '@/lib/data-classification';
 import { getConnector } from '@/lib/connector-detail';
 import { createDomain, listDomains } from '@/lib/data-domains-store';
 import { validateDomainForm } from '@/lib/data-domains-ui';
@@ -53,7 +54,14 @@ export async function POST(req: Request) {
     body?.opHints && typeof body.opHints === 'object'
       ? (body.opHints as Record<string, unknown>)
       : undefined;
-  const created = await createDomain({ ...result.value, opHints }, orgId);
+  // Sensitivity of what this rule reaches. Normalised through the shared vocabulary so an unknown
+  // label can never be stored as something the run-sensitivity rule will misread; omitted means
+  // unclassified, which is reported as such rather than floored to public.
+  const classification =
+    typeof body?.classification === 'string' && body.classification.trim()
+      ? normalizeLevel(body.classification)
+      : null;
+  const created = await createDomain({ ...result.value, opHints, classification }, orgId);
   auditFromSession(gate, orgId, {
     action: 'data-domain.create',
     resource: `data-domain:${created.id}`,

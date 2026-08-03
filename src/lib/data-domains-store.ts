@@ -35,6 +35,9 @@ export function ensureDataDomainsSchema(): Promise<void> {
       )
     `,
     )
+    // Self-migrated like the other stores here, so an existing deployment gains the column without a
+    // separate migration step.
+    .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS classification text;`))
     .then(() => undefined)
     .catch((error) => {
       schemaReady = null;
@@ -50,6 +53,7 @@ export function toDataDomain(r: DataDomainRow): DataDomain {
     orgId: r.orgId,
     label: r.label,
     aliases: Array.isArray(r.aliases) ? r.aliases : [],
+    classification: (r as { classification?: string | null }).classification ?? null,
     connectorId: r.connectorId,
     resource: r.resource,
     opHints: r.opHints ?? undefined,
@@ -62,6 +66,7 @@ export interface CreateDomainInput {
   resource: string;
   aliases?: string[];
   opHints?: Record<string, unknown>;
+  classification?: string | null;
 }
 
 export interface UpdateDomainInput {
@@ -70,6 +75,7 @@ export interface UpdateDomainInput {
   resource?: string;
   aliases?: string[];
   opHints?: Record<string, unknown> | null;
+  classification?: string | null;
 }
 
 // List every declared domain for an org, stable order (label asc) for deterministic resolution.
@@ -111,6 +117,7 @@ export async function createDomain(
       orgId,
       label: input.label,
       aliases: input.aliases ?? [],
+      classification: input.classification ?? null,
       connectorId: input.connectorId,
       resource: input.resource,
       opHints: input.opHints,
@@ -133,6 +140,7 @@ export async function updateDomain(
   if (patch.connectorId !== undefined) set.connectorId = patch.connectorId;
   if (patch.resource !== undefined) set.resource = patch.resource;
   if (patch.aliases !== undefined) set.aliases = patch.aliases;
+  if (patch.classification !== undefined) set.classification = patch.classification;
   if (patch.opHints !== undefined) set.opHints = patch.opHints ?? undefined;
 
   const [row] = await db
