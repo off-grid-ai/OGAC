@@ -1,6 +1,6 @@
 import { withGatewayScope } from '@/lib/gateway-scope';
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { agentRuns } from '@/db/schema';
 import {
@@ -109,6 +109,12 @@ export interface AgentRun {
   checks: CheckResult[];
   provenance: Provenance | null;
   startedAt: string;
+  /** Highest classification this run read; null = nothing classified was read. */
+  dataClassification?: string | null;
+  /** The policy version in force when it ran; null = predates the history. */
+  policyVersion?: number | null;
+  /** Why we were permitted to process what it read; null = no declared source was read. */
+  lawfulBasis?: string | null;
 }
 
 function extractText(data: unknown): string | null {
@@ -429,12 +435,40 @@ function toRun(
   };
 }
 
+// Deploy is rsync-only with no migration step, so the governance columns are self-provisioned on
+// first use (the pattern the other stores here use). Every read of agent_runs selects * and would
+// throw on a missing column, so this is awaited by the readers too, not just the writer.
+let ensuredGovernanceColumns: Promise<void> | null = null;
+async function ensureAgentRunGovernanceColumns(): Promise<void> {
+  ensuredGovernanceColumns ??= db
+    .execute(sql`ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS data_classification text;`)
+    .then(() => db.execute(sql`ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS policy_version integer;`))
+    .then(() => db.execute(sql`ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS lawful_basis text;`))
+    .then(() => undefined)
+    .catch((e) => {
+      ensuredGovernanceColumns = null;
+      throw e;
+    });
+  return ensuredGovernanceColumns;
+}
+
 // Persist a run and return the API shape. Shared by the denied / blocked / done paths.
 async function persist(
   id: string,
   v: Omit<AgentRun, 'id' | 'startedAt'>,
   orgId: string = DEFAULT_ORG,
+  /**
+   * The declared data domains this run actually read. Absent on the denied/blocked paths, which read
+   * nothing — those still get the POLICY VERSION, because the rules governed what the run was allowed
+   * to do even when it was stopped.
+   */
+  boundDomains: readonly string[] = [],
 ): Promise<AgentRun> {
+  // Best-effort: a governance stamp must never be able to fail a run. A failure yields nulls and the
+  // surfaces report "not recorded" rather than guessing.
+  await ensureAgentRunGovernanceColumns().catch(() => {});
+  const { resolveGovernanceStamp, NO_STAMP } = await import('@/lib/run-governance-stamp');
+  const stamp = await resolveGovernanceStamp(boundDomains, orgId).catch(() => NO_STAMP);
   const [row] = await db
     .insert(agentRuns)
     .values({
@@ -451,9 +485,14 @@ async function persist(
       citations: deepStripNul(v.citations),
       checks: deepStripNul(v.checks),
       provenance: deepStripNul(v.provenance),
+      dataClassification: stamp.dataClassification,
+      policyVersion: stamp.policyVersion,
+      lawfulBasis: stamp.lawfulBasis,
     })
     .returning();
-  return toRun(row, v);
+  // The stamp goes into the RETURNED run too — a caller reading the response of the run it just
+  // created would otherwise see nulls and conclude the stamp had not been recorded.
+  return toRun(row, { ...v, ...stamp });
 }
 
 function rowToRun(r: typeof agentRuns.$inferSelect): AgentRun {
@@ -466,10 +505,14 @@ function rowToRun(r: typeof agentRuns.$inferSelect): AgentRun {
     citations: r.citations ?? [],
     checks: (r.checks ?? []) as CheckResult[],
     provenance: r.provenance ?? null,
+    dataClassification: (r as { dataClassification?: string | null }).dataClassification ?? null,
+    policyVersion: (r as { policyVersion?: number | null }).policyVersion ?? null,
+    lawfulBasis: (r as { lawfulBasis?: string | null }).lawfulBasis ?? null,
   });
 }
 
 export async function listAgentRuns(limit = 15, orgId: string = DEFAULT_ORG): Promise<AgentRun[]> {
+  await ensureAgentRunGovernanceColumns().catch(() => {});
   const rows = await db
     .select()
     .from(agentRuns)
@@ -486,6 +529,7 @@ export async function listAgentRunsByAgent(
   limit = 50,
   orgId: string = DEFAULT_ORG,
 ): Promise<AgentRun[]> {
+  await ensureAgentRunGovernanceColumns().catch(() => {});
   const rows = await db
     .select()
     .from(agentRuns)
@@ -501,6 +545,7 @@ export async function getAgentRun(
   id: string,
   orgId: string = DEFAULT_ORG,
 ): Promise<AgentRun | null> {
+  await ensureAgentRunGovernanceColumns().catch(() => {});
   const [row] = await db
     .select()
     .from(agentRuns)
@@ -528,6 +573,7 @@ export async function cancelAgentRun(
   id: string,
   orgId: string = DEFAULT_ORG,
 ): Promise<AgentRun | null> {
+  await ensureAgentRunGovernanceColumns().catch(() => {});
   const [row] = await db
     .update(agentRuns)
     .set({ status: 'cancelled', answer: '' })
@@ -788,6 +834,9 @@ async function runAgentImpl(
   // declared-domain id and keep their legacy behavior; ungrounded agents still retrieve nothing.
   t = Date.now();
   let routed: Awaited<ReturnType<typeof route>>;
+  // The declared domains this run resolved to, carried to the persisted governance stamp. Retrieval
+  // already resolves them to authorize the read — nothing was recording them on the run.
+  let readDomainIds: string[] = [];
   if (sourceMode === 'provided') {
     const hits = [...(context?.providedSources ?? [])];
     routed = {
@@ -815,6 +864,7 @@ async function runAgentImpl(
       contract,
       asker: context?.asker ?? { subject: caller, roles: [] },
     });
+    readDomainIds = retrieval.requestedDomainIds ?? [];
     if (!retrieval.allow) {
       const dataVerdict = retrieval.denied;
       mark('data', 'deny', dataVerdict.reason, [], t);
@@ -841,6 +891,11 @@ async function runAgentImpl(
           provenance: null,
         },
         attribution.org,
+        // A DENIED read read NOTHING. Stamping the requested domains here would record that this run
+        // processed confidential data when policy is precisely what stopped it — a false positive in
+        // the one report a CISO would act on. The policy version is still stamped, because the rules
+        // are what produced the denial.
+        [],
       );
     }
     routed = retrieval.routed;
@@ -898,6 +953,7 @@ async function runAgentImpl(
         provenance: null,
       },
       attribution.org,
+      readDomainIds,
     );
   }
   // The egress the pipeline permits for this run's data-class — threaded into every tool dispatch so
@@ -983,6 +1039,7 @@ async function runAgentImpl(
           provenance: null,
         },
         attribution.org,
+        readDomainIds,
       );
     }
     modelQuery = decision.text;
@@ -1052,6 +1109,7 @@ async function runAgentImpl(
           provenance: null,
         },
         attribution.org,
+        readDomainIds,
       );
     }
     routed = { ...routed, hits: sourceMasking.hits };
@@ -1121,6 +1179,7 @@ async function runAgentImpl(
             provenance: null,
           },
           attribution.org,
+          readDomainIds,
         );
       }
     }
@@ -1220,6 +1279,7 @@ async function runAgentImpl(
         provenance: null,
       },
       attribution.org,
+      readDomainIds,
     );
   }
 
@@ -1277,6 +1337,7 @@ async function runAgentImpl(
       provenance,
     },
     attribution.org,
+    readDomainIds,
   );
 
   // 8. Observability fan-out — the SAME runId lands in all four planes, correlated by one key (C2).

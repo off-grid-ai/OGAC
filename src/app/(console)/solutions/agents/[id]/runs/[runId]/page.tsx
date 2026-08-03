@@ -172,6 +172,46 @@ export default async function RunTracePage({
           </span>
         </div>
 
+        {/* THE GOVERNANCE STAMP. App runs carried these three; agent runs carried none, so every
+            governance question had a blind spot the size of every agent run in the system. Each
+            states "not recorded" rather than showing a blank, because a blank reads as compliance. */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span title="The most sensitive data this run read, from the sources it bound">
+            {run.dataClassification
+              ? `read ${run.dataClassification} data`
+              : 'no classified source read'}
+          </span>
+          <span aria-hidden>·</span>
+          {run.policyVersion != null ? (
+            <Link
+              href={`/governance/policies/history?v=${run.policyVersion}`}
+              className="hover:text-primary hover:underline"
+              title="The policy rules in force when this run happened"
+            >
+              policy v{run.policyVersion}
+            </Link>
+          ) : (
+            <span title="This run predates policy history — we will not claim which rules applied">
+              policy version not recorded
+            </span>
+          )}
+          {run.lawfulBasis ? (
+            <>
+              <span aria-hidden>·</span>
+              <span
+                className={
+                  /no basis|no lawful basis/i.test(run.lawfulBasis)
+                    ? 'text-amber-700 dark:text-amber-500'
+                    : undefined
+                }
+                title="The lawful basis for processing the data this run read"
+              >
+                {run.lawfulBasis}
+              </span>
+            </>
+          ) : null}
+        </div>
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card className="shadow-sm">
             <CardHeader>

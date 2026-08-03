@@ -279,6 +279,12 @@ export const agentRuns = pgTable('agent_runs', {
       publicKey: string | null;
       signedAt: string;
     }>(),
+  // GOVERNANCE STAMP — the same three questions app runs answer, on the OTHER execution path.
+  // Agent runs were left unstamped, so "which models saw confidential data", "under which policy",
+  // and "on what lawful basis" each had a blind spot the size of every agent run in the system.
+  dataClassification: text('data_classification'),
+  policyVersion: integer('policy_version'),
+  lawfulBasis: text('lawful_basis'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

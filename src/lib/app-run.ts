@@ -1317,45 +1317,15 @@ function dispatchSinkDelivery(
  * today's classification against yesterday's run. Never throws — a run must not fail because a
  * classification lookup did.
  */
-// ─── What this run read, and on what basis ─────────────────────────────────────────────────────────
-//
-// One pass over the bound domains answers both governance questions — how sensitive the data was, and
-// whether we were permitted to process it. They were separate reads; the domain list is fetched once.
-async function runDataPosture(
-  spec: AppSpec,
-  orgId: string,
-): Promise<{ classification: string | null; lawfulBasis: string | null }> {
-  try {
-    const bound = (spec.steps ?? [])
-      .filter((s) => s.kind === 'connector-query')
-      .map((s) => (s as { domain?: string }).domain)
-      .filter((d): d is string => Boolean(d));
-    if (!bound.length) return { classification: null, lawfulBasis: null };
-    const { listDomains } = await import('@/lib/data-domains-store');
-    const { runSensitivity } = await import('@/lib/run-sensitivity');
-    const { resolveRunBasis } = await import('@/lib/lawful-basis');
-    const domains = await listDomains(orgId);
-    const read = domains.filter((d) => bound.includes(d.id) || bound.includes(d.label));
-    const classification = runSensitivity(
-      read.map((d) => ({
-        label: d.label,
-        classification: (d as { classification?: string | null }).classification ?? null,
-      })),
-    ).level;
-    // The SUMMARY is stored, not just the basis ids: a run that read one grounded source and one
-    // ungrounded one is not "consent" — the record has to say so, or it overstates our position.
-    const basis = resolveRunBasis(
-      read.map((d) => ({
-        id: d.id,
-        label: d.label,
-        lawfulBasis: (d as { lawfulBasis?: string | null }).lawfulBasis ?? null,
-        purpose: (d as { purpose?: string | null }).purpose ?? null,
-      })),
-    );
-    return { classification, lawfulBasis: read.length ? basis.summary : null };
-  } catch {
-    return { classification: null, lawfulBasis: null };
-  }
+// The app's bound data domains → the governance stamp. The derivation itself lives in
+// run-governance-stamp.ts so the agent path cannot drift from this one.
+async function runDataPosture(spec: AppSpec, orgId: string) {
+  const bound = (spec.steps ?? [])
+    .filter((s) => s.kind === 'connector-query')
+    .map((s) => (s as { domain?: string }).domain)
+    .filter((d): d is string => Boolean(d));
+  const { resolveGovernanceStamp } = await import('@/lib/run-governance-stamp');
+  return resolveGovernanceStamp(bound, orgId);
 }
 
 /** The app's current version number, or null when it has no history yet. Never throws. */
@@ -1380,7 +1350,7 @@ export async function runApp(
   const appVersion = await currentAppVersion(spec.id, ctx.orgId);
   const state = initState(spec, ctx.runId, appVersion);
   const posture = await runDataPosture(spec, ctx.orgId);
-  state.dataClassification = posture.classification;
+  state.dataClassification = posture.dataClassification;
   state.lawfulBasis = posture.lawfulBasis;
   await deps.persist(state, input, ctx.orgId);
   // Every inference this app makes — agent steps, grounding, guardrail model calls — is attributed to
