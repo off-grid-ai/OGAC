@@ -20,6 +20,8 @@ import {
 import { deriveAssetPosture, type ClassificationLevel } from '@/lib/data-classification';
 import { evaluateFreshness, summarizeFreshness, type FreshnessResult } from '@/lib/data-freshness';
 import { evaluateRetention } from '@/lib/data-retention';
+import { RetentionPanel } from '@/components/data/RetentionPanel';
+import { listRetentionRules, listRetentionRuns } from '@/lib/retention-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 import { PageFrame } from '@/components/PageFrame';
@@ -49,6 +51,13 @@ export async function DataGovernanceContent({
 }: Readonly<{ embedded?: boolean; showHeading?: boolean }> = {}) {
   await requireModuleForUser('governance');
   const org = await currentOrgId();
+  const [retentionRules, sweeps] = await Promise.all([
+    listRetentionRules(org).catch(() => []),
+    listRetentionRuns(org).catch(() => []),
+  ]);
+  // Dates cross the server/client boundary as ISO strings.
+  const retentionSweeps = sweeps.map((r) => ({ ...r, ranAt: r.ranAt.toISOString() }));
+
   const [assets, allClassifications, retentions, requests] = await Promise.all([
     listAssets(org),
     listAllClassifications(org),
@@ -191,6 +200,11 @@ export async function DataGovernanceContent({
               )}
             </CardContent>
           </Card>
+
+          {/* RETENTION THAT ACTUALLY RUNS. Everything below this reads the warehouse catalogue and can
+              only SAY an asset is due — nothing acts on it. This is the console-owned half: set the
+              limit, apply it, and keep the proof. */}
+          <RetentionPanel rules={retentionRules} runs={retentionSweeps} />
 
           {/* Retention due. */}
           <Card className="shadow-sm">
