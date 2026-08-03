@@ -50,6 +50,10 @@ export interface DomainLite {
   resource: string;
   /** Sensitivity of what this rule reaches; null = nobody has graded it. */
   classification?: string | null;
+  /** DPDP lawful basis; null = none recorded. */
+  lawfulBasis?: string | null;
+  /** What this data may be used for; null = not stated. */
+  purpose?: string | null;
 }
 
 // One declared domain rule as a card, with row-level management: edit (URL-driven side panel,
@@ -208,6 +212,10 @@ export function DomainCard({
           // Without this the edit form opened with an empty grade and SAVING would clear it — an edit
           // to a label would silently un-classify the domain.
           classification: domain.classification ?? '',
+          // Same trap as classification: without these, editing a label would silently erase the
+          // lawful basis and purpose.
+          lawfulBasis: domain.lawfulBasis ?? '',
+          purpose: domain.purpose ?? '',
         }}
         submitUrl={`/api/v1/admin/data-domains/${domain.id}`}
         method="PATCH"

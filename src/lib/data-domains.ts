@@ -34,6 +34,10 @@ export interface DataDomain {
    * Null = nobody has graded it, which is reported as unclassified and never floored to public.
    */
   classification?: string | null;
+  /** DPDP lawful basis for processing what this rule reaches; null = none recorded. */
+  lawfulBasis?: string | null;
+  /** What this data may be used for, in the operator's words; null = not stated. */
+  purpose?: string | null;
 }
 
 export interface RankedDomain {

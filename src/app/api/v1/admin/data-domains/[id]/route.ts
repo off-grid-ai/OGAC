@@ -6,6 +6,7 @@ import {
 } from '@/lib/adapters/kafka-source-onboarding';
 import { requireAdmin } from '@/lib/authz';
 import { normalizeLevel } from '@/lib/data-classification';
+import { isLawfulBasis } from '@/lib/lawful-basis';
 import { getConnector } from '@/lib/connector-detail';
 import { deleteDomain, getDomain, updateDomain } from '@/lib/data-domains-store';
 import { parseAliases } from '@/lib/data-domains-ui';
@@ -38,6 +39,8 @@ interface DomainPatch {
   opHints?: Record<string, unknown> | null;
   /** Sensitivity of what this rule reaches; null clears the grade. */
   classification?: string | null;
+  lawfulBasis?: string | null;
+  purpose?: string | null;
 }
 
 // Pure: validate + build the partial-update patch from the request body. Field-level validation on
@@ -81,6 +84,14 @@ function buildDomainPatch(
     // through the shared vocabulary so a typo cannot become a level the sensitivity rule misreads.
     const raw = typeof body.classification === 'string' ? body.classification.trim() : '';
     patch.classification = raw ? normalizeLevel(raw) : null;
+  }
+  if (body.lawfulBasis !== undefined) {
+    const raw = typeof body.lawfulBasis === 'string' ? body.lawfulBasis.trim() : '';
+    patch.lawfulBasis = raw && isLawfulBasis(raw) ? raw : null;
+  }
+  if (body.purpose !== undefined) {
+    const raw = typeof body.purpose === 'string' ? body.purpose.trim() : '';
+    patch.purpose = raw || null;
   }
   return { ok: true, patch };
 }

@@ -204,6 +204,24 @@ export function AppRunStatus({ initial }: Readonly<{ initial: AppRunView }>) {
                   policy version not recorded
                 </span>
               )}
+              {/* AND WHETHER WE WERE ALLOWED TO. The basis is only meaningful if the gap is visible
+                  too, so a run that read an ungrounded source says so in warning tone rather than
+                  showing a reassuring basis name. */}
+              {run.lawfulBasis ? (
+                <>
+                  {' · '}
+                  <span
+                    className={
+                      /no basis|no lawful basis/i.test(run.lawfulBasis)
+                        ? 'text-amber-700 dark:text-amber-500'
+                        : undefined
+                    }
+                    title="The lawful basis for processing the data this run read"
+                  >
+                    {run.lawfulBasis}
+                  </span>
+                </>
+              ) : null}
               {polling ? (
                 <span className="ml-2 inline-flex items-center gap-1 text-sky-600 dark:text-sky-400">
                   <Spinner className="size-3" /> live

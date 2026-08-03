@@ -3,6 +3,7 @@ import { auditFromSession } from '@/lib/audit-actor';
 import { isGovernedKafkaConnector } from '@/lib/adapters/kafka-source-onboarding';
 import { requireAdmin } from '@/lib/authz';
 import { normalizeLevel } from '@/lib/data-classification';
+import { isLawfulBasis } from '@/lib/lawful-basis';
 import { getConnector } from '@/lib/connector-detail';
 import { createDomain, listDomains } from '@/lib/data-domains-store';
 import { validateDomainForm } from '@/lib/data-domains-ui';
@@ -61,7 +62,15 @@ export async function POST(req: Request) {
     typeof body?.classification === 'string' && body.classification.trim()
       ? normalizeLevel(body.classification)
       : null;
-  const created = await createDomain({ ...result.value, opHints, classification }, orgId);
+  // Lawful basis is validated against the DPDP vocabulary — an unrecognised value is stored as NO
+  // BASIS RECORDED rather than being kept as junk that later reads like a real basis.
+  const rawBasis = typeof body?.lawfulBasis === 'string' ? body.lawfulBasis.trim() : '';
+  const lawfulBasis = rawBasis && isLawfulBasis(rawBasis) ? rawBasis : null;
+  const purpose = typeof body?.purpose === 'string' && body.purpose.trim() ? body.purpose.trim() : null;
+  const created = await createDomain(
+    { ...result.value, opHints, classification, lawfulBasis, purpose },
+    orgId,
+  );
   auditFromSession(gate, orgId, {
     action: 'data-domain.create',
     resource: `data-domain:${created.id}`,

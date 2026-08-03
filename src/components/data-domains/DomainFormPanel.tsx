@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { validateDomainForm, type DomainFormResult } from '@/lib/data-domains-ui';
+import { LAWFUL_BASES } from '@/lib/lawful-basis';
 
 const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm';
 
@@ -26,6 +27,10 @@ export interface DomainDraft {
   aliasesRaw: string;
   /** Sensitivity of what this rule reaches. Empty = unclassified, which is a real state, not a default. */
   classification?: string | null;
+  /** DPDP lawful basis. Empty = none recorded, which is reported as a gap, never assumed. */
+  lawfulBasis?: string | null;
+  /** What this data may be used for. Empty = not stated. */
+  purpose?: string | null;
 }
 
 // The shared create/edit form for a data-domain rule, rendered inside a URL-driven Sheet. It owns
@@ -59,6 +64,8 @@ export function DomainFormPanel({
   const [resource, setResource] = useState(initial.resource);
   const [aliasesRaw, setAliasesRaw] = useState(initial.aliasesRaw);
   const [classification, setClassification] = useState(initial.classification ?? '');
+  const [lawfulBasis, setLawfulBasis] = useState(initial.lawfulBasis ?? '');
+  const [purpose, setPurpose] = useState(initial.purpose ?? '');
   const [errors, setErrors] = useState<DomainFormResult['errors']>({});
   const [busy, setBusy] = useState(false);
 
@@ -70,6 +77,8 @@ export function DomainFormPanel({
       setResource(initial.resource);
       setAliasesRaw(initial.aliasesRaw);
       setClassification(initial.classification ?? '');
+      setLawfulBasis(initial.lawfulBasis ?? '');
+      setPurpose(initial.purpose ?? '');
       setErrors({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,7 +99,7 @@ export function DomainFormPanel({
       // Sent alongside the validated rule. An empty string CLEARS the grade — a domain nobody has
       // graded must be able to go back to unclassified rather than being stuck at whatever was picked
       // once by mistake.
-      body: JSON.stringify({ ...result.value, classification }),
+      body: JSON.stringify({ ...result.value, classification, lawfulBasis, purpose }),
     });
     setBusy(false);
     if (res.ok) {
@@ -137,6 +146,47 @@ export function DomainFormPanel({
             Every run inherits the highest grade it reads, so a report can answer &ldquo;which models
             processed confidential data&rdquo;. Unclassified is never treated as public.
           </p>
+        </div>
+        {/* LAWFUL BASIS + PURPOSE. A DPO's first two questions about any processing — are we allowed
+            to do this, and is this what we said we'd use it for. Neither existed anywhere. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="domain-basis" className="text-xs">
+              Why we may process this
+            </Label>
+            <select
+              id="domain-basis"
+              value={lawfulBasis}
+              onChange={(e) => setLawfulBasis(e.target.value)}
+              className={SELECT}
+            >
+              <option value="">No basis recorded — reported as a gap</option>
+              {LAWFUL_BASES.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label} — {b.detail}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground">
+              {LAWFUL_BASES.find((b) => b.id === lawfulBasis)?.detail ??
+                'A run that reads a source with no recorded basis is flagged — we never assume consent.'}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="domain-purpose" className="text-xs">
+              What it may be used for
+            </Label>
+            <Input
+              id="domain-purpose"
+              placeholder="Assessing and settling claims"
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              An app doing something outside this is flagged for a human to confirm — data collected
+              for one purpose should not be quietly reused for another.
+            </p>
+          </div>
         </div>
           <div className="space-y-1.5">
             <Label htmlFor="dom-label">Label</Label>

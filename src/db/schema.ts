@@ -1136,6 +1136,10 @@ export const appRuns = pgTable('app_runs', {
   // Stamped at run start from policy_versions; null on runs that predate the history, which must
   // read as "not recorded" rather than be attributed to the earliest version we happen to hold.
   policyVersion: integer('policy_version'),
+  // WHY WE WERE PERMITTED TO PROCESS WHAT THIS RUN READ (DPDP lawful basis), resolved from the
+  // domains its steps bound. Stores the SUMMARY, not a bare basis id: a run that read one grounded
+  // source and one ungrounded one is not "consent", and the record must not overstate our position.
+  lawfulBasis: text('lawful_basis'),
   // Aggregated final output of the app run.
   outcome: text('outcome').notNull().default(''),
   // Detached provenance signature over the outcome — same shape as agentRuns.provenance.
@@ -1264,6 +1268,14 @@ export const dataDomains = pgTable('data_domains', {
   // Classifying the domain closes that chain, because the domain is the thing an app actually binds to.
   // Null means UNCLASSIFIED and is reported as such — never silently treated as public.
   classification: text('classification'),
+  // WHY WE ARE ALLOWED TO PROCESS THIS, and WHAT FOR (DPDP lawful basis + purpose limitation).
+  //
+  // A DPO's first question is not "is it secure" but "are we permitted to do this at all", and the
+  // second is "is this the purpose we collected it for". Nothing in the schema answered either.
+  // Recorded on the domain for the same reason as classification: the domain is what apps bind to.
+  // Null means NO BASIS RECORDED and is reported as such — never defaulted to consent.
+  lawfulBasis: text('lawful_basis'),
+  purpose: text('purpose'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('data_domains_org_idx').on(t.orgId), index('data_domains_connector_idx').on(t.connectorId)]);

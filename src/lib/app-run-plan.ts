@@ -77,6 +77,8 @@ export interface AppRunState {
   appVersion?: number | null;
   /** The most sensitive classification this run reads — fixed at start, like the version. */
   dataClassification?: string | null;
+  /** Why we were permitted to process what this run read; null = no personal-data source read. */
+  lawfulBasis?: string | null;
 }
 
 // ─── topoOrder — a stable topological order of the steps ─────────────────────────────────────────

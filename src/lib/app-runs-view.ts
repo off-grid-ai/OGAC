@@ -60,6 +60,8 @@ export interface AppRunView {
   appVersion?: number | null;
   /** The policy version in force when this ran; null on runs predating the history. */
   policyVersion?: number | null;
+  /** Why we were permitted to process what this run read; null = no personal-data source read. */
+  lawfulBasis?: string | null;
 }
 
 // ─── Tone vocabulary — the design tokens' status colours, chosen by pure rule ─────────────────────
@@ -162,6 +164,8 @@ export interface AppRunRowLike {
   appVersion?: number | null;
   /** The policy version in force when this ran; null on runs predating the history. */
   policyVersion?: number | null;
+  /** Why we were permitted to process what this run read; null = no personal-data source read. */
+  lawfulBasis?: string | null;
 }
 
 // ─── Row → view mapper (pure) ─────────────────────────────────────────────────────────────────────
@@ -178,5 +182,6 @@ export function toAppRunView(row: AppRunRowLike): AppRunView {
     finishedAt: row.finishedAt ? new Date(row.finishedAt).toISOString() : null,
     appVersion: (row as { appVersion?: number | null }).appVersion ?? null,
     policyVersion: (row as { policyVersion?: number | null }).policyVersion ?? null,
+    lawfulBasis: (row as { lawfulBasis?: string | null }).lawfulBasis ?? null,
   };
 }

@@ -1317,25 +1317,44 @@ function dispatchSinkDelivery(
  * today's classification against yesterday's run. Never throws — a run must not fail because a
  * classification lookup did.
  */
-async function runDataClassification(spec: AppSpec, orgId: string): Promise<string | null> {
+// ─── What this run read, and on what basis ─────────────────────────────────────────────────────────
+//
+// One pass over the bound domains answers both governance questions — how sensitive the data was, and
+// whether we were permitted to process it. They were separate reads; the domain list is fetched once.
+async function runDataPosture(
+  spec: AppSpec,
+  orgId: string,
+): Promise<{ classification: string | null; lawfulBasis: string | null }> {
   try {
     const bound = (spec.steps ?? [])
       .filter((s) => s.kind === 'connector-query')
       .map((s) => (s as { domain?: string }).domain)
       .filter((d): d is string => Boolean(d));
-    if (!bound.length) return null;
+    if (!bound.length) return { classification: null, lawfulBasis: null };
     const { listDomains } = await import('@/lib/data-domains-store');
     const { runSensitivity } = await import('@/lib/run-sensitivity');
+    const { resolveRunBasis } = await import('@/lib/lawful-basis');
     const domains = await listDomains(orgId);
     const read = domains.filter((d) => bound.includes(d.id) || bound.includes(d.label));
-    return runSensitivity(
+    const classification = runSensitivity(
       read.map((d) => ({
         label: d.label,
         classification: (d as { classification?: string | null }).classification ?? null,
       })),
     ).level;
+    // The SUMMARY is stored, not just the basis ids: a run that read one grounded source and one
+    // ungrounded one is not "consent" — the record has to say so, or it overstates our position.
+    const basis = resolveRunBasis(
+      read.map((d) => ({
+        id: d.id,
+        label: d.label,
+        lawfulBasis: (d as { lawfulBasis?: string | null }).lawfulBasis ?? null,
+        purpose: (d as { purpose?: string | null }).purpose ?? null,
+      })),
+    );
+    return { classification, lawfulBasis: read.length ? basis.summary : null };
   } catch {
-    return null;
+    return { classification: null, lawfulBasis: null };
   }
 }
 
@@ -1360,7 +1379,9 @@ export async function runApp(
   // a null simply means "unversioned", which is honest for an app that predates version history.
   const appVersion = await currentAppVersion(spec.id, ctx.orgId);
   const state = initState(spec, ctx.runId, appVersion);
-  state.dataClassification = await runDataClassification(spec, ctx.orgId);
+  const posture = await runDataPosture(spec, ctx.orgId);
+  state.dataClassification = posture.classification;
+  state.lawfulBasis = posture.lawfulBasis;
   await deps.persist(state, input, ctx.orgId);
   // Every inference this app makes — agent steps, grounding, guardrail model calls — is attributed to
   // the app's tenant on the observability doc (G-GATEWAY-ATTR-SWEEP).

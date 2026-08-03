@@ -58,6 +58,9 @@ async function ensureAppVersionColumn(): Promise<void> {
     .then(() => db.execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS data_classification text;`))
     .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS classification text;`))
     .then(() => db.execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS policy_version integer;`))
+    .then(() => db.execute(sql`ALTER TABLE app_runs ADD COLUMN IF NOT EXISTS lawful_basis text;`))
+    .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS lawful_basis text;`))
+    .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS purpose text;`))
     .then(() => undefined)
     .catch((e) => {
       ensuredColumn = null;
@@ -87,6 +90,9 @@ export async function upsertAppRunState(
     ...(state.appVersion != null ? { appVersion: state.appVersion } : {}),
     // The sensitivity of what it read, so "which models saw Confidential data" is a query.
     ...(state.dataClassification != null ? { dataClassification: state.dataClassification } : {}),
+    // WHY WE WERE PERMITTED TO. The lawful basis the run relied on, or the honest gap when a source
+    // it read has none recorded.
+    ...(state.lawfulBasis != null ? { lawfulBasis: state.lawfulBasis } : {}),
     // WHICH POLICY WAS IN FORCE. Rules are edited in place, so without this a run reviewed months
     // later is judged against today's policy — which may have been rewritten since. Set on the
     // insert only (absent from the `set` clause below) so a mid-flight policy change cannot
@@ -107,6 +113,7 @@ export async function upsertAppRunState(
         // actually started on.
         ...(state.appVersion != null ? { appVersion: state.appVersion } : {}),
         ...(state.dataClassification != null ? { dataClassification: state.dataClassification } : {}),
+        ...(state.lawfulBasis != null ? { lawfulBasis: state.lawfulBasis } : {}),
         ...(finished ? { finishedAt: new Date() } : {}),
       },
     });

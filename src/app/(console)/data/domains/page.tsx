@@ -89,6 +89,8 @@ export default async function DataDomainsPage() {
               connectorName: connectorName(d.connectorId),
               resource: d.resource,
               classification: d.classification ?? null,
+              lawfulBasis: d.lawfulBasis ?? null,
+              purpose: d.purpose ?? null,
             }}
             usage={usageFor(d)}
             connectors={connectorOptions}

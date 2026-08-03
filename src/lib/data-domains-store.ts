@@ -38,6 +38,11 @@ export function ensureDataDomainsSchema(): Promise<void> {
     // Self-migrated like the other stores here, so an existing deployment gains the column without a
     // separate migration step.
     .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS classification text;`))
+    // WHY we may hold this, and WHAT it may be used for. A DPO's first two questions about any
+    // processing, and nothing in the schema answered either. On the domain, not the app, because the
+    // domain is what apps bind to — a basis per app would be re-declared forever and drift.
+    .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS lawful_basis text;`))
+    .then(() => db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS purpose text;`))
     .then(() => undefined)
     .catch((error) => {
       schemaReady = null;
@@ -54,6 +59,8 @@ export function toDataDomain(r: DataDomainRow): DataDomain {
     label: r.label,
     aliases: Array.isArray(r.aliases) ? r.aliases : [],
     classification: (r as { classification?: string | null }).classification ?? null,
+    lawfulBasis: (r as { lawfulBasis?: string | null }).lawfulBasis ?? null,
+    purpose: (r as { purpose?: string | null }).purpose ?? null,
     connectorId: r.connectorId,
     resource: r.resource,
     opHints: r.opHints ?? undefined,
@@ -67,6 +74,8 @@ export interface CreateDomainInput {
   aliases?: string[];
   opHints?: Record<string, unknown>;
   classification?: string | null;
+  lawfulBasis?: string | null;
+  purpose?: string | null;
 }
 
 export interface UpdateDomainInput {
@@ -76,6 +85,8 @@ export interface UpdateDomainInput {
   aliases?: string[];
   opHints?: Record<string, unknown> | null;
   classification?: string | null;
+  lawfulBasis?: string | null;
+  purpose?: string | null;
 }
 
 // List every declared domain for an org, stable order (label asc) for deterministic resolution.
@@ -118,6 +129,8 @@ export async function createDomain(
       label: input.label,
       aliases: input.aliases ?? [],
       classification: input.classification ?? null,
+      lawfulBasis: input.lawfulBasis ?? null,
+      purpose: input.purpose ?? null,
       connectorId: input.connectorId,
       resource: input.resource,
       opHints: input.opHints,
@@ -141,6 +154,8 @@ export async function updateDomain(
   if (patch.resource !== undefined) set.resource = patch.resource;
   if (patch.aliases !== undefined) set.aliases = patch.aliases;
   if (patch.classification !== undefined) set.classification = patch.classification;
+  if (patch.lawfulBasis !== undefined) set.lawfulBasis = patch.lawfulBasis;
+  if (patch.purpose !== undefined) set.purpose = patch.purpose;
   if (patch.opHints !== undefined) set.opHints = patch.opHints ?? undefined;
 
   const [row] = await db
