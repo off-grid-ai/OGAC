@@ -169,3 +169,50 @@ export function agoText(iso: string, now: Date): string {
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
+
+// ─── Test cases that belong to a shared pipeline ──────────────────────────────────────────────────────
+//
+// The Quality tab of "Expense Claim Approval (fidelity check)" listed cases titled
+// "Reimbursement Approval: answer using a source this pipeline does not allow." and
+// "Reimbursement Approval (copy): …". They belong to the shared pipeline and the page says so in prose —
+// but the effect is a person reading another app's cases under theirs and concluding the screen is wrong.
+// One case also appeared twice with different expectations.
+
+export interface RawCase {
+  id: string;
+  query: string;
+  expected: string;
+}
+
+export interface PresentedCase {
+  id: string;
+  /** The question, with any "<App name>: " prefix lifted out of it. */
+  query: string;
+  expected: string;
+  /** The app the case was written for, when its query named one. Null when it names none. */
+  fromApp: string | null;
+}
+
+/**
+ * Lift the app name out of the case text and drop exact duplicates.
+ *
+ * The prefix is SHOWN, as a tag, not deleted: these cases really do come from a sibling app on the same
+ * pipeline, and hiding that would make the list look like it was written for this app when it was not.
+ * Naming the source turns a confusing screen into an accurate one.
+ */
+export function presentCases(cases: readonly RawCase[]): PresentedCase[] {
+  const seen = new Set<string>();
+  const out: PresentedCase[] = [];
+  for (const c of cases) {
+    const m = /^([^:]{3,60}):\s*(.+)$/.exec(c.query.trim());
+    const fromApp = m ? m[1].trim() : null;
+    const query = m ? m[2].trim() : c.query.trim();
+    // Dedupe on the MEANING (question + expectation), not the id — the same case attached twice is one
+    // case to a reader, and showing it twice reads as a bug in the product.
+    const key = `${query.toLowerCase()}|${c.expected.trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id: c.id, query, expected: c.expected.trim(), fromApp });
+  }
+  return out;
+}

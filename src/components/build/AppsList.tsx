@@ -1,6 +1,5 @@
 import { ArrowSquareOut, Clock, Play, Sparkle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { DeleteRowButton } from '@/components/admin/DeleteRowButton';
 import { PipelineChip, type PipelineChipData } from '@/components/pipelines/PipelineChip';
 import { Badge } from '@/components/ui/badge';
 import { appStateNote, confusableTitles, orderAppsByAttention } from '@/lib/my-work';
@@ -136,9 +135,9 @@ export function AppsList({
                     shared link
                   </a>
                 ) : null}
-                <div className="ml-auto">
-                  <DeleteRowButton url={`/api/v1/admin/apps/${app.id}`} label={app.title} />
-                </div>
+                {/* DELETE SAT BESIDE OPEN AT EQUAL PROMINENCE on every card. Moved behind the app's
+                    own screen: deleting a process is not a browsing-level action, and a mis-click here
+                    destroys something a department depends on. */}
               </div>
             </CardContent>
           </Card>

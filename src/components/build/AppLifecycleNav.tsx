@@ -64,12 +64,18 @@ export function AppLifecycleNav({
               <ArrowSquareOut className="size-3.5" />
             </a>
           ) : (
-            <span
-              className="ml-auto shrink-0 text-[11px] text-muted-foreground"
-              title="Publish this app to give your team a link they can open."
+            /* THE OWNER'S ACTUAL NEXT STEP HAD NO BUTTON. On an unpublished app the two prominent
+               header controls were "Duplicate this app" and "Publish as template" — platform actions —
+               while "Not published yet" was 11px grey text in the corner and going live had nowhere to
+               click. This points at the tab that publishes, and names the check-first order. */
+            <a
+              href={`/solutions/apps/${encodeURIComponent(appId)}/quality`}
+              className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 no-underline transition-colors hover:bg-amber-500/20 dark:text-amber-500"
+              title="Nobody can use this app until it is published. Run its checks first, then publish."
             >
-              Not published yet
-            </span>
+              Draft — check it, then publish
+              <ArrowSquareOut className="size-3.5" />
+            </a>
           )}
           {/* The lifecycle tabs used to render as a horizontal rail HERE, alongside the left sidebar —
             two competing navigations on one screen, and the reason this surface was hard to place

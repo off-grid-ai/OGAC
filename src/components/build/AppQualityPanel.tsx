@@ -1,7 +1,7 @@
 'use client';
 
 import { CheckCircle, Plus, XCircle } from '@phosphor-icons/react';
-import { overallVerdict, type CheckRunSummary } from '@/lib/quality-plain';
+import { overallVerdict, presentCases, type CheckRunSummary } from '@/lib/quality-plain';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -44,6 +44,10 @@ export function AppQualityPanel({
   const at = useMemo(() => (now ? new Date(now) : new Date(0)), [now]);
   // THE ANSWER THIS TAB EXISTS FOR, which it could not give. A never-run check is deliberately not
   // counted as passing: "we never checked" and "we checked and it was fine" are different answers.
+  const presented = useMemo(
+    () => presentCases(golden.map((g) => ({ id: g.id, query: g.query, expected: g.expected }))),
+    [golden],
+  );
   const overall = useMemo(
     () =>
       overallVerdict(
@@ -176,15 +180,28 @@ export function AppQualityPanel({
       {/* Golden set for this pipeline */}
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-sm">Golden set for this pipeline ({golden.length})</CardTitle>
+          {/* "Golden set" is the industry's word, not the owner's. */}
+          <CardTitle className="text-sm">
+            Test cases these checks run against ({presented.length})
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {golden.length > 0 ? (
+          {presented.length > 0 ? (
             <div className="space-y-1.5">
-              {golden.map((g) => (
+              {presented.map((g) => (
                 <div key={g.id} className="rounded-md border border-border bg-background px-3 py-2">
                   <div className="text-sm text-foreground">{g.query}</div>
-                  <div className="text-[11px] text-muted-foreground">expects: {g.expected}</div>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>Should: {g.expected}</span>
+                    {/* These cases really do come from sibling apps on the same pipeline. Naming the
+                        source turns a confusing screen into an accurate one; hiding it made the list
+                        look like it was written for this app when it was not. */}
+                    {g.fromApp && g.fromApp !== appTitle ? (
+                      <span className="rounded border border-border px-1.5 py-0.5">
+                        written for {g.fromApp}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>
