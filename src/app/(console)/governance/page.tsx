@@ -1,5 +1,6 @@
 import { DomainDashboard } from '@/components/domain-dashboard/DomainDashboard';
 import { ModuleCard, type ModuleLink } from '@/components/ModuleCard';
+import { listDomains } from '@/lib/data-domains-store';
 import { PageFrame } from '@/components/PageFrame';
 import { buildDomainDashboard } from '@/lib/domain-dashboard';
 import { getOrgPolicy, listAudit, listUsers } from '@/lib/store';
@@ -15,12 +16,18 @@ export const dynamic = 'force-dynamic';
 // "Unavailable" (attention), never a fabricated number.
 export default async function GovernancePage() {
   const orgId = await currentOrgId();
-  const [policy, users, teams, audit] = await Promise.all([
+  const [policy, users, teams, audit, domains] = await Promise.all([
     safeWithTimeout(() => getOrgPolicy(), 1200, null),
     safeWithTimeout(() => listUsers(orgId), 1200, null),
     safeWithTimeout(() => listTeams(orgId), 1200, null),
     safeWithTimeout(() => listAudit({ orgId, limit: 6 }), 1200, null),
+    safeWithTimeout(() => listDomains(orgId), 1200, null),
   ]);
+
+  // THE DPO's WORKLIST. Every data source we process without a recorded lawful basis is an
+  // indefensible position, and it was invisible — there was nowhere in the console this count could
+  // come from. It is stated as a count of gaps, not a reassuring percentage.
+  const ungrounded = domains?.filter((d) => !d.lawfulBasis).length ?? null;
 
   const model = buildDomainDashboard('governance', {
     facts: [
@@ -39,6 +46,18 @@ export default async function GovernancePage() {
         description: users ? 'Identities that can sign in to the console.' : 'Users did not respond.',
         href: '/governance/access',
         state: users ? 'neutral' : 'attention',
+      },
+      {
+        label: 'Sources without a lawful basis',
+        value: ungrounded == null ? 'Unavailable' : ungrounded.toLocaleString(),
+        description:
+          ungrounded == null
+            ? 'Data domains did not respond.'
+            : ungrounded === 0
+              ? `Every one of ${domains?.length ?? 0} data sources records why we may process it.`
+              : `Of ${domains?.length ?? 0} data sources, ${ungrounded} do not record why we are permitted to process them. Runs reading these are flagged.`,
+        href: '/data/domains',
+        state: ungrounded == null ? 'attention' : ungrounded === 0 ? 'good' : 'attention',
       },
       {
         label: 'Teams',

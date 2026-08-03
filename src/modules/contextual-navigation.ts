@@ -62,6 +62,7 @@ export type ContextualDestinationId =
   | 'modules'
   | 'decisions'
   | 'history'
+  | 'review'
   | 'users'
   | 'invitations'
   | 'clients'
@@ -341,6 +342,14 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
         label: 'Realm',
         description: 'Identity realm configuration.',
         route: '/governance/access/realm',
+      },
+      {
+        // "Show me your last access review" had no answer — the console could list people and change
+        // roles but never recorded that anyone certified the list.
+        id: 'review',
+        label: 'Review',
+        description: 'Certify who should still have access.',
+        route: '/governance/access/review',
       },
     ],
   },

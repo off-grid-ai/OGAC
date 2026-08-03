@@ -786,6 +786,24 @@ export async function setUserRole(
   return row ?? null;
 }
 
+// Take a person's console access away, org-scoped. Used by the access review, where a 'revoke'
+// decision has to actually remove access — a review that records a revocation without performing it
+// is worse than no review, because it produces an artefact asserting something untrue.
+//
+// The row is deleted rather than flagged: audit events reference the email/id as text, so the trail
+// survives the user record going away.
+export async function revokeUserAccess(
+  id: string,
+  orgId: string = DEFAULT_ORG,
+): Promise<boolean> {
+  await ensureOrgSchema();
+  const rows = await db
+    .delete(users)
+    .where(and(eq(users.id, id), eq(users.orgId, orgId)))
+    .returning({ id: users.id });
+  return rows.length > 0;
+}
+
 // ─── Data plane (M3) ──────────────────────────────────────────────────────────
 export interface Connector {
   id: string;
