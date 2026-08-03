@@ -19,6 +19,7 @@ import {
   type WorkRun,
 } from '@/lib/app-work-queue';
 import { getApp } from '@/lib/apps-store';
+import { disambiguate } from '@/lib/my-work';
 import { currentOrgId } from '@/lib/tenancy';
 import { cn } from '@/lib/utils';
 
@@ -123,6 +124,32 @@ function Row({
       ) : null}
     </Link>
   );
+}
+
+/**
+ * Give identical waiting rows something to tell them apart.
+ *
+ * Three cases of the same claim record rendered three rows reading exactly "Meera Malhotra · submitted ·
+ * ₹41,346.44 · 2025-09-16" — a person cannot tell whether that is one case shown thrice or three real
+ * ones, and cannot safely act on any of them. Same defect and same fix as the cross-app queue; the rule
+ * lives in my-work.ts so the two screens cannot drift.
+ */
+function disambiguateWaiting(runs: readonly WorkRun[]): WorkRun[] {
+  return disambiguate(
+    runs.map((r) => ({
+      runId: r.id,
+      appId: '',
+      appTitle: '',
+      subject: r.subject ?? null,
+      waitingSince: r.startedAt,
+      href: '',
+    })),
+    new Date(0),
+    (c) => c.subject?.trim() || c.runId,
+  ).map(({ case: c, label }) => {
+    const original = runs.find((r) => r.id === c.runId)!;
+    return { ...original, subject: label };
+  });
 }
 
 export default async function AppWorkPage({
@@ -285,7 +312,7 @@ export default async function AppWorkPage({
                     Nothing is waiting on a decision right now.
                   </p>
                 ) : (
-                  queue.waiting.map((run) => (
+                  disambiguateWaiting(queue.waiting).map((run) => (
                     <Row
                       key={run.id}
                       run={run}

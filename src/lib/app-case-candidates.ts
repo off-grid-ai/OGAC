@@ -11,6 +11,8 @@
 // This module is the PURE half: which domain an app reads, and how to turn a raw row into a row a person
 // can recognise. The I/O (resolving the connector, running the query) stays in the route.
 
+import { DEFAULT_CURRENCY, formatMoney } from '@/lib/money';
+
 /** A record the app could work on, reduced to what a person needs to choose between them. */
 export interface CaseCandidate {
   /** Stable identity of the record, passed as the run input when chosen. */
@@ -86,11 +88,14 @@ function firstString(row: Record<string, unknown>, keys: readonly string[]): str
   return null;
 }
 
-/** Group a whole number so an amount reads as money. Deterministic — never toLocaleString. */
+/**
+ * Money, in the org's currency and grouping.
+ *
+ * Grouped western-style with no symbol, which put a bare "41,346.44" next to a "₹37,562" from a sibling
+ * code path on the same screen. One shared formatter now, so the two cannot disagree again.
+ */
 function group(value: number): string {
-  const [whole, fraction] = Math.abs(value).toString().split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${value < 0 ? '-' : ''}${grouped}${fraction ? `.${fraction}` : ''}`;
+  return formatMoney(value, DEFAULT_CURRENCY, { decimals: !Number.isInteger(value) });
 }
 
 /**
