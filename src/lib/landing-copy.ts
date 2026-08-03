@@ -134,20 +134,8 @@ export const LANDING = {
       ],
     },
   },
-  insights: {
-    number: '07',
-    kicker: 'Insights',
-    heading: 'The case for enterprise intelligence.',
-    intro: 'The thesis, the operating model, and the controls that make it practical.',
-    articles: [
-      { title: 'Why enterprise AI needs an operating layer', summary: 'The missing bridge between frontier models and how an enterprise works.' },
-      { title: 'How an enterprise learns from its own work', summary: 'Turning scattered experience into reusable intelligence.' },
-      { title: 'What makes an AI answer trustworthy', summary: 'How citations, provenance, and evaluation let people verify a result.' },
-      { title: 'What the 14-day enterprise proof includes', summary: 'Five use cases, agreed outcomes, zero upfront cost.' },
-    ],
-  },
   faq: {
-    number: '08',
+    number: '07',
     kicker: 'FAQ',
     heading: 'Frequently asked questions.',
     asideKicker: 'Still have questions?',

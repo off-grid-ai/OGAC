@@ -404,25 +404,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 08 Insights ────────────────────────────────────────────────────── */}
-      <section id="insights" className="relative border-b border-border bg-card/40">
-        <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead number={c.insights.number} kicker={c.insights.kicker} heading={c.insights.heading} intro={c.insights.intro} />
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {c.insights.articles.map((a, i) => (
-              <BlurFade key={a.title} delay={0.06 * i} inView>
-                <div className="flex h-full flex-col rounded-2xl border border-border bg-background p-5">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Draft</span>
-                  <h3 className="mt-2 text-sm font-semibold text-foreground">{a.title}</h3>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{a.summary}</p>
-                </div>
-              </BlurFade>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 09 FAQ ─────────────────────────────────────────────────────────── */}
+      {/* ── 08 FAQ ─────────────────────────────────────────────────────────── */}
       <section id="faq" className="relative border-b border-border">
         <div className="mx-auto grid max-w-[100rem] gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1fr_1.4fr]">
           <div>
