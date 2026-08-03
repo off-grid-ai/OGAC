@@ -29,6 +29,8 @@ interface AuditSpec {
   upstreamVersion: string;
   versionSource: string;
   denominatorSource: string;
+  /** When THIS service was last audited. Per-service on purpose — see the default below. */
+  auditedAt?: string;
   auditState?: ServiceCapabilityAudit['auditState'];
   auditStateEvidence?: string;
   summary: string;
@@ -42,7 +44,10 @@ function audit(spec: AuditSpec): ServiceCapabilityAudit {
     upstreamVersion: spec.upstreamVersion,
     versionSource: spec.versionSource,
     denominatorSource: spec.denominatorSource,
-    auditedAt: '2026-07-20',
+    // PER-SERVICE, not one date for the family. Re-auditing the Console and stamping today's date on
+    // all twenty entries would claim twenty audits that never happened — the exact overstatement this
+    // map exists to avoid. Services keep the date they were actually last looked at.
+    auditedAt: spec.auditedAt ?? '2026-07-20',
     auditState: spec.auditState ?? 'stale',
     auditStateEvidence:
       spec.auditState === 'current'
@@ -66,6 +71,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
   audit({
     serviceId: 'console',
     serviceLabel: 'Console',
+    auditedAt: '2026-08-03',
     upstreamVersion: 'Deployed release 10c00aa44e6d80843dd1f9b0fda1b312d9fbc8cd',
     versionSource: `live deploy/.deployed-sha on S1 verified 2026-08-03 → 10c00aa44e6d80843dd1f9b0fda1b312d9fbc8cd, signin 200; ${FLEET_EVIDENCE} release stamp`,
     denominatorSource:
