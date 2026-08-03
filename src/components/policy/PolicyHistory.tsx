@@ -1,7 +1,7 @@
 import { ArrowDown, MinusCircle, PlusCircle, PencilSimple, Power } from '@phosphor-icons/react/dist/ssr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { describeRule, type RuleChange } from '@/lib/policy-version';
+import { describeRule, diffRuleSets, summariseChanges, type RuleChange } from '@/lib/policy-version';
 import type { PolicyVersionRecord } from '@/lib/policy-versions-store';
 
 const CHANGE_ICON: Record<RuleChange['kind'], typeof PlusCircle> = {
@@ -63,6 +63,25 @@ export function PolicyHistory({
   // When a run linked here, show THAT version's rules in the left panel — the reader came to find out
   // what applied to their run, not what applies today. Falls back to current when v is unknown, and
   // says which it is showing either way.
+  // THE CHANGE LIST IS DERIVED, NOT REPLAYED.
+  //
+  // Each version's `changes` was written by whichever wording the code had at the time, so old rows
+  // kept phrasing since improved ("Deny when action is credit_decision") while the panel beside them
+  // read properly. Recomputing from the two immutable RULE SNAPSHOTS is not a rewrite of history — the
+  // snapshots are the record; the sentence is a rendering of it — and it means the wording can never
+  // drift again. The stored list is the fallback for a version whose predecessor is outside the
+  // loaded window, where a derived diff would wrongly read as "everything was added".
+  const described = versions.map((v, i) => {
+    const prev = versions[i + 1];
+    if (!prev) {
+      return i === versions.length - 1 && v.version === 1
+        ? { ...v, changes: diffRuleSets([], v.rules), summary: v.summary }
+        : v;
+    }
+    const changes = diffRuleSets(prev.rules, v.rules);
+    return { ...v, changes, summary: summariseChanges(changes) };
+  });
+
   const focused = focusVersion != null ? versions.find((v) => v.version === focusVersion) : undefined;
   const shown = focused ?? current;
   const isHistoric = shown.version !== current.version;
@@ -146,7 +165,7 @@ export function PolicyHistory({
         </CardHeader>
         <CardContent>
           <ol className="space-y-4">
-            {[current, ...past].map((v, i) => (
+            {described.map((v, i) => (
               <li
                 key={v.version}
                 className={`relative rounded-md pl-6 ${v.version === shown.version && isHistoric ? 'bg-amber-500/[0.07] py-1.5' : ''}`}
