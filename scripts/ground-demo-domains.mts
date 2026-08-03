@@ -42,20 +42,38 @@ const NO_PERSONAL_DATA = /pricing|rate card|rfq|competitor|branch|product catalo
 await db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS lawful_basis text;`);
 await db.execute(sql`ALTER TABLE data_domains ADD COLUMN IF NOT EXISTS purpose text;`);
 
-const domains = await db.execute<{ id: string; org_id: string; label: string; lawful_basis: string | null }>(sql`
-  SELECT id, org_id, label, lawful_basis FROM data_domains
+const domains = await db.execute<{
+  id: string;
+  org_id: string;
+  label: string;
+  lawful_basis: string | null;
+  classification: string | null;
+}>(sql`
+  SELECT id, org_id, label, lawful_basis, classification FROM data_domains
   WHERE org_id IN ('org_bharat','org_suraksha') ORDER BY org_id, label`);
 
 let grounded = 0;
 let noPersonalData = 0;
 let unmatched = 0;
 for (const d of domains.rows) {
-  if (NO_PERSONAL_DATA.test(d.label)) {
+  // The no-personal-data exemption must DEFER TO THE CLASSIFICATION. 'reimbursement quota' matched the
+  // label pattern and was exempted while being graded confidential — i.e. the two governance answers
+  // for one source contradicted each other. Confidential or restricted means personal data is in
+  // there, so a lawful basis is required whatever the label looks like.
+  const gradedSensitive = d.classification === 'confidential' || d.classification === 'restricted';
+  if (NO_PERSONAL_DATA.test(d.label) && !gradedSensitive) {
     noPersonalData++;
     console.log(`  ${d.org_id} ${d.label.padEnd(34)} — no personal data, deliberately left ungrounded`);
     continue;
   }
   const hit = GROUNDS.find((g) => g.match.test(d.label));
+  if (!hit && gradedSensitive) {
+    // Graded sensitive but no rule matched: this is a real gap that a human must close, and it is
+    // reported loudly rather than being given a plausible-looking default basis.
+    unmatched++;
+    console.log(`! ${d.org_id} ${d.label.padEnd(34)} ${String(d.classification).padEnd(13)} GRADED SENSITIVE, NO BASIS RULE — needs a human`);
+    continue;
+  }
   if (!hit) {
     unmatched++;
     console.log(`? ${d.org_id} ${d.label.padEnd(34)} NO RULE — stays a recorded gap`);
