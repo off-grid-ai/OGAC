@@ -9,7 +9,7 @@ import { listApps } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
 import {
   buildMyWork,
-  caseLabel,
+  disambiguate,
   overdueNote,
   waitedFor,
   type AppSummary,
@@ -99,17 +99,17 @@ export default async function MyTasksPage() {
                     ) : null}
                   </CardHeader>
                   <CardContent className="space-y-1.5">
-                    {g.cases.map((c) => (
+                    {disambiguate(g.cases, now).map(({ case: c, label }) => (
                       <Link
                         key={c.runId}
                         href={c.href}
                         className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 hover:border-primary/50 hover:bg-muted/40"
                       >
                         <span className="min-w-0">
-                          {/* Never the run id: "Case proof_msd05iih" tells a person nothing they can act on. */}
-                          <span className="block truncate text-sm text-foreground">
-                            {caseLabel(c, now)}
-                          </span>
+                          {/* Never the run id: "Case proof_msd05iih" tells a person nothing they can act on.
+                              Identical labels get their start time appended — three indistinguishable rows
+                              is the failure a case subject exists to prevent. */}
+                          <span className="block truncate text-sm text-foreground">{label}</span>
                           <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                             <Clock className="size-3" />
                             waiting {waitedFor(c.waitingSince, now)}

@@ -228,6 +228,9 @@ function groupDigits(value: number): string {
 const QUANTITY_KEY = /(amount|value|total|price|cost|salary|balance|sum|limit|premium|payout|claim_?amt)/i;
 const IDENTIFIER_KEY = /(number|no|id|ref|code|pan|account|acct|policy|ifsc|phone|mobile|pin|otp)$/i;
 
+/** Field names that carry the case but name nothing about it — labelling them adds only noise. */
+const GENERIC_KEY = /^(input|text|body|message|payload|data|value|content|prompt)$/i;
+
 function isQuantityKey(key: string): boolean {
   if (IDENTIFIER_KEY.test(key)) return false;
   return QUANTITY_KEY.test(key);
@@ -281,8 +284,15 @@ export function runSubject(input: unknown): string | null {
   for (const [key, value] of Object.entries(record)) {
     const text = scalarText(value, key);
     if (!text) continue;
-    const label = key.replace(/[_-]+/g, ' ').trim();
-    parts.push(`${label.charAt(0).toUpperCase()}${label.slice(1)}: ${text}`);
+    // A GENERIC ENVELOPE KEY IS NOT A LABEL. Prefixing these produced rows reading
+    // "Input: Vendor 140 · open · 76,557" — the word "Input" is the plumbing's name for the field, and
+    // it pushes the part the reader actually needs further along the line.
+    if (GENERIC_KEY.test(key)) {
+      parts.push(text);
+    } else {
+      const label = key.replace(/[_-]+/g, ' ').trim();
+      parts.push(`${label.charAt(0).toUpperCase()}${label.slice(1)}: ${text}`);
+    }
     if (parts.length === 2) break;
   }
   if (parts.length > 0) return parts.join(' · ').slice(0, MAX_SUBJECT);

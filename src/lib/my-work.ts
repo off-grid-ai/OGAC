@@ -73,6 +73,24 @@ export function caseLabel(c: WaitingCase, now: Date): string {
   return `Unnamed case · waiting ${days} day${days === 1 ? '' : 's'}`;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * "03 Aug 14:33" — formatted explicitly, NOT via toLocaleString.
+ *
+ * app-work-queue.ts already records why: toLocaleString resolves the locale AND time zone from the
+ * environment, so it renders one way on the server and another in the browser. That mismatch broke this
+ * page's first deploy once already, and this is the same trap one module over. UTC is stated so the
+ * reader is never shown a time whose zone is a guess.
+ */
+function startedAtText(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return 'a time we did not record';
+  const d = new Date(t);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getUTCDate())} ${MONTHS[d.getUTCMonth()]} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
+}
+
 /** How long it has been waiting, in words a person reads without doing arithmetic. */
 export function waitedFor(since: string, now: Date): string {
   const ms = now.getTime() - Date.parse(since);
@@ -149,6 +167,32 @@ export function buildMyWork(
     idle,
     isEmpty: oldestFirst.length === 0 && idle.length === 0,
   };
+}
+
+/**
+ * Make every label in a group distinguishable.
+ *
+ * Three cases of the same claim record produced three rows reading exactly
+ * "Meera Malhotra · submitted · 41,346.44 · 2025-09-16" — a person cannot tell them apart, cannot tell
+ * whether it is one case shown thrice or three real ones, and cannot safely act on any of them. That is
+ * precisely the failure a case subject exists to prevent, so where labels collide the arrival time is
+ * appended — the one thing that genuinely differs. Labels that are already unique are left alone.
+ */
+export function disambiguate(
+  cases: readonly WaitingCase[],
+  now: Date,
+  label: (c: WaitingCase, now: Date) => string = caseLabel,
+): { case: WaitingCase; label: string }[] {
+  const counts = new Map<string, number>();
+  for (const c of cases) {
+    const l = label(c, now);
+    counts.set(l, (counts.get(l) ?? 0) + 1);
+  }
+  return cases.map((c) => {
+    const l = label(c, now);
+    if ((counts.get(l) ?? 0) < 2) return { case: c, label: l };
+    return { case: c, label: `${l} · started ${startedAtText(c.waitingSince)}` };
+  });
 }
 
 /**
