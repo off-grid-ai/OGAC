@@ -170,19 +170,27 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
       {/* ROADMAP §10 Flow 3 ("generates the app and tests … generates or updates evaluations"): checks
           derived from this app's own design, offered for a person to accept. Above the panel because a
           new app's evaluation set is empty and this is what fills it. */}
-      <SuggestedChecks appId={id} appTitle={app.title} />
-      <RealCaseQualityCard quality={realCases} appHref={`/solutions/apps/${encodeURIComponent(id)}`} />
-      <AppQualityCoverage items={coverage} />
-      {/* The positive answer, when there is one. Only reachable because the run records which app it was
-          for — otherwise this would be an org-wide number wearing this app's name. */}
-      {driftSentence ? (
-        <Card className="shadow-sm">
-          <CardContent className="py-4">
-            <p className="text-xs font-medium text-foreground">Has the data feeding this app shifted?</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{driftSentence}</p>
-          </CardContent>
-        </Card>
-      ) : null}
+      {/* Two columns from xl. These four cards were a single tall stack, each one full width with a
+          third of a wide screen empty beside it — the repeated piece of design feedback in this repo.
+          Two rather than four: "Not watching this app" runs to several lines and four skinny columns
+          would trade one kind of waste for a worse one. */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SuggestedChecks appId={id} appTitle={app.title} />
+        <RealCaseQualityCard quality={realCases} appHref={`/solutions/apps/${encodeURIComponent(id)}`} />
+        <AppQualityCoverage items={coverage} />
+        {/* The positive answer, when there is one. Only reachable because the run records which app it
+            was for — otherwise this would be an org-wide number wearing this app's name. */}
+        {driftSentence ? (
+          <Card className="shadow-sm">
+            <CardContent className="py-4">
+              <p className="text-xs font-medium text-foreground">
+                Has the data feeding this app shifted?
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{driftSentence}</p>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
       <AppQualityPanel
         appId={id}
         appTitle={app.title}

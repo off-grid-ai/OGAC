@@ -48,23 +48,49 @@ outcome language, without the person ever opening the operator page?**
 | Guardrails / masking / recognizers (9) | **Partly** — the run trail says "passed a safety check"; there is no per-app "what protects this" panel |
 | Data sources / connectors (15) | **Partly** — the app's steps name what they read, and the source-health warning now appears on the deployed app too (2026-08-04) |
 | Knowledge indexes / retrieval (8) | **Partly** — reached through the app's steps, never summarised as "what this app knows" |
-| Drift monitoring (7) | **No** — per-app drift is impossible: `drift_runs` carries only `org_id` + `dataset`, no app key |
-| Model routing / where it ran (7) | **No, and not buildable today** — the ledger records a model name and nothing about where it ran. See below. |
+| Drift monitoring (7) | **Yes (2026-08-04)** — drift checks record the app they were run for; the Quality tab answers it both ways round |
+| Model routing / where it ran (7) | **Yes (2026-08-04)** — every governed call records the endpoint it went to; "Where the data went" states the record |
 | Lineage (4) | **No** — no per-app "where this data came from" |
 | Replication / ETL / orchestration (15) | **Correctly operator-only** — a department person does not run pipelines |
 | SIEM / audit / posture (6+) | **Correctly operator-only** |
 
-## Refused rather than faked
+## The two I first refused — and then closed properly
 
-Two panels a reader would obviously want, that would have to be invented:
+I initially recorded both of these as "correctly refused: the data does not exist". Refusing to **fake**
+them was right. Stopping there was not — making the data exist was within reach, and both are now closed.
 
-- **"Where did this app's data go — did anything leave the building?"** This is the product's core claim
-  and it is the one an owner would most value. The ledger records **a model name (4 distinct) and nothing
-  about where that model ran** — no provider, no host, no region, no per-run egress event. A panel here
-  would be an assertion dressed as evidence. It needs the recording first (ranked #1 in
-  `WHATS_MISSING_2.md`), not a UI.
-- **Per-app drift.** `drift_runs` has no app key. A per-app drift panel would be silently always-empty or
-  silently org-wide.
+### 1. Where the data actually went — **CLOSED 2026-08-04**
+
+Every governed model call now records, **at the moment of the call**, the endpoint it was made to, the
+leash decision (local/cloud/block) and whether personal details were masked first. `classifyEndpoint`
+(pure) decides on-prem vs external from the address: loopback, RFC1918, RFC6598, `.local`/`.internal`/
+`.lan` and single-label hosts are on-prem; a public domain is external.
+
+Proven live on `org_bharat`:
+`{"decision":"local","masked":true,"endpoint":"http://127.0.0.1:8800"}` →
+*"All 1 AI call for this app stayed on your own hardware — nothing was sent to an outside provider."*
+
+The honesty rules are the substance:
+- **UNKNOWN is a real answer** and is never folded into either side. An unclassifiable endpoint must not
+  count as on-prem (that manufactures the reassurance) nor as external (that invents a breach).
+- **With no records it says so** rather than reassuring. "Nothing left" and "we did not look" are the same
+  picture to an auditor and opposite facts to a customer.
+- It sits **beside** "What protects this", which states the RULES. This states the RECORD.
+
+Cost of getting it there: **four** boundaries had to name the field (`StepResult` → the workflow's
+`foldResult` → `applyResult` → `toStoredSteps`). It was produced correctly and arrived as nothing, because
+the workflow fold — the path every real app takes — did not list it.
+
+### 2. Per-app drift — **CLOSED 2026-08-04**
+
+`drift_runs` now records `dataset` + `app_id` when the check is run, so attribution is real rather than
+reconstructed. `listDriftRunsForApp` returns only runs whose `app_id` was recorded — deliberately not
+"every run in this org shown on the app's page", which is the join the column exists to avoid.
+
+Verified both directions: `bhapp_loan` (one attributed run) reads *"100% of the data feeding this app has
+shifted since its baseline"*; `bhapp_reimb` (none) is reported as a **gap** — "no drift check has been run
+for this app yet" — never as calm. Drifted data is named as a reason to look, not a failure: data moving
+is often the business changing.
 
 ## Closed on 2026-08-04
 
@@ -84,7 +110,12 @@ Two panels a reader would obviously want, that would have to be invented:
 
 ## Next, in value order
 
-1. **Per-run egress record**, then the panel — turns the core claim from assertion into evidence.
-2. **"What protects this app"** — one plain-language panel from the app's own declared checks and masking
-   rules. Buildable today from the app spec.
-3. **"What this app knows"** — the knowledge/domains it reads, summarised, instead of only inside steps.
+1. **"What this app knows"** — the knowledge and data domains it reads, summarised on the app, instead of
+   being visible only inside individual steps.
+2. **Lineage per app** — "where this data came from", which today has no per-app join.
+3. **Subject-indexed audit** — the audit trail names an actor, never a data subject, so "who looked at
+   this customer's file?" is still unanswerable (`WHATS_MISSING_2.md` #2).
+
+The lesson from the two closures above is the one worth carrying: *"the data does not exist"* is a
+statement about today's recording, not a boundary on the work. Refusing to fake a join is right; leaving
+the question permanently unanswerable when we control the writer is not.
