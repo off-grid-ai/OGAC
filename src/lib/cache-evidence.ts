@@ -112,6 +112,47 @@ export function cacheEvidence(c: CacheCounters, configuredShared: boolean): Cach
   };
 }
 
+export interface CacheSelection {
+  /** True when this deployment asked for a shared cache at all. */
+  configuredShared: boolean;
+  /**
+   * True when a shared cache was selected but cannot possibly work, because no address is configured.
+   * Distinct from an outage: every read and write will land in the fallback, so the counters look exactly
+   * like a Redis that is down. The remedy is different, so the cause has to be too.
+   */
+  misconfigured: boolean;
+  sentence: string;
+}
+
+/**
+ * What the deployment ASKED for, read apart from what the counters show it GOT.
+ *
+ * Without this split, a shared cache selected with no address produces `degraded` and the sentence
+ * "the shared store did not answer" — true, and it points the reader at a server that was never named.
+ */
+export function cacheSelection(portId: string, hasAddress: boolean): CacheSelection {
+  if (portId !== 'redis') {
+    return {
+      configuredShared: false,
+      misconfigured: false,
+      sentence: 'This deployment uses the in-process cache, so each process keeps its own copy.',
+    };
+  }
+  if (!hasAddress) {
+    return {
+      configuredShared: true,
+      misconfigured: true,
+      sentence:
+        'A shared cache is selected but no cache address is configured, so nothing can reach a shared store and every entry stays in the process that made it. This is a missing setting, not an outage.',
+    };
+  }
+  return {
+    configuredShared: true,
+    misconfigured: false,
+    sentence: 'This deployment is configured to use a shared cache, so entries are meant to outlive any one process.',
+  };
+}
+
 /** A counters object with one field incremented. Pure, so the store stays a plain value. */
 export function count(c: CacheCounters, field: keyof CacheCounters, by = 1): CacheCounters {
   return { ...c, [field]: c[field] + by };

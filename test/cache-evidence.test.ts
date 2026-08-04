@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   ZERO_COUNTERS,
   cacheEvidence,
+  cacheSelection,
   count,
   type CacheCounters,
 } from '../src/lib/cache-evidence.ts';
@@ -72,6 +73,40 @@ test('count() is pure — the original tallies are untouched', () => {
   assert.equal(before.sharedHits, 1);
   assert.equal(after.sharedHits, 2);
   assert.notEqual(before, after);
+});
+
+test('THE AMBIGUITY: a shared cache with no address produces the SAME counters as an outage', () => {
+  // Both cases tally every write to the fallback. cacheEvidence cannot tell them apart and must not try —
+  // so the selection is what names the cause, and the remedies are genuinely different: start the server,
+  // versus configure an address for a server nobody has named.
+  const outageLike = c({ fallbackWrites: 12, fallbackHits: 3 });
+  const evidence = cacheEvidence(outageLike, true);
+  assert.equal(evidence.state, 'degraded');
+
+  const unreachable = cacheSelection('redis', true);
+  const unnamed = cacheSelection('redis', false);
+  assert.equal(unreachable.misconfigured, false);
+  assert.equal(unnamed.misconfigured, true);
+  assert.match(unnamed.sentence, /missing setting, not an outage/);
+  // The outage case must NOT be described as a missing setting.
+  assert.doesNotMatch(unreachable.sentence, /missing setting/);
+});
+
+test('the in-process default is not a misconfiguration, with or without an address', () => {
+  for (const hasAddress of [true, false]) {
+    const s = cacheSelection('memory', hasAddress);
+    assert.equal(s.configuredShared, false);
+    assert.equal(s.misconfigured, false);
+    // A leftover address while in-process is selected is not an error — the address is simply unused.
+    assert.doesNotMatch(s.sentence, /outage|missing/);
+  }
+});
+
+test('an unknown cache port is treated as not-shared rather than assumed shared', () => {
+  // Assuming shared would claim a guarantee the port may not provide.
+  const s = cacheSelection('some-future-cache', true);
+  assert.equal(s.configuredShared, false);
+  assert.equal(s.misconfigured, false);
 });
 
 test('invalidations are tracked independently of reads', () => {
