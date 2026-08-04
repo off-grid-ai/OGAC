@@ -12,7 +12,8 @@ import { listAppRuns } from '@/lib/app-run-store';
 import { buildAppDashboard } from '@/lib/app-dashboard';
 import { isDeclinedByPerson } from '@/lib/app-run-progress';
 import { latestResult } from '@/lib/app-front-door';
-import { describeProtections, type RoutingRule } from '@/lib/app-protections';
+import { describeProtections, describeReads, type RoutingRule } from '@/lib/app-protections';
+import { listDomains } from '@/lib/data-domains-store';
 import { summariseEgress, type EgressEvent } from '@/lib/egress-record';
 import { getPipeline } from '@/lib/pipelines';
 import { sourceHealth } from '@/lib/source-health';
@@ -217,6 +218,17 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
   );
   const egress = summariseEgress(egressEvents);
 
+  // WHAT THIS APP READS, by name. The protections panel could say "only 6 approved sources" without ever
+  // naming one, and learning which meant opening the Build editor and interpreting step definitions.
+  const domains = await listDomains(orgId).catch(() => []);
+  const reads = describeReads(
+    (app.steps ?? []).map((st) => ({
+      kind: st.kind,
+      domain: (st as { domain?: string }).domain,
+    })),
+    domains.map((d) => ({ id: d.id, label: d.label })),
+  );
+
   const fields = deriveRunFields(app.inputForm, prompt);
   const surface = sharedSurface(resolved.slug);
   // The read-only viewer's write controls must annotate themselves — that is the documented half of the
@@ -241,6 +253,7 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           owner={owner}
           sourceWarning={health.warning}
           protections={protections}
+          reads={reads}
           egress={egress}
           shape={queue.shape}
           howWorkArrives={queue.howWorkArrives}

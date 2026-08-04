@@ -63,6 +63,7 @@ export function AppUseShell({
   sourceWarning,
   protections,
   egress,
+  reads,
 }: Readonly<{
   /** Passed to the run panel so a case can be picked from the app's bound data. */
   appId?: string;
@@ -135,6 +136,8 @@ export function AppUseShell({
    * picture to an auditor and opposite facts to a customer.
    */
   egress?: EgressSummary | null;
+  /** The named data this app reads, and how many references could not be resolved. */
+  reads?: { names: string[]; unresolved: number } | null;
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -362,6 +365,16 @@ export function AppUseShell({
                 >
                   <span className="font-medium">Where the data went: </span>
                   {egress.sentence}
+                </p>
+              ) : null}
+              {/* Named, not counted. "Only 6 approved sources" is reassurance without information. */}
+              {reads && reads.names.length > 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">What it reads: </span>
+                  {reads.names.join(' · ')}
+                  {reads.unresolved > 0
+                    ? ` — and ${reads.unresolved} more this screen could not name.`
+                    : ''}
                 </p>
               ) : null}
               <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">

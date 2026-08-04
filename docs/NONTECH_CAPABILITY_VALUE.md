@@ -45,7 +45,7 @@ outcome language, without the person ever opening the operator page?**
 | Quality / evaluators / golden cases (13) | **Yes** — the app's Quality tab: checks, real cases it decided, what else is watching it |
 | Usage dashboards / throughput (4) | **Yes** — `AppOwnerDashboard` (2026-08-04): volume, decisions, where the time goes |
 | Access / RBAC / ABAC (5) | **Yes** — the app's Access tab, plus the owner banner naming an owner who never signs in |
-| Guardrails / masking / recognizers (9) | **Partly** — the run trail says "passed a safety check"; there is no per-app "what protects this" panel |
+| Guardrails / masking / recognizers (9) | **Yes (2026-08-04)** — the app's "What protects this" panel states them in plain language, from its own pipeline |
 | Data sources / connectors (15) | **Partly** — the app's steps name what they read, and the source-health warning now appears on the deployed app too (2026-08-04) |
 | Knowledge indexes / retrieval (8) | **Partly** — reached through the app's steps, never summarised as "what this app knows" |
 | Drift monitoring (7) | **Yes (2026-08-04)** — drift checks record the app they were run for; the Quality tab answers it both ways round |

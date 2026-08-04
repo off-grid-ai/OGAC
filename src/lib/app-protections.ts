@@ -148,3 +148,58 @@ function describeRoutingRule(r: RoutingRule): Protection | null {
   }
   return null;
 }
+
+// ─── What this app reads ─────────────────────────────────────────────────────────────────────────────
+//
+// The knowledge and data-source capabilities were reachable only THROUGH the app's individual steps — a
+// reader had to open the Build editor and interpret step definitions to learn what the app looks at. The
+// protections panel could say "it can only read 6 approved sources" without ever naming one, which is
+// reassurance without information.
+//
+// Pure.
+
+export interface StepLike {
+  kind: string;
+  /** A connector-query step's declared domain — an id or a label. */
+  domain?: string;
+}
+
+export interface DomainLabel {
+  id: string;
+  label: string;
+}
+
+/**
+ * The named things this app reads, in the order its steps read them, de-duplicated.
+ *
+ * A domain reference that resolves to nothing is DROPPED rather than shown as a raw id: "reads
+ * dom_7d17b157-0e6" tells a department reader less than saying nothing, and it was exactly the defect
+ * fixed once already on the case picker. The count of unresolved ones is returned so a caller can be
+ * honest that the list is partial instead of quietly presenting it as complete.
+ */
+export function describeReads(
+  steps: readonly StepLike[],
+  domains: readonly DomainLabel[],
+): { names: string[]; unresolved: number } {
+  const byId = new Map(domains.map((d) => [d.id, d.label]));
+  const byLabel = new Map(domains.map((d) => [d.label.toLowerCase(), d.label]));
+  const names: string[] = [];
+  const seen = new Set<string>();
+  let unresolved = 0;
+
+  for (const st of steps) {
+    if (st.kind !== 'connector-query') continue;
+    const ref = (st.domain ?? '').trim();
+    if (!ref) continue;
+    const label = byId.get(ref) ?? byLabel.get(ref.toLowerCase()) ?? null;
+    if (!label) {
+      unresolved++;
+      continue;
+    }
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(label);
+  }
+  return { names, unresolved };
+}
