@@ -313,3 +313,39 @@ process, `/readyz` is not consumed, and per-shard readiness has no surface.
 This is the fourth time in this session that a `gap` line asserted something was invisible when it was
 already recorded. The instrument drifts pessimistic as the product moves, and reading it without measuring
 produces work that is either unnecessary or actively wrong.
+
+## The forwards were dead, and that had been distorting the map (2026-08-04)
+
+Chasing the three "forwarder not repo-owned" items found something much worse than a reproducibility gap.
+Two LaunchDaemons existed on the host but not in the repo, each running `gost` as root against a
+**hard-coded 192.168.1.65** — g5's address when they were written. g5 is now `192.168.1.29`:
+
+| | via the forward | direct to g5 |
+| --- | --- | --- |
+| `:4000` LiteLLM | **000** | 200 |
+| `:9428` VictoriaLogs | **000** | 200 |
+| `:16686` Jaeger | **000** | 200 |
+
+**Because the ports were bound, nothing detected them as down.** A listener is not a route. Every console
+surface over the model router, the log store and the trace store was talking to a dead port.
+
+Fixed by folding all three into the repo-owned `tcp-forward.js`, which resolves `.local` names per
+connection — the rule at the top of that file exists precisely so a DHCP lease change cannot break a
+forward. Verified after cutover: all three answer 200; LiteLLM returns its model list; Jaeger reports 5
+services including `offgrid-console`.
+
+**This probably distorted several capability assessments.** Entries for VictoriaLogs ingestion, Jaeger
+service dependencies, OTel trace export and the LiteLLM surfaces were audited while their transport was
+silently dead — so some of those `partial`/`no` gates may be describing a broken forward rather than
+missing work. **Re-audit that cluster before building against it**, which is the same
+verify-before-building rule this document keeps re-learning.
+
+### What the fixed forward made provable
+
+A live round-trip through the LiteLLM proxy: `POST /v1/chat/completions` with `onprem/qwen3-vl-8b` returned
+the requested string, and `/spend/logs` attributed it (47 rows today, newest matching the request).
+Impossible before the fix.
+
+**Deliberately not claimed:** console chat and governed pipeline runs still go through the aggregator on
+`:8800`, not the proxy. Repointing them is a deployment change. So the proxy is proven *reachable and
+attributing*, not proven as the serving path — and the entry says exactly that.

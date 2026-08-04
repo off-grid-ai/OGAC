@@ -1782,7 +1782,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Serve chat and model requests through a single OpenAI-compatible model door.',
         ROUTER_ROUTE,
         'Inspect inference wiring',
-        'The endpoint resolver can select LiteLLM, but the audited deployment has no verified live cutover. Run chat and governed pipeline traffic through the selected provider and record the serving deployment.',
+        'PARTLY PROVEN 2026-08-04. A live round-trip through the proxy now exists: POST 127.0.0.1:4000/v1/chat/completions with model onprem/qwen3-vl-8b returned the requested string ("PROXY-CUTOVER-OK", 19 prompt + 8 completion tokens, system_fingerprint b1-277a105), and the proxy ATTRIBUTED it — /spend/logs carries 47 rows dated 2026-08-04 with the newest at 09:45:51 matching that request. This was impossible before today: the loopback forward on :4000 was a legacy root gost process hard-coding 192.168.1.65 while g5 had moved to .29, so the port was bound and every request timed out (fixed by adopting the forward into the repo-owned mDNS tcp-forward.js). STILL OPEN, and deliberately not claimed: console CHAT and a GOVERNED PIPELINE run have not been routed through the proxy — inference currently goes through the aggregator on :8800, and repointing it is a deployment change, not a console one. So the proxy is proven reachable and attributing; it is not proven as the serving path for product traffic.',
         [
           'yes',
           'LiteLLM Proxy exposes OpenAI-compatible inference APIs.',
