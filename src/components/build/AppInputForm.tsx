@@ -53,25 +53,32 @@ export function AppInputForm({
       : [{ key: 'input', label: prompt.label, type: 'text', required: true }];
   const [values, setValues] = useState<Record<string, string>>({});
   const [running, setRunning] = useState(false);
+  const [rehearsed, setRehearsed] = useState(false);
   const [outcome, setOutcome] = useState<RunOutcome | null>(null);
 
   const missing = fields.filter((f) => f.required && !values[f.key]?.trim());
 
-  async function run() {
+  async function run(rehearse = false) {
     if (running || missing.length > 0) return;
     setRunning(true);
     setOutcome(null);
+    setRehearsed(rehearse);
     try {
       const res = await fetch(`/api/v1/admin/apps/${app.id}/run`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ input: values }),
+        // REHEARSE ON A REAL CASE. Shadow mode and the case picker both already existed; nothing joined
+        // them, so testing before publishing was an act of faith. In shadow every side-effecting step is
+        // intercepted and reports what it WOULD have done — the decision itself is made for real, which
+        // is the whole point: you see the judgement without the consequence.
+        body: JSON.stringify({ input: values, ...(rehearse ? { mode: 'shadow' } : {}) }),
       });
       if (!res.ok) throw new Error('The run could not be started');
       const data = (await res.json()) as RunOutcome;
       setOutcome(data);
       if (data.status === 'error') toast.error('The run hit an error — see the trace below.');
       else if (data.status === 'awaiting_human') toast.info('Paused for human review.');
+      else if (rehearse) toast.success('Rehearsal finished — nothing was actually sent or changed.');
       else toast.success('Run complete.');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Run failed');
@@ -149,11 +156,33 @@ export function AppInputForm({
               )}
             </div>
           ))}
-          <div className="flex items-center justify-end pt-1">
-            <Button onClick={run} disabled={running || missing.length > 0} className="gap-1.5">
-              <Play className="size-4" weight="fill" />
-              {running ? 'Running…' : 'Run'}
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            {/* REHEARSE FIRST. Testing before publishing was an act of faith: shadow mode existed as a
+                setting and the case picker existed, and nothing joined them. The decision is made for
+                real; only the side effects are intercepted — you see the judgement without the
+                consequence, which is the only kind of test worth running on someone's real data. */}
+            <p className="text-[11px] text-muted-foreground">
+              A rehearsal makes the real decision but sends nothing and changes nothing.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => run(true)}
+                disabled={running || missing.length > 0}
+                className="gap-1.5"
+              >
+                <Play className="size-4" />
+                {running && rehearsed ? 'Rehearsing…' : 'Rehearse it'}
+              </Button>
+              <Button
+                onClick={() => run(false)}
+                disabled={running || missing.length > 0}
+                className="gap-1.5"
+              >
+                <Play className="size-4" weight="fill" />
+                {running && !rehearsed ? 'Running…' : 'Run for real'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
