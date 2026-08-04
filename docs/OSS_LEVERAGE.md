@@ -349,3 +349,38 @@ Impossible before the fix.
 **Deliberately not claimed:** console chat and governed pipeline runs still go through the aggregator on
 `:8800`, not the proxy. Repointing them is a deployment change. So the proxy is proven *reachable and
 attributing*, not proven as the serving path — and the entry says exactly that.
+## The cache panel found the cache was not a cache (2026-08-04)
+
+Closing "no console page renders the cache counters" turned into the most valuable finding of the
+batch, and it is a warning about how these gates get marked.
+
+**What the map said.** `shared-response-cache`: upstream `yes`, adapter `yes` ("selection proven live,
+not inferred"), ui `partial` — the only gap was a missing page. Building the page took an hour.
+
+**What was actually true.** The shared cache had not been shared for some time. `OFFGRID_REDIS_URL`
+pointed at `127.0.0.1:8937`, a loopback forward whose target host `offgrid-g6.local` no longer
+resolves. Redis is deliberately never a hard dependency, so every read and write fell back to the
+in-process map without erroring. Requests succeeded. The hit rate was perfect. Two processes held
+different caches and nothing said so.
+
+**Why the earlier "proven live" was not wrong when it was written, and still misled.** The probe that
+proved selection really did read a value straight out of Redis — when g6 resolved. A gate records that
+something worked once; it cannot notice the transport dying underneath it later. Any gate whose
+evidence is a one-time probe is a claim about the past.
+
+**The wider blast radius.** `offgrid-g6.local` does not resolve at all, so the entire auxiliary tier is
+dark: tracing, BI dashboards, device management, PII detection and masking, ETL orchestration, and the
+data-integration API. All of them were forwarded through ports that a bound socket makes look healthy.
+Every g6-backed gate in this document needs re-auditing before it is trusted — this is the second time
+today a cluster of gates turned out to have been assessed while its transport was silently dead.
+
+**Fixed.** Redis now runs on S1 from the repo's own compose profile; cross-process sharing is proven by
+a separate client reading back an entry the adapter wrote. The forwarder now prints `** DEAD **` beside
+any bound port whose target cannot be resolved, so this failure announces itself next time.
+
+**My own defect, one commit deep.** The first version of the panel read the counters of the process
+rendering it. That process serves pages and runs no inference — the workers run all of it — so it
+displayed UNEXERCISED with every figure at zero while the cache was in use. Accurate numbers, false
+story: precisely the failure the module was written to prevent, reproduced by me inside it. Each
+process now publishes a snapshot and the panel sums them, keeping the per-process split visible,
+because one worker falling back while another looks perfect is the finding and an average buries it.
