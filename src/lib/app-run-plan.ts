@@ -49,6 +49,7 @@ export interface StepState {
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
   actionImpact?: import('@/lib/action-contract').ActionImpact;
   actionReceipt?: import('@/lib/action-contract').ActionReceipt;
+  egress?: import('@/lib/egress-record').EgressEvent;
   deliveryReceipt?: import('@/lib/sink-delivery-receipt').SinkDeliveryReceipt;
   startedAt?: string;
   finishedAt?: string;
@@ -256,6 +257,7 @@ export interface StepResultInput {
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
   actionImpact?: import('@/lib/action-contract').ActionImpact;
   actionReceipt?: import('@/lib/action-contract').ActionReceipt;
+  egress?: import('@/lib/egress-record').EgressEvent;
   deliveryReceipt?: import('@/lib/sink-delivery-receipt').SinkDeliveryReceipt;
 }
 
@@ -298,6 +300,10 @@ export function applyStepResult(
       ...(result.actionImpact !== undefined ? { actionImpact: result.actionImpact } : {}),
       ...(result.actionReceipt !== undefined ? { actionReceipt: result.actionReceipt } : {}),
       ...(result.deliveryReceipt !== undefined ? { deliveryReceipt: result.deliveryReceipt } : {}),
+      // WHERE THE CALL WENT. Forwarded explicitly because this projection copies field by field: a new
+      // field that is not named here is silently dropped, which is how the egress record reached the
+      // database as nothing at all while the step itself completed fine.
+      ...(result.egress !== undefined ? { egress: result.egress } : {}),
     };
     if (result.status === 'running' && !s.startedAt) next.startedAt = now;
     if (result.status === 'done' || result.status === 'error' || result.status === 'skipped') {
@@ -332,6 +338,7 @@ export interface PersistedStepRow {
   wouldPerform?: import('@/lib/app-run-controls').WouldPerform;
   actionImpact?: import('@/lib/action-contract').ActionImpact;
   actionReceipt?: import('@/lib/action-contract').ActionReceipt;
+  egress?: import('@/lib/egress-record').EgressEvent;
   deliveryReceipt?: import('@/lib/sink-delivery-receipt').SinkDeliveryReceipt;
   startedAt?: string;
   finishedAt?: string;
@@ -380,6 +387,7 @@ export function rebuildAppRunState(
       ...(s.wouldPerform !== undefined ? { wouldPerform: s.wouldPerform } : {}),
       ...(s.actionImpact !== undefined ? { actionImpact: s.actionImpact } : {}),
       ...(s.actionReceipt !== undefined ? { actionReceipt: s.actionReceipt } : {}),
+      ...(s.egress !== undefined ? { egress: s.egress } : {}),
       ...(s.startedAt !== undefined ? { startedAt: s.startedAt } : {}),
       ...(s.finishedAt !== undefined ? { finishedAt: s.finishedAt } : {}),
     };

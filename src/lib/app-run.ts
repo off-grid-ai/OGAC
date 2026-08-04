@@ -141,6 +141,15 @@ export interface StepResult {
   actionImpact?: ActionImpact;
   /** Signed execution evidence. Present only after a real live mutation/replay. */
   actionReceipt?: ActionReceipt;
+  /**
+   * WHERE THIS CALL ACTUALLY WENT.
+   *
+   * The product's central claim is that data stays on the customer's machines, and it was the one claim
+   * the platform could not evidence: the ledger held a model NAME and nothing about where that model
+   * ran. Recorded here, at execution time, so "nothing left the building" is a record rather than an
+   * inference from settings that may have changed since.
+   */
+  egress?: import('@/lib/egress-record').EgressEvent;
   /** Structured, retained proof of a governed egress delivery (webhook/slack/whatsapp). */
   deliveryReceipt?: SinkDeliveryReceipt;
 }
@@ -194,6 +203,13 @@ export interface AppRunDeps {
     orgId: string,
     context?: import('@/lib/agent-run-context').RunContext,
   ) => Promise<AgentRunLike | null>;
+  /**
+   * The inference endpoint a governed model call is made to.
+   *
+   * A dep rather than a direct import so the executor stays testable without a live gateway, and so the
+   * recorded evidence comes from the same resolution the call itself uses.
+   */
+  inferenceEndpoint?: () => string;
   /** Org's declared data domains (the rule engine's inputs). */
   listDomains: (orgId: string) => Promise<DomainLike[]>;
   /** Fetch a connector by id, org-scoped. Null if absent. */
@@ -327,6 +343,11 @@ export function defaultDeps(
     async runAgent(agentId, query, caller, requireReview, orgId, context) {
       const { runAgent } = await import('@/lib/agentrun');
       return runAgent(agentId, query, caller, requireReview, orgId, context);
+    },
+    // Read from the same resolution the governed call itself uses, so the recorded evidence cannot
+    // drift from where the request went.
+    inferenceEndpoint() {
+      return process.env.OFFGRID_GATEWAY_URL ?? '';
     },
     async listDomains(orgId) {
       const { listDomains } = await import('@/lib/data-domains-store');
@@ -816,6 +837,16 @@ async function executeAgentStep(
     childRunId: run.id,
     refs: (run.citations ?? []).map((c, i) => ({ name: c.title || c.ref, position: i + 1 })),
     detail: `agent ${agentId} → ${run.status}`,
+    // The endpoint is read at the moment of the call, not from the app's configuration — that is the
+    // difference between evidence and an assertion. requireMasking is what was actually applied above.
+    egress: {
+      decision: modelVerdict.egress,
+      // Optional on purpose: a deps fake without it records no endpoint, which classifies as UNKNOWN
+      // and is reported as unknown — never quietly counted as "stayed on-prem".
+      endpoint: deps.inferenceEndpoint?.() ?? '',
+      masked: requireMasking,
+      at: new Date().toISOString(),
+    },
   };
 }
 

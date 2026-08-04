@@ -13,6 +13,7 @@ import { RunPanel, type RunField } from '@/components/app-use/RunPanel';
 import type { AppSurface } from '@/lib/app-surface';
 import { statsForShape, showsWaitingQueue, type LatestResult } from '@/lib/app-front-door';
 import type { Protection } from '@/lib/app-protections';
+import type { EgressSummary } from '@/lib/egress-record';
 import type { AppShape } from '@/lib/app-work-queue';
 import { utcStamp } from '@/lib/timestamp';
 import type { CockpitMetrics, TrendPoint } from '@/lib/cockpit-metrics';
@@ -61,6 +62,7 @@ export function AppUseShell({
   owner,
   sourceWarning,
   protections,
+  egress,
 }: Readonly<{
   /** Passed to the run panel so a case can be picked from the app's bound data. */
   appId?: string;
@@ -125,6 +127,14 @@ export function AppUseShell({
    * building" here would dress configuration up as proof.
    */
   protections?: Protection[];
+  /**
+   * Where this app's AI calls actually went, from the runs themselves.
+   *
+   * Distinct from `protections`, which states the RULES. This states the RECORD — and when there is no
+   * record it says so rather than reassuring, because "nothing left" and "we did not look" are the same
+   * picture to an auditor and opposite facts to a customer.
+   */
+  egress?: EgressSummary | null;
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -338,6 +348,22 @@ export function AppUseShell({
               <p className="mt-0.5 text-xs text-muted-foreground">
                 The rules in force whenever this app runs — not a record of any one case.
               </p>
+              {/* THE RECORD, next to the rules. Every governed model call records the endpoint it was
+                  made to, so this is checkable rather than a claim to be trusted. */}
+              {egress ? (
+                <p
+                  className={`mt-3 rounded-md border px-3 py-2 text-xs ${
+                    egress.external > 0
+                      ? 'border-amber-500/40 bg-amber-500/[0.06] text-amber-800 dark:text-amber-300'
+                      : egress.total === 0
+                        ? 'border-border bg-muted/30 text-muted-foreground'
+                        : 'border-primary/40 bg-primary/[0.05] text-foreground'
+                  }`}
+                >
+                  <span className="font-medium">Where the data went: </span>
+                  {egress.sentence}
+                </p>
+              ) : null}
               <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 {protections.map((p) => (
                   <li key={p.title} className="rounded-md border border-border/70 bg-muted/25 p-3">

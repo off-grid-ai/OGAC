@@ -199,6 +199,11 @@ function foldResult(result: StepResult): StepResultInput {
     actionImpact: result.actionImpact,
     actionReceipt: result.actionReceipt,
     deliveryReceipt: result.deliveryReceipt,
+    // WHERE THE CALL WENT. This fold is the FOURTH place a step field has to be named to survive the
+    // journey from the executor to the database (StepResult → foldResult → applyResult → toStoredSteps).
+    // Omitting it here is why the record was produced correctly and arrived as nothing: the durable path
+    // runs every real app, so a field missing from this one function is a field that does not exist.
+    egress: result.egress,
   };
 }
 

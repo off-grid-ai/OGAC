@@ -13,6 +13,7 @@ import { buildAppDashboard } from '@/lib/app-dashboard';
 import { isDeclinedByPerson } from '@/lib/app-run-progress';
 import { latestResult } from '@/lib/app-front-door';
 import { describeProtections, type RoutingRule } from '@/lib/app-protections';
+import { summariseEgress, type EgressEvent } from '@/lib/egress-record';
 import { getPipeline } from '@/lib/pipelines';
 import { sourceHealth } from '@/lib/source-health';
 import {
@@ -206,6 +207,16 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
       })
     : [];
 
+  // WHERE THIS APP'S DATA ACTUALLY WENT. Read off the runs themselves — each governed model call records
+  // the endpoint it was made to at the moment it was made. This is the difference between the product's
+  // central claim being configuration a reader must trust and being a record they can check.
+  const egressEvents = runs.flatMap((r) =>
+    (((r as { steps?: { egress?: EgressEvent }[] }).steps ?? [])
+      .map((st) => st.egress)
+      .filter((e): e is EgressEvent => Boolean(e?.endpoint !== undefined))),
+  );
+  const egress = summariseEgress(egressEvents);
+
   const fields = deriveRunFields(app.inputForm, prompt);
   const surface = sharedSurface(resolved.slug);
   // The read-only viewer's write controls must annotate themselves — that is the documented half of the
@@ -230,6 +241,7 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           owner={owner}
           sourceWarning={health.warning}
           protections={protections}
+          egress={egress}
           shape={queue.shape}
           howWorkArrives={queue.howWorkArrives}
           // What the last run produced — for a job this is the reason the app exists, and it appeared

@@ -33,6 +33,7 @@ function toRowSteps(steps: StepState[]): AppRunRow['steps'] {
     actionImpact: s.actionImpact,
     actionReceipt: s.actionReceipt,
     deliveryReceipt: s.deliveryReceipt,
+    egress: s.egress,
     startedAt: s.startedAt,
     finishedAt: s.finishedAt,
   }));
