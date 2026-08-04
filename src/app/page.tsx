@@ -84,29 +84,14 @@ function Nav() {
 function SectionHead({ number, kicker, heading, intro }: Readonly<{ number: string; kicker: string; heading: string; intro?: string }>) {
   return (
     <BlurFade inView>
-      {/* The design's eyebrow: a dot, the kicker in mono, then a hatched rule running out to
-          the right margin. The number sits at the far right for now — in the design it lives
-          in the sticky section index, so it moves there once that is built. */}
-      <div className="flex items-center gap-3 border-y border-[var(--og-border-light)] py-2">
-        <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-primary" />
-          {kicker}
-        </span>
-        <span aria-hidden className="og-hatch h-3 flex-1" />
-        <span className="shrink-0 font-mono text-[11px] tracking-[0.2em] text-muted-foreground">
-          {number}
-        </span>
-      </div>
-      {/* Heading left, supporting line right — the design pairs them on one row rather than
-          stacking, which is also what keeps wide screens from going empty on the right. */}
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:items-end">
-        <h2 className="og-display text-3xl font-medium leading-[1.15] text-foreground sm:text-4xl lg:text-[2.6rem]">
-          {heading}
-        </h2>
-        {intro ? (
-          <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">{intro}</p>
-        ) : null}
-      </div>
+      <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-primary">
+        <span className="text-muted-foreground">{number}</span>
+        {kicker}
+      </p>
+      <h2 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        {heading}
+      </h2>
+      {intro ? <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">{intro}</p> : null}
     </BlurFade>
   );
 }
@@ -114,9 +99,7 @@ function SectionHead({ number, kicker, heading, intro }: Readonly<{ number: stri
 export default function LandingPage() {
   const c = LANDING;
   return (
-    // `og-landing` opts this page into the landing palette + display font (see globals.css).
-    // The console does NOT get this class, so its own look is untouched.
-    <div className="og-landing min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <LandingThemeDefault />
       <Nav />
 
@@ -416,39 +399,6 @@ export default function LandingPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          </BlurFade>
-        </div>
-      </section>
-
-      {/* ── 07 Proof ───────────────────────────────────────────────────────── */}
-      {/* The only section that asks for nothing: three ways in to judge the product first-hand. */}
-      <section id="proof" className="relative border-b border-border">
-        <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead
-            number={c.proof.number}
-            kicker={c.proof.kicker}
-            heading={c.proof.heading}
-            intro={c.proof.intro}
-          />
-          <BlurFade delay={0.12} inView>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                { label: c.hero.trustItems[0], href: href('liveProduct') },
-                { label: c.hero.trustItems[1], href: href('liveProduct') },
-                { label: c.hero.trustItems[2], href: href('source') },
-              ].map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="group flex items-center justify-between rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary"
-                >
-                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground">
-                    {item.label}
-                  </span>
-                  <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              ))}
             </div>
           </BlurFade>
         </div>
