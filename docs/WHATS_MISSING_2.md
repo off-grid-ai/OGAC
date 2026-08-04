@@ -123,11 +123,18 @@ whether a change helped.
 Shadow mode exists as a *setting*. What's missing is the flow: "run this on case #4 and show me what it
 would have done, without doing it". Testing before publish is still an act of faith.
 
-### 8. Creation still needs a technical hand
-Measured on the builder: **"0 ready · 38 unavailable · 16 not shown by access"**, with data sources listed
-as "expense claims (Not available with your access)". The plain-language authoring is genuinely good, and
-then it stops at the one step a non-technical person cannot do for themselves — binding data they're not
-entitled to. Someone technical has to finish it.
+### 8. ~~Creation still needs a technical hand~~ — WITHDRAWN, this finding was wrong
+
+I measured **"0 ready · 38 unavailable · 16 not shown by access"** on the builder and concluded that
+creation stops at a data-binding wall a non-technical person cannot pass.
+
+It does not. I had measured it signed in as the **read-only demo account**, for which "Not available with
+your access" is the correct and intended answer. Re-measured against the same endpoint with an admin
+token: **40 ready, 4 need approval, 3 unavailable, 1 denied — 44 of 48 selectable.**
+
+The wall was my account, not the product. Recorded here rather than quietly deleted, because it is the
+same mistake this codebase keeps catching — a refusal reading as a defect — and because
+verify-before-building is the only reason no code was written for it.
 
 ## Maintenance
 
@@ -149,7 +156,7 @@ access export, (4) fairness checks on decisioning apps, (5) adverse-decision art
 and an access review for real on both tenants, (7) consent withdrawal, (8) publish approval.
 
 **Operator:** (1) tell them work arrived, (2) delegation and cover, (3) bulk decide, (4) due dates with
-escalation, (5) quality trend, (6) named owner, (7) tell the owner their source went stale.
+escalation, (5) quality trend, (6) named owner, (7) tell the owner their source went stale. (Creation was withdrawn — see 8.)
 
 Two of these are cheap and change the product's honesty a lot: **running retention and one access review
 on a real tenant** (the machinery is proven — it just needs doing), and **a per-run egress record**, which
