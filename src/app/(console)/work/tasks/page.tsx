@@ -17,6 +17,8 @@ import {
 } from '@/lib/my-work';
 import { auth } from '@/auth';
 import { CoverPanel } from '@/components/work/CoverPanel';
+import { slaStatus, slaWeight, summariseBreaches, type SlaRule } from '@/lib/case-sla';
+import { slaRuleMap } from '@/lib/case-sla-store';
 import { listCover } from '@/lib/cover-store';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -64,6 +66,16 @@ export default async function MyTasksPage() {
   const now = new Date();
   const work = buildMyWork(cases, summaries, now);
 
+  // HOW LATE IS IT. A case waiting ten minutes and one waiting ten days looked the same, so nothing ever
+  // forced the pile to move. Targets are per app; an app with no target says so rather than being
+  // reported as on time, which would invent a commitment the organisation never made.
+  const slaRules = await slaRuleMap(orgId).catch(() => ({}) as Record<string, SlaRule>);
+  const slaFor = (c: { appId: string; waitingSince: string }) =>
+    slaStatus(c.waitingSince, slaRules[c.appId], now);
+  const breaches = summariseBreaches(
+    cases.map((c) => ({ appTitle: c.appTitle, status: slaFor(c) })),
+  );
+
   // WHO IS COVERING. With no cover recorded, a person on leave means their cases sit unwatched — which
   // is what the ten-day-old cases on this tenant were. Best-effort: a failed read hides the panel rather
   // than blocking the queue, which is the more important thing on this page.
@@ -84,6 +96,20 @@ export default async function MyTasksPage() {
               : 'When something needs a person, it appears here.'}
           </p>
         </div>
+
+        {/* Overdue work, and processes with no target at all — the second is why a pile grows unnoticed.
+            Silent when there is nothing to say, so the banner keeps its meaning. */}
+        {breaches.message ? (
+          <div
+            className={`rounded-md border p-3 text-xs ${
+              breaches.overdue > 0
+                ? 'border-destructive/40 bg-destructive/[0.05] text-foreground'
+                : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+            }`}
+          >
+            {breaches.message}
+          </div>
+        ) : null}
 
         {cover ? (
           <CoverPanel
@@ -126,7 +152,12 @@ export default async function MyTasksPage() {
                     ) : null}
                   </CardHeader>
                   <CardContent className="space-y-1.5">
-                    {disambiguate(g.cases, now).map(({ case: c, label }) => (
+                    {disambiguate(
+                      [...g.cases].sort(
+                        (a, b) => slaWeight(slaFor(a).state) - slaWeight(slaFor(b).state),
+                      ),
+                      now,
+                    ).map(({ case: c, label }) => (
                       <Link
                         key={c.runId}
                         href={c.href}
@@ -137,9 +168,29 @@ export default async function MyTasksPage() {
                               Identical labels get their start time appended — three indistinguishable rows
                               is the failure a case subject exists to prevent. */}
                           <span className="block truncate text-sm text-foreground">{label}</span>
-                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <Clock className="size-3" />
-                            waiting {waitedFor(c.waitingSince, now)}
+                          <span className="flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Clock className="size-3" />
+                              waiting {waitedFor(c.waitingSince, now)}
+                            </span>
+                            {/* Against the promise, not just the clock. */}
+                            {(() => {
+                              const s = slaFor(c);
+                              if (s.state === 'no-promise') return null;
+                              return (
+                                <span
+                                  className={
+                                    s.state === 'overdue'
+                                      ? 'font-medium text-destructive'
+                                      : s.state === 'due-soon'
+                                        ? 'text-amber-700 dark:text-amber-500'
+                                        : 'text-muted-foreground'
+                                  }
+                                >
+                                  · {s.label}
+                                </span>
+                              );
+                            })()}
                           </span>
                         </span>
                         <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
