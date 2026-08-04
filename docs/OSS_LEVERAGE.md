@@ -252,3 +252,28 @@ but reachable by seed SQL or API — which is how the demo pipelines were config
    above). Three wrong shapes before I read the merge.
 3. I dropped the cloud half of the detector-outage test rather than ship an assertion I could not state
    confidently. The suite that owns sink governance already covers it.
+
+## Content guardrails: two claims corrected, the rest are real
+
+Memory said the guardrail entries had once been stale-pessimistic, so I checked all six. **Four are
+precise and genuinely open** — the deployed shard runs 4 of 15 input classifiers, the output scanner set is
+limited, Console scanner rules are not reconciled into the upstream static YAML, and there is no telemetry
+adapter. Those are real work, correctly described.
+
+**Two claims were wrong**, and both are the same defect this session kept finding — an "it is hidden"
+assertion that was no longer true:
+
+- *"Its optional-shard degradation header is discarded by the Console adapter"* — it is not.
+  `guardrail-provider` parses `x-offgrid-guard-degraded` and `x-offgrid-guard-answered`, and `checks.ts`
+  folds them into the retained check detail.
+- *"An optional classifier outage is hidden from the normal path"* — it is not. **Ten** agent runs already
+  carry it, e.g. `run_658c93b8`, `run_cc73dcf2`, `run_f9208926` on `org_bharat`, each retaining
+  `coverage degraded: unavailable classifiers; answered by pii` — and one of those runs was **blocked**.
+  A governed run whose classifier shard was down says so rather than reading clean.
+
+What remains true in that entry is narrower and now stated as such: `/healthz` proves only the aggregator
+process, `/readyz` is not consumed, and per-shard readiness has no surface.
+
+This is the fourth time in this session that a `gap` line asserted something was invisible when it was
+already recorded. The instrument drifts pessimistic as the product moves, and reading it without measuring
+produces work that is either unnecessary or actively wrong.

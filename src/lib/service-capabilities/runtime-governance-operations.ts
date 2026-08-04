@@ -429,7 +429,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Detect injection, toxicity, gibberish, language, banned content, code, and request-size risks.',
         GUARDRAILS_PROTECTIONS_ROUTE,
         'Manage prompt protections',
-        'The deployed g6 shard runs only PromptInjection, Toxicity, Gibberish, and Language from the 15-class 0.3.16 input denominator. Its optional-shard degradation header is discarded by the Console adapter, and catalog entries for other scanners do not reconfigure the static shard.',
+        'The deployed g6 shard runs only PromptInjection, Toxicity, Gibberish, and Language from the 15-class 0.3.16 input denominator. CORRECTED 2026-08-04: the claim that its optional-shard degradation header is discarded by the Console adapter is WRONG — guardrail-provider parses x-offgrid-guard-degraded and x-offgrid-guard-answered, and checks.ts writes them into the retained check detail (10 agent runs already carry \'coverage degraded: unavailable classifiers; answered by pii\'). What is genuinely still missing is the 15-class denominator, and catalog entries for other scanners do not reconfigure the static shard.',
         [
           'yes',
           'The pinned input-scanner module exports 15 scanner classes, including injection, toxicity, content restrictions, language, code, regex, secrets, and token limits.',
@@ -501,12 +501,12 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Probe liveness/readiness, bound scanner latency, and choose fail-fast or aggregate behavior.',
         GUARDRAILS_ROUTE,
         'Inspect guardrail posture',
-        'Expose required versus optional shard readiness and degradation. Today /healthz only proves the aggregator process, /readyz is not consumed, and an optional classifier outage is hidden from the normalized Console verdict.',
+        'Expose required versus optional shard readiness and degradation. CORRECTED 2026-08-04: an optional classifier outage is NOT hidden — a degraded scan is retained on the run (run_658c93b8, run_cc73dcf2, run_f9208926 on org_bharat all carry \'coverage degraded: unavailable classifiers; answered by pii\', one of them blocked). What remains true is that /healthz only proves the aggregator process, /readyz is not consumed, and per-shard readiness is absent from the normalized Console verdict.',
         [
           'yes',
           'LLM Guard 0.3.16 provides /healthz and /readyz, prompt/output timeouts, scan_fail_fast, lazy loading, and deterministic HTTP errors.',
           'partial',
-          'The Console bounds requests and fails closed on adapter/required-shard failure; Off Grid adds required/optional shard policy, but optional degradation is not propagated to the port result.',
+          'The Console bounds requests and fails closed on adapter/required-shard failure; Off Grid adds required/optional shard policy, and optional degradation IS propagated — the provider parses the degraded/answered headers and the pure check mapper folds them into the retained verdict, so a run whose classifier shard was down says so instead of reading clean. Still partial only for readiness (/readyz) consumption result.',
           'partial',
           'Overview shows configured/reachable state, but not readiness, per-shard health, model load state, degradation, latency, or recovery actions.',
           'partial',
