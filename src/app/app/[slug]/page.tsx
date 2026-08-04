@@ -12,6 +12,9 @@ import { listAppRuns } from '@/lib/app-run-store';
 import { buildAppDashboard } from '@/lib/app-dashboard';
 import { isDeclinedByPerson } from '@/lib/app-run-progress';
 import { latestResult } from '@/lib/app-front-door';
+import { describeProtections, type RoutingRule } from '@/lib/app-protections';
+import { getPipeline } from '@/lib/pipelines';
+import { sourceHealth } from '@/lib/source-health';
 import {
   outcomeMix,
   timeUse,
@@ -172,6 +175,37 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
     qualitySentence: quality?.sentence ?? null,
   };
 
+  // IS THE DATA STILL ARRIVING. This warning was on the console-side app page and NOT on the surface the
+  // department actually opens — so the team using the app was the one group never told that the app is
+  // now working from nothing. Same pure rule, so the two surfaces cannot disagree.
+  const health = sourceHealth(
+    runs.map((r) => ({
+      startedAt:
+        r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? ''),
+      steps:
+        ((r as { steps?: { kind?: string; status?: string; outcome?: string; label?: string }[] })
+          .steps ?? []),
+    })),
+  );
+
+  // WHAT PROTECTS THIS APP. Real, enforced, and previously legible only on operator surfaces in operator
+  // language. Read from the app's own pipeline; best-effort, because a failed read must leave the panel
+  // absent rather than imply the app is unprotected.
+  const pipeline = app.pipelineId
+    ? await getPipeline(app.pipelineId, orgId).catch(() => null)
+    : null;
+  const protections = pipeline
+    ? describeProtections({
+        guardrailOverlay: (pipeline as { guardrailOverlay?: Record<string, { bool?: boolean; mode?: string }> })
+          .guardrailOverlay,
+        policyOverlay: (pipeline as { policyOverlay?: Record<string, { mode?: string; level?: string }> })
+          .policyOverlay,
+        routingRules: (pipeline as { routing?: { rules?: RoutingRule[] } }).routing?.rules,
+        dataAllowlist: (pipeline as { dataAllowlist?: string[] }).dataAllowlist,
+        hasHumanStep: (app.steps ?? []).some((st) => st.kind === 'human'),
+      })
+    : [];
+
   const fields = deriveRunFields(app.inputForm, prompt);
   const surface = sharedSurface(resolved.slug);
   // The read-only viewer's write controls must annotate themselves — that is the documented half of the
@@ -194,6 +228,8 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           surface={surface}
           appId={app.id}
           owner={owner}
+          sourceWarning={health.warning}
+          protections={protections}
           shape={queue.shape}
           howWorkArrives={queue.howWorkArrives}
           // What the last run produced — for a job this is the reason the app exists, and it appeared

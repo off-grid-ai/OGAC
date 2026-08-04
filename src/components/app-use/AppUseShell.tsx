@@ -12,6 +12,7 @@ import { CockpitDashboard } from '@/components/app-use/CockpitDashboard';
 import { RunPanel, type RunField } from '@/components/app-use/RunPanel';
 import type { AppSurface } from '@/lib/app-surface';
 import { statsForShape, showsWaitingQueue, type LatestResult } from '@/lib/app-front-door';
+import type { Protection } from '@/lib/app-protections';
 import type { AppShape } from '@/lib/app-work-queue';
 import { utcStamp } from '@/lib/timestamp';
 import type { CockpitMetrics, TrendPoint } from '@/lib/cockpit-metrics';
@@ -58,6 +59,8 @@ export function AppUseShell({
   latest,
   howWorkArrives,
   owner,
+  sourceWarning,
+  protections,
 }: Readonly<{
   /** Passed to the run panel so a case can be picked from the app's bound data. */
   appId?: string;
@@ -107,6 +110,21 @@ export function AppUseShell({
    * (assets under management, a lead→won funnel), not something an ordinary app owner can read.
    */
   owner?: OwnerDashboardData | null;
+  /**
+   * "This app read no data on its last run" — or null when its reads are fine.
+   *
+   * The console-side page carried this and the deployed app did not, so the team who actually use the app
+   * were the one group never told it is working from nothing.
+   */
+  sourceWarning?: string | null;
+  /**
+   * What protects this app, in plain language, from its own pipeline.
+   *
+   * These are the RULES IN FORCE, not evidence about any particular run — the panel says so. The
+   * platform records a model name and nothing about where that model ran, so claiming "nothing left your
+   * building" here would dress configuration up as proof.
+   */
+  protections?: Protection[];
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -189,6 +207,13 @@ export function AppUseShell({
 
       {view === 'work' ? (
         <div className="space-y-5">
+          {/* Above the headline: if the app is reading nothing, every number below it is about a process
+              that has stopped receiving work, and reading them first would mislead. */}
+          {sourceWarning ? (
+            <p className="rounded-lg border border-amber-500/40 bg-amber-500/[0.06] px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+              {sourceWarning}
+            </p>
+          ) : null}
           {workHeadline ? (
             <h2 className="text-xl font-semibold tracking-tight text-foreground">{workHeadline}</h2>
           ) : null}
@@ -303,6 +328,33 @@ export function AppUseShell({
               )}
             </div>
           </section>
+          ) : null}
+
+          {/* AFTER the queue. This shell's own rule is that what is waiting for you comes first;
+              reassurance about the rules is worth reading second, not ahead of the work. */}
+          {protections && protections.length > 0 ? (
+            <section className="rounded-lg border border-border p-4">
+              <h3 className="text-sm font-medium text-foreground">What protects this</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                The rules in force whenever this app runs — not a record of any one case.
+              </p>
+              <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                {protections.map((p) => (
+                  <li key={p.title} className="rounded-md border border-border/70 bg-muted/25 p-3">
+                    <p className="text-xs font-medium text-foreground">
+                      {p.title}
+                      {/* "Cannot be turned off" is the strongest form of this and worth naming. */}
+                      {p.locked ? (
+                        <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wide text-primary">
+                          always on
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{p.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
         </div>
       ) : view === 'dashboard' && owner ? (
