@@ -26,7 +26,7 @@ import type { PiiScanLike } from '@/lib/guardrail-rules-runtime';
 import type { PipelineContract } from '@/lib/pipeline-enforcement';
 
 /** The outbound sinks that DELIVER text over a wire (governed the same way). Console/report differ. */
-export type DeliverSinkKind = 'email' | 'webhook' | 'slack' | 'whatsapp';
+export type DeliverSinkKind = 'email' | 'webhook' | 'slack' | 'whatsapp' | 'topic';
 
 export interface SinkDescriptor {
   kind: DeliverSinkKind;
@@ -47,6 +47,11 @@ export const SINK_REGISTRY: Record<DeliverSinkKind, SinkDescriptor> = {
   webhook: { kind: 'webhook', transport: 'cloud', label: 'webhook', destinationField: 'url' },
   slack: { kind: 'slack', transport: 'cloud', label: 'Slack message', destinationField: 'channel' },
   whatsapp: { kind: 'whatsapp', transport: 'air-gapped', label: 'WhatsApp message', destinationField: 'to' },
+  // AIR-GAPPED: the broker is on the customer's own network, so no cloud egress leash applies. PII masking
+  // still does — a record on a topic is read by other systems and people, and "internal" is not
+  // "unprotected". This entry is what binds a governed pipeline output to the stream producer, which is the
+  // capability-map gap ("no general pipeline output uses this adapter") rather than any missing primitive.
+  topic: { kind: 'topic', transport: 'air-gapped', label: 'stream record', destinationField: 'topic' },
 };
 
 export function getSinkDescriptor(kind: DeliverSinkKind): SinkDescriptor {

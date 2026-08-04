@@ -210,6 +210,14 @@ export interface AppRunDeps {
    * recorded evidence comes from the same resolution the call itself uses.
    */
   inferenceEndpoint?: () => string;
+  /**
+   * Publish the governed outcome to a stream topic. Injected like every other sink so the executor stays
+   * unit-testable with no broker; production wires sendToTopic. HONEST: no broker ⇒ { configured:false }.
+   */
+  sendToTopic: (
+    cfg: { topic?: string; key?: string },
+    ctx: { runId: string; orgId: string; appId: string; outcome: string },
+  ) => Promise<{ ok: boolean; configured: boolean; reason: string; partition?: number; offset?: string }>;
   /** Org's declared data domains (the rule engine's inputs). */
   listDomains: (orgId: string) => Promise<DomainLike[]>;
   /** Fetch a connector by id, org-scoped. Null if absent. */
@@ -346,6 +354,10 @@ export function defaultDeps(
     },
     // Read from the same resolution the governed call itself uses, so the recorded evidence cannot
     // drift from where the request went.
+    async sendToTopic(cfg, ctx) {
+      const { sendToTopic } = await import('@/lib/adapters/sinks/topic');
+      return sendToTopic(cfg, ctx);
+    },
     inferenceEndpoint() {
       return process.env.OFFGRID_GATEWAY_URL ?? '';
     },
@@ -1213,7 +1225,12 @@ async function executeOutputStep(
   // webhook / slack / whatsapp — the outbound ACTION sinks. All three run the SAME governed pipeline
   // (egress leash → PII mask → deliver → honest record) via the pure planSinkGovernance orchestrator,
   // dispatching the actual delivery by sink type. This is the DRY seam: no per-sink governance here.
-  if (step.sink === 'webhook' || step.sink === 'slack' || step.sink === 'whatsapp') {
+  if (
+    step.sink === 'webhook' ||
+    step.sink === 'slack' ||
+    step.sink === 'whatsapp' ||
+    step.sink === 'topic'
+  ) {
     return deliverGovernedSink(step.sink, spec, step, outcome, ctx, deps);
   }
 
@@ -1333,6 +1350,12 @@ function dispatchSinkDelivery(
   }
   if (sink === 'slack') {
     return deps.sendSlack({ text: body, channel: str(cfg.channel) });
+  }
+  if (sink === 'topic') {
+    return deps.sendToTopic(
+      { topic: str(cfg.topic), key: str(cfg.key) },
+      { runId: ctx.runId, orgId: ctx.orgId, appId: spec.id, outcome: body },
+    );
   }
   // whatsapp
   return deps.sendWhatsApp({ to: str(cfg.to) ?? str(cfg.number) ?? '', text: body });

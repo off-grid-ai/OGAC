@@ -204,3 +204,44 @@ terminal. Two of my characterisations were wrong in the same breath: these are b
 Feature Flags is a genuine credential gap (Unleash answers 401; no admin token exists in the deployment
 env). Device Management genuinely needs a host enrolled. Those two are operator work; Redpanda and LanceDB
 are ours.
+
+## Redpanda producer: the binding, closed properly (2026-08-04)
+
+Having established the gap was **binding**, not primitives, I built the binding: a `topic` outbound sink,
+registered in the existing `SINK_REGISTRY` so a governed app output step publishes its outcome to a stream
+topic through the *same* sequence every other sink runs (egress leash → PII mask → deliver → honest
+record). No parallel path, no governance logic in the new file.
+
+Air-gapped, like the on-prem WhatsApp gateway — the broker is on the customer's own network — and it never
+auto-creates a topic: a sink that conjures its destination hides a misconfigured app.
+
+Proven live:
+
+```
+registry     {"kind":"topic","transport":"air-gapped","label":"stream record","destinationField":"topic"}
+no topic     ok:false configured:false  "this step names no topic to publish to"
+unknown      ok:false configured:true   "This server does not host this topic-partition"   (no auto-create)
+PUBLISH      ok:true  partition:0 offset:"0"                                (the broker's own receipt)
+CONSUMED     key=apprun_bindproof_… runId matched, full JSON round-tripped
+```
+
+And the governance property that mattered, checked against the **real** `pl_seed_org_bharat_*` contract:
+`sinkMaskingRequired` is true and the raw PAN is replaced with `[PAN]` before the record is published.
+Internal is not unprotected — a topic is durable and multi-consumer, unlike a point-to-point message.
+
+### A governance gap found while testing it
+
+`effectiveGovernance` merges by iterating the **org catalogue**, so a pipeline guardrail overlay naming a
+control the org never declares contributed **nothing, silently**. A pipeline reading "PII masking: locked
+ON" while doing nothing is the worst kind of wrong. It now returns `ignored: string[]` so a surface can say
+the setting has no effect. Not reachable through the overlay UI today (it offers only declared controls),
+but reachable by seed SQL or API — which is how the demo pipelines were configured.
+
+### Three of my own errors in this one slice, for the record
+
+1. I asserted topic records are masked using a scan shaped `{ sanitized }`. `PiiScanLike` uses `redacted`.
+   The malformed scan meant no substitution happened and my test "found" a hole that was mine.
+2. I built test contracts with a guardrail **overlay** and no org default — which contributes nothing (see
+   above). Three wrong shapes before I read the merge.
+3. I dropped the cloud half of the detector-outage test rather than ship an assertion I could not state
+   confidently. The suite that owns sink governance already covers it.

@@ -206,6 +206,15 @@ export interface EffectiveGovernance {
   controls: Record<string, EffectiveControl>;
   /** The keys where a loosen was rejected — the honest "you can't weaken this" signal. */
   rejected: string[];
+  /**
+   * Overlay keys this merge IGNORED because the org catalogue does not declare that control.
+   *
+   * The merge iterates the ORG DEFAULTS — that is deliberate, the catalogue defines which controls exist
+   * — but it means a pipeline overlay naming an undeclared control was silently dropped. A governance
+   * control that reads "locked ON" on a pipeline and does nothing is the worst kind of wrong, so the keys
+   * are reported and a surface can say the setting has no effect. Empty in the normal case.
+   */
+  ignored: string[];
 }
 
 /** Position of a level on the scale; -1 if not a known level. Higher index = MORE permissive. PURE. */
@@ -231,6 +240,9 @@ export function effectiveGovernance(
 ): EffectiveGovernance {
   const controls: Record<string, EffectiveControl> = {};
   const rejected: string[] = [];
+  // Overlay keys with no org default are never visited by the loop below, so collect them up front
+  // rather than letting them vanish.
+  const ignored = Object.keys(pipelineOverlay).filter((k) => !(k in orgDefaults));
 
   for (const [key, org] of Object.entries(orgDefaults)) {
     const overlay = pipelineOverlay[key];
@@ -284,7 +296,7 @@ export function effectiveGovernance(
     controls[key] = eff;
   }
 
-  return { controls, rejected };
+  return { controls, rejected, ignored };
 }
 
 // ─── 3. canReachData — the HARD data ceiling ────────────────────────────────────────────────────────

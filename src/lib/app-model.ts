@@ -78,7 +78,10 @@ export interface OutputStep {
   id: string;
   label: string;
   kind: 'output';
-  sink: 'console' | 'report' | 'email' | 'whatsapp' | 'webhook' | 'slack';
+  // 'topic' publishes the governed outcome to a stream topic on the customer's own network — the binding
+  // that makes a pipeline output actually use the stream producer, which is what the capability map was
+  // asking for ("no general pipeline output uses this adapter").
+  sink: 'console' | 'report' | 'email' | 'whatsapp' | 'webhook' | 'slack' | 'topic';
   config?: Record<string, unknown>;
 }
 
