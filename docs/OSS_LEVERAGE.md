@@ -75,7 +75,40 @@ A **terminal** run's lost write is `console.error` (nothing later will correct i
 `console.warn` (the next step's write supersedes it). Treating them the same would either cry wolf or bury
 the permanent case.
 
-## One entry that is understated — and NOT promoted
+### AI Gateway — cloud egress DLP: the entry was understated, and now says what is true
+
+I first corrected this from code reading and refused to promote the gate, which was right. Then I went and
+measured the ledger, which is what the bar actually requires:
+
+- **24** retained `gateway.egress.dlp` events, **every one carrying a run id**.
+- **21 come from the AGENT path.** Sampled `run_8efafec2` / `run_e0949b61` / `run_14e9b52a` — all resolve to
+  `agent_runs` rows, `status=done`, `org_bharat`, `outcome=redacted`, dated 2026-08-03/04.
+- 3 from chat. Outbound sinks mask via `maskTextForSend` before the body crosses the boundary.
+
+So the old text — "agent and app model calls, cloud tools, and outbound sinks do not enter it" — was wrong
+about agents and sinks. The audit entry now states the measured numbers instead.
+
+**What is genuinely unproven, and the gate stays `partial` for it:** the APP model call on a
+cloud-permitted pipeline. **0** app-spawned agent runs carry a DLP event — because every app run on this
+tenant is forced on-prem by the pipeline routing rule `pii-local`, so there is no cloud egress to screen.
+That is the leash working, not a hole, but it leaves the app cloud-egress seam without a live artefact.
+
+**Prove it on a scratch pipeline that permits cloud egress. Do NOT relax a live tenant's PII routing rule
+to manufacture the evidence** — weakening a real control to produce a test artefact is the worst trade
+available here.
+
+### OpenTelemetry Collector — trace correlation per app run
+
+`correlationIds` already derives a deterministic trace id from a run id — better than storing one, since it
+cannot drift — but it was only ever used on the agent path. From an APP run's console record there was no
+way to reach its trace except searching Jaeger by time and hoping. `traceLookup` closes that.
+
+The honesty half matters as much as the link: a trace that is not there can mean nothing was exported **or
+that the export failed**, and presenting "no trace" as if it settled the question is the
+failure-presents-as-emptiness defect. The caption says both. **Still open:** recording exporter-failure
+state per run, which needs instrumentation inside the OTLP path rather than a caption.
+
+## Superseded note
 
 **AI Gateway — cloud egress DLP.** The gap text says the final enforcement hook "covers only the
 chat/stream cloud-model path; agent and app model calls, cloud tools, and outbound sinks do not enter it."
@@ -96,10 +129,17 @@ stale-pessimism that once had guardrails recorded as missing when LLM Guard outp
 
 ## Next, in value order
 
-1. **Live cloud-egress DLP proof** on the agent path — settles the entry above either way.
-2. **OpenTelemetry Collector — durable trace correlation per app run**, so a run can be found in Jaeger
-   from its console record instead of by timestamp.
+1. **App cloud-egress DLP proof on a scratch cloud-permitted pipeline** — the one remaining unproven seam
+   in the entry above. Never by loosening a live tenant's routing.
+2. **Exporter-failure state per run** — so a missing trace is distinguishable from a failed export.
 3. **Vector index — payload-index lifecycle** (create/drop Qdrant payload indexes). Real query-performance
    headroom we own the adapter for.
 4. **Redpanda / LanceDB / Feature Flags / Device Management** — adapters exist, no end-to-end proof on the
    deployment. Each is a drill, not a build.
+
+## The pattern across all of this
+
+Three of the four things touched today were **not** missing features. Presidio's "add a language setting"
+would have broken PII protection; the cloud-egress entry understated coverage by 21 events; the persistence
+gap was a silent `catch`. The map's `gap` text is a hypothesis written at audit time, and the work is to
+measure it before building to it — twice today that measurement inverted the prescription.

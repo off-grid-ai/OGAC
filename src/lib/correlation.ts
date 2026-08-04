@@ -76,3 +76,40 @@ export function correlationIds(runId: string): CorrelationIds {
     provenanceRef: runId,
   };
 }
+
+// ─── Finding a run's trace without guessing at timestamps ─────────────────────────────────────────────
+//
+// The capability map records this against the OTel collector: "add durable correlation and exporter-failure
+// state per application run." The correlation itself already exists — `correlationIds` derives a
+// deterministic trace id from the run id, which is better than storing one because it cannot drift — but it
+// was only ever used on the agent path. For an APP run there was no way to get from a console record to its
+// trace except by searching Jaeger by time and hoping.
+//
+// The honesty half matters as much as the link. A trace that is not there can mean two very different
+// things: nothing was exported, or the export FAILED. Presenting "no trace" as though it settled the
+// question is the failure-presents-as-emptiness defect again, so the caption says both.
+
+export interface TraceLookup {
+  traceId: string;
+  /** Deep link into the trace viewer, or null when no viewer is configured. */
+  href: string | null;
+  /** What a reader should understand if the trace is not there. */
+  caveat: string;
+}
+
+/**
+ * Where to find this run's trace.
+ *
+ * `viewerUrl` is passed in rather than read from the environment so this stays pure and so a caller that
+ * has no viewer configured gets `href: null` instead of a link to nowhere.
+ */
+export function traceLookup(runId: string, viewerUrl?: string | null): TraceLookup {
+  const { traceId } = correlationIds(runId);
+  const base = (viewerUrl ?? '').trim().replace(/\/+$/, '');
+  return {
+    traceId,
+    href: base ? `${base}/trace/${traceId}` : null,
+    caveat:
+      'If the trace is not there, it may not have been exported rather than not have happened — the run record above is the authoritative account of what ran.',
+  };
+}
