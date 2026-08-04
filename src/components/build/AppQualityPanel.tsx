@@ -26,6 +26,7 @@ export function AppQualityPanel({
   golden,
   libraryEvals,
   lastRuns,
+  history,
   now,
 }: Readonly<{
   appId: string;
@@ -35,6 +36,8 @@ export function AppQualityPanel({
   libraryEvals: EvalDef[];
   /** Most recent recorded run per check, read on the server — see QualityCheckRow. */
   lastRuns?: Record<string, CheckRunSummary>;
+  /** Every recorded run per check, oldest first, for the direction. */
+  history?: Record<string, CheckRunSummary[]>;
   /** Passed from the server so the "3 days ago" stamps do not shift on hydration. */
   now?: string;
 }>) {
@@ -167,6 +170,7 @@ export function AppQualityPanel({
                 key={d.id}
                 check={{ id: d.id, name: d.name, metric: d.metric, threshold: d.threshold, direction: d.direction }}
                 lastRun={lastRuns?.[d.id]}
+                history={history?.[d.id]}
                 justRan={results[d.id]}
                 running={running === d.id}
                 now={at}

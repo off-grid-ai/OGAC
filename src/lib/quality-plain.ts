@@ -216,3 +216,105 @@ export function presentCases(cases: readonly RawCase[]): PresentedCase[] {
   }
   return out;
 }
+
+// ─── Is it getting better or worse? ──────────────────────────────────────────────────────────────────
+//
+// The Quality tab could say what happened LAST time and nothing about direction — and direction is the
+// thing that tells you whether a change helped. The data was already there: 5–6 recorded runs per
+// pipeline spanning six weeks on this tenant, with nothing plotting them.
+
+export interface TrendPoint {
+  /** ISO. */
+  at: string;
+  /** Share of cases that passed, 0..1. */
+  rate: number;
+}
+
+export type TrendDirection = 'improving' | 'declining' | 'steady' | 'too-few';
+
+export interface Trend {
+  direction: TrendDirection;
+  points: TrendPoint[];
+  /** One sentence. Never a bare percentage delta. */
+  sentence: string;
+}
+
+/** Below this many runs there is no trend, only noise. */
+const MIN_POINTS = 3;
+/** Movement smaller than this is not a signal — it is the same result measured twice. */
+const NOISE = 0.05;
+
+/**
+ * Read the direction from a check's recorded runs.
+ *
+ * Compares the most recent run to the MEDIAN of the earlier ones rather than to the single previous run:
+ * one bad run next to one good run is a coin flip, and calling that "declining" trains people to ignore
+ * the label. With fewer than three runs it says so instead of drawing a line through two dots.
+ */
+export function trendOf(runs: readonly CheckRunSummary[]): Trend {
+  const points: TrendPoint[] = [...runs]
+    .filter((r) => r.total > 0)
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+    .map((r) => ({ at: r.startedAt, rate: r.passed / r.total }));
+
+  if (points.length < MIN_POINTS) {
+    return {
+      direction: 'too-few',
+      points,
+      sentence:
+        points.length === 0
+          ? 'Never run, so there is nothing to compare.'
+          : `Only ${points.length} run${points.length === 1 ? '' : 's'} recorded — too few to say whether it is improving.`,
+    };
+  }
+
+  const latest = points[points.length - 1].rate;
+  const earlier = points.slice(0, -1).map((p) => p.rate).sort((a, b) => a - b);
+  const mid = Math.floor(earlier.length / 2);
+  const baseline =
+    earlier.length % 2 === 1 ? earlier[mid] : (earlier[mid - 1] + earlier[mid]) / 2;
+  const delta = latest - baseline;
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+
+  if (Math.abs(delta) < NOISE) {
+    return {
+      direction: 'steady',
+      points,
+      sentence: `Holding around ${pct(latest)} across ${points.length} runs.`,
+    };
+  }
+  if (delta > 0) {
+    return {
+      direction: 'improving',
+      points,
+      sentence: `Up to ${pct(latest)} from ${pct(baseline)} typical — better than it was.`,
+    };
+  }
+  return {
+    direction: 'declining',
+    points,
+    sentence: `Down to ${pct(latest)} from ${pct(baseline)} typical — worse than it was. Something changed.`,
+  };
+}
+
+/** Every recorded run of each check, oldest first — the input to trendOf. */
+export function runsPerCheck(
+  checks: readonly { id: string; metric: string; pipelineId?: string | null }[],
+  runs: readonly PastRun[],
+): Record<string, CheckRunSummary[]> {
+  const out: Record<string, CheckRunSummary[]> = {};
+  for (const check of checks) {
+    const metric = check.metric.toLowerCase().trim();
+    const all = runs.filter(
+      (r) => (r.engine ?? '').split(':')[0].toLowerCase().trim() === metric,
+    );
+    // Same preference as lastRunPerCheck: a run bound to this pipeline describes THIS app; an unbound
+    // one measured the gateway in general and would overstate what we know about this app.
+    const bound = all.filter((r) => r.pipelineId && r.pipelineId === check.pipelineId);
+    const pool = bound.length > 0 ? bound : all;
+    out[check.id] = pool
+      .map((r) => ({ passed: r.passed, total: r.total, startedAt: r.startedAt }))
+      .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  }
+  return out;
+}

@@ -4,7 +4,7 @@ import { SuggestedChecks } from '@/components/build/SuggestedChecks';
 import { getApp } from '@/lib/apps-store';
 import { listEvalDefs } from '@/lib/eval-defs';
 import { listEvalRuns, listGoldenCases } from '@/lib/evals';
-import { lastRunPerCheck } from '@/lib/quality-plain';
+import { lastRunPerCheck, runsPerCheck } from '@/lib/quality-plain';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -52,6 +52,17 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
     listEvalRuns(200, orgId).catch(() => []),
   ]);
 
+  const checkHistory = runsPerCheck(
+    evals.map((d) => ({ id: d.id, metric: d.metric, pipelineId: app.pipelineId ?? null })),
+    pastRuns.map((r) => ({
+      engine: r.engine,
+      passed: r.passed,
+      total: r.total,
+      startedAt: String(r.startedAt ?? ''),
+      pipelineId: (r as { pipelineId?: string | null }).pipelineId ?? null,
+    })),
+  );
+
   const lastRuns = lastRunPerCheck(
     evals.map((d) => ({ id: d.id, metric: d.metric, pipelineId: app.pipelineId ?? null })),
     pastRuns.map((r) => ({
@@ -76,6 +87,7 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
         golden={golden}
         libraryEvals={libraryEvals}
         lastRuns={lastRuns}
+        history={checkHistory}
         now={new Date().toISOString()}
       />
     </div>
