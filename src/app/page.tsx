@@ -171,7 +171,11 @@ export default function LandingPage() {
           Spotlight), and an overflow-clipping ANCESTOR silently disables `position: sticky` in its
           subtree. Inside the hero the stage grew correctly but never pinned — it just scrolled up off
           the screen while expanding. Nothing here may reintroduce overflow clipping. */}
-      <section className="relative border-b border-border">
+      {/* ANCHOR: /#animation lands here. The stage is scroll-driven and only plays while it is at least
+          45% in view, so the anchor must land on the section TOP (where the grow begins) rather than
+          mid-pin — otherwise a shared link arrives part-way through the camera move. scroll-mt keeps the
+          sticky header off it. */}
+      <section id="animation" className="relative scroll-mt-16 border-b border-border">
         <ControlPlaneStage />
       </section>
 

@@ -6,23 +6,55 @@ Measured against `SERVICE_CAPABILITY_AUDITS` on **2026-08-04**. The map records 
 (`upstream` / `adapter` / `ui` / `workflow`), so "under-leveraged" has an exact definition: **the upstream
 service says YES and one of ours says NO.**
 
-## THE COMPLETE ASSESSMENT — all 196 items, classified (2026-08-04)
+## THE COMPLETE ASSESSMENT — all 196 items (2026-08-04)
 
-Earlier passes sampled. This is every item, classified from its own gap text and gate evidence:
+**The three headline counts are DERIVED, not typed.** Regenerate them — never edit them by hand:
 
-| Class | Items | Share | What it means |
-| --- | --- | --- | --- |
-| **Fully leveraged** | **70** | 36% | all four gates `yes` — nothing to do |
-| Open build work | 73 | 37% | ours to build, no external dependency |
-| Needs a proof run | 26 | 13% | adapter + UI exist; never exercised end-to-end on this deployment |
-| **Deliberate — current state IS best** | **17** | 9% | the entry itself says keep it deployment-owned / don't expose an editor / governance stays in the spine |
-| Blocked on an operator | 8 | 4% | a credential to mint, a host to enrol, sudo on the box |
-| Upstream doesn't support it | 2 | 1% | not our gap at all |
+```bash
+npx tsx scripts/count-capability-gates.mts          # add --json for the per-item breakdown
+```
 
-**At their best possible state today: 89 of 196 (45%)** — the 70 fully leveraged, plus the 17 where the
+```
+services              49
+capability items      196
+fully leveraged       83   (all four gates yes)
+under-leveraged       111  (upstream yes, one of ours not)
+upstream cannot       2    (not our gap)
+```
+
+> **Every hand-typed version of these numbers in this document was wrong.** It said 70 fully leveraged;
+> a later summary of mine said 82; the truth is **83**. It said 124 under-leveraged; the truth is **111**.
+> Three different wrong numbers for one fact, because the fact was retyped instead of computed. The
+> script above now derives it from `src/lib/service-capability-map.ts`, which is the system of record.
+
+Per gate, for where the weight actually sits:
+
+| Gate | yes | partial | no |
+| --- | ---: | ---: | ---: |
+| upstream | 194 | 1 | 1 |
+| adapter | 122 | 55 | 19 |
+| ui | 118 | 54 | 24 |
+| workflow | **103** | 51 | **42** |
+
+`workflow` is the weakest column by a distance — 42 outright `no`. That is the honest shape of the gap:
+most capabilities are proven as primitives and not yet bound into a product workflow.
+
+### The classification below is JUDGEMENT, not derived
+
+These sub-splits come from reading each item's gap text, so they are an assessment and will drift as
+items close. Only the derived counts above are authoritative:
+
+| Class | Items | What it means |
+| --- | --- | --- |
+| Open build work | ~73 | ours to build, no external dependency |
+| Needs a proof run | ~26 | adapter + UI exist; never exercised end-to-end on this deployment |
+| **Deliberate — current state IS best** | **17** | the entry itself says keep it deployment-owned / don't expose an editor / governance stays in the spine |
+| Blocked on an operator | 8 | a credential to mint, a host to enrol, sudo on the box |
+
+**At their best possible state today: 102 of 196 (52%)** — the 83 fully leveraged, plus the 17 where the
 architecture deliberately declined, plus the 2 upstream cannot do.
 
-**Genuinely actionable by us: 99** (73 build + 26 proof runs). **8 need an operator.**
+**Genuinely actionable by us: ~99** (build + proof runs). **8 need an operator.**
 
 ### What that means for the goal as written
 
@@ -42,17 +74,17 @@ is an afternoon with the box, and each converts a `partial` into a `yes` with a 
 done today (the vault restore drill; the Redpanda produce/consume) and one of those revealed that the *gap
 text* had been wrong for months.
 
-## The measurement — and a correction to it
+## The measurement — and the corrections to it
 
-> **I got this number wrong four times before checking it properly.** I first reported "31 of 196", and
-> repeated it in four summaries. The 31 was the number of rows that survived `tail -60` on my own
-> diagnostic — I read a truncated list as the total. **The real figure is 126 of 196** (64%), not 31 (16%).
-> Recounted after today's promotions: **124**.
+> **This one number was wrong four separate times.** I first reported "31 of 196" and repeated it in four
+> summaries; the 31 was the number of rows that survived `tail -60` on my own diagnostic — I read a
+> truncated list as the total. Then "126", then "124". The derived answer is **111**.
 >
-> The lesson is the one this session kept teaching in other forms: a number that arrives from a pipe you
-> did not bound is not a measurement. It is what fitted on the screen.
+> Two lessons, both earned here: a number that arrives from a pipe you did not bound is not a
+> measurement, it is what fitted on the screen. And a number a human has to retype after every change
+> will eventually be wrong — which is why the count is now a script, not a sentence.
 
-**124 of 196 capabilities are under-leveraged** — the upstream service supports it and one of our gates
+**111 of 196 capabilities are under-leveraged** — the upstream service supports it and one of our gates
 does not.
 
 A large share are `partial` on `adapter` or `workflow` for reasons the entries themselves record as

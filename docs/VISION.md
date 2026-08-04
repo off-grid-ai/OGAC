@@ -10,8 +10,9 @@
 
 This is the strategy document: what we are building, who it is for, why it wins, and why an
 *integrated* platform beats the point tools it replaces. The phase plan lives in
-[`ROADMAP.md`](./ROADMAP.md); the service-by-service inventory in
-[`OSS_SERVICES_MATRIX.md`](./OSS_SERVICES_MATRIX.md). This document is the "why" above both.
+[`ROADMAP.md`](./ROADMAP.md); the service-by-service inventory is `SERVICE_CAPABILITY_AUDITS` in
+`src/lib/service-capability-map.ts` (49 services, 196 capability items, four gates each), with the
+live assessment in [`OSS_LEVERAGE.md`](./OSS_LEVERAGE.md). This document is the "why" above both.
 
 ---
 
@@ -124,8 +125,9 @@ is the consolidation of what the market sells as five separate products:
 - **Regulatory reporting** — governance registry (DPO attestations, impact assessments, RACI,
   vendor reviews) and one-click compliance exports with citations.
 
-Every one of these exists in code today behind a clean adapter seam (see the inventory in
-[`OSS_SERVICES_MATRIX.md`](./OSS_SERVICES_MATRIX.md)). The work ahead is depth and consolidation —
+Every one of these exists in code today behind a clean adapter seam (see `SERVICE_CAPABILITY_AUDITS`
+in `src/lib/service-capability-map.ts`, and [`OSS_LEVERAGE.md`](./OSS_LEVERAGE.md) for what is actually
+leveraged). The work ahead is depth and consolidation —
 turning capabilities into surfaces an officer can actually operate — not green-field building.
 
 ---

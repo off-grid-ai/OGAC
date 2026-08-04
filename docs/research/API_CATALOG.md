@@ -1,5 +1,14 @@
 # Off Grid Console — Unified API Catalog Research
 
+> **HISTORICAL RESEARCH SNAPSHOT — do not treat as current (stamped 2026-08-04).**
+> This document drew conclusions from `OSS_SERVICES_MATRIX.md` / `OSS_CAPABILITY_AUDIT.md`, both of which
+> were **deleted on 2026-08-04** because their claims had gone false. Anything here that cites them as
+> confirmation is unreliable — specifically, VictoriaMetrics, VictoriaLogs, Jaeger, the OTel collector,
+> Ragas and SeaweedFS were recorded as "off / not deployed" and are all serving traffic; Temporal was
+> "scaffold only" and now executes app runs; Qdrant was "not active" and is the retrieval backend.
+> The current source of truth is `SERVICE_CAPABILITY_AUDITS` in `src/lib/service-capability-map.ts`
+> (derive the counts with `npx tsx scripts/count-capability-gates.mts`) plus `docs/OSS_LEVERAGE.md`.
+
 _Research date: 2026-07-02. Source of truth: `deploy/docker-compose.yml`, `deploy/docker-compose.edge.yml`, `deploy/onprem/Caddyfile`, `docs/OSS_SERVICES_MATRIX.md`, and `src/app/api/` route tree._
 
 ---

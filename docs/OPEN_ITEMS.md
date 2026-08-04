@@ -4,13 +4,13 @@
 reconciliation pass (2026-07-09) that VERIFIED every candidate-open item from all the gap/status docs
 against the current `src/` code AND the live deployment on S1 (via the tunnel + break-glass admin
 bearer) — not trusted from the doc. The source ledgers (`GAPS_BACKLOG.md`, `VERIFICATION_GAPS.md`,
-`HARDENING_AUDIT.md`, `ROADMAP_STATUS.md`, `USE_CASES_PLAN.md`, `OSS_CAPABILITY_AUDIT.md`,
+`HARDENING_AUDIT.md`, `ROADMAP_STATUS.md`, `USE_CASES_PLAN.md`, ~~`OSS_CAPABILITY_AUDIT.md`~~ (deleted 2026-08-04 — stale),
 `UX_AUDIT.md`, etc.) remain as append-only history; **read this for the current truth.**
 
 ## Tally
 
 - **~470 candidate-open lines** were extracted across the docs (the bulk being the 190-row
-  `OSS_CAPABILITY_AUDIT.md`, the 48-row `UX_AUDIT.md`, and the 52-row insurer parity list).
+  ~~`OSS_CAPABILITY_AUDIT.md`~~ (deleted 2026-08-04 — stale), the 48-row `UX_AUDIT.md`, and the 52-row insurer parity list).
 - **~440 are STALE / RESOLVED / out-of-scope-by-design** this pass (see "Verified resolved" below).
 - **28 are genuinely OPEN**, listed here.
 - **0 are demo-blockers.** The live surfaces the demo leads with (warehouse, PII/Presidio, SIEM,
@@ -133,7 +133,7 @@ _None._ Confirmed by the live Phase-F sweep + same-day reconciliation.
   `href={/workspace/knowledge/${c.id}}`). Analytics now data-wired (`computeAnalytics` + pipeline facet).
 - **Integration correlation:** #29 C4 probe, #30 evals-adapter auth, #31/#33/#36..40, S4/S5/S7/T2/PA-14
   — all resolved with evidence in their source ledgers.
-- **OSS_CAPABILITY_AUDIT.md (OCA-1..190):** NOT gaps — this is a deliberate capability/scope audit
+- **OSS_CAPABILITY_AUDIT.md (OCA-1..190) — SOURCE DELETED 2026-08-04.** The doc was a 2026-07 snapshot whose claims had gone false (it recorded VictoriaMetrics/Jaeger/Ragas as "off" while they serve traffic, Temporal as "scaffold only" while it runs app runs, Qdrant as "not active" while it is the retrieval backend). Superseded by `SERVICE_CAPABILITY_AUDITS` in `src/lib/service-capability-map.ts` + `OSS_LEVERAGE.md`. These OCA ids no longer resolve. Originally: NOT gaps — a deliberate capability/scope audit
   ("we use LanceDB not pgvector", "Caddy does the WAF/rate-limit not the aggregator", most Keycloak/
   Temporal/OpenSearch deep features intentionally unused). Excluded from the open list by design; the
   few that overlap a real gap (Presidio custom recognizers, Superset dashboard, backups) are captured
