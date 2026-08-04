@@ -93,9 +93,27 @@ cloud-permitted pipeline. **0** app-spawned agent runs carry a DLP event — bec
 tenant is forced on-prem by the pipeline routing rule `pii-local`, so there is no cloud egress to screen.
 That is the leash working, not a hole, but it leaves the app cloud-egress seam without a live artefact.
 
-**Prove it on a scratch pipeline that permits cloud egress. Do NOT relax a live tenant's PII routing rule
-to manufacture the evidence** — weakening a real control to produce a test artefact is the worst trade
-available here.
+**Probed it properly (2026-08-04), and the answer is sharper than "unproven".** Two scratch runs through
+`runAgent` — the exact function an app's agent step calls — with no live tenant config touched:
+
+| Contract | `runEgress` | DLP event | Why |
+| --- | --- | --- | --- |
+| no routing rules | not cloud | 0 | nothing to screen |
+| real pipeline overlay incl. `pii-local` | **`local`** | 0 | **the leash sent it on-prem** |
+
+`runEgress = modelVerdict.egress`, and `egressDlpRunDemand` only demands masking for a **cloud-permitted**
+run. A locally-routed run skips the hook *because nothing leaves the building* — that is the control
+working, not a hole. Both probes also had their PII masked at the input guardrail regardless
+(`PAN ABCDE1234F` → `[PAN]`, verified in the run's own checks) and neither leaked the raw PAN into the
+answer.
+
+So the app path cannot produce a cloud-egress artefact **on this deployment** without routing governed app
+runs to a cloud provider — which is a deploy-level change to a box whose entire promise is the opposite.
+The 21 agent-path events remain the evidence that the hook fires when a run *is* cloud-permitted.
+
+**Do NOT relax a live tenant's PII routing rule to manufacture the evidence** — weakening a real control to
+produce a test artefact is the worst trade available here. If this must be closed, it needs a separate
+cloud-permitted pipeline on a scratch org, not an edit to `pl_seed_org_bharat_*`.
 
 ### OpenTelemetry Collector — trace correlation per app run
 
@@ -108,15 +126,41 @@ that the export failed**, and presenting "no trace" as if it settled the questio
 failure-presents-as-emptiness defect. The caption says both. **Still open:** recording exporter-failure
 state per run, which needs instrumentation inside the OTLP path rather than a caption.
 
+### Vector index — payload-index lifecycle
+
+Measured on the deployed collection (`offgrid-brain`): **no payload indexes at all**, while *every* governed
+retrieval filters on `org_id` — the tenant isolation boundary, applied on every single query in `qdrant.ts`.
+Qdrant answers an unindexed filter by scanning: invisible at three points, and the thing that falls over
+first as a corpus grows.
+
+`listPayloadIndexes` / `createPayloadIndex` / `dropPayloadIndex` on the port, with the judgement pure:
+`recommendPayloadIndexes` only ever suggests fields **we actually filter on** (an index costs memory and
+write time, so recommending one nobody queries is a cost with no return), and reports them even on a tiny
+collection with `smallForNow` set — a recommendation that appears once the store is already slow arrives
+after the problem.
+
+Fixed on the live deployment, not just in code:
+
+```
+BEFORE  indexes: []            → recommends org_id:keyword, text:text  (not urgent yet)
+AFTER   indexes: [org_id keyword (3 points), text text (3 points)]
+        recommends: none  →  "Every field this platform filters on is indexed (2 indexes)."
+```
+
+`validateIndexRequest` refuses a field name before it reaches a REST path (`"org id"`, `"org/../id"`,
+64+ chars) and names the valid types on a bad one. 9 tests, built on the real `payload_schema` shapes the
+deployment returned before and after.
+
 ## Next, in value order
 
 1. **App cloud-egress DLP proof on a scratch cloud-permitted pipeline** — the one remaining unproven seam
    in the entry above. Never by loosening a live tenant's routing.
 2. **Exporter-failure state per run** — so a missing trace is distinguishable from a failed export.
-3. **Vector index — payload-index lifecycle** (create/drop Qdrant payload indexes). Real query-performance
-   headroom we own the adapter for.
-4. **Redpanda / LanceDB / Feature Flags / Device Management** — adapters exist, no end-to-end proof on the
-   deployment. Each is a drill, not a build.
+3. **Redpanda / LanceDB / Feature Flags / Device Management** — adapters exist, no end-to-end proof on the
+   deployment. Each is a **drill**, not a build: enrol a host, produce and consume a correlated record,
+   create-to-archive a flag. They need an operator at the box, not code from here.
+4. **A console surface for payload indexes.** The port and the rule exist and were exercised live; no page
+   owns them yet, so today this is an API-level capability.
 
 ## The pattern across all of this
 

@@ -7,6 +7,11 @@
 
 import { qdrantFetch, qdrantFetchRaw } from '@/lib/qdrant-http';
 import {
+  type PayloadFieldType,
+  type PayloadIndex,
+  parsePayloadIndexes,
+} from '@/lib/qdrant-payload-index';
+import {
   type CollectionInfo,
   type CollectionSummary,
   type RecoverRequest,
@@ -31,6 +36,16 @@ export interface QdrantSnapshotsPort {
   downloadSnapshot(name: string, snapshot: string): Promise<Response>;
   /** Relative REST path of a snapshot file (pure passthrough — no host). */
   snapshotDownloadPath(name: string, snapshot: string): string;
+
+  // ── Payload indexes ──
+  // Every governed retrieval filters on `org_id` — the tenant isolation boundary — and the deployed
+  // collection had NO payload indexes at all. Qdrant answers an unindexed filter by scanning, which is
+  // invisible at three points and is what falls over first as a corpus grows.
+  /** Indexes currently on the collection, parsed from its payload_schema. */
+  listPayloadIndexes(name: string): Promise<PayloadIndex[]>;
+  /** Create one. `wait` so the caller can prove it exists rather than assume. */
+  createPayloadIndex(name: string, field: string, type: PayloadFieldType): Promise<void>;
+  dropPayloadIndex(name: string, field: string): Promise<void>;
 }
 
 async function readJson(res: Response): Promise<unknown> {
@@ -58,6 +73,28 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 }
 
 export const qdrantSnapshots: QdrantSnapshotsPort = {
+  async listPayloadIndexes(name) {
+    const res = await qdrantFetch(`/collections/${encodeURIComponent(name)}`, 'GET');
+    await assertOk(res, `read collection ${name}`);
+    const body = (await readJson(res)) as { result?: unknown } | null;
+    return parsePayloadIndexes(body?.result);
+  },
+  async createPayloadIndex(name, field, type) {
+    // wait=true so a caller that then lists the indexes sees it — an async index creation would make
+    // "prove it exists" a race, and an unverifiable create is not a managed index.
+    const res = await qdrantFetch(`/collections/${encodeURIComponent(name)}/index?wait=true`, 'PUT', {
+      field_name: field,
+      field_schema: type,
+    });
+    await assertOk(res, `create payload index ${field} on ${name}`);
+  },
+  async dropPayloadIndex(name, field) {
+    const res = await qdrantFetch(
+      `/collections/${encodeURIComponent(name)}/index/${encodeURIComponent(field)}?wait=true`,
+      'DELETE',
+    );
+    await assertOk(res, `drop payload index ${field} on ${name}`);
+  },
   async listCollections(): Promise<CollectionSummary[]> {
     const res = await qdrantFetch('/collections', 'GET');
     await assertOk(res, 'list collections');
