@@ -20,6 +20,7 @@ import {
   type WorkRun,
 } from '@/lib/app-work-queue';
 import { ownershipVerdict } from '@/lib/app-ownership';
+import { sourceHealth } from '@/lib/source-health';
 import { getApp } from '@/lib/apps-store';
 import { disambiguate } from '@/lib/my-work';
 import { currentOrgId } from '@/lib/tenancy';
@@ -253,6 +254,18 @@ export default async function AppWorkPage({
     }
   })();
 
+  // IS THE DATA STILL ARRIVING. Freshness lives on the warehouse catalogue, which apps are not joined
+  // to — so this reads the app's OWN runs instead: a read that errored, or that returned nothing where
+  // it used to return rows, is the operator-visible form of a source going stale.
+  const health = sourceHealth(
+    rows.map((r) => ({
+      startedAt:
+        r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? ''),
+      steps: ((r as { steps?: { kind?: string; status?: string; outcome?: string; label?: string }[] })
+        .steps ?? []),
+    })),
+  );
+
   const base = `/solutions/apps/${encodeURIComponent(id)}`;
 
   return (
@@ -261,6 +274,14 @@ export default async function AppWorkPage({
         {/* The headline DOMINATES. Everything else on this screen is context for it: what is waiting for
           you is the reason you opened the app, and it previously shared visual billing with "Needed a
           person 100%" — a number nobody acts on. */}
+        {/* The data this app depends on. Silent unless a read failed, or stopped returning anything it
+            used to return — an app that has always read nothing is not a regression. */}
+        {health.warning ? (
+          <div className="rounded-md border border-destructive/40 bg-destructive/[0.05] p-3 text-xs text-foreground">
+            {health.warning}
+          </div>
+        ) : null}
+
         {/* Ownership, stated where the work is. Silent when the owner is real, reachable and present. */}
         {ownership?.warning ? (
           <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
