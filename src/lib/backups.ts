@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
-import { readdir, rm, stat } from 'node:fs/promises';
+import { readdir, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import {
@@ -314,5 +314,26 @@ export async function readScheduleStatus(): Promise<ScheduleStatus> {
         ? 'launchctl unavailable in this environment — schedule status can only be read on the S1 host.'
         : `launchd job ${LAUNCHD_LABEL} is NOT loaded. Install /Library/LaunchDaemons/${LAUNCHD_LABEL}.plist (StartCalendarInterval Hour=2) to schedule the nightly backup — see deploy/onprem/backup.sh.`,
     };
+  }
+}
+
+// ─── The restore rehearsal record (I/O) ──────────────────────────────────────────────────────────────
+//
+// The fleet drill (deploy/onprem/vault-recovery-drill.sh) proves the whole chain — restore a snapshot into
+// a throwaway vault, unseal it, read a canary back, enable the file audit device and show the request
+// recorded with the secret HMAC'd — and used to print all of it to stdout and exit. Nothing persisted, so
+// "when did you last prove you can restore this?" was answerable only from someone's scrollback.
+//
+// The script now writes a JSON record next to the backups; this reads it. Best-effort: a missing or
+// unreadable record resolves to null, which drillStatus reports as NEVER REHEARSED rather than as health.
+export async function readDrillRecord(): Promise<import('@/lib/dr-drill').DrillRecord | null> {
+  const { parseDrillRecord } = await import('@/lib/dr-drill');
+  const file = path.join(config().backupRoot, 'restore-drill.json');
+  try {
+    const raw = await readFile(file, 'utf8');
+    return parseDrillRecord(JSON.parse(raw));
+  } catch {
+    // Absent, unreadable, or not JSON — all mean "no usable proof", which is the honest answer.
+    return null;
   }
 }
