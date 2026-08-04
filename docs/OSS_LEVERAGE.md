@@ -1,0 +1,105 @@
+# Are we leveraging the OSS we already run?
+
+**Goal:** every integrated OSS service used to the best state it can be.
+
+Measured against `SERVICE_CAPABILITY_AUDITS` on **2026-08-04**. The map records four gates per capability
+(`upstream` / `adapter` / `ui` / `workflow`), so "under-leveraged" has an exact definition: **the upstream
+service says YES and one of ours says NO.**
+
+## The measurement
+
+**31 of 196 capabilities are under-leveraged** — the OSS supports it, we do not yet use it.
+
+Split by which gate fails:
+
+| Failing gate(s) | What it means | Count |
+| --- | --- | --- |
+| `workflow` only | Adapter and UI exist; never proven end to end on the deployment | ~11 |
+| `ui` / `ui+workflow` | Adapter works; no console surface owns it | ~9 |
+| `adapter…` | Code we have to write | ~8 |
+| all three | Host-owned or a deliberate ownership choice | ~3 |
+
+The `adapter`-only ones are the real backlog, because the others are mostly deploy-config or a conscious
+decision to keep something in its own surface (Superset authoring, LiteLLM guardrails — governance stays in
+the Off Grid pipeline spine, which is a valid choice and is recorded as one rather than as a gap).
+
+## Closed on 2026-08-04
+
+### Presidio — language selection and multilingual analysis
+
+The map asked for "supported-language discovery, validation, and an org or pipeline setting". **Half of
+that would have broken the tenant's PII protection.** Measured against the deployed analyzer:
+
+```
+/supportedentities?language=en  → 200
+/supportedentities?language=hi  → 500  "No matching recognizers were found to serve the request"
+ta, mr, es                      → 500  likewise
+```
+
+English is the **only** language this deployment serves. A language picker offering Hindi would send `hi`,
+the analyzer would 500, and this scan is **fail-closed by design** — so it would refuse every governed
+call. Adding the setting without the validation converts a working control into an outage. **So the
+validation shipped and the picker did not.**
+
+`presidioLanguages()` discovers support by probing (Presidio has no list-languages endpoint; a served
+language answers 200, an unserved one 500), cached 10 minutes. `resolveAnalyzerLanguage` never returns a
+language the service cannot serve and states why it substituted — a scan that quietly ran in the wrong
+language is a scan whose misses nobody can account for.
+
+**The measurement that matters for an Indian tenant**, and the reason not to panic about English-only:
+
+```
+analyze("ग्राहक का पैन ABCDE1234F और आधार 2345 6789 0123 है", language: "en")
+  → PERSON, IN_PAN, IN_AADHAAR     (engine=presidio, status=applied)
+```
+
+The Indian identifier recognizers are **pattern-based**, so PAN, Aadhaar, voter ID, card and account
+numbers and email are found whatever script surrounds them. Only names and places in non-Latin script are
+matched less reliably, and `describeLanguageReach` says exactly that rather than implying multilingual
+cover we do not have.
+
+### App Worker — output and run-state persistence
+
+`persistState` was `try { … } catch { /* DB unreachable — degrade to no-op */ }`. The comment is right that
+the workflow state is authoritative — the **run** is not lost. What was lost is the **console's view** of
+it, which is what every person and every audit reads: a completed run whose final write failed showed
+whatever the last successful write said, with no error anywhere.
+
+Now: bounded exponential retry (total under a second — an activity that retries for a minute stalls the run
+it is trying to record), then a loud `APP_RUN_PERSIST_FAILED` line carrying run/org/status/attempts and the
+error **cause** (Drizzle wraps the real reason there; a bare message reads "Failed query" and diagnoses
+nothing). It cannot be recorded in the database we just failed to reach, so it goes to the worker log —
+and without the run id the alarm is unactionable, because the repair is "re-persist THIS run".
+
+A **terminal** run's lost write is `console.error` (nothing later will correct it); a mid-run write is
+`console.warn` (the next step's write supersedes it). Treating them the same would either cry wolf or bury
+the permanent case.
+
+## One entry that is understated — and NOT promoted
+
+**AI Gateway — cloud egress DLP.** The gap text says the final enforcement hook "covers only the
+chat/stream cloud-model path; agent and app model calls, cloud tools, and outbound sinks do not enter it."
+
+Reading the code, all three paths are in fact covered:
+- **chat/stream** — `sanitizeOutboundMessages`, fail-closed, replaces `payload.messages` before
+  `forwardToCloud`;
+- **agent, and app transitively** (app agent steps call `runAgent`) — PII scan → `enforceEgressDlp` → a
+  `blocked` verdict refuses the run, with input masking via `applyPiiEscalation` and output masking
+  substituted before provenance signing;
+- **outbound sinks** — `maskTextForSend` before the body crosses the boundary.
+
+**The gate stays as it is.** The bar in this repo is that a gate is promoted only by someone who **ran it
+and read the artifact**, and code reading is not that. Settling it needs one live cloud-routed request with
+PII through the agent path, confirming the `gateway.egress.dlp` audit event and the masked payload. Until
+someone does that, an understated map is the safer error — but it is still an error, and it is the same
+stale-pessimism that once had guardrails recorded as missing when LLM Guard output scanning already worked.
+
+## Next, in value order
+
+1. **Live cloud-egress DLP proof** on the agent path — settles the entry above either way.
+2. **OpenTelemetry Collector — durable trace correlation per app run**, so a run can be found in Jaeger
+   from its console record instead of by timestamp.
+3. **Vector index — payload-index lifecycle** (create/drop Qdrant payload indexes). Real query-performance
+   headroom we own the adapter for.
+4. **Redpanda / LanceDB / Feature Flags / Device Management** — adapters exist, no end-to-end proof on the
+   deployment. Each is a drill, not a build.
