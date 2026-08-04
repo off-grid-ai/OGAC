@@ -64,6 +64,7 @@ export type ContextualDestinationId =
   | 'history'
   | 'review'
   | 'retention'
+  | 'fairness'
   | 'users'
   | 'invitations'
   | 'clients'
@@ -449,6 +450,14 @@ export const CONTEXTUAL_MODULES: readonly ContextualModule[] = [
         label: 'Retention',
         description: 'How long records are kept, and proof they were deleted.',
         route: '/governance/evidence/retention',
+      },
+      {
+        // For an app that DECLINES people — a loan, a claim — "does it decide differently for different
+        // groups?" is the question a regulator opens with, and there was no fairness check of any kind.
+        id: 'fairness',
+        label: 'Fairness',
+        description: 'Whether apps that decide about people approve some groups less often.',
+        route: '/governance/evidence/fairness',
       },
     ],
   },
