@@ -275,13 +275,56 @@ Screenshotting the BROWSER path (not the run script) found four more defects the
 (`shouldIntercept` → `liveActionsEnabled`, fail-safe). The run records what it WOULD have sent, and
 "Send report now" works on demand. Turning on global egress is an operator decision, not a code change.
 
+### The front door now adapts, and there is a real dashboard (2026-08-04)
+
+Items 2 and 3 below are **DONE**. Both were found by opening the screens rather than by reading the code.
+
+**Item 2 — the app's shape.** `appShape` and `buildAppWorkQueue` already distinguished a job from a queue
+and already wrote a shape-aware headline. **The screen ignored both.** On the one job-shaped app in the
+demo tenants (Renewal & Persistency Nudge — scheduled, zero human steps):
+- it led with *"Waiting for you — Nothing is waiting on a decision right now"*, a section that can never
+  hold anything, because nothing in that app can wait for a decision;
+- two of its five numbers were structurally zero forever for that shape;
+- the headline said *"Run it again any time"* and there was no way to run it from that screen;
+- what it PRODUCED — the entire reason a job exists — appeared nowhere.
+
+A job now leads with **running it** and **its last result**, side by side. The run form is the same
+`RunPanel` the Run tab used (no second submit path), the now-duplicate Run tab is dropped, and the first
+tab is called **Overview** because "Work" reads as a queue. `app-front-door.ts` is the pure half:
+`statsForShape`, `showsWaitingQueue`, `latestResult`.
+
+Three defects surfaced from looking at the result panel:
+- **`CasePicker` collapsed every non-OK response into "Could not look up cases · Try again".** On a public
+  app page the lookup is admin-only and answers 401, so an anonymous reader got a control presented as
+  broken with a retry that could never succeed. `api-failure`'s `explainResponse` was written for exactly
+  this ("a refusal is not a failure") and this component was not using it.
+- **The result was printed raw**, so `**Retention Action Recommendation**` reached a department reader with
+  literal asterisks — on the one panel carrying the app's whole value. Now the shared `Markdown`.
+- **The demo data had no outputs at all.** All nine seeded runs had `outcome=''` and every step output
+  null, so the panel correctly said "no readable result". Fixed by RUNNING the app for real, not by
+  seeding text: a live run produced a genuine 1.4k recommendation with PII pseudonymised in place.
+
+**Item 3 — the dashboard. The doc was wrong that no component existed** — `CockpitDashboard` does. But it
+is the bespoke RM cross-sell cockpit (assets under management, a lead→won funnel, product mix) for an app
+that has since been deleted, and nothing answered the question an ordinary owner has. `AppOwnerDashboard`
++ `app-owner-dashboard.ts` now answer it from the app's own runs: **how much it has handled** (30 days,
+gaps plotted as gaps), **what it decided** (declines kept apart from failures), **where the time goes**
+(work vs waiting, stated separately, never blended), and **whether its answers hold up** (the same
+retained verdicts the Quality tab reads, so the two cannot disagree).
+
+No cost panel: there is no per-run cost on `app_runs`, and a fabricated ₹0.00 reads as "this is free" —
+the defect `money.ts` exists to stop.
+
+Caught on the first screenshot of it: **two unlabelled denominators on one screen** — "17 cases in the
+last 30 days" beside "10 of 18 cases". The mix now says "Of all 18 cases so far".
+
 ### Not built yet — in priority order
 1. ~~Input derived from the app's own definition~~ **DONE** — `app-input-prompt.ts`: label "The case to
    work on", and the example is a REAL previous case from that app. Nothing invented when there is no
    prior run.
-2. **Adapt the front door to the app's shape** (see §3b) — a job-shaped app must lead with "run it now"
-   and its latest results, not with an empty decision queue.
-3. **The dashboard** — the only item on the founder's list with no component behind it at all.
+2. ~~Adapt the front door to the app's shape~~ **DONE 2026-08-04** — see above.
+3. ~~The dashboard~~ **DONE 2026-08-04** — `AppOwnerDashboard`. The claim that no component existed was
+   wrong; the one that existed was a bespoke cross-sell cockpit. See above.
 4. **Org-tree RBAC** — **DONE. It was already built, tested AND wired; only the DATA was missing.**
    I declared this missing twice. Both times the code was there and I had not looked.
    - `resolveManagementChain` (`app-sharing-policy.ts`) treats a team `lead` as a manager to that team's

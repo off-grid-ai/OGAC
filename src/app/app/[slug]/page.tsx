@@ -12,6 +12,15 @@ import { listAppRuns } from '@/lib/app-run-store';
 import { buildAppDashboard } from '@/lib/app-dashboard';
 import { isDeclinedByPerson } from '@/lib/app-run-progress';
 import { latestResult } from '@/lib/app-front-door';
+import {
+  outcomeMix,
+  timeUse,
+  volumeByDay,
+  volumeTrend,
+} from '@/lib/app-owner-dashboard';
+import { listOnlineScoresForApp } from '@/lib/qa/online-scores';
+import { qualityOnRealCases } from '@/lib/quality-on-real-cases';
+import { splitRunTime } from '@/lib/run-time-split';
 import { buildAppWorkQueue, caseLabel, caseTrail, runSubject, statusLabel } from '@/lib/app-work-queue';
 import { getAppBySlug } from '@/lib/apps-store';
 import { resolveDeployedApp } from '@/lib/deployed-app';
@@ -127,6 +136,42 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
       };
     }),
   });
+  // ─── The app owner's dashboard ─────────────────────────────────────────────────────────────────
+  // Derived from the app's OWN runs, plus the same retained quality verdicts the Quality tab reads — so
+  // the deployed app and its management view cannot give two answers about how it is doing.
+  const ownerRuns = runs.map((r) => {
+    const steps = (r as { steps?: unknown }).steps as
+      | { kind?: string; status?: string; startedAt?: string; finishedAt?: string }[]
+      | undefined;
+    const startedAt =
+      r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? '');
+    const finishedAt =
+      (r as { finishedAt?: Date | string | null }).finishedAt instanceof Date
+        ? ((r as { finishedAt: Date }).finishedAt).toISOString()
+        : ((r as { finishedAt?: string | null }).finishedAt ?? null);
+    const split = splitRunTime(steps, startedAt, finishedAt);
+    return {
+      startedAt,
+      finishedAt,
+      status: String(r.status),
+      declined: isDeclinedByPerson(steps),
+      workingMs: split.workingMs,
+      waitingMs: split.waitingMs,
+    };
+  });
+  const volume = volumeByDay(ownerRuns, new Date(nowMs));
+  // Quality is best-effort: a failed read must leave the panel silent, never claim the app is fine.
+  const verdicts = await listOnlineScoresForApp(app.id, orgId, 200).catch(() => []);
+  const finishedCount = ownerRuns.filter((r) => r.status === 'done').length;
+  const quality = verdicts.length > 0 ? qualityOnRealCases(verdicts, finishedCount) : null;
+  const owner = {
+    volume,
+    trend: volumeTrend(volume),
+    mix: outcomeMix(ownerRuns),
+    time: timeUse(ownerRuns),
+    qualitySentence: quality?.sentence ?? null,
+  };
+
   const fields = deriveRunFields(app.inputForm, prompt);
   const surface = sharedSurface(resolved.slug);
   // The read-only viewer's write controls must annotate themselves — that is the documented half of the
@@ -148,6 +193,7 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           fields={fields}
           surface={surface}
           appId={app.id}
+          owner={owner}
           shape={queue.shape}
           howWorkArrives={queue.howWorkArrives}
           // What the last run produced — for a job this is the reason the app exists, and it appeared

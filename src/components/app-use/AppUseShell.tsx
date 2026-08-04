@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { CaseDecision } from '@/components/build/CaseDecision';
+import { AppOwnerDashboard, type OwnerDashboardData } from '@/components/app-use/AppOwnerDashboard';
 import { Markdown } from '@/components/Markdown';
 import { Button } from '@/components/ui/button';
 import { CockpitDashboard } from '@/components/app-use/CockpitDashboard';
@@ -56,6 +57,7 @@ export function AppUseShell({
   shape = 'queue',
   latest,
   howWorkArrives,
+  owner,
 }: Readonly<{
   /** Passed to the run panel so a case can be picked from the app's bound data. */
   appId?: string;
@@ -98,11 +100,18 @@ export function AppUseShell({
   latest?: LatestResult | null;
   /** One sentence: how this app is triggered ("Runs on a schedule", "Arrives by email"). */
   howWorkArrives?: string;
+  /**
+   * The generic app-owner dashboard — "is this working, and where is it going wrong?".
+   *
+   * Distinct from `metrics`, which drives CockpitDashboard: that is the bespoke RM cross-sell cockpit
+   * (assets under management, a lead→won funnel), not something an ordinary app owner can read.
+   */
+  owner?: OwnerDashboardData | null;
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
   const shownStats = statsForShape(shape, stats ?? []);
-  const hasDashboard = Boolean(metrics);
+  const hasDashboard = Boolean(metrics) || Boolean(owner);
   const hasWork = Boolean(stats?.length || waiting?.length);
   // A job's front door already carries the run form, so a separate Run tab would be the same control in
   // two places — two things to keep working, and a reader wondering whether they differ.
@@ -296,6 +305,8 @@ export function AppUseShell({
           </section>
           ) : null}
         </div>
+      ) : view === 'dashboard' && owner ? (
+        <AppOwnerDashboard data={owner} />
       ) : view === 'dashboard' && metrics ? (
         <CockpitDashboard metrics={metrics} trend={trend ?? []} live={live} customerHrefBase={surface.customerHrefBase} />
       ) : view === 'run' ? (
