@@ -1,7 +1,10 @@
 import { notFound } from 'next/navigation';
 import { AppQualityPanel } from '@/components/build/AppQualityPanel';
 import { AppQualityCoverage, type NotWatching } from '@/components/build/AppQualityCoverage';
+import { listDriftRunsForApp } from '@/lib/drift-runs';
+import { appDriftSentence } from '@/lib/quality-plain';
 import { RealCaseQualityCard } from '@/components/build/RealCaseQualityCard';
+import { Card, CardContent } from '@/components/ui/card';
 import { FEEDBACK_SUITE } from '@/lib/feedback-map';
 import { getAlertDestination } from '@/lib/qa/quality-alert-destination-store';
 import { SuggestedChecks } from '@/components/build/SuggestedChecks';
@@ -128,14 +131,22 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
       reason: 'this app is bound to no pipeline, so nothing gates its releases and there is no version to roll back to',
     });
   }
-  coverage.push({
-    // Checked, not assumed: drift_runs carry org_id and dataset with no app or pipeline column, so a
-    // per-app drift figure here would be invented.
-    name: 'Drift',
-    reason:
-      'it is tracked per dataset, not per app, so none of this organization’s drift runs can be attributed to this one',
-    href: '/insights/quality/drift',
-  });
+  // DRIFT, now attributable. This used to be an unconditional gap: drift_runs carried only org_id, so a
+  // per-app figure would have been invented. Rather than leave it as a permanent absence, the run now
+  // RECORDS which app it was for (drift_runs.app_id), so this reports the real answer — and still says
+  // "nothing yet" honestly for an app that has never had a check run for it.
+  const appDrift = await listDriftRunsForApp(id, orgId).catch(() => []);
+  const driftSentence = appDriftSentence(
+    appDrift.map((r) => ({ status: r.status, driftShare: r.driftShare, startedAt: r.startedAt })),
+  );
+  if (appDrift.length === 0) {
+    coverage.push({
+      name: 'Drift on this app’s data',
+      reason:
+        'no drift check has been run for this app yet, so it is not known whether the data feeding it has shifted',
+      href: '/insights/quality/drift',
+    });
+  }
   if (!alertDest) {
     coverage.push({
       name: 'Quality alerts',
@@ -162,6 +173,16 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
       <SuggestedChecks appId={id} appTitle={app.title} />
       <RealCaseQualityCard quality={realCases} appHref={`/solutions/apps/${encodeURIComponent(id)}`} />
       <AppQualityCoverage items={coverage} />
+      {/* The positive answer, when there is one. Only reachable because the run records which app it was
+          for — otherwise this would be an org-wide number wearing this app's name. */}
+      {driftSentence ? (
+        <Card className="shadow-sm">
+          <CardContent className="py-4">
+            <p className="text-xs font-medium text-foreground">Has the data feeding this app shifted?</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{driftSentence}</p>
+          </CardContent>
+        </Card>
+      ) : null}
       <AppQualityPanel
         appId={id}
         appTitle={app.title}

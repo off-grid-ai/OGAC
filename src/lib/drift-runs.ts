@@ -39,6 +39,12 @@ export async function ensureDriftSchema(): Promise<void> {
         started_at timestamptz NOT NULL DEFAULT now()
       );`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS drift_runs_org_idx ON drift_runs (org_id);`);
+    // WHAT THIS RUN WAS ABOUT. drift_runs carried only org_id, so a per-app drift panel was impossible:
+    // it could only be silently always-empty or silently org-wide. Rather than fake the join, the
+    // attribution is now recorded at the moment the check is run.
+    await db.execute(sql`ALTER TABLE drift_runs ADD COLUMN IF NOT EXISTS dataset text;`);
+    await db.execute(sql`ALTER TABLE drift_runs ADD COLUMN IF NOT EXISTS app_id text;`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS drift_runs_app_idx ON drift_runs (org_id, app_id);`);
   })();
   return ensurePromise;
 }
@@ -83,14 +89,19 @@ export async function recordDriftRun(
     baseline: number;
     current: number;
     attribution: DriftAttribution | Record<string, unknown> | null;
+    /** The dataset the check was run against, when the caller named one. */
+    dataset?: string | null;
+    /** The app this check was run for, when it was run for one. */
+    appId?: string | null;
   },
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
   await ensureDriftSchema();
   const attribution = run.attribution ? JSON.stringify(run.attribution) : null;
   await db.execute(
-    sql`INSERT INTO drift_runs (id, org_id, engine, status, drift_share, baseline, current, attribution)
-        VALUES (${run.id}, ${orgId}, ${run.engine}, ${run.status}, ${run.driftShare}, ${run.baseline}, ${run.current}, ${attribution}::jsonb);`,
+    sql`INSERT INTO drift_runs (id, org_id, engine, status, drift_share, baseline, current, attribution, dataset, app_id)
+        VALUES (${run.id}, ${orgId}, ${run.engine}, ${run.status}, ${run.driftShare}, ${run.baseline}, ${run.current}, ${attribution}::jsonb,
+                ${run.dataset ?? null}, ${run.appId ?? null});`,
   );
 }
 
@@ -118,4 +129,25 @@ export async function deleteDriftRun(id: string, orgId: string = DEFAULT_ORG): P
     sql`DELETE FROM drift_runs WHERE id = ${id} AND org_id = ${orgId};`,
   );
   return (rowCount ?? 0) > 0;
+}
+
+/**
+ * Drift checks run FOR one app.
+ *
+ * Only runs whose `app_id` was recorded at execution time are returned. Deliberately not "every run in
+ * this org, shown on the app's page": that is the fabricated join this column exists to avoid, and it
+ * would report unrelated drift as this app's problem.
+ */
+export async function listDriftRunsForApp(
+  appId: string,
+  orgId: string = DEFAULT_ORG,
+  limit = 20,
+): Promise<DriftRun[]> {
+  await ensureDriftSchema();
+  const { rows } = await db.execute<DriftRunRow>(
+    sql`SELECT id, org_id, engine, status, drift_share, baseline, current, started_at, attribution
+        FROM drift_runs WHERE org_id = ${orgId} AND app_id = ${appId}
+        ORDER BY started_at DESC LIMIT ${limit};`,
+  );
+  return rows.map(toDriftRun);
 }

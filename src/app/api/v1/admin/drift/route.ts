@@ -30,6 +30,9 @@ export async function POST(req: Request) {
     itemId?: unknown;
     columnOverrides?: unknown;
     driftShareThreshold?: unknown;
+    /** Optional attribution: which dataset, and which app this check was run for. */
+    dataset?: unknown;
+    appId?: unknown;
   };
   const itemId = typeof body.itemId === 'string' ? body.itemId : '';
   const columnOverrides: DriftMethodOverride[] = Array.isArray(body.columnOverrides)
@@ -68,6 +71,10 @@ export async function POST(req: Request) {
     runId = `drift_${randomUUID().slice(0, 12)}`;
     await recordDriftRun(
       {
+        // Recorded so a per-app drift panel is possible without inventing a join. Absent when the check
+        // was run org-wide, which is the honest majority case.
+        dataset: typeof body?.dataset === 'string' ? body.dataset : null,
+        appId: typeof body?.appId === 'string' ? body.appId : null,
         id: runId,
         engine: typeof attr.engine === 'string' ? attr.engine : result.data.engine,
         status: result.data.status,

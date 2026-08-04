@@ -318,3 +318,44 @@ export function runsPerCheck(
   }
   return out;
 }
+
+// ─── Has the data feeding this app shifted? ────────────────────────────────────────────────────────────
+//
+// Drift used to be reported on the app's Quality tab as a permanent absence — "it is tracked per dataset,
+// not per app" — because `drift_runs` carried only `org_id`. The run now records which app it was for, so
+// the question has a real answer. This turns those runs into the sentence its owner needs.
+
+export interface AppDriftRun {
+  status: string;
+  /** 0..1 share of columns that drifted, or null when the engine did not report one. */
+  driftShare: number | null;
+  /** ISO. */
+  startedAt: string;
+}
+
+/**
+ * What to tell an app owner about drift in the data feeding it.
+ *
+ * Returns null when nothing has been checked — the caller reports that as a gap rather than as calm.
+ * A never-checked app and a checked-and-stable app are opposite facts.
+ */
+export function appDriftSentence(runs: readonly AppDriftRun[]): string | null {
+  const ordered = [...runs]
+    .filter((r) => Number.isFinite(Date.parse(r.startedAt)))
+    .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+  if (ordered.length === 0) return null;
+
+  const latest = ordered[0];
+  const when = latest.startedAt.slice(0, 10);
+  const drifted = latest.status.toLowerCase() === 'drift';
+  const pct = latest.driftShare === null ? null : Math.round(latest.driftShare * 100);
+
+  if (!drifted) {
+    return `The data feeding this app looked normal when it was last checked on ${when}.`;
+  }
+  // Named as a reason to look, not as a failure: data moving is often the business changing, and telling
+  // an owner their app is broken when the world changed would send them after the wrong thing.
+  return pct === null
+    ? `The data feeding this app has shifted since its baseline — last checked ${when}. Its answers were tuned on the older pattern, so they are worth re-checking.`
+    : `${pct}% of the data feeding this app has shifted since its baseline — last checked ${when}. Its answers were tuned on the older pattern, so they are worth re-checking.`;
+}
