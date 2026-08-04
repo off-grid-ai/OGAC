@@ -149,12 +149,25 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           appId={app.id}
           workHeadline={queue.headline}
           stats={dashboard.metrics.map((m) => ({ label: m.label, value: m.value, tone: m.tone }))}
+          // ACTIVITY — every case, newest first. This tab rendered a hardcoded "No runs yet" empty
+          // state: it was never passed a single run, so an app with 18 real cases told its users it
+          // had done nothing. Worse, the waiting-case links below point HERE, so the one path a
+          // person follows to act on their queue landed on that false empty state.
+          activity={[...asWorkRuns]
+            .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))
+            .map((r) => ({
+              id: r.id,
+              subject: caseLabel(r.subject, r.id),
+              status: statusLabel(r.status, { declined: r.declined }),
+              startedAt: r.startedAt,
+              trail: r.trail,
+            }))}
           waiting={queue.waiting.map((c) => ({
             id: c.id,
             pendingStepId: (c as { pendingStepId?: string | null }).pendingStepId,
             trail: (c as { trail?: string | null }).trail,
             label: caseLabel(c.subject, c.id),
-            href: `/app/${encodeURIComponent(resolved.slug)}?view=activity`,
+            href: `/app/${encodeURIComponent(resolved.slug)}?view=activity#case-${encodeURIComponent(c.id)}`,
             when: `${statusLabel(c.status, { declined: c.declined })} · ${
               Number.isNaN(Date.parse(c.startedAt))
                 ? ''

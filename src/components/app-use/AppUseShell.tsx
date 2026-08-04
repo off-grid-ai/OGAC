@@ -48,6 +48,7 @@ export function AppUseShell({
   workHeadline,
   stats,
   appId,
+  activity,
 }: Readonly<{
   /** Passed to the run panel so a case can be picked from the app's bound data. */
   appId?: string;
@@ -69,6 +70,14 @@ export function AppUseShell({
   workHeadline?: string;
   /** The process's numbers, in the department's language. */
   stats?: UseStat[];
+  /**
+   * ACTIVITY — every case this app has handled, newest first.
+   *
+   * The Activity tab was hardcoded to an empty state: it rendered "No runs yet" unconditionally, having
+   * never been passed a single run. The app had 18. An empty state that cannot be anything else is not
+   * an empty state, it is a false statement.
+   */
+  activity?: UseActivityCase[];
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -173,7 +182,13 @@ export function AppUseShell({
             <div className="overflow-hidden rounded-lg border border-border">
               {waiting?.length ? (
                 waiting.map((c) => (
-                  <div key={c.id} className="border-b border-border px-4 py-3 last:border-b-0">
+                  // Anchored, because the waiting queue links here: a person following "this needs you" should
+        // land ON their case, not at the top of every case the app has ever run.
+        <div
+          key={c.id}
+          id={`case-${c.id}`}
+          className="scroll-mt-24 border-b border-border px-4 py-3 last:border-b-0 target:bg-primary/5"
+        >
                     <a href={c.href} className="block no-underline hover:opacity-80">
                       {/* Full width, wrapping: you must be able to read the case you are deciding. */}
                       <span className="block text-sm leading-snug text-foreground">{c.label}</span>
@@ -205,9 +220,54 @@ export function AppUseShell({
         <CockpitDashboard metrics={metrics} trend={trend ?? []} live={live} customerHrefBase={surface.customerHrefBase} />
       ) : view === 'run' ? (
         <RunPanel fields={fields} surface={surface} appId={appId} />
+      ) : activity && activity.length > 0 ? (
+        <ActivityList cases={activity} />
       ) : (
         <ActivityEmpty />
       )}
+    </div>
+  );
+}
+
+export interface UseActivityCase {
+  id: string;
+  /** What the case was about, in the author's words. */
+  subject: string | null;
+  /** Already in plain words — 'Completed', 'Waiting for you', 'Could not finish'. */
+  status: string;
+  /** ISO. */
+  startedAt: string;
+  /** The governed trail: what was read, checked, decided. */
+  trail: string | null;
+}
+
+// Every case the app has handled. Deliberately the SAME wording the console uses for the same run —
+// a deployed app and its management view must never describe one case two ways.
+function ActivityList({ cases }: Readonly<{ cases: UseActivityCase[] }>) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border">
+      {cases.map((c) => (
+        // Anchored, because the waiting queue links here: a person following "this needs you" should
+        // land ON their case, not at the top of every case the app has ever run.
+        <div
+          key={c.id}
+          id={`case-${c.id}`}
+          className="scroll-mt-24 border-b border-border px-4 py-3 last:border-b-0 target:bg-primary/5"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm text-foreground">{c.subject ?? 'Unnamed case'}</p>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {c.status}
+              {/* Formatted deterministically, never toLocaleString: this renders on the server and again
+                  in the browser, and the two disagree on locale and time zone. */}
+              {c.startedAt ? ` · ${c.startedAt.slice(0, 16).replace('T', ' ')} UTC` : ''}
+            </p>
+          </div>
+          {c.trail ? (
+            <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{c.trail}</p>
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }
