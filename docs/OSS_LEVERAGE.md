@@ -108,25 +108,6 @@ that the export failed**, and presenting "no trace" as if it settled the questio
 failure-presents-as-emptiness defect. The caption says both. **Still open:** recording exporter-failure
 state per run, which needs instrumentation inside the OTLP path rather than a caption.
 
-## Superseded note
-
-**AI Gateway — cloud egress DLP.** The gap text says the final enforcement hook "covers only the
-chat/stream cloud-model path; agent and app model calls, cloud tools, and outbound sinks do not enter it."
-
-Reading the code, all three paths are in fact covered:
-- **chat/stream** — `sanitizeOutboundMessages`, fail-closed, replaces `payload.messages` before
-  `forwardToCloud`;
-- **agent, and app transitively** (app agent steps call `runAgent`) — PII scan → `enforceEgressDlp` → a
-  `blocked` verdict refuses the run, with input masking via `applyPiiEscalation` and output masking
-  substituted before provenance signing;
-- **outbound sinks** — `maskTextForSend` before the body crosses the boundary.
-
-**The gate stays as it is.** The bar in this repo is that a gate is promoted only by someone who **ran it
-and read the artifact**, and code reading is not that. Settling it needs one live cloud-routed request with
-PII through the agent path, confirming the `gateway.egress.dlp` audit event and the masked payload. Until
-someone does that, an understated map is the safer error — but it is still an error, and it is the same
-stale-pessimism that once had guardrails recorded as missing when LLM Guard output scanning already worked.
-
 ## Next, in value order
 
 1. **App cloud-egress DLP proof on a scratch cloud-permitted pipeline** — the one remaining unproven seam
