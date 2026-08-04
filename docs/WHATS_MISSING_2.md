@@ -40,10 +40,26 @@ Lawful basis is now on every source, and "consent" is one of the options. But co
 person can **revoke**, and nothing records a withdrawal or stops future processing when it happens. A
 consent record you cannot withdraw is not consent.
 
-### 5. No fairness evidence on decisions that decline people
-**Zero fairness or bias checks exist** — on a tenant whose live apps underwrite personal loans and triage
-claims. Three quality checks per pipeline cover grounding, relevance and PII. None asks whether outcomes
-skew by any attribute. For credit decisions this is the exposure a regulator opens with.
+### 5. ~~No fairness evidence on decisions that decline people~~ — **CLOSED 2026-08-04**
+Was: zero fairness or bias checks, on a tenant underwriting personal loans and triaging claims.
+
+Now: `Governance → Evidence → Fairness`. Each group's selection rate against the best-performing group,
+screened on the four-fifths (0.8) ratio — a screen that says "explain this", never "you discriminated".
+Checks are **run and FILED** (`fairness_runs`), because a control that has never run is not a control.
+
+Ran live on all four decisioning apps across both tenants. Every one honestly reports **UNTESTED rather
+than clear** (3–10 decided cases each), names the six protected attributes absent from the decision
+records, and states the remedy: *the decision record has to carry them*. Without that a reader concludes
+the platform cannot do fairness, when in fact the decisions simply do not carry the fields.
+
+What it refuses to do is the substance: a group under 20 decided cases is never scored; an absent protected
+attribute is reported absent and **never imputed** (inferring gender from a name to audit fairness would
+create the profiling the audit exists to prevent); a near-unique attribute is refused as an identifier
+(this fired on real data — `cost_centre` and `expense_type`); a FAILED run is excluded rather than counted
+as a decline, since counting a crash as an adverse outcome invents adverse impact out of an outage.
+
+Nine tests cover the arithmetic the live data cannot yet exercise — a real 0.44 ratio flagged, even rates
+passing, under-minimum groups unscored, identifiers refused, and the 0/0 edge.
 
 ### 6. A declined applicant cannot be given reasons
 The model's reasoning sits in the run, in its own words, sometimes markdown, sometimes absent. There is
@@ -69,10 +85,20 @@ tight; today an incident would be managed in email and reconstructed afterwards.
 No change-approval record on publish, no segregation of duties. The person who writes the app also decides
 its checks pass and puts it live. That fails basic change control before it fails any framework.
 
-### 11. Two of my own controls are wired but never exercised
-**0 retention sweeps and 0 completed access reviews on a real tenant.** Both are proven end to end on a
-scratch org. The surfaces say so honestly, but an auditor asking "show me your last access review" still
-gets nothing. A control that has never run is not yet a control.
+### 11. ~~Two of my own controls are wired but never exercised~~ — **CLOSED 2026-08-04**
+Both have now run on both real tenants, with dated artefacts.
+
+**Retention:** rules set per record class (bank 7 years on app runs, insurer 10 — defensible for lending
+and life records), sweep executed and filed. It deleted nothing, correctly and explicitly: nothing is past
+its window (oldest data 55 days). `remaining` is re-counted after the work, so the record proves the
+deletion rather than asserting it.
+
+**Access review:** completed on both tenants, 5 people each. The interesting part is what it forced —
+the review flags "full admin access and has never signed in" as high risk, and **keeping** that account
+now requires a written justification. Proven live: submitting the same review without one is refused with
+*"priya.nair@…: full admin access and has never signed in — say why this access is being kept"*. Before
+this, the artefact's worst line was its only silent one, which is the rubber stamp these reviews are
+famous for.
 
 ### 12. No sub-processor register
 Zero. Which external providers may receive data, under what terms, is not recorded anywhere — and it is a
@@ -151,9 +177,15 @@ them say nothing.
 
 ## The order I would fix them
 
-**CISO/DPO:** (1) per-run egress record — where data actually went, (2) subject-indexed audit, (3) subject
-access export, (4) fairness checks on decisioning apps, (5) adverse-decision artefact, (6) run retention
-and an access review for real on both tenants, (7) consent withdrawal, (8) publish approval.
+**CISO/DPO:** ~~(1) per-run egress record~~ **CLOSED**, ~~(2) subject-indexed audit~~ **CLOSED**,
+(3) subject access export, ~~(4) fairness checks on decisioning apps~~ **CLOSED**, (5) adverse-decision
+artefact, ~~(6) run retention and an access review for real on both tenants~~ **CLOSED**, (7) consent
+withdrawal, (8) publish approval.
+
+**Still open, in order:** adverse-decision artefact (a declined applicant cannot be given reasons),
+subject access export (the DSAR access right — erasure works, access does not), consent withdrawal,
+publish approval / segregation of duties. Then DPIA-as-assessment, breach clock, sub-processor register,
+audit-log integrity verification.
 
 **Operator:** (1) tell them work arrived, (2) delegation and cover, (3) bulk decide, (4) due dates with
 escalation, (5) quality trend, (6) named owner, (7) tell the owner their source went stale. (Creation was withdrawn — see 8.)
