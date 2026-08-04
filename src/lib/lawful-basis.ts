@@ -38,7 +38,42 @@ export const LAWFUL_BASES = [
     label: 'Employment',
     detail: 'Processing about our own staff for employment purposes.',
   },
+  {
+    // NOT a lawful basis — the honest answer when the question does not apply.
+    //
+    // Measured 2026-08-04: 14 data domains carried no basis, and most are business records — a pricing
+    // rate card, a vendor list, the general ledger, branch data, competitor intel. DPDP lawful basis
+    // governs PERSONAL data; there is no basis to record for a source that holds none. With only the five
+    // real bases available, closing that gap meant either leaving them permanently flagged or stamping
+    // something like "legitimate use" on a rate card — recording a fiction to make a governance surface
+    // look complete, which is the worst option on the list.
+    //
+    // Kept LAST and labelled as a declaration rather than a basis, so a reader cannot mistake it for one.
+    // `requiresBasis` below is what decides whether a source still owes a DPO decision.
+    id: 'not-personal-data',
+    label: 'No personal data (basis not applicable)',
+    detail:
+      'This source holds no personal data, so no lawful basis applies. A deliberate declaration, not an unanswered question — and it is wrong for anything that identifies a person, directly or in combination.',
+  },
 ] as const;
+
+/**
+ * Does this source still owe a lawful-basis decision?
+ *
+ * `not-personal-data` is answered, so it does not. An empty basis does. Kept separate from
+ * `isLawfulBasis` because "is this a valid value" and "is this source still a gap" are different
+ * questions, and conflating them is how a declaration gets counted as a basis.
+ */
+export function requiresBasis(basis: string | null | undefined): boolean {
+  const b = (basis ?? '').trim();
+  return b === '' || b === 'unknown';
+}
+
+/** True when the recorded value is a real processing basis, not the not-applicable declaration. */
+export function isProcessingBasis(basis: string | null | undefined): boolean {
+  const b = (basis ?? '').trim();
+  return b !== '' && b !== 'not-personal-data';
+}
 
 export type LawfulBasisId = (typeof LAWFUL_BASES)[number]['id'];
 

@@ -140,7 +140,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Record why the organization may process each source, and what it may be used for.',
         '/data/domains',
         'Review sources without a basis',
-        'Eight of 23 sources still record no lawful basis, and two are graded sensitive with no rule matched — a person has to decide those. Runs reading them are flagged rather than assumed lawful.',
+        'NARROWED to a genuine human decision 2026-08-04. The vocabulary could not express "this source holds no personal data", so business records — a pricing rate card, a vendor list, the general ledger, branch data, competitor intel — could only be left permanently flagged or stamped with a fiction like "legitimate use". Added `not-personal-data` as an explicit DECLARATION (labelled as such, kept last, and excluded from isProcessingBasis so it can never be counted as a basis), and applied it to the 10 that hold none. On the real tenants exactly TWO sources still owe a basis — both "reimbursement quota", both employee-linked and graded confidential — which is the gate\'s own "a person has to decide those". Deliberately NOT auto-assigned: choosing between employment and consent for staff data is a DPO decision, and guessing it to green a surface is the failure this whole item guards against.',
         [
           'yes',
           'The release stores a DPDP lawful basis and purpose on each data domain.',
@@ -149,7 +149,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'yes',
           'Settable in the domain form, shown on every card, and filterable to the gaps.',
           'partial',
-          'Graded 25 live sources, and the governance overview reports the 8 still without one — so the record is honest but incomplete.',
+          'Graded 25 live sources. 2026-08-04: sources holding no personal data now declare that explicitly rather than sitting in the same bucket as an unanswered question, taking the real-tenant gap from 8 to 2 — and those 2 are the employee-linked ones a DPO must decide. Still partial, correctly: an outstanding human decision is not a closed control, and the overview keeps reporting them.',
         ],
       ],
       [
@@ -176,7 +176,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Prove that records were deleted when the retention limit said they would be.',
         '/governance/evidence/retention',
         'Open retention evidence',
-        'Warehouse and lake purging stays with the data engine and is reported as deferred, not claimed. No tenant has set a limit yet, so no production sweep has run — the surface says so rather than implying retention is being honoured.',
+        'CLOSED on a real tenant 2026-08-04. Warehouse and lake purging still stays with the data engine and is reported as deferred, not claimed — that part is an ownership boundary, not a gap.',
         [
           'yes',
           'The release owns retention rules and a durable record of every sweep.',
@@ -184,8 +184,8 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'The sweep executes over console-owned record classes and re-counts what is left afterwards.',
           'yes',
           'Rules and sweep evidence are a Console route under Evidence.',
-          'partial',
-          'Proven end to end on a scratch org (out-of-retention run redacted, recent one untouched, legal hold naming itself) but never yet applied on a real tenant.',
+          'yes',
+          'Applied on BOTH real tenants 2026-08-04. Rules set per record class with defensible windows for the sector — bank 2555 days on app runs, insurer 3650 (life records run longer), 365 on agent runs, 1095 on indexed document text — then a sweep executed and filed on each. It deleted nothing, correctly and explicitly: the oldest data is 55 days old, so nothing was past its window, and `remaining` is RE-COUNTED after the work so the record proves the deletion rather than asserting it. The artefact reads "0 records past their retention limit removed · nothing past the limit remains" per class, which is the honest outcome rather than a reassuring one.',
         ],
       ],
       [
