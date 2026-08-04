@@ -43,11 +43,20 @@ export function RunPanel({
   fields,
   surface,
   appId,
+  heading = 'Start a case',
 }: Readonly<{
   fields: RunField[];
   surface: AppSurface;
   /** The app, so a case can be PICKED from its bound data instead of typed. */
   appId?: string;
+  /**
+   * The panel's own title, or null to suppress it.
+   *
+   * A job's front door already heads this section "Run it now"; leaving the card's own "Start a case"
+   * inside it stacks two headings on one control, and "case" is the wrong noun for a shape where
+   * nothing queues.
+   */
+  heading?: string | null;
 }>) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.filter((f) => f.type === 'select' && f.options?.[0]).map((f) => [f.key, ''])),
@@ -141,12 +150,14 @@ export function RunPanel({
   return (
     <div className="grid gap-5 lg:grid-cols-3">
       <Card className="shadow-sm lg:col-span-2">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Start a case</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Fill in what this run needs — every run goes through the governed pipeline.
-          </p>
-        </CardHeader>
+        {heading ? (
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">{heading}</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Fill in what this run needs — every run goes through the governed pipeline.
+            </p>
+          </CardHeader>
+        ) : null}
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             {offerPicker && appId ? (

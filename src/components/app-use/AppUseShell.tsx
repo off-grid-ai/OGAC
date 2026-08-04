@@ -5,10 +5,13 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { CaseDecision } from '@/components/build/CaseDecision';
+import { Markdown } from '@/components/Markdown';
 import { Button } from '@/components/ui/button';
 import { CockpitDashboard } from '@/components/app-use/CockpitDashboard';
 import { RunPanel, type RunField } from '@/components/app-use/RunPanel';
 import type { AppSurface } from '@/lib/app-surface';
+import { statsForShape, showsWaitingQueue, type LatestResult } from '@/lib/app-front-door';
+import type { AppShape } from '@/lib/app-work-queue';
 import { utcStamp } from '@/lib/timestamp';
 import type { CockpitMetrics, TrendPoint } from '@/lib/cockpit-metrics';
 
@@ -50,6 +53,9 @@ export function AppUseShell({
   stats,
   appId,
   activity,
+  shape = 'queue',
+  latest,
+  howWorkArrives,
 }: Readonly<{
   /** Passed to the run panel so a case can be picked from the app's bound data. */
   appId?: string;
@@ -79,17 +85,37 @@ export function AppUseShell({
    * an empty state, it is a false statement.
    */
   activity?: UseActivityCase[];
+  /**
+   * Which shape of app this is. Derived by appShape (does any step pause for a person?), never
+   * configured — see docs/APP_AS_PRODUCT.md §3b.
+   *
+   * A JOB is something people come and run to get results; nothing ever waits for a decision. Leading
+   * such an app with "Waiting for you — nothing is waiting on a decision" answers a question nobody
+   * asked, on a section that can never hold anything.
+   */
+  shape?: AppShape;
+  /** For a job: what its last run produced. This is the reason the app exists. */
+  latest?: LatestResult | null;
+  /** One sentence: how this app is triggered ("Runs on a schedule", "Arrives by email"). */
+  howWorkArrives?: string;
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
+  const shownStats = statsForShape(shape, stats ?? []);
   const hasDashboard = Boolean(metrics);
   const hasWork = Boolean(stats?.length || waiting?.length);
+  // A job's front door already carries the run form, so a separate Run tab would be the same control in
+  // two places — two things to keep working, and a reader wondering whether they differ.
+  const runIsOnFrontDoor = shape === 'job' && hasWork;
   const views: { key: UseView; label: string }[] = [
     // Work LEADS when there is anything to show: what is waiting for you comes before how to start
-    // something new.
-    ...(hasWork ? [{ key: 'work' as UseView, label: 'Work' }] : []),
+    // something new. For a job it is labelled for what it holds — running it and its results — because
+    // "Work" reads as a queue, which is exactly what this shape does not have.
+    ...(hasWork
+      ? [{ key: 'work' as UseView, label: shape === 'job' ? 'Overview' : 'Work' }]
+      : []),
     ...(hasDashboard ? [{ key: 'dashboard' as UseView, label: 'Dashboard' }] : []),
-    { key: 'run', label: 'Run' },
+    ...(runIsOnFrontDoor ? [] : [{ key: 'run' as UseView, label: 'Run' }]),
     { key: 'activity', label: 'Activity' },
   ];
   const fallback: UseView = hasWork ? 'work' : hasDashboard ? 'dashboard' : 'run';
@@ -158,9 +184,12 @@ export function AppUseShell({
             <h2 className="text-xl font-semibold tracking-tight text-foreground">{workHeadline}</h2>
           ) : null}
 
-          {stats?.length ? (
+          {/* Only the numbers that can ever be non-trivial for this shape. A permanently-zero figure is
+              not neutral — it competes with the ones that matter and teaches the reader to skim past all
+              of them. */}
+          {shownStats.length ? (
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
-              {stats.map((stat) => (
+              {shownStats.map((stat) => (
                 <div
                   key={stat.label}
                   className={`min-w-0 rounded-lg border p-4 ${
@@ -178,6 +207,55 @@ export function AppUseShell({
             </div>
           ) : null}
 
+          {/* A JOB's front door leads with running it and with what it last produced — side by side, so a
+              wide screen carries both instead of stacking one under the other. */}
+          {shape === 'job' ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <section className="rounded-lg border border-border p-4">
+                <h3 className="text-sm font-medium text-foreground">Run it now</h3>
+                {howWorkArrives ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{howWorkArrives}</p>
+                ) : null}
+                <div className="mt-3">
+                  {/* The SAME run panel the Run tab uses. The headline already promised "run it again any
+                      time" and there was no way to do it from this screen; a second submit path here
+                      would be a second thing to keep correct. */}
+                  <RunPanel fields={fields} surface={surface} appId={appId} heading={null} />
+                </div>
+              </section>
+              <section className="rounded-lg border border-border p-4">
+                <h3 className="text-sm font-medium text-foreground">What it produced last</h3>
+                {latest ? (
+                  <>
+                    <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                      {utcStamp(latest.when)}
+                    </p>
+                    {latest.outcome ? (
+                      // Rendered, not printed. The model writes markdown, so a raw dump put
+                      // "**Retention Action Recommendation**" in front of a department reader — literal
+                      // asterisks on the one panel that carries the app's whole value. Uses the shared
+                      // Markdown component rather than a second renderer.
+                      <div className="mt-2 max-h-[34rem] overflow-y-auto pr-1">
+                        <Markdown>{latest.outcome}</Markdown>
+                      </div>
+                    ) : (
+                      // Never a blank panel: a never-run job and a job whose last run failed are
+                      // different situations and an empty box conflates them.
+                      <p className="mt-2 text-sm text-muted-foreground">{latest.absence}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    This has not produced a result yet. Run it and the output will appear here.
+                  </p>
+                )}
+              </section>
+            </div>
+          ) : null}
+
+          {/* A queue app shows this even when empty — "nothing is waiting" is the answer to the question
+              that screen exists to answer. A job app has no such question. */}
+          {showsWaitingQueue(shape, waiting?.length ?? 0) ? (
           <section>
             <h3 className="mb-2 text-sm font-medium text-foreground">Waiting for you</h3>
             <div className="overflow-hidden rounded-lg border border-border">
@@ -216,6 +294,7 @@ export function AppUseShell({
               )}
             </div>
           </section>
+          ) : null}
         </div>
       ) : view === 'dashboard' && metrics ? (
         <CockpitDashboard metrics={metrics} trend={trend ?? []} live={live} customerHrefBase={surface.customerHrefBase} />

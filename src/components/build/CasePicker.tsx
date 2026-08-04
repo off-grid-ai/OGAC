@@ -3,6 +3,7 @@
 import { ArrowClockwise, Database } from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { explainResponse } from '@/lib/api-failure';
 import type { CaseCandidate } from '@/lib/app-case-candidates';
 
 // ─── Pick a case from the org's own data (GAP 0, the half a person touches) ───────────────────────────
@@ -41,7 +42,10 @@ export function CasePicker({
         detail?: string;
         settledHidden?: number;
       }
-    | { status: 'error' }
+    // A REFUSAL is kept apart from BREAKAGE. Collapsing both into 'error' put "Could not look up cases
+    // · Try again" on the public app surface, where the lookup is admin-only and answers 401 to an
+    // anonymous reader: a control presented as broken, with a retry that can never succeed.
+    | { status: 'error'; refusal: boolean; message: string }
   >({ status: 'loading' });
 
   const load = useCallback(async () => {
@@ -56,7 +60,8 @@ export function CasePicker({
         settledHidden?: number;
       };
       if (!res.ok) {
-        setState({ status: 'error' });
+        const failure = await explainResponse(res, 'Could not look up cases.');
+        setState({ status: 'error', refusal: failure.refusal, message: failure.message });
         return;
       }
       setState({
@@ -68,7 +73,8 @@ export function CasePicker({
         settledHidden: data.settledHidden ?? 0,
       });
     } catch {
-      setState({ status: 'error' });
+      // A transport failure IS breakage — offer the retry.
+      setState({ status: 'error', refusal: false, message: 'Could not look up cases.' });
     }
   }, [appId]);
 
@@ -80,9 +86,18 @@ export function CasePicker({
     return <p className="text-xs text-muted-foreground">Looking for cases…</p>;
   }
   if (state.status === 'error') {
+    // Refused: the system is working and this reader simply may not browse the org's records. No retry
+    // button — offering one that cannot succeed is worse than offering none.
+    if (state.refusal) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          Picking from your records needs a signed-in account.
+        </p>
+      );
+    }
     return (
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        Could not look up cases.
+        {state.message}
         <Button variant="ghost" size="sm" className="h-6 gap-1 px-1.5 text-xs" onClick={() => void load()}>
           <ArrowClockwise className="size-3" />
           Try again

@@ -11,6 +11,7 @@ import { runInputPrompt } from '@/lib/app-input-prompt';
 import { listAppRuns } from '@/lib/app-run-store';
 import { buildAppDashboard } from '@/lib/app-dashboard';
 import { isDeclinedByPerson } from '@/lib/app-run-progress';
+import { latestResult } from '@/lib/app-front-door';
 import { buildAppWorkQueue, caseLabel, caseTrail, runSubject, statusLabel } from '@/lib/app-work-queue';
 import { getAppBySlug } from '@/lib/apps-store';
 import { resolveDeployedApp } from '@/lib/deployed-app';
@@ -147,6 +148,22 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           fields={fields}
           surface={surface}
           appId={app.id}
+          shape={queue.shape}
+          howWorkArrives={queue.howWorkArrives}
+          // What the last run produced — for a job this is the reason the app exists, and it appeared
+          // nowhere on the screen a team opens.
+          latest={latestResult(
+            runs.map((r) => ({
+              id: r.id,
+              status: String(r.status),
+              startedAt:
+                r.startedAt instanceof Date ? r.startedAt.toISOString() : String(r.startedAt ?? ''),
+              outcome:
+                typeof (r as { outcome?: unknown }).outcome === 'string'
+                  ? ((r as { outcome: string }).outcome)
+                  : null,
+            })),
+          )}
           workHeadline={queue.headline}
           stats={dashboard.metrics.map((m) => ({ label: m.label, value: m.value, tone: m.tone }))}
           // ACTIVITY — every case, newest first. This tab rendered a hardcoded "No runs yet" empty
