@@ -291,30 +291,33 @@ export async function inspectRestore(name: string): Promise<RestoreInspection> {
   }
 }
 
-export async function readScheduleStatus(): Promise<ScheduleStatus> {
-  const base = {
-    label: LAUNCHD_LABEL,
-    controllable: false as const,
-  };
+export async function readScheduleStatus(now: number = Date.now()): Promise<ScheduleStatus> {
+  const base = { label: LAUNCHD_LABEL, controllable: false as const };
+  const { backupEvidence, scheduleVerdict } = await import('@/lib/backup-schedule');
+
+  // LIVE FINDING: a non-zero exit here does NOT mean "not loaded". The job is a SYSTEM-domain
+  // LaunchDaemon and this process is unprivileged, so `launchctl list` cannot see it — and the page was
+  // telling operators their nightly backup was not scheduled while listing a backup from every night. The
+  // console must not gain sudo to read a status; the pure rule corroborates with the artefacts instead.
+  let probe: import('@/lib/backup-schedule').LaunchdProbe;
   try {
     await execFileAsync('launchctl', ['list', LAUNCHD_LABEL], { timeout: 5000 });
-    return {
-      ...base,
-      scheduled: true,
-      detail: `launchd job ${LAUNCHD_LABEL} is loaded (daily 02:00). Managed via /Library/LaunchDaemons/${LAUNCHD_LABEL}.plist.`,
-    };
+    probe = 'loaded';
   } catch (e) {
-    const msg = (e as Error).message || '';
-    // Non-zero exit = not loaded; ENOENT = launchctl unavailable (not macOS / dev box).
-    const unavailable = /ENOENT|not found/i.test(msg);
-    return {
-      ...base,
-      scheduled: false,
-      detail: unavailable
-        ? 'launchctl unavailable in this environment — schedule status can only be read on the S1 host.'
-        : `launchd job ${LAUNCHD_LABEL} is NOT loaded. Install /Library/LaunchDaemons/${LAUNCHD_LABEL}.plist (StartCalendarInterval Hour=2) to schedule the nightly backup — see deploy/onprem/backup.sh.`,
-    };
+    probe = /ENOENT|not found/i.test((e as Error).message || '') ? 'unavailable' : 'not-visible';
   }
+
+  // The evidence: when backups actually landed. Best-effort — an unreadable directory yields no evidence,
+  // which the rule treats as "cannot corroborate", never as "scheduled".
+  let timestamps: (number | null)[] = [];
+  try {
+    timestamps = (await readEntries(config().backupRoot)).map((e) => e.timestampMs);
+  } catch {
+    timestamps = [];
+  }
+
+  const verdict = scheduleVerdict(probe, backupEvidence(timestamps, now), LAUNCHD_LABEL);
+  return { ...base, scheduled: verdict.scheduled, detail: verdict.detail };
 }
 
 // ─── The restore rehearsal record (I/O) ──────────────────────────────────────────────────────────────
