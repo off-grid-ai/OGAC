@@ -41,7 +41,7 @@ import { recordCount } from '@/lib/connector-exec';
 export { execConnectorQuery, recordCount } from '@/lib/connector-exec';
 export type { ConnectorTarget, ConnectorQuery, ConnectorQueryResult } from '@/lib/connector-exec';
 import { type EdgeIntent, defaultIntent } from '@/lib/edge-intent';
-import { emitSpan } from '@/lib/otel';
+import { emitCounter, emitSpan } from '@/lib/otel';
 import { type RoutingDecision, decideRouting } from '@/lib/routing-policy';
 import { shipAudit, shipAuditEvent } from '@/lib/siem';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -609,6 +609,16 @@ export async function persistAuditEvent(input: AuditEventInput): Promise<Canonic
       actor: ev.actor.id,
       outcome: ev.outcome,
       ...(ev.runId ? { run_id: ev.runId } : {}),
+      ...(ev.org ? { org: ev.org } : {}),
+    });
+    // THE APPLICATION METRIC. VictoriaMetrics held zero application series — the metrics pipeline was
+    // wired and nothing ever produced into it, so "collector throughput" and "alerts on real behaviour"
+    // had nothing to stand on. Governed events are the right thing to meter: every action that matters
+    // passes through here, and the dimensions an operator alerts on (which action, which outcome, which
+    // tenant) are exactly the ones already on the record.
+    emitCounter('offgrid_audit_events_total', 1, {
+      action: ev.action,
+      outcome: ev.outcome,
       ...(ev.org ? { org: ev.org } : {}),
     });
   } catch {

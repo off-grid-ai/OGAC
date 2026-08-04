@@ -84,3 +84,79 @@ export function emitSpan(name: string, attrs: SpanAttrs): void {
   }
   if (targets().length > 0) exportSpan(name, attrs);
 }
+
+// ─── Metrics ────────────────────────────────────────────────────────────────────────────────────────
+//
+// The capability map: "OTLP metrics and remote write — add a recurring application metric producer and
+// correlate accepted/exported sample counts", with the workflow gate at `no` because "the fleet reports
+// zero application series". Verified 2026-08-04: VictoriaMetrics answers
+// /api/v1/label/__name__/values with `data: []` — reachable and genuinely empty. The collector's metrics
+// pipeline was wired and nothing was ever produced into it.
+//
+// Same OTLP/HTTP wire as spans, different signal path (/v1/metrics). Deliberately only two primitives —
+// a counter and a gauge — because an application metric nobody reads is cost, and these two cover
+// "how often did X happen" and "what is X now", which is what the operational alerts need.
+
+/** A gauge sample: the value as of now. */
+export function emitGauge(name: string, value: number, attrs: SpanAttrs = {}): void {
+  emitMetric(name, value, attrs, 'gauge');
+}
+
+/** A counter sample: monotonically increasing total. */
+export function emitCounter(name: string, value: number, attrs: SpanAttrs = {}): void {
+  emitMetric(name, value, attrs, 'sum');
+}
+
+function metricTargets(): SpanTarget[] {
+  // Langfuse ingests traces, not metrics — sending it a metrics envelope would be a guaranteed 4xx on
+  // every emit, so the metric path targets the collector only.
+  return OTLP_URL ? [{ url: `${OTLP_URL}/v1/metrics`, headers: {} }] : [];
+}
+
+function emitMetric(name: string, value: number, attrs: SpanAttrs, kind: 'gauge' | 'sum'): void {
+  if (process.env.OTEL_DEBUG === 'true') {
+    process.stdout.write(`[otel] ${kind} ${name}=${value} ${JSON.stringify(attrs)}\n`);
+  }
+  const tgts = metricTargets();
+  if (tgts.length === 0) return;
+
+  const now = `${Date.now() * 1_000_000}`;
+  const point = {
+    asDouble: value,
+    timeUnixNano: now,
+    startTimeUnixNano: now,
+    attributes: toAttributes(attrs),
+  };
+  const body = {
+    resourceMetrics: [
+      {
+        resource: { attributes: toAttributes({ 'service.name': 'offgrid-console' }) },
+        scopeMetrics: [
+          {
+            scope: { name: 'offgrid.console' },
+            metrics: [
+              {
+                name,
+                ...(kind === 'gauge'
+                  ? { gauge: { dataPoints: [point] } }
+                  : // aggregationTemporality 2 = CUMULATIVE, isMonotonic true — what a counter means, and
+                    // what VictoriaMetrics needs to treat it as a counter rather than an arbitrary series.
+                    { sum: { dataPoints: [point], aggregationTemporality: 2, isMonotonic: true } }),
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const payload = JSON.stringify(body);
+  for (const t of tgts) {
+    // Fire-and-forget, exactly like spans: observability must never block or fail the request path.
+    fetch(t.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...t.headers },
+      body: payload,
+      signal: AbortSignal.timeout(3000),
+    }).catch(() => {});
+  }
+}
