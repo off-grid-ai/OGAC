@@ -156,9 +156,9 @@ deployment returned before and after.
 1. **App cloud-egress DLP proof on a scratch cloud-permitted pipeline** — the one remaining unproven seam
    in the entry above. Never by loosening a live tenant's routing.
 2. **Exporter-failure state per run** — so a missing trace is distinguishable from a failed export.
-3. **Redpanda / LanceDB / Feature Flags / Device Management** — adapters exist, no end-to-end proof on the
-   deployment. Each is a **drill**, not a build: enrol a host, produce and consume a correlated record,
-   create-to-archive a flag. They need an operator at the box, not code from here.
+3. **Redpanda / LanceDB / Feature Flags / Device Management** — see the correction below. Redpanda is a
+   product-binding job, not a drill. Feature Flags needs an admin token nobody has minted. Device
+   Management needs a host enrolled.
 4. **A console surface for payload indexes.** The port and the rule exist and were exercised live; no page
    owns them yet, so today this is an API-level capability.
 
@@ -168,3 +168,39 @@ Three of the four things touched today were **not** missing features. Presidio's
 would have broken PII protection; the cloud-egress entry understated coverage by 21 events; the persistence
 gap was a silent `catch`. The map's `gap` text is a hypothesis written at audit time, and the work is to
 measure it before building to it — twice today that measurement inverted the prescription.
+
+## A correction I owe: I misread the Redpanda gaps
+
+I described Redpanda / LanceDB / Feature Flags / Device Management as "drills, not builds — they need an
+operator at the box". Then I ran the Redpanda drill from here to prove the point, and it worked:
+
+```
+CREATE     topic offgrid.drill.capability-proof            present: true
+CONFIGURE  retention.ms = 600000                           read back
+PRODUCE    partition 0, offset 0, errorCode 0
+CONSUME    matched by correlationId corr-1785830119        full JSON round-tripped
+DELETE     topic gone: true                                nothing left behind
+
+Schema Registry:  register {"id":4} → read v1 → compatibility {"is_compatible":true}
+                  → soft + hard delete → back to the original 3 subjects
+```
+
+**But that closes nothing, and I nearly promoted four gates on the strength of it.** Reading the entries
+properly, their `workflow` gap does not say "never proven". It says:
+
+- produce → *"no general pipeline output uses this adapter"*
+- consume → *"no registered source pipeline does"*
+- schema registry → *"production streams do not enforce console-managed schemas"*
+- topic lifecycle → *"no application provisioning lifecycle is registered"*
+
+And a fifth entry, `bfsi-stream-proof`, is **already `yes` on all four gates** — the primitives were proven
+on 2026-07-20. My drill was a sixth proof of a primitive that was never in doubt.
+
+**The gap is production BINDING, not proof.** Closing it means a governed pipeline output actually
+publishing to a topic and a registered source actually consuming one — product work, not an operator at a
+terminal. Two of my characterisations were wrong in the same breath: these are builds, and they are builds
+*here*, not on the box.
+
+Feature Flags is a genuine credential gap (Unleash answers 401; no admin token exists in the deployment
+env). Device Management genuinely needs a host enrolled. Those two are operator work; Redpanda and LanceDB
+are ours.
