@@ -69,6 +69,27 @@
   /* Headings only. A system stack for now so no webfont, no CSP change and no layout shift;
      swapping in the real display face later is this one line. */
   --og-font-display: ui-sans-serif, -apple-system, 'Segoe UI', Inter, sans-serif;
+
+  /* The semantic tokens have to be restated here, NOT just the --og-* ones above.
+     `@theme` (without `inline`) RESOLVES its values at build time, so --color-background holds
+     a literal copy of the old grey rather than a live var(--og-background) reference — proven by
+     a computed-style probe that read #f0e8da on --og-background while background-color stayed
+     rgb(247,248,248). Overriding --og-* alone is therefore invisible to bg-background and
+     friends. These lines are what actually repaint the page. */
+  --color-background: var(--og-background);
+  --color-foreground: var(--og-text);
+  --color-card: var(--og-surface);
+  --color-card-foreground: var(--og-text);
+  --color-popover: var(--og-surface);
+  --color-popover-foreground: var(--og-text);
+  --color-secondary: var(--og-surface-light);
+  --color-secondary-foreground: var(--og-text);
+  --color-muted: var(--og-surface-light);
+  --color-muted-foreground: var(--og-text-muted);
+  --color-accent: var(--og-surface-light);
+  --color-accent-foreground: var(--og-text);
+  --color-border: var(--og-border);
+  --color-input: var(--og-border);
 }
 
 /* Dark is warm here, not the console's neutral greys: cream text on near-black. */
