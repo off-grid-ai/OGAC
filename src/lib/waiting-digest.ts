@@ -109,7 +109,7 @@ export function buildDigest(cases: readonly DigestCase[], consoleUrl: string): D
     .slice(0, 10)
     .map(
       (c) =>
-        `  · ${c.label} — ${c.appTitle}, waiting ${c.daysWaiting} day${c.daysWaiting === 1 ? '' : 's'}`,
+        `  · ${digestLine(c.label, c.appTitle)}, waiting ${c.daysWaiting} day${c.daysWaiting === 1 ? '' : 's'}`,
     );
   const more = worth.length > 10 ? `\n  …and ${worth.length - 10} more.` : '';
 
@@ -128,4 +128,27 @@ export function buildDigest(cases: readonly DigestCase[], consoleUrl: string): D
   ].join('\n');
 
   return { subject, text };
+}
+
+/**
+ * One digest line's "what, in which app" — without saying the app twice.
+ *
+ * Case subjects are frequently derived FROM the app, so appending the app title unconditionally produced
+ * lines like "Personal Loan Underwriting — Ishaan Kulkarni, ₹1,37,863 — Personal Loan Underwriting". The
+ * reader is scanning ten of these in an email; a stutter in every line makes the part that differs harder
+ * to find, which is the whole job of the digest.
+ *
+ * Pure.
+ */
+export function digestLine(label: string, appTitle: string): string {
+  const l = label.trim();
+  const app = appTitle.trim();
+  if (!app) return l;
+  // Already named, at either end or as the whole label — don't say it again.
+  const lower = l.toLowerCase();
+  const appLower = app.toLowerCase();
+  if (lower === appLower || lower.startsWith(`${appLower} `) || lower.endsWith(` ${appLower}`)) {
+    return l;
+  }
+  return `${l} — ${app}`;
 }
