@@ -124,6 +124,19 @@ function headlineFor(waiting: number, runnable: number): string {
  * which is right for watching activity and wrong here: the case that has sat for three days is the one
  * that matters, and a newest-first queue buries it further every time new work arrives.
  */
+/**
+ * Narrow the queue to what someone is looking for.
+ *
+ * Matches the case subject, the app it belongs to, and the run id — the three things a person actually
+ * has when they come looking. Blank returns everything rather than nothing, so an empty box is not a
+ * filter.
+ */
+export function matchesQuery(c: WaitingCase, q: string): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  return `${c.subject ?? ''} ${c.appTitle} ${c.runId}`.toLowerCase().includes(needle);
+}
+
 export function buildMyWork(
   cases: readonly WaitingCase[],
   apps: readonly AppSummary[],

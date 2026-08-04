@@ -19,6 +19,7 @@ import { db } from '@/db';
 import { listAllAgents } from '@/lib/agents';
 import { listAgentRuns } from '@/lib/agentrun';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
+import { runSubject } from '@/lib/app-work-queue';
 import { listApps } from '@/lib/apps-store';
 import { isAutotestActor, isDemoTenantOrg } from '@/lib/demo-test-artifacts';
 import {
@@ -69,6 +70,8 @@ async function readAppRuns(orgId: string): Promise<AppRunSource[]> {
         actor: appRunActor(r.input),
         dataClassification: (r as { dataClassification?: string | null }).dataClassification ?? null,
         lawfulBasis: (r as { lawfulBasis?: string | null }).lawfulBasis ?? null,
+        // The case subject — what a person actually searches by.
+        subject: runSubject((r as { input?: unknown }).input),
       }));
   } catch {
     return [];

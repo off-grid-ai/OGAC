@@ -53,6 +53,14 @@ export interface RunRow {
   lawfulBasis: string | null;
   /** True when this run read a source with no recorded lawful basis — the row an auditor wants. */
   basisGap: boolean;
+  /**
+   * WHAT THE CASE IS ABOUT, e.g. "Meera Malhotra · submitted · ₹41,346.44".
+   *
+   * Search covered the app title, pipeline, actor and id — everything EXCEPT the one thing a person
+   * actually remembers. Looking for a case by the customer's name or a claim reference found nothing,
+   * so once something left the visible queue the only way back was scrolling.
+   */
+  subject: string | null;
 }
 
 /**
@@ -157,16 +165,22 @@ export function sumStepMs(
  * and reports an ungrounded source. A run with no stamp at all is "not recorded" — not a gap — since
  * calling it a gap would flag every run that predates the stamp as a compliance failure.
  */
-function governanceOf(src: { dataClassification?: string | null; lawfulBasis?: string | null }): {
+function governanceOf(src: {
+  dataClassification?: string | null;
+  lawfulBasis?: string | null;
+  subject?: string | null;
+}): {
   dataClassification: string | null;
   lawfulBasis: string | null;
   basisGap: boolean;
+  subject: string | null;
 } {
   const lawfulBasis = src.lawfulBasis ?? null;
   return {
     dataClassification: src.dataClassification ?? null,
     lawfulBasis,
     basisGap: Boolean(lawfulBasis && /no basis|no lawful basis/i.test(lawfulBasis)),
+    subject: src.subject ?? null,
   };
 }
 
@@ -184,6 +198,8 @@ export interface AppRunSource {
   title?: string | null;
   dataClassification?: string | null;
   lawfulBasis?: string | null;
+  /** What the case is about, so search can find it by the customer or reference. */
+  subject?: string | null;
 }
 
 export interface AgentRunSource {
@@ -293,6 +309,7 @@ export function fromChatRun(src: ChatRunSource): RunRow {
     dataClassification: null,
     lawfulBasis: null,
     basisGap: false,
+    subject: null,
   };
 }
 
@@ -361,7 +378,8 @@ export function filterRuns(rows: RunRow[], f: RunFilter): RunRow[] {
     if (f.sensitivity && f.sensitivity !== 'all' && r.dataClassification !== f.sensitivity) return false;
     if (f.basis === 'missing' && !r.basisGap) return false;
     if (q) {
-      const hay = `${r.name} ${r.pipeline} ${r.actor} ${r.id} ${r.rawStatus}`.toLowerCase();
+      const hay =
+        `${r.name} ${r.subject ?? ''} ${r.pipeline} ${r.actor} ${r.id} ${r.rawStatus}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;

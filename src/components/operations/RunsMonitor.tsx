@@ -287,7 +287,7 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
               if (e.key === 'Enter') setParam('q', queryDraft.trim());
             }}
             onBlur={() => setParam('q', queryDraft.trim())}
-            placeholder="Search name, pipeline, actor…"
+            placeholder="Search a person, claim, app or actor…"
             className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -320,8 +320,15 @@ export function RunsMonitor({ initial }: Readonly<{ initial: RunsResponse }>) {
                     {kindLabel(r.kind)}
                   </span>
                 </td>
-                <td className="max-w-[16rem] truncate px-3 py-2 text-foreground" title={r.name}>
-                  {r.name}
+                <td className="max-w-[18rem] px-3 py-2 text-foreground" title={r.subject ?? r.name}>
+                  <span className="block truncate">{r.name}</span>
+                  {/* WHAT THE CASE IS ABOUT. Search now matches this, so a result has to show the thing
+                      that matched — a row that says only the app title looks like a false hit. */}
+                  {r.subject ? (
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {r.subject}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2">
                   <StatusBadge status={r.status} />

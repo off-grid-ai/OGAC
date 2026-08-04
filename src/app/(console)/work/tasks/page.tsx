@@ -10,6 +10,7 @@ import { requireModuleForUser } from '@/lib/module-access';
 import {
   buildMyWork,
   disambiguate,
+  matchesQuery,
   overdueNote,
   waitedFor,
   type AppSummary,
@@ -33,7 +34,10 @@ export const dynamic = 'force-dynamic';
 // sales word, and the one named after their work did not contain it.
 //
 // This is that answer, first in the Work section. Pure logic in my-work.ts.
-export default async function MyTasksPage() {
+export default async function MyTasksPage({
+  searchParams,
+}: Readonly<{ searchParams: Promise<{ q?: string }> }>) {
+  const { q = '' } = await searchParams;
   await requireModuleForUser('studio');
   const orgId = await currentOrgId();
   const [apps, runs] = await Promise.all([
@@ -64,7 +68,9 @@ export default async function MyTasksPage() {
   }));
 
   const now = new Date();
-  const work = buildMyWork(cases, summaries, now);
+  // URL-driven, like every other filter here, so a search is shareable and Back steps out of it.
+  const visible = cases.filter((c) => matchesQuery(c, q));
+  const work = buildMyWork(visible, summaries, now);
 
   // HOW LATE IS IT. A case waiting ten minutes and one waiting ten days looked the same, so nothing ever
   // forced the pile to move. Targets are per app; an app with no target says so rather than being
@@ -88,14 +94,37 @@ export default async function MyTasksPage() {
   return (
     <PageFrame>
       <div className="w-full space-y-6">
-        <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
           <h1 className="text-xl font-semibold text-foreground">{work.headline}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {work.totalWaiting > 0
               ? 'Oldest first — the case that has waited longest is the one that needs you most.'
               : 'When something needs a person, it appears here.'}
           </p>
+          </div>
+          {/* FIND A CASE. Once something left the visible queue the only way back was scrolling. */}
+          <form className="shrink-0">
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Find a person, claim or app…"
+              aria-label="Find a case"
+              className="w-64 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </form>
         </div>
+
+        {/* A search that hides work must say so, or an empty screen reads as "nothing needs you". */}
+        {q.trim() ? (
+          <p className="text-xs text-muted-foreground">
+            Showing {visible.length} of {cases.length} waiting {cases.length === 1 ? 'case' : 'cases'}{' '}
+            matching &ldquo;{q.trim()}&rdquo;.{' '}
+            <Link href="/work/tasks" className="font-medium text-foreground underline">
+              Show everything
+            </Link>
+          </p>
+        ) : null}
 
         {/* Overdue work, and processes with no target at all — the second is why a pile grows unnoticed.
             Silent when there is nothing to say, so the banner keeps its meaning. */}
