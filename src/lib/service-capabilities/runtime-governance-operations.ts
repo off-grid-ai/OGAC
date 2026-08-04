@@ -1507,7 +1507,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Mint short-lived guest access only after verifying the owned dashboard exists.',
         '/insights/usage/dashboards',
         'Open governed dashboard',
-        'Capture one immutable guest-token and expiry/revocation workflow; configured code alone is not production proof.',
+        'INVESTIGATED 2026-08-04 and the blocker is CONFIG DRIFT, not missing code. mintGuestToken correctly refuses to mint until the dashboard exists — it looks the dashboard up by OFFGRID_SUPERSET_EMBED_UUID (8cf450b7-3b71-47e8-8c2b-f86bc2a62b45) and that UUID matches no dashboard in the deployed Superset, while provisionDashboard reports a real dashboard at id 1 with a different uuid. So the two disagree about "provisioned", the surface shows a provisioning CTA instead of a blank iframe (which is the RIGHT failure), and no token can be minted to capture. Fixing it means pointing the env var at the intended dashboard\'s real UUID — a deployment decision about WHICH dashboard is the governed embed, not a code change, and guessing it would be inventing the answer. The refusal path itself is verified: configured=true, state=not-provisioned, no token issued.',
         [
           'yes',
           'Superset 4.1.1 supports embedded dashboard configuration and guest tokens.',
