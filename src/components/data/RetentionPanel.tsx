@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { explainResponse } from '@/lib/api-failure';
 import { RETAINABLE_CLASSES, classLabel, type RetentionRule, type SweepAction } from '@/lib/retention-sweep';
+import { utcStamp } from '@/lib/timestamp';
 
 const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm';
 
@@ -204,7 +205,10 @@ export function RetentionPanel({
               ) : (
                 <Warning className="size-4 text-amber-600" weight="fill" />
               )}
-              Last applied {new Date(latest.ranAt).toLocaleString()}
+              {/* Explicit UTC, not toLocaleString: this renders on the server and again in the browser
+                  and the two resolve locale AND zone from their own environment. It also has to be
+                  readable AS EVIDENCE — "8/4/2026, 8:28:04 AM" does not say which zone that is. */}
+              Last applied {utcStamp(latest.ranAt, { precision: 'seconds' })}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-xs">

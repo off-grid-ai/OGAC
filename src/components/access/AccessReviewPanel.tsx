@@ -61,6 +61,12 @@ export function AccessReviewPanel({
     () => (activityAvailable ? attentionFlags(subjects, at) : []),
     [subjects, at, activityAvailable],
   );
+  // The high-severity rows — the ones a "keep" has to justify. Derived from the same flags shown above
+  // rather than re-deciding what counts as risky here.
+  const highRiskById = useMemo(
+    () => new Set(flags.filter((f) => f.severity === 'high').map((f) => f.userId)),
+    [flags],
+  );
   const flagFor = (id: string) => flags.find((f) => f.userId === id);
   const dueness = useMemo(
     () => reviewDueness(lastReviewedAt ? new Date(lastReviewedAt) : null, at),
@@ -87,7 +93,9 @@ export function AccessReviewPanel({
       newRole: drafts[s.id].newRole,
     }));
 
-  const check = validateReview(subjects, decisions);
+  // Same instant and same activity-knowledge the flags above were computed with, so the reviewer is
+  // never blocked by a rule derived from a different view of the list than the one on their screen.
+  const check = validateReview(subjects, decisions, at, { activityKnown: activityAvailable });
 
   function set(id: string, patch: Partial<Draft>) {
     setDrafts((d) => ({
@@ -254,7 +262,10 @@ export function AccessReviewPanel({
                   ))}
                 </div>
                 <div className="min-w-0 space-y-1.5">
-                  {d && d.decision !== 'keep' ? (
+                  {/* A high-risk row kept without a reason is the rubber stamp these reviews are
+                      famous for, so keeping one asks why too — the artefact's worst line must not be
+                      its only silent one. */}
+                  {d && (d.decision !== 'keep' || highRiskById.has(s.id)) ? (
                     <>
                       {d.decision === 'change-role' ? (
                         <select
@@ -272,7 +283,11 @@ export function AccessReviewPanel({
                       <Input
                         value={d.reason}
                         placeholder={
-                          d.decision === 'revoke' ? 'Why are they losing access?' : 'Why the change?'
+                          d.decision === 'revoke'
+                            ? 'Why are they losing access?'
+                            : d.decision === 'keep'
+                              ? 'Why is this access being kept?'
+                              : 'Why the change?'
                         }
                         onChange={(e) => set(s.id, { reason: e.target.value })}
                         className="h-8 text-xs"

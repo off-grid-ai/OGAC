@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { lastAuditedActivityByEmail } from '@/lib/access-activity';
 import { validateReview, type ReviewSubject, type SubjectDecision } from '@/lib/access-review';
 import { listAccessReviews, recordAccessReview } from '@/lib/access-reviews-store';
 import { auditFromSession } from '@/lib/audit-actor';
@@ -42,13 +43,21 @@ export async function POST(req: Request) {
   // Validated against the list AS IT IS NOW, not as the browser saw it. A person added since the page
   // loaded would otherwise be certified by omission.
   const people = await listUsers(org);
+  // Last activity, from the SAME ledger read the review page uses. Without it every subject arrives as
+  // "never signed in", so this route's risk flags would disagree with the ones the reviewer was shown —
+  // one rule, two answers, on the artefact that is supposed to settle the question. A null means the
+  // ledger was unreachable, which is passed through rather than being read as "nobody has signed in".
+  const activity = await lastAuditedActivityByEmail(org).catch(() => null);
   const subjects: ReviewSubject[] = people.map((u) => ({
     id: u.id,
     email: u.email ?? '',
     name: u.name,
     role: u.role,
+    lastActiveAt: activity?.[(u.email ?? '').toLowerCase()] ?? null,
   }));
-  const check = validateReview(subjects, decisions);
+  const check = validateReview(subjects, decisions, new Date(), {
+    activityKnown: activity !== null,
+  });
   if (!check.ok) {
     return NextResponse.json(
       { error: 'This review is not complete.', reasons: check.errors },

@@ -84,14 +84,42 @@ export interface ValidationResult {
 
 /**
  * A review is only an artefact if it is COMPLETE and REASONED: every person on the list has a
- * decision, and any decision that takes access away says why. A partial review certifies nothing.
+ * decision, any decision that takes access away says why, and — the part that decides whether this is
+ * evidence or theatre — KEEPING someone the review itself flagged as high risk also says why.
+ *
+ * Without that last rule the artefact's worst line is silent. Exercising this control for real on the
+ * demo tenant produced exactly that: "full admin access and has never signed in" → kept, no reason
+ * recorded. An auditor reading it learns that the risk was seen and waved through, and cannot tell
+ * whether anybody thought about it. A rubber stamp on the one row that matters is the failure mode
+ * these reviews are famous for, and attentionFlags already knows which row it is.
+ *
+ * `now` is passed so the flags are computed against the same instant the caller judged — never
+ * defaulted to a fresh clock inside a validator.
  */
 export function validateReview(
   subjects: readonly ReviewSubject[],
   decisions: readonly SubjectDecision[],
+  now: Date = new Date(),
+  /**
+   * Whether last-activity is actually KNOWN for these subjects.
+   *
+   * When the activity ledger is unreachable every subject arrives with lastActiveAt null, which
+   * attentionFlags correctly reads as "has never signed in" — but that finding would be fabricated by
+   * the outage, not observed. Demanding a written justification on the strength of it would block a
+   * legitimate review with an invented reason, so the flagged-keep rule stands down and the rest of the
+   * validation still applies.
+   */
+  { activityKnown = true }: { activityKnown?: boolean } = {},
 ): ValidationResult {
   const errors: string[] = [];
   const byUser = new Map(decisions.map((d) => [d.userId, d]));
+  const highRisk = new Map(
+    activityKnown
+      ? attentionFlags(subjects, now)
+          .filter((f) => f.severity === 'high')
+          .map((f) => [f.userId, f.why] as const)
+      : [],
+  );
 
   const undecided = subjects.filter((s) => !byUser.has(s.id));
   if (undecided.length) {
@@ -109,6 +137,12 @@ export function validateReview(
     }
     if (d.decision === 'change-role' && !d.newRole?.trim()) {
       errors.push(`${d.email}: pick the role to move them to`);
+    }
+    // Keeping a high-risk account is a legitimate decision — it just has to be a decision, not a blank.
+    if (d.decision === 'keep' && highRisk.has(d.userId) && !d.reason?.trim()) {
+      errors.push(
+        `${d.email}: ${highRisk.get(d.userId)?.toLowerCase()} — say why this access is being kept`,
+      );
     }
   }
 

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { CockpitDashboard } from '@/components/app-use/CockpitDashboard';
 import { RunPanel, type RunField } from '@/components/app-use/RunPanel';
 import type { AppSurface } from '@/lib/app-surface';
+import { utcStamp } from '@/lib/timestamp';
 import type { CockpitMetrics, TrendPoint } from '@/lib/cockpit-metrics';
 
 type UseView = 'work' | 'dashboard' | 'run' | 'activity';
@@ -258,9 +259,7 @@ function ActivityList({ cases }: Readonly<{ cases: UseActivityCase[] }>) {
             <p className="text-sm text-foreground">{c.subject ?? 'Unnamed case'}</p>
             <p className="font-mono text-[11px] text-muted-foreground">
               {c.status}
-              {/* Formatted deterministically, never toLocaleString: this renders on the server and again
-                  in the browser, and the two disagree on locale and time zone. */}
-              {c.startedAt ? ` · ${c.startedAt.slice(0, 16).replace('T', ' ')} UTC` : ''}
+              {c.startedAt ? ` · ${utcStamp(c.startedAt)}` : ''}
             </p>
           </div>
           {c.trail ? (

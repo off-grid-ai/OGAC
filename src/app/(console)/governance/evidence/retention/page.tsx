@@ -19,14 +19,14 @@ export default async function RetentionEvidencePage() {
   return (
     <PageFrame>
       <div className="w-full space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Retention</h2>
-          <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
-            How long each kind of record is kept, and the proof it was actually deleted. A limit is
-            only a setting until a sweep runs — every sweep here re-counts what is left afterwards, so
-            the record proves the deletion rather than asserting it.
-          </p>
-        </div>
+        {/* No second "Retention" heading. The console layout already titles this page and describes
+            it; repeating the word directly underneath reads as two sections rather than one. What is
+            kept is the sentence the short layout description does not carry: why a limit alone proves
+            nothing. */}
+        <p className="max-w-3xl text-xs text-muted-foreground">
+          A limit is only a setting until a sweep runs. Every sweep below re-counts what is left
+          afterwards, so the record proves the deletion rather than asserting it.
+        </p>
         <RetentionPanel
           rules={rules}
           runs={sweeps.map((r) => ({ ...r, ranAt: r.ranAt.toISOString() }))}
