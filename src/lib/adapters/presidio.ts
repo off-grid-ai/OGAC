@@ -18,6 +18,8 @@ import type { PiiPort, PiiResult } from './types';
 type Env = Record<string, string | undefined>;
 type Fetcher = typeof fetch;
 
+import { DEFAULT_PII_LANGUAGE, resolveAnalyzerLanguage } from '@/lib/pii-language';
+
 export interface PresidioConfig {
   analyzerUrl: string | null;
   anonymizerUrl: string | null;
@@ -123,6 +125,15 @@ export async function scanWithPresidio(
       scope: 'data-redaction',
     };
   }
+  // VALIDATE THE LANGUAGE BEFORE SENDING IT. A language the analyzer has no model for answers 500, and
+  // this scan is fail-closed — so an unsupported request would refuse every governed call rather than
+  // improve detection. resolveAnalyzerLanguage never returns one the service cannot serve.
+  const requested = policy.language ?? DEFAULT_PII_LANGUAGE;
+  const resolution =
+    requested === DEFAULT_PII_LANGUAGE
+      ? { language: DEFAULT_PII_LANGUAGE, substituted: false, note: null }
+      : resolveAnalyzerLanguage(requested, await presidioLanguages(config, fetcher).catch(() => []));
+
   try {
     const raw = await postJson(
       `${config.analyzerUrl}/analyze`,
@@ -130,7 +141,7 @@ export async function scanWithPresidio(
         text,
         policy.recognizers ?? [],
         policy.thresholds ?? DEFAULT_THRESHOLDS,
-        policy.language ?? 'en',
+        resolution.language,
       ),
       config.timeoutMs,
       fetcher,
@@ -284,3 +295,45 @@ export const presidioDataPii: PiiPort = {
     }
   },
 };
+
+// ─── Which languages the deployed analyzer will actually serve ────────────────────────────────────────
+//
+// Discovered, not assumed. Measured on the audited deployment: `en` answers 200 and `hi`/`ta`/`mr`/`es`
+// answer 500 "No matching recognizers were found to serve the request" — so sending a language nobody
+// installed a model for turns a working, fail-closed PII scan into a refused call.
+//
+// Cached for the process because the answer changes only when the service is redeployed, and this sits in
+// front of every governed scan.
+let languageCache: { at: number; langs: string[] } | null = null;
+const LANGUAGE_TTL_MS = 10 * 60 * 1000;
+
+export async function presidioLanguages(
+  config: PresidioConfig = resolvePresidioConfig(),
+  fetcher: typeof fetch = fetch,
+  candidates: readonly string[] = ['en', 'hi', 'mr', 'ta', 'te', 'bn', 'es', 'de', 'fr'],
+): Promise<string[]> {
+  if (languageCache && Date.now() - languageCache.at < LANGUAGE_TTL_MS) return languageCache.langs;
+  if (!config.analyzerUrl) return [];
+
+  // Presidio has no "list languages" endpoint, so support is probed per candidate: a language it can
+  // serve answers 200, one it cannot answers 500. Probing beats guessing from a config file that may not
+  // match what is installed in the image.
+  const langs: string[] = [];
+  await Promise.all(
+    candidates.map(async (l) => {
+      try {
+        const res = await fetcher(
+          `${config.analyzerUrl}/supportedentities?language=${encodeURIComponent(l)}`,
+          { signal: AbortSignal.timeout(Math.min(config.timeoutMs, 4000)) },
+        );
+        if (res.ok) langs.push(l);
+      } catch {
+        // Unreachable ⇒ not supported as far as this call is concerned. An empty result is handled by
+        // resolveAnalyzerLanguage, which then sends the default rather than the request.
+      }
+    }),
+  );
+  const sorted = langs.sort();
+  languageCache = { at: Date.now(), langs: sorted };
+  return sorted;
+}
