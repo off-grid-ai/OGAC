@@ -15,7 +15,6 @@ import { buildAppWorkQueue, caseLabel, caseTrail, runSubject, statusLabel } from
 import { getAppBySlug } from '@/lib/apps-store';
 import { resolveDeployedApp } from '@/lib/deployed-app';
 import type { FormField } from '@/lib/app-model';
-import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +32,8 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
   // sample dashboard or a generic run form. Every other App retains the shared generated surface.
   const isCockpit = /cross[-\s]?sell/i.test(resolved.slug) || /cross[-\s]?sell/i.test(resolved.title);
   if (isCockpit) {
-    const orgId = await currentOrgId();
+    // Same public-page reasoning as below: no actor, so the app's own org is the correct scope.
+    const orgId = app.orgId;
     const book = await readBankCrossSellOpportunityBook(resolved.slug, orgId).catch(() => null);
     const rows =
       book?.opportunities.map((opportunity, index) => ({
@@ -66,7 +66,17 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
     );
   }
 
-  const orgId = await currentOrgId();
+  // THE APP'S OWN ORG, not the caller's.
+  //
+  // This page is PUBLIC — publishing is the opt-in — so there is no signed-in actor. currentOrgId()
+  // resolves through bindTenantOrg, which correctly returns the ACTOR's org whenever it differs from
+  // the host tenant (a viewer must never read another tenant's data). With no actor at all that lands
+  // on 'default', so the page read runs for the wrong org and showed "No runs yet" while 18 real runs
+  // sat under org_bharat. A right rule for authenticated surfaces, wrong for this one.
+  //
+  // The slug uniquely identifies ONE app row, and that row carries its org, so scoping to it is both
+  // correct and non-leaking: there is no caller whose org could differ.
+  const orgId = app.orgId;
   const runs = await listAppRuns(app.id, orgId, 500).catch(() => []);
 
   // A real previous case becomes the entry example, and the numbers come from the same pure rule the
