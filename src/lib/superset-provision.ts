@@ -24,6 +24,17 @@ export interface EmbedInputs {
   embedUuid?: string;
   // Result of probing the dashboard via the Superset API. undefined ⇒ probe not run / not reachable.
   dashboardExists?: boolean;
+  /**
+   * Whether a dashboard with our TITLE exists at all, independent of the embed UUID matching.
+   *
+   * These are two different situations wearing one message. Measured on the deployed Superset
+   * 2026-08-04: the dashboard EXISTS (id 1, "Off Grid AI — Gateway Overview") but has no embedded
+   * registration, so the configured embed UUID matched nothing. Both cases previously rendered the same
+   * "not provisioned" CTA — and provisioning from the console cannot fix the second one, because
+   * registering a dashboard for embedding is a Superset admin action. A CTA that cannot succeed is worse
+   * than no CTA: the operator clicks, nothing changes, and they conclude the product is broken.
+   */
+  dashboardFoundByTitle?: boolean;
 }
 
 export type EmbedState =
@@ -45,6 +56,10 @@ export function decideEmbed(inp: EmbedInputs): EmbedDecision {
     return { state: 'not-configured' };
   }
   if (inp.dashboardExists !== true) {
+    // The dashboard is there but not registered for embedding — provisioning from here will not help.
+    if (inp.dashboardFoundByTitle === true) {
+      return { state: 'not-provisioned', reason: 'dashboard-exists-not-embed-registered' };
+    }
     return { state: 'not-provisioned', reason: 'dashboard-uuid-not-found' };
   }
   return { state: 'ready' };
