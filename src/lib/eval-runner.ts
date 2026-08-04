@@ -80,6 +80,17 @@ async function buildSamples(model: string): Promise<Sample[]> {
   return samples;
 }
 
+// The metrics the ragas sidecar can actually score. Declared BEFORE its first use: the call site is at
+// runtime so there is no live TDZ, but this codebase has had production-only crashes from declaration
+// order and the ordering is free.
+const RAGAS_METRICS = new Set([
+  'faithfulness',
+  'answer_relevancy',
+  'context_precision',
+  'context_recall',
+  'answer_correctness',
+]);
+
 // Ask the ragas sidecar for per-metric scores over the dataset. Returns the metric map (0..1) or
 // null if the sidecar is unset/unreachable — the caller then degrades to the heuristic honestly.
 async function ragasMetrics(
@@ -88,6 +99,20 @@ async function ragasMetrics(
   model: string,
 ): Promise<Record<string, number> | null> {
   if (!RAGAS_URL) return null;
+
+  // VALIDATE THE METRIC LIST FIRST. Measured against the live sidecar 2026-08-04: asking for a metric it
+  // does not know makes it run ALL FIVE — each one a chain of 30–90s gateway LLM calls — and return them
+  // without ever saying the requested metric was unsupported. So a typo silently costs ~5x the compute and
+  // answers a question nobody asked. Filtering here means an unknown metric is reported as OMITTED (the
+  // caller sees it missing from the returned map) instead of being replaced by everything.
+  const requested = metrics?.length ? metrics : undefined;
+  const supported = requested?.filter((m) => RAGAS_METRICS.has(m));
+  if (requested && (!supported || supported.length === 0)) {
+    // Nothing we can ask for. Returning null degrades to the heuristic honestly rather than sending an
+    // empty list, which the sidecar also reads as "run everything".
+    return null;
+  }
+
   try {
     const dataset = samples.map((s) => ({
       question: s.question,
@@ -105,7 +130,7 @@ async function ragasMetrics(
         model,
         gateway: `${GATEWAY_URL}/v1`,
         dataset,
-        ...(metrics?.length ? { metrics } : {}),
+        ...(supported?.length ? { metrics: supported } : {}),
       }),
       signal: AbortSignal.timeout(600_000),
     });
@@ -116,14 +141,6 @@ async function ragasMetrics(
     return null;
   }
 }
-
-const RAGAS_METRICS = new Set([
-  'faithfulness',
-  'answer_relevancy',
-  'context_precision',
-  'context_recall',
-  'answer_correctness',
-]);
 
 // Whether this definition's metric can be scored by the real ragas sidecar.
 function usesRagas(def: EvalDef): boolean {
