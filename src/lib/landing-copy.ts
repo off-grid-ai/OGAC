@@ -35,6 +35,15 @@ export const LANDING = {
       { number: '04', name: 'Stay in control', points: ['Your rules apply to every use case.', 'See what happened, why, and what it cost.', 'Trace every result to its sources.'] },
     ],
   },
+  // The governed-path band that sits directly under the hero: the four planes every request
+  // crosses, in order. Transcribed from the design canvas (the four-column row beneath the first
+  // console shot), which is why each line is terse - it renders in a narrow column.
+  planes: [
+    { name: 'Data', outcome: 'Structured for use. Never exported to get there.' },
+    { name: 'AI Runtime', outcome: 'One controlled point. No call reaches a model without passing through it.' },
+    { name: 'Solutions', outcome: 'Inside your rules by default, not bolted on after.' },
+    { name: 'Operations', outcome: 'Tracked end to end. Stopped the moment it fails a check.' },
+  ],
   overview: {
     number: '01',
     kicker: 'Overview',
@@ -68,7 +77,7 @@ export const LANDING = {
     ],
   },
   numbers: {
-    number: '03',
+    number: '05',
     kicker: 'Numbers',
     heading: 'A concrete way to start.',
     intro: 'Prove outcomes before taking on any risk.',
@@ -83,7 +92,7 @@ export const LANDING = {
     ],
   },
   outcomes: {
-    number: '04',
+    number: '03',
     kicker: 'Outcomes',
     heading: 'A company that learns, acts, and stays accountable.',
     intro: 'A shorter distance between what the enterprise knows and what every person can do.',
@@ -94,7 +103,7 @@ export const LANDING = {
     ],
   },
   trust: {
-    number: '05',
+    number: '04',
     kicker: 'Trust',
     heading: 'Know what happened. Know why. Stay in control.',
     intro: 'Control should make AI usable, not slow it down.',
@@ -134,8 +143,16 @@ export const LANDING = {
       ],
     },
   },
-  faq: {
+  // "Judge the product" - the invitation to inspect before talking to sales. New section from the
+  // design canvas; it earns its place because it is the only one that asks for nothing in return.
+  proof: {
     number: '07',
+    kicker: 'Proof',
+    heading: 'Judge the product, not the pitch.',
+    intro: 'Explore live bank and insurer environments. Inspect the source before you speak to us.',
+  },
+  faq: {
+    number: '08',
     kicker: 'FAQ',
     heading: 'Frequently asked questions.',
     asideKicker: 'Still have questions?',

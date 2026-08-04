@@ -404,6 +404,39 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── 07 Proof ───────────────────────────────────────────────────────── */}
+      {/* The only section that asks for nothing: three ways in to judge the product first-hand. */}
+      <section id="proof" className="relative border-b border-border">
+        <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
+          <SectionHead
+            number={c.proof.number}
+            kicker={c.proof.kicker}
+            heading={c.proof.heading}
+            intro={c.proof.intro}
+          />
+          <BlurFade delay={0.12} inView>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                { label: c.hero.trustItems[0], href: href('liveProduct') },
+                { label: c.hero.trustItems[1], href: href('liveProduct') },
+                { label: c.hero.trustItems[2], href: href('source') },
+              ].map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="group flex items-center justify-between rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary"
+                >
+                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground">
+                    {item.label}
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              ))}
+            </div>
+          </BlurFade>
+        </div>
+      </section>
+
       {/* ── 08 FAQ ─────────────────────────────────────────────────────────── */}
       <section id="faq" className="relative border-b border-border">
         <div className="mx-auto grid max-w-[100rem] gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1fr_1.4fr]">
