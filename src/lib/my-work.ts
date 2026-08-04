@@ -325,3 +325,41 @@ export function confusableTitles(
   }
   return out;
 }
+
+// ─── Should the home screen lead with this person's work? ─────────────────────────────────────────────
+//
+// The console's home is, by its own comment, "the jobs-oriented OPERATOR home": governance posture,
+// policy engine, content guardrails, cloud egress, blocking decisions, service latencies in ms. There is
+// no department person's home — they land on that one. Measured on the demo tenant: fourteen cases were
+// waiting for a decision and the only trace of them anywhere above the fold was a number in a sidebar
+// badge, under a headline reading "Everything your platform is doing right now … so you can run it".
+//
+// So the home leads with the reader's own work WHEN THEY HAVE ANY, and is otherwise untouched. An
+// operator with an empty queue still gets the operator home, because for them it is the right home.
+
+export interface WorkLead {
+  /** The sentence to lead with. */
+  headline: string;
+  /** The nudge about the oldest item, or null when nothing is old enough to be worth naming. */
+  note: string | null;
+  /** How many are waiting. */
+  total: number;
+}
+
+/**
+ * What the home should say about this person's queue, or null to leave the home as it is.
+ *
+ * Returns null on an empty queue rather than a reassuring "you're all clear": an operator's home is not
+ * the place for a green tick about work they do not do, and a band that is always present stops being
+ * read. It also returns null when the underlying read FAILED — claiming an empty queue off a failed read
+ * is the one error here that makes someone stop looking for their work.
+ */
+export function workLead(work: MyWork, complete = true): WorkLead | null {
+  if (!complete || work.totalWaiting === 0) return null;
+  const worst = work.groups[0];
+  return {
+    headline: work.headline,
+    note: worst ? overdueNote(worst) : null,
+    total: work.totalWaiting,
+  };
+}

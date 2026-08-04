@@ -12,6 +12,8 @@ import { readSiemView } from '@/lib/siem-view';
 import { probeService } from '@/lib/status';
 import { listConnectors } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
+import { readMyWork } from '@/lib/my-work-reader';
+import { workLead } from '@/lib/my-work';
 import { safeWithTimeout } from '@/lib/with-timeout';
 import { ActivityCard, BlockingFeed, Section, ServicesCard, TileCard } from './overview-components';
 import { PageFrame } from '@/components/PageFrame';
@@ -134,6 +136,12 @@ export default async function ConsoleHome() {
   };
 
   const home = synthesizeOperatorHome(input);
+
+  // Fault-isolated like every other read on this page: a slow or broken queue read degrades to "no band"
+  // rather than blanking the home. readMyWork reports its own completeness, and workLead refuses to say
+  // "nothing is waiting" off a failed read — the one error here that would make someone stop looking.
+  const myWork = await safe(() => readMyWork(org, new Date()), null);
+  const lead = myWork ? workLead(myWork.work, myWork.complete) : null;
   const firstName = session?.user?.name?.split(' ')[0] ?? session?.user?.email?.split('@')[0];
 
   return (
@@ -152,6 +160,36 @@ export default async function ConsoleHome() {
           </div>
 
           {/* Quick actions */}
+          {/* THE READER'S OWN WORK, FIRST.
+              This page describes itself as the operator home, and for an operator it is the right one.
+              But a department person lands here too, and on the demo tenant fourteen cases were waiting
+              for a decision while the only trace above the fold was a number in a sidebar badge, under
+              "Everything your platform is doing right now … so you can run it". Their work now leads.
+              Nothing is removed: with an empty queue this band is absent and the home is unchanged. */}
+          {lead ? (
+            <section className="rounded-xl border border-primary/40 bg-primary/[0.04] p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Waiting for you
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+                    {lead.headline}
+                  </h2>
+                  {lead.note ? (
+                    <p className="mt-1 text-sm text-muted-foreground">{lead.note}</p>
+                  ) : null}
+                </div>
+                <Link
+                  href="/work/tasks"
+                  className="shrink-0 rounded-md border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/15"
+                >
+                  Open my tasks →
+                </Link>
+              </div>
+            </section>
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
             {QUICK_ACTIONS.map((a) => (
               <Link

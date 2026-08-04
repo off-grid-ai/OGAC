@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { CasePicker } from '@/components/build/CasePicker';
 import { progressHeadline, type RunProgressStep } from '@/lib/app-run-progress';
+import { statusLabel } from '@/lib/app-work-queue';
 import { Label } from '@/components/ui/label';
 import type { AppSurface } from '@/lib/app-surface';
 
@@ -154,7 +155,9 @@ export function RunPanel({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">{heading}</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Fill in what this run needs — every run goes through the governed pipeline.
+              {/* Not "the governed pipeline". A department reader does not know what a pipeline is, and
+                  the promise they care about is the outcome: it is checked, and it is written down. */}
+              Fill in what this run needs — every run is checked against your rules and recorded.
             </p>
           </CardHeader>
         ) : null}
@@ -271,7 +274,9 @@ export function RunPanel({
                     : result.status === 'queued' || result.status === 'running'
                       ? 'Started. It is running now; the result will appear under Activity.'
                       : result.status
-                        ? `Finished with status "${result.status}" and produced no text. See Activity for the step-by-step trail.`
+                        // statusLabel, not the raw status. This printed Finished with status "done" —
+                        // an internal token in a sentence aimed at someone who has never seen one.
+                        ? `${statusLabel(result.status)} — no text was produced. See Activity for the step-by-step trail.`
                         : 'Started. See Activity for the step-by-step trail.')}
               </pre>
               {/* The provenance arrives WITH the answer, not on another screen. */}

@@ -3,9 +3,7 @@ import Link from 'next/link';
 import { PageFrame } from '@/components/PageFrame';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { listAppRunsView } from '@/lib/app-runs-view-reader';
-import { runSubject } from '@/lib/app-work-queue';
-import { listApps } from '@/lib/apps-store';
+import { readMyWork } from '@/lib/my-work-reader';
 import { requireModuleForUser } from '@/lib/module-access';
 import {
   buildMyWork,
@@ -13,8 +11,6 @@ import {
   matchesQuery,
   overdueNote,
   waitedFor,
-  type AppSummary,
-  type WaitingCase,
 } from '@/lib/my-work';
 import { auth } from '@/auth';
 import { CoverPanel } from '@/components/work/CoverPanel';
@@ -40,34 +36,11 @@ export default async function MyTasksPage({
   const { q = '' } = await searchParams;
   await requireModuleForUser('studio');
   const orgId = await currentOrgId();
-  const [apps, runs] = await Promise.all([
-    listApps(orgId).catch(() => []),
-    listAppRunsView(undefined, orgId, 300).catch(() => []),
-  ]);
-
-  const titleById = new Map(apps.map((a) => [a.id, a.title]));
-  const cases: WaitingCase[] = runs
-    .filter((r) => String(r.status) === 'awaiting_human')
-    // A run whose app has been deleted cannot be acted on — sending someone to a dead page is worse
-    // than leaving it out, and it is counted nowhere else either.
-    .filter((r) => titleById.has(r.appId))
-    .map((r) => ({
-      runId: r.id,
-      appId: r.appId,
-      appTitle: titleById.get(r.appId) ?? r.appId,
-      subject: runSubject((r as { input?: unknown }).input),
-      waitingSince: String(r.startedAt ?? ''),
-      // Straight to where the evidence is, so the decision is made having seen the case.
-      href: `/solutions/apps/${encodeURIComponent(r.appId)}/runs/${encodeURIComponent(r.id)}`,
-    }));
-
-  const summaries: AppSummary[] = apps.map((a) => ({
-    id: a.id,
-    title: a.title,
-    published: Boolean((a as { published?: boolean }).published),
-  }));
-
   const now = new Date();
+  // ONE read of "what is waiting for a person", shared with the home screen and the digest. This used to
+  // be assembled here, again in the digest route, and a third time on the home — same rule, three copies.
+  const { cases, summaries } = await readMyWork(orgId, now);
+
   // URL-driven, like every other filter here, so a search is shareable and Back steps out of it.
   const visible = cases.filter((c) => matchesQuery(c, q));
   const work = buildMyWork(visible, summaries, now);
