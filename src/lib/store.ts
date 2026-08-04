@@ -599,7 +599,18 @@ export async function persistAuditEvent(input: AuditEventInput): Promise<Canonic
         ${ev.costUsd ?? null}, ${ev.outcome}, ${ev.runId ?? null}, ${ev.ip ?? null}
       );
     `);
-    emitSpan('audit.event.v2', { action: ev.action, actor: ev.actor.id, outcome: ev.outcome });
+    // run_id + org ON THE SPAN, not just in the row. Without them a run's trace is unfindable in the
+    // trace store: the span carried only action/actor/outcome, so there was no key to search by — and a
+    // trace id DERIVED from the run id cannot work either, because the emitter generates its own
+    // (normalizeTraceId is Langfuse's arbitrary-string form, not a 128-bit W3C id). Verified live: spans
+    // for offgrid-console existed but carried no run key, so "find the trace for this run" had no answer.
+    emitSpan('audit.event.v2', {
+      action: ev.action,
+      actor: ev.actor.id,
+      outcome: ev.outcome,
+      ...(ev.runId ? { run_id: ev.runId } : {}),
+      ...(ev.org ? { org: ev.org } : {}),
+    });
   } catch {
     /* best-effort — Postgres audit insert must never fail the action */
   }

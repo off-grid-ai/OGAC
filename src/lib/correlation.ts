@@ -90,8 +90,19 @@ export function correlationIds(runId: string): CorrelationIds {
 // question is the failure-presents-as-emptiness defect again, so the caption says both.
 
 export interface TraceLookup {
+  /**
+   * The LANGFUSE trace id for this run — an arbitrary-string id, which is why the stripped form works
+   * there. It is NOT a W3C/Jaeger trace id (those are 128-bit hex) and must never be used as one.
+   */
   traceId: string;
-  /** Deep link into the trace viewer, or null when no viewer is configured. */
+  /**
+   * Deep link into the trace viewer, or null when no viewer is configured.
+   *
+   * CORRECTED 2026-08-04: this used to be `${viewer}/trace/${traceId}`, which could never resolve in
+   * Jaeger — `apprun_60a23031` normalises to `apprun60a23031`, and `p`/`r`/`u`/`n` are not hex. I shipped
+   * that link earlier the same day and only caught it by querying Jaeger for a real run. It is now a
+   * SEARCH by the run_id tag, which is findable because the audit span now carries that tag.
+   */
   href: string | null;
   /** What a reader should understand if the trace is not there. */
   caveat: string;
@@ -106,10 +117,15 @@ export interface TraceLookup {
 export function traceLookup(runId: string, viewerUrl?: string | null): TraceLookup {
   const { traceId } = correlationIds(runId);
   const base = (viewerUrl ?? '').trim().replace(/\/+$/, '');
+  // SEARCH, not a derived id. The trace store generates its own trace ids, so the only durable key is a
+  // tag the emitter puts on the span — `run_id`, added to the audit span for exactly this.
+  const search = base
+    ? `${base}/search?service=offgrid-console&tags=${encodeURIComponent(JSON.stringify({ run_id: runId }))}`
+    : null;
   return {
     traceId,
-    href: base ? `${base}/trace/${traceId}` : null,
+    href: search,
     caveat:
-      'If the trace is not there, it may not have been exported rather than not have happened — the run record above is the authoritative account of what ran.',
+      'If no trace is found, it may not have been exported rather than not have happened — and spans emitted before run_id tagging (2026-08-04) carry no run key at all, so older runs will not match. The run record above is the authoritative account of what ran.',
   };
 }
