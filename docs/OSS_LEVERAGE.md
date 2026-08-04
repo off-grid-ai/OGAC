@@ -159,8 +159,11 @@ deployment returned before and after.
 3. **Redpanda / LanceDB / Feature Flags / Device Management** — see the correction below. Redpanda is a
    product-binding job, not a drill. Feature Flags needs an admin token nobody has minted. Device
    Management needs a host enrolled.
-4. **A console surface for payload indexes.** The port and the rule exist and were exercised live; no page
-   owns them yet, so today this is an API-level capability.
+4. ~~A console surface for payload indexes~~ **DONE 2026-08-04** — `PayloadIndexManager` on the collection
+   detail page, beside snapshots. Recommendations are one-click *with the type the rule already decided*:
+   making an operator retype `keyword` is how the field that matters most ends up indexed as the wrong
+   type. Full CRUD round-trip verified live (GET → DELETE `text` → recommendation returns → POST → gone
+   again; a malformed field name answers 400).
 
 ## The pattern across all of this
 

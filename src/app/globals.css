@@ -41,6 +41,60 @@
   color-scheme: dark;
 }
 
+/* ─── Landing surface ─────────────────────────────────────────────────────────────────────
+   The public landing follows the design direction built in the design tool: a warm cream
+   ground with white page-cards, alternating dark bands, hatched rules, and a geometric sans
+   for headings (mono is kept for eyebrows and labels only).
+
+   SCOPED TO .og-landing, DELIBERATELY NOT :root — `--og-background` and friends style every
+   operator console surface, so putting cream in :root would repaint the whole console. Only
+   the landing opts in.
+
+   These are the design project's own token values, read from the source rather than sampled
+   from a screenshot (sampling a JPEG gave wrong answers). Overriding --og-* rather than
+   --color-* is what makes this work: the semantic tokens in @theme hold an unresolved
+   var(--og-…) reference, so it re-resolves per element — the same mechanism the dark theme
+   already uses. */
+.og-landing {
+  --og-background: #f0e8da; /* Light/Background */
+  --og-surface: #fafaf9; /* the white page-cards that sit on the cream ground */
+  --og-surface-light: #e3d8c5; /* Light/Background Alt */
+  --og-text: #1d1d1d; /* Light/Text 100 */
+  --og-text-secondary: rgba(28, 28, 28, 0.8); /* Light/Text 75 */
+  --og-text-muted: rgba(28, 28, 28, 0.66); /* Light/Text 50 */
+  --og-border: rgba(29, 29, 29, 0.25); /* Light/Text 25 */
+  --og-border-light: rgba(46, 46, 46, 0.1); /* Light/Text 10 */
+  /* The diagonal hatch that fills section eyebrow rules and chart bars. */
+  --og-grid: rgba(74, 72, 68, 0.14); /* Light/Grid on Light */
+  /* Headings only. A system stack for now so no webfont, no CSP change and no layout shift;
+     swapping in the real display face later is this one line. */
+  --og-font-display: ui-sans-serif, -apple-system, 'Segoe UI', Inter, sans-serif;
+}
+
+/* Dark is warm here, not the console's neutral greys: cream text on near-black. */
+[data-theme='dark'] .og-landing {
+  --og-background: #262626; /* Dark/Background */
+  --og-surface: #1c1c1c; /* Dark/Background Alt */
+  --og-surface-light: #2e2e2e;
+  --og-text: #f0e7da; /* Dark/Text 100 */
+  --og-text-secondary: #d1c2a5; /* Dark/Text 75 */
+  --og-text-muted: rgba(209, 194, 165, 0.66); /* Dark/Text 50 */
+  --og-border: rgba(204, 189, 159, 0.22);
+  --og-border-light: rgba(204, 189, 159, 0.1); /* Dark/Text 10 */
+  --og-grid: rgba(59, 58, 56, 0.74); /* Dark/Grid on Dark */
+}
+
+/* The hatched rule that runs from a section eyebrow out to the right margin. */
+.og-hatch {
+  background-image: repeating-linear-gradient(-45deg, var(--og-grid) 0 1px, transparent 1px 5px);
+}
+
+/* Headings. Mono stays the default everywhere else on the page. */
+.og-display {
+  font-family: var(--og-font-display);
+  letter-spacing: -0.015em;
+}
+
 /* Map Tailwind palette + shadcn semantic tokens to brand, so utility classes and pulled
    library components inherit Off Grid and flip light/dark with zero per-component styling. */
 @theme {

@@ -84,14 +84,29 @@ function Nav() {
 function SectionHead({ number, kicker, heading, intro }: Readonly<{ number: string; kicker: string; heading: string; intro?: string }>) {
   return (
     <BlurFade inView>
-      <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-primary">
-        <span className="text-muted-foreground">{number}</span>
-        {kicker}
-      </p>
-      <h2 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-        {heading}
-      </h2>
-      {intro ? <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">{intro}</p> : null}
+      {/* The design's eyebrow: a dot, the kicker in mono, then a hatched rule running out to
+          the right margin. The number sits at the far right for now — in the design it lives
+          in the sticky section index, so it moves there once that is built. */}
+      <div className="flex items-center gap-3 border-y border-[var(--og-border-light)] py-2">
+        <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-primary" />
+          {kicker}
+        </span>
+        <span aria-hidden className="og-hatch h-3 flex-1" />
+        <span className="shrink-0 font-mono text-[11px] tracking-[0.2em] text-muted-foreground">
+          {number}
+        </span>
+      </div>
+      {/* Heading left, supporting line right — the design pairs them on one row rather than
+          stacking, which is also what keeps wide screens from going empty on the right. */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:items-end">
+        <h2 className="og-display text-3xl font-medium leading-[1.15] text-foreground sm:text-4xl lg:text-[2.6rem]">
+          {heading}
+        </h2>
+        {intro ? (
+          <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">{intro}</p>
+        ) : null}
+      </div>
     </BlurFade>
   );
 }
@@ -99,7 +114,9 @@ function SectionHead({ number, kicker, heading, intro }: Readonly<{ number: stri
 export default function LandingPage() {
   const c = LANDING;
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    // `og-landing` opts this page into the landing palette + display font (see globals.css).
+    // The console does NOT get this class, so its own look is untouched.
+    <div className="og-landing min-h-screen bg-background text-foreground">
       <LandingThemeDefault />
       <Nav />
 
