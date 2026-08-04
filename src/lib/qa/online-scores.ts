@@ -177,3 +177,42 @@ export async function listOnlineScores(orgId = 'default', limit = 200): Promise<
     return [];
   }
 }
+
+/**
+ * Retained verdicts for ONE app, newest first.
+ *
+ * The judge tags every app verdict `app:<appId>` (see app-run-score), so an app's own quality on real
+ * work is directly readable — it was simply never read anywhere. Org-scoped as well as subject-scoped so
+ * one tenant can never see another's verdicts through a guessed app id.
+ */
+export async function listOnlineScoresForApp(
+  appId: string,
+  orgId = 'default',
+  limit = 200,
+): Promise<OnlineScore[]> {
+  try {
+    await ensureOnlineScoresSchema();
+    const { db } = await import('@/db');
+    const { sql } = await import('drizzle-orm');
+    const res = await db.execute(sql`
+      SELECT run_id, org_id, subject_id, quality, faithfulness, judged, reasoning, ts
+      FROM online_scores
+      WHERE org_id = ${orgId} AND subject_id = ${`app:${appId}`}
+      ORDER BY ts DESC LIMIT ${Math.min(1000, Math.max(1, limit))};
+    `);
+    return (res.rows as unknown as Record<string, unknown>[]).map((r) => ({
+      runId: String(r.run_id),
+      orgId: String(r.org_id),
+      subjectId: String(r.subject_id),
+      quality: Number(r.quality ?? 0),
+      faithfulness: Number(r.faithfulness ?? 0),
+      judged: r.judged === true,
+      reasoning: r.reasoning == null ? '' : String(r.reasoning),
+      ts: r.ts instanceof Date ? r.ts.toISOString() : String(r.ts),
+    }));
+  } catch {
+    // Never throws: an unreadable verdict store must degrade to "not scored", which the pure rule
+    // reports honestly, rather than breaking the app's Quality tab.
+    return [];
+  }
+}

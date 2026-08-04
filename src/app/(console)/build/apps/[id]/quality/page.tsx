@@ -1,6 +1,10 @@
 import { notFound } from 'next/navigation';
 import { AppQualityPanel } from '@/components/build/AppQualityPanel';
+import { RealCaseQualityCard } from '@/components/build/RealCaseQualityCard';
 import { SuggestedChecks } from '@/components/build/SuggestedChecks';
+import { listAppRunsView } from '@/lib/app-runs-view-reader';
+import { listOnlineScoresForApp } from '@/lib/qa/online-scores';
+import { qualityOnRealCases } from '@/lib/quality-on-real-cases';
 import { getApp } from '@/lib/apps-store';
 import { listEvalDefs } from '@/lib/eval-defs';
 import { listEvalRuns, listGoldenCases } from '@/lib/evals';
@@ -63,6 +67,28 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
     })),
   );
 
+  // QUALITY ON REAL CASES. The judge already scores finished runs into online_scores tagged
+  // `app:<id>`; nothing read it back on the app that produced them. Coverage is computed against how
+  // many cases actually FINISHED, so an average over one of ten cannot read as the app's quality.
+  const [verdicts, appRuns] = await Promise.all([
+    listOnlineScoresForApp(id, orgId).catch(() => []),
+    listAppRunsView(id, orgId, 500).catch(() => []),
+  ]);
+  const finishedCases = appRuns.filter((r) =>
+    ['done', 'error', 'cancelled'].includes(String(r.status)),
+  ).length;
+  const realCases = qualityOnRealCases(
+    verdicts.map((v) => ({
+      runId: v.runId,
+      quality: v.quality,
+      faithfulness: v.faithfulness,
+      judged: v.judged,
+      reasoning: v.reasoning,
+      ts: v.ts,
+    })),
+    finishedCases,
+  );
+
   const lastRuns = lastRunPerCheck(
     evals.map((d) => ({ id: d.id, metric: d.metric, pipelineId: app.pipelineId ?? null })),
     pastRuns.map((r) => ({
@@ -80,6 +106,7 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
           derived from this app's own design, offered for a person to accept. Above the panel because a
           new app's evaluation set is empty and this is what fills it. */}
       <SuggestedChecks appId={id} appTitle={app.title} />
+      <RealCaseQualityCard quality={realCases} appHref={`/solutions/apps/${encodeURIComponent(id)}`} />
       <AppQualityPanel
         appId={id}
         appTitle={app.title}
