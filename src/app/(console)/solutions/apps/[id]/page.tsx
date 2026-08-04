@@ -2,6 +2,7 @@ import { ArrowRight, CheckCircle, Clock, Hourglass } from '@phosphor-icons/react
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CaseDecision } from '@/components/build/CaseDecision';
+import { WaitingSelection } from '@/components/build/WaitingSelection';
 import { PageFrame } from '@/components/PageFrame';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -312,15 +313,33 @@ export default async function AppWorkPage({
                     Nothing is waiting on a decision right now.
                   </p>
                 ) : (
-                  disambiguateWaiting(queue.waiting).map((run) => (
-                    <Row
-                      key={run.id}
-                      run={run}
-                      href={`${base}/review`}
-                      icon={<Clock className="size-4 text-primary" />}
-                      pendingStepId={(run as { pendingStepId?: string | null }).pendingStepId}
-                    />
-                  ))
+                  // SELECT SEVERAL AND DECIDE THEM TOGETHER. Seven near-identical reimbursements were
+                  // seven round trips. The rows stay server-rendered — only the selection is client
+                  // state — so the batch path renders exactly the same case a single decision does.
+                  <WaitingSelection
+                    appId={id}
+                    candidates={disambiguateWaiting(queue.waiting).map((run) => ({
+                      runId: run.id,
+                      appId: id,
+                      appTitle: app.title,
+                      pendingStepId: (run as { pendingStepId?: string | null }).pendingStepId ?? null,
+                      label: run.subject ?? run.id,
+                      daysWaiting: Math.max(
+                        0,
+                        Math.floor((Date.now() - Date.parse(run.startedAt)) / 86_400_000) || 0,
+                      ),
+                    }))}
+                  >
+                    {disambiguateWaiting(queue.waiting).map((run) => (
+                      <Row
+                        key={run.id}
+                        run={run}
+                        href={`${base}/review`}
+                        icon={<Clock className="size-4 text-primary" />}
+                        pendingStepId={(run as { pendingStepId?: string | null }).pendingStepId}
+                      />
+                    ))}
+                  </WaitingSelection>
                 )}
               </Card>
             </section>
