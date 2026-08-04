@@ -42,7 +42,7 @@ export function FairnessEvidence({ rows }: Readonly<{ rows: FairnessAppRow[] }>)
         method: 'POST',
       });
       if (!res.ok) {
-        const f = await explainResponse(res, 'The fairness check could not be run.');
+        const f = await explainResponse(res, 'run a fairness check');
         toast.error(f.message);
         return;
       }

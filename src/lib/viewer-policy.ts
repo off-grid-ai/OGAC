@@ -38,14 +38,56 @@ export function canWrite(role: string | null | undefined): boolean {
 }
 
 /**
+ * POST endpoints that are SEMANTICALLY READS — a query whose input is too big or too structured for a
+ * query string, returning data and changing nothing.
+ *
+ * LIVE FINDING (2026-08-04). The read-only demo account's own banner promises "can view everything,
+ * including admin", and it could not search the organisation's memory: the query travels in a POST body,
+ * the method rule saw POST, and the refusal read "cannot make changes" for an action that changes nothing.
+ * The account contradicted its own promise.
+ *
+ * DELIBERATELY EXACT MATCHES, not prefixes. A prefix would let any future sub-route inherit a write
+ * exemption nobody reviewed — `/api/v1/organizational-brain/search` must not also exempt
+ * `/api/v1/organizational-brain/search/delete`. Anything not listed here stays blocked, so the failure
+ * mode of forgetting to add an endpoint is a refused read, never an unreviewed write.
+ *
+ * Before adding a path: it must perform NO state change of any kind. An endpoint that records something
+ * as a side effect — even an access-log row — does not belong here.
+ */
+export const READ_ONLY_QUERY_PATHS: readonly string[] = ['/api/v1/organizational-brain/search'];
+
+/**
+ * Is this a POST that only reads? Exact path match, method must be POST.
+ *
+ * The path is normalised for a trailing slash only. No case folding (paths are case-sensitive), no query
+ * string (the caller passes a pathname), and no partial matching.
+ */
+export function isReadOnlyQueryPost(
+  method: string | null | undefined,
+  path: string | null | undefined,
+): boolean {
+  if (typeof method !== 'string' || method.trim().toUpperCase() !== 'POST') return false;
+  if (typeof path !== 'string') return false;
+  const p = path.trim().replace(/\/+$/, '');
+  return READ_ONLY_QUERY_PATHS.includes(p === '' ? '/' : p);
+}
+
+/**
  * Should this specific request be blocked as a read-only viewer write attempt? True only when BOTH
  * the caller is a viewer AND the method mutates. A viewer GET is allowed (read everything).
+ *
+ * `path` is OPTIONAL and additive: without it the behaviour is exactly the method rule as before, so no
+ * existing caller changes. With it, a POST on the read-only query allowlist is not a write attempt.
  */
 export function isViewerWriteAttempt(
   role: string | null | undefined,
   method: string | null | undefined,
+  path?: string | null,
 ): boolean {
-  return isViewer(role) && isMutatingMethod(method);
+  if (!isViewer(role)) return false;
+  if (!isMutatingMethod(method)) return false;
+  // A read that happens to use POST is still a read.
+  return !isReadOnlyQueryPost(method, path);
 }
 
 // The placeholder a viewer sees instead of a real secret value. Kept as a constant so the redaction

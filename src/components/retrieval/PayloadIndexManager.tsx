@@ -36,7 +36,7 @@ export function PayloadIndexManager({ collectionName }: Readonly<{ collectionNam
     if (!res.ok) {
       // A refusal is not breakage — explainResponse keeps them apart so a viewer is not told the store
       // is broken when they simply may not administer it.
-      setError((await explainResponse(res, 'Could not read the payload indexes.')).message);
+      setError((await explainResponse(res, 'read this collection’s filter indexes')).message);
       return;
     }
     setError(null);
@@ -56,7 +56,7 @@ export function PayloadIndexManager({ collectionName }: Readonly<{ collectionNam
         body: JSON.stringify({ field, type }),
       });
       if (!res.ok) {
-        toast.error((await explainResponse(res, 'The index could not be created.')).message);
+        toast.error((await explainResponse(res, 'create a filter index')).message);
         return;
       }
       // The route returns the RE-READ state, so what lands here is what the store actually has.
@@ -72,7 +72,7 @@ export function PayloadIndexManager({ collectionName }: Readonly<{ collectionNam
     try {
       const res = await fetch(`${api}?field=${encodeURIComponent(field)}`, { method: 'DELETE' });
       if (!res.ok) {
-        toast.error((await explainResponse(res, 'The index could not be dropped.')).message);
+        toast.error((await explainResponse(res, 'drop a filter index')).message);
         return;
       }
       setState((await res.json()) as State);

@@ -227,7 +227,10 @@ export default auth(async (req) => {
   // edit (the per-handler `requireWriter` gate is defense-in-depth on top). GET/HEAD/OPTIONS pass, so
   // a viewer reads every surface. Machine bearer tokens are never a viewer (they short-circuit above).
   const role = (req.auth.user as { role?: string } | undefined)?.role;
-  if (pathname.startsWith('/api/') && isViewerWriteAttempt(role, req.method)) {
+  // The PATHNAME is passed so a POST that is semantically a READ (a query whose input is too structured
+  // for a query string — see READ_ONLY_QUERY_PATHS) is not refused as a write. Exact matches only, so the
+  // failure mode of an unlisted endpoint is a refused read, never an unreviewed write.
+  if (pathname.startsWith('/api/') && isViewerWriteAttempt(role, req.method, pathname)) {
     return withCors(NextResponse.json(VIEWER_FORBIDDEN_BODY, { status: 403 }), pathname);
   }
   return withCors(pass(), pathname);

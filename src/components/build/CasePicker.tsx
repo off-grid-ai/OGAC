@@ -60,7 +60,7 @@ export function CasePicker({
         settledHidden?: number;
       };
       if (!res.ok) {
-        const failure = await explainResponse(res, 'Could not look up cases.');
+        const failure = await explainResponse(res, 'look up cases from your records');
         setState({ status: 'error', refusal: failure.refusal, message: failure.message });
         return;
       }
@@ -74,7 +74,7 @@ export function CasePicker({
       });
     } catch {
       // A transport failure IS breakage — offer the retry.
-      setState({ status: 'error', refusal: false, message: 'Could not look up cases.' });
+      setState({ status: 'error', refusal: false, message: 'look up cases from your records' });
     }
   }, [appId]);
 

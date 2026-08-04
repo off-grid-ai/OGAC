@@ -1,4 +1,4 @@
-import { ArrowRight, Books } from '@phosphor-icons/react/dist/ssr';
+import { ArrowRight, Books, MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { auth } from '@/auth';
 import { CreateCollectionButton } from '@/components/knowledge/CreateCollectionButton';
@@ -56,11 +56,18 @@ export async function KnowledgeContent({
             </p>
           </div>
         ) : null}
-        {isAdmin ? (
-          <div className={showHeading ? undefined : 'ml-auto'}>
-            <CreateCollectionButton />
-          </div>
-        ) : null}
+        <div className={`flex items-center gap-2 ${showHeading ? '' : 'ml-auto'}`}>
+          {/* Ask the whole memory, not one collection. The retrieval was API/tool-first — reachable only
+              through an agent — so a person who wanted to check what the org knows had no way in. */}
+          <Link
+            href={`${detailBasePath}/memory`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            <MagnifyingGlass className="size-4" />
+            Search everything
+          </Link>
+          {isAdmin ? <CreateCollectionButton /> : null}
+        </div>
       </div>
 
       {collections.length === 0 ? (
