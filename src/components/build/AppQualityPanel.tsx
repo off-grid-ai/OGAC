@@ -133,14 +133,16 @@ export function AppQualityPanel({
       <div>
         <h2 className="text-lg font-semibold tracking-tight text-foreground">Quality</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Evals and the golden set here belong to <span className="text-foreground">{appTitle}</span>.
-          They run against this pipeline&apos;s own context (its data, knowledge, and model), so a
-          passing run means <span className="text-foreground">this pipeline</span> meets the bar — not
-          the gateway in the abstract.
+          These checks run against <span className="text-foreground">{appTitle}</span>&apos;s own data,
+          knowledge and model — so a pass means this app meets the bar, not the platform in general.
         </p>
       </div>
 
-      {/* This pipeline's evals */}
+      {/* CHECKS AND THEIR CASES, SIDE BY SIDE. Both were full-width cards holding a narrow list, so a
+          1900px screen showed two lines of content and a page-and-a-half of scroll. They are also read
+          together — "did it pass, and against what?" — so splitting them vertically forced the reader
+          to hold one in their head while scrolling to the other. */}
+      <div className="grid gap-4 lg:grid-cols-2">
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm">Evals for this pipeline</CardTitle>
@@ -226,6 +228,8 @@ export function AppQualityPanel({
       </Card>
 
       {/* Attach from the org-wide library */}
+      </div>
+
       {libraryEvals.length > 0 ? (
         <Card className="shadow-sm">
           <CardHeader>
