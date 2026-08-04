@@ -1,6 +1,6 @@
-import { Database, Info, Warning } from '@phosphor-icons/react/dist/ssr';
+import { Database, Info, Warning, WarningOctagon } from '@phosphor-icons/react/dist/ssr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { CacheCounters, CacheEvidence, CacheSelection } from '@/lib/cache-evidence';
+import type { AggregateTally, CacheCounters, CacheEvidence, CacheSelection } from '@/lib/cache-evidence';
 
 // ─── What the console's OWN answer cache is doing ───────────────────────────────────────────────────
 //
@@ -32,11 +32,28 @@ function tallies(c: CacheCounters): { label: string; value: number; hint: string
   ];
 }
 
+function since(ageMs: number): string {
+  const mins = Math.round(ageMs / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  return hrs < 24 ? `${hrs} h ago` : `${Math.round(hrs / 24)} d ago`;
+}
+
 export function ConsoleCacheEvidence({
   counters,
   evidence,
   selection,
-}: Readonly<{ counters: CacheCounters; evidence: CacheEvidence; selection: CacheSelection }>) {
+  aggregate,
+  readError,
+}: Readonly<{
+  counters: CacheCounters;
+  evidence: CacheEvidence;
+  selection: CacheSelection;
+  aggregate: AggregateTally | null;
+  /** Set when the tallies could not be read. Rendered as a failure — never as an idle cache. */
+  readError?: string;
+}>) {
   const style = STATE_STYLE[evidence.state];
   const rate = evidence.hitRate === null ? null : Math.round(evidence.hitRate * 100);
   const fallback = evidence.fallbackShare === null ? null : Math.round(evidence.fallbackShare * 100);
@@ -50,9 +67,11 @@ export function ConsoleCacheEvidence({
             The console’s own answer cache
           </CardTitle>
           <span
-            className={`rounded-sm border px-2 py-0.5 font-mono text-[10px] tracking-wider ${style.className}`}
+            className={`rounded-sm border px-2 py-0.5 font-mono text-[10px] tracking-wider ${
+              readError ? 'border-amber-600/40 text-amber-700 dark:text-amber-500' : style.className
+            }`}
           >
-            {style.label}
+            {readError ? 'PARTIAL VIEW' : style.label}
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -62,6 +81,18 @@ export function ConsoleCacheEvidence({
       </CardHeader>
 
       <CardContent className="space-y-3 text-xs">
+        {/* A failed read of the other processes' tallies is NOT an idle cache. Said before any number, so
+            nobody reads the figures below as platform-wide when they are one process's. */}
+        {readError ? (
+          <p className="flex items-start gap-1.5 rounded-md border border-amber-600/40 bg-amber-500/5 p-2.5 text-[11px] text-amber-800 dark:text-amber-400">
+            <WarningOctagon className="mt-0.5 size-3.5 shrink-0" weight="duotone" />
+            <span>
+              Only this process could be read, so the figures below are partial and the state above is not a
+              verdict on the whole platform. {readError}
+            </span>
+          </p>
+        ) : null}
+
         {/* The misconfiguration case first: its counters are indistinguishable from an outage, so if we do
             not name it here the reader goes looking for a server that was never configured. */}
         {selection.misconfigured ? (
@@ -94,7 +125,9 @@ export function ConsoleCacheEvidence({
             <p className="font-mono text-lg text-foreground">
               {counters.sharedWrites + counters.fallbackWrites}
             </p>
-            <p className="text-[11px] text-muted-foreground">answers stored since this process started</p>
+            <p className="text-[11px] text-muted-foreground">
+              answers stored{readError ? ' by this process' : ''}
+            </p>
           </div>
         </div>
 
@@ -113,14 +146,53 @@ export function ConsoleCacheEvidence({
           ))}
         </div>
 
-        {/* Scope, stated rather than implied. These are one process's tallies — and when the state is
-            DEGRADED that is not a footnote about the numbers, it IS the finding. */}
+        {/* WHERE the work happened. The console process serves this page and runs no inference, so a
+            single-process reading would report an idle cache while the workers hammer it. */}
+        {aggregate && aggregate.processes.length > 0 ? (
+          <div className="border-t border-border pt-2">
+            <p className="text-[11px] font-medium text-foreground">Which processes reported</p>
+            <ul className="mt-1 space-y-1">
+              {aggregate.processes.map((p) => {
+                const served = p.counters.sharedHits + p.counters.fallbackHits;
+                const wrote = p.counters.sharedWrites + p.counters.fallbackWrites;
+                return (
+                  <li
+                    key={p.label}
+                    className="flex flex-wrap items-baseline justify-between gap-2 rounded-md border border-border/60 px-2.5 py-1.5"
+                  >
+                    <span className="font-mono text-[11px] text-foreground">{p.label}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {served} read{served === 1 ? '' : 's'} · {wrote} write{wrote === 1 ? '' : 's'}
+                      {p.counters.fallbackHits + p.counters.fallbackWrites > 0 ? (
+                        <span className="text-amber-700 dark:text-amber-500">
+                          {' '}
+                          · {p.counters.fallbackHits + p.counters.fallbackWrites} did not use the shared store
+                        </span>
+                      ) : null}
+                      <span className={p.stale ? 'text-amber-700 dark:text-amber-500' : ''}>
+                        {' '}
+                        · reported {since(p.ageMs)}
+                        {p.stale ? ' (may have restarted)' : ''}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {aggregate.allStale ? (
+              <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-500">
+                No process has reported recently, so these totals are the last known reading rather than
+                what is happening now.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         <p className="flex items-start gap-1.5 border-t border-border pt-2 text-[11px] text-muted-foreground/80">
           <Info className="mt-0.5 size-3 shrink-0" />
           <span>
-            Counted by this console process since it last restarted. Work that runs in the background
-            workers is tallied separately there, so these are not platform-wide totals — and if the shared
-            cache is doing its job, that is the only thing about this cache that stays per-process.
+            Each process counts the cache work it does and publishes it here, so these are the totals across
+            the platform rather than one process&rsquo;s. Counts reset when a process restarts.
           </span>
         </p>
       </CardContent>

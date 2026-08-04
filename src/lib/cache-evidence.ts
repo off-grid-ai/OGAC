@@ -112,6 +112,71 @@ export function cacheEvidence(c: CacheCounters, configuredShared: boolean): Cach
   };
 }
 
+// ─── Across processes ───────────────────────────────────────────────────────────────────────────────
+//
+// The counters are per-process by necessity: the failure they exist to catch is the shared store being
+// unreachable, so they cannot be kept IN the shared store — the one moment we most need to record is the
+// moment we could not write to it.
+//
+// That makes a single process's tallies structurally misleading. On this deployment the console process
+// serves the page and the WORKER runs the inference, so a panel reading its own process shows zeroes
+// forever and reports UNEXERCISED about a cache that is working hard. Each process therefore reports its
+// own snapshot, and the surface sums them.
+
+/** How long a process's snapshot stays trustworthy before it is only a last-known reading. */
+export const TALLY_STALE_MS = 5 * 60 * 1000;
+
+export interface ProcessTally {
+  /** Which process reported — a worker versus the web process is the distinction that matters. */
+  label: string;
+  counters: CacheCounters;
+  /** When this process last reported, in ms since epoch. */
+  reportedAt: number;
+}
+
+export interface AggregateTally {
+  total: CacheCounters;
+  /** Every reporting process, newest report first, each marked live or stale. */
+  processes: { label: string; counters: CacheCounters; ageMs: number; stale: boolean }[];
+  /** True when NO process has reported recently — the totals are history, not a current reading. */
+  allStale: boolean;
+}
+
+/**
+ * Sum every process's tallies, keeping the per-process split.
+ *
+ * Stale snapshots are still counted, because the reads and writes they record really happened — but they
+ * are MARKED, because presenting a dead process's numbers as current is how a panel lies while showing
+ * accurate figures. A restarted worker's contribution is history; the label says so.
+ */
+export function aggregateTallies(rows: readonly ProcessTally[], now: number): AggregateTally {
+  const total = { ...ZERO_COUNTERS };
+  const processes = rows
+    .map((r) => {
+      for (const k of Object.keys(ZERO_COUNTERS) as (keyof CacheCounters)[]) {
+        total[k] += r.counters[k] ?? 0;
+      }
+      const ageMs = Math.max(0, now - r.reportedAt);
+      return { label: r.label, counters: r.counters, ageMs, stale: ageMs > TALLY_STALE_MS };
+    })
+    .sort((a, b) => a.ageMs - b.ageMs);
+  return { total, processes, allStale: processes.length > 0 && processes.every((p) => p.stale) };
+}
+
+/** Snapshot interval — once per this window per process, so tallying never adds IO to the cache path. */
+export const SNAPSHOT_EVERY_MS = 15_000;
+
+/**
+ * Whether this process should write its snapshot yet.
+ *
+ * Debounced on purpose: the counters move on every cache read, and a write per read would make the
+ * evidence more expensive than the thing it measures.
+ */
+export function shouldSnapshot(lastAt: number | null, now: number, everyMs = SNAPSHOT_EVERY_MS): boolean {
+  if (lastAt === null) return true;
+  return now - lastAt >= everyMs;
+}
+
 export interface CacheSelection {
   /** True when this deployment asked for a shared cache at all. */
   configuredShared: boolean;

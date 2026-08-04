@@ -2,7 +2,13 @@ import { CacheDashboard } from '@/components/gateway/CacheDashboard';
 import { ConsoleCacheEvidence } from '@/components/gateway/ConsoleCacheEvidence';
 import { cacheCounters } from '@/lib/adapters/cache';
 import { getCache } from '@/lib/adapters/registry';
-import { cacheEvidence, cacheSelection } from '@/lib/cache-evidence';
+import {
+  aggregateTallies,
+  cacheEvidence,
+  cacheSelection,
+  type AggregateTally,
+} from '@/lib/cache-evidence';
+import { readCacheTallies } from '@/lib/cache-tallies-store';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +23,21 @@ export const dynamic = 'force-dynamic';
 export default async function ModelCachePage() {
   await requireModuleForUser('gateway');
   const port = getCache();
-  const counters = cacheCounters();
   const selection = cacheSelection(port.meta.id, Boolean(port.meta.embedUrl));
+
+  // Every process publishes its own tallies; the totals are their sum. On a failed read we fall back to
+  // THIS process's counters and say so — a failed read must not present as a cache nobody has used.
+  let aggregate: AggregateTally | null = null;
+  let readError: string | undefined;
+  try {
+    aggregate = aggregateTallies(await readCacheTallies(), Date.now());
+  } catch (e) {
+    readError = `The other processes’ tallies could not be read: ${
+      (e as { cause?: { code?: string } })?.cause?.code ?? (e as Error)?.message ?? 'unknown error'
+    }.`;
+  }
+
+  const counters = aggregate ? aggregate.total : cacheCounters();
   return (
     <div className="space-y-4">
       <CacheDashboard />
@@ -26,6 +45,8 @@ export default async function ModelCachePage() {
         counters={counters}
         evidence={cacheEvidence(counters, selection.configuredShared)}
         selection={selection}
+        aggregate={aggregate}
+        readError={readError}
       />
     </div>
   );

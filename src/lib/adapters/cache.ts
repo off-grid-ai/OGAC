@@ -63,9 +63,38 @@ export function cacheCounters(): CacheCounters {
   return { ...counters };
 }
 
+// ─── Publishing the tallies ─────────────────────────────────────────────────────────────────────────
+// A process's own counters describe only the work IT did, and on this deployment the process that serves
+// the cache page runs no inference while the worker runs all of it. So each process publishes a snapshot
+// and the surface sums them; without this the panel reports an idle cache while the cache is working.
+//
+// Debounced, fire-and-forget, and never allowed to throw: this is evidence about the cache, and it must
+// not become a reason the cache path fails or slows down.
+let lastSnapshotAt: number | null = null;
+
+function publish(): void {
+  const now = Date.now();
+  void import('@/lib/cache-evidence').then(async ({ shouldSnapshot }) => {
+    if (!shouldSnapshot(lastSnapshotAt, now)) return;
+    lastSnapshotAt = now; // set BEFORE awaiting, so a slow write cannot queue a second one
+    const { processRole, recordCacheTally } = await import('@/lib/cache-tallies-store');
+    await recordCacheTally(processRole(process.argv, process.env.OFFGRID_PROCESS_ROLE), cacheCounters());
+  }).catch(() => {
+    // Swallowed deliberately. If the database is unreachable the panel will show this role's snapshot as
+    // stale, which is the honest outcome — far better than a cache read failing to record a statistic.
+  });
+}
+
+/** Tally one event and publish if the debounce window has passed. */
+function tally(field: keyof CacheCounters): void {
+  counters = count(counters, field);
+  publish();
+}
+
 /** Test/diagnostic reset. Never called from a request path. */
 export function resetCacheCounters(): void {
   counters = { ...ZERO_COUNTERS };
+  lastSnapshotAt = null;
 }
 
 export const redisCache: CachePort = {
@@ -81,39 +110,39 @@ export const redisCache: CachePort = {
   async get(key) {
     if (!REDIS_URL) {
       const local = memGet(key);
-      counters = count(counters, local === null ? 'misses' : 'fallbackHits');
+      tally(local === null ? 'misses' : 'fallbackHits');
       return local;
     }
     try {
       const shared = await redis(REDIS_URL).get(key);
       if (shared !== null) {
-        counters = count(counters, 'sharedHits');
+        tally('sharedHits');
         return shared;
       }
       // Redis answered and had nothing. The in-process map may still hold it from a write-through, and
       // serving that IS a fallback hit — the shared store did not have what it should have.
       const local = memGet(key);
-      counters = count(counters, local === null ? 'misses' : 'fallbackHits');
+      tally(local === null ? 'misses' : 'fallbackHits');
       return local;
     } catch {
       const local = memGet(key); // fall back to memory — Redis is never a hard dependency
-      counters = count(counters, local === null ? 'misses' : 'fallbackHits');
+      tally(local === null ? 'misses' : 'fallbackHits');
       return local;
     }
   },
   async set(key, value, ttl) {
     memSet(key, value, ttl); // write-through so a Redis outage still serves recent entries
     if (!REDIS_URL) {
-      counters = count(counters, 'fallbackWrites');
+      tally('fallbackWrites');
       return;
     }
     try {
       await redis(REDIS_URL).set(key, value, ttl);
-      counters = count(counters, 'sharedWrites');
+      tally('sharedWrites');
     } catch {
       // The write survives in memory, so nothing breaks — but it did NOT reach the shared store, and
       // recording that is the whole point: a silently local write is how "shared" stops being true.
-      counters = count(counters, 'fallbackWrites');
+      tally('fallbackWrites');
     }
   },
   async health() {

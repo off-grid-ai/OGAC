@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  TALLY_STALE_MS,
   ZERO_COUNTERS,
+  aggregateTallies,
   cacheEvidence,
   cacheSelection,
   count,
+  shouldSnapshot,
   type CacheCounters,
 } from '../src/lib/cache-evidence.ts';
 
@@ -107,6 +110,90 @@ test('an unknown cache port is treated as not-shared rather than assumed shared'
   const s = cacheSelection('some-future-cache', true);
   assert.equal(s.configuredShared, false);
   assert.equal(s.misconfigured, false);
+});
+
+const NOW = 1_770_000_000_000;
+
+test('THE DEFECT THIS EXISTS FOR: the process serving the page is not the one running the work', () => {
+  // Measured live: the console process reports all zeroes while the worker does every inference. Reading
+  // one process therefore reports UNEXERCISED about a cache that is working — accurate numbers, false story.
+  const web = { label: 'web', counters: c(), reportedAt: NOW };
+  const worker = { label: 'worker', counters: c({ sharedHits: 60, misses: 12, sharedWrites: 12 }), reportedAt: NOW };
+
+  const webOnly = cacheEvidence(web.counters, true);
+  assert.equal(webOnly.state, 'idle'); // what the surface used to say
+
+  const agg = aggregateTallies([web, worker], NOW);
+  assert.equal(agg.total.sharedHits, 60);
+  assert.equal(agg.total.misses, 12);
+  assert.equal(cacheEvidence(agg.total, true).state, 'shared'); // what is actually true
+});
+
+test('one process falling back is degraded even when another looks perfect', () => {
+  // Averaging would bury this: the worker is silently local while the web process is fine.
+  const agg = aggregateTallies(
+    [
+      { label: 'web', counters: c({ sharedHits: 900, sharedWrites: 400 }), reportedAt: NOW },
+      { label: 'worker', counters: c({ fallbackWrites: 3 }), reportedAt: NOW },
+    ],
+    NOW,
+  );
+  assert.equal(agg.total.fallbackWrites, 3);
+  assert.equal(cacheEvidence(agg.total, true).state, 'degraded');
+});
+
+test('a stale snapshot is still counted but MARKED, never presented as current', () => {
+  const agg = aggregateTallies(
+    [
+      { label: 'worker', counters: c({ sharedHits: 5, sharedWrites: 5 }), reportedAt: NOW - TALLY_STALE_MS - 1 },
+      { label: 'web', counters: c({ sharedHits: 1, sharedWrites: 1 }), reportedAt: NOW },
+    ],
+    NOW,
+  );
+  // The reads really happened, so they count.
+  assert.equal(agg.total.sharedHits, 6);
+  // Freshest first, and only the old one is flagged.
+  assert.deepEqual(agg.processes.map((p) => [p.label, p.stale]), [['web', false], ['worker', true]]);
+  assert.equal(agg.allStale, false);
+});
+
+test('every process stale means the totals are history, and it says so', () => {
+  const agg = aggregateTallies(
+    [{ label: 'worker', counters: c({ sharedHits: 9, sharedWrites: 9 }), reportedAt: NOW - TALLY_STALE_MS - 1 }],
+    NOW,
+  );
+  assert.equal(agg.allStale, true);
+});
+
+test('no reporting processes is not "all stale" — there is nothing to be stale', () => {
+  const agg = aggregateTallies([], NOW);
+  assert.equal(agg.allStale, false);
+  assert.deepEqual(agg.total, ZERO_COUNTERS);
+  // And with nothing reported the cache reads as unexercised, not broken.
+  assert.equal(cacheEvidence(agg.total, true).state, 'idle');
+});
+
+test('a clock skewed snapshot from the future is age zero, not negative', () => {
+  const agg = aggregateTallies([{ label: 'w', counters: c(), reportedAt: NOW + 60_000 }], NOW);
+  assert.equal(agg.processes[0].ageMs, 0);
+  assert.equal(agg.processes[0].stale, false);
+});
+
+test('a row missing a counter field contributes zero rather than NaN', () => {
+  // Rows come back from JSON, and one NaN would poison every total on the panel.
+  const partial = { sharedHits: 4 } as unknown as CacheCounters;
+  const agg = aggregateTallies([{ label: 'old-version', counters: partial, reportedAt: NOW }], NOW);
+  assert.equal(agg.total.sharedHits, 4);
+  assert.equal(agg.total.misses, 0);
+  for (const v of Object.values(agg.total)) assert.ok(Number.isFinite(v));
+});
+
+test('snapshots are debounced, and the first one always writes', () => {
+  assert.equal(shouldSnapshot(null, NOW), true);
+  assert.equal(shouldSnapshot(NOW, NOW + 1), false);
+  assert.equal(shouldSnapshot(NOW, NOW + 15_000), true);
+  // Explicit window honoured, so a caller can tighten it without editing the default.
+  assert.equal(shouldSnapshot(NOW, NOW + 100, 50), true);
 });
 
 test('invalidations are tracked independently of reads', () => {
