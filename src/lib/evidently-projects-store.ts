@@ -164,6 +164,14 @@ export interface DriftProjectDetail {
   project: DriftProjectView;
   history: DriftReportEntry[];
   trend: TrendSeries;
+  /**
+   * True when the history is THIS project's own runs.
+   *
+   * False means these are the org's recent runs shown because the project has no attributed runs yet — a
+   * surface must say so rather than implying they belong to this project. Runs recorded before project
+   * attribution existed (pre-2026-08-04) carry no project_id.
+   */
+  scoped: boolean;
 }
 
 export async function getDriftProjectDetail(
@@ -173,9 +181,19 @@ export async function getDriftProjectDetail(
 ): Promise<DriftProjectDetail | null> {
   const project = await getDriftProject(id, orgId);
   if (!project) return null;
-  const runs = await listDriftRuns(RUN_WINDOW, orgId || DEFAULT_ORG);
+
+  // PER-PROJECT history, now that a run records its project_id. This used to be the whole ORG's runs keyed
+  // by this project's threshold, so two projects on different datasets showed each other's reports.
+  const { listDriftRunsForProject } = await import('@/lib/drift-runs');
+  const own = await listDriftRunsForProject(id, orgId || DEFAULT_ORG).catch(() => []);
+  // Runs recorded BEFORE project attribution existed carry no project_id, so a project created earlier
+  // would show an empty history. Falling back to the org window keeps those readable; `scoped` tells the
+  // caller which it is, so a surface can say "not yet attributed to this project" rather than implying
+  // these runs are its own.
+  const runs = own.length > 0 ? own : await listDriftRuns(RUN_WINDOW, orgId || DEFAULT_ORG);
   return {
     project,
+    scoped: own.length > 0,
     history: normalizeReportHistory(runs),
     trend: buildTrendSeries(runs, { threshold: project.driftThreshold, granularity }),
   };

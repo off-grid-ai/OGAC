@@ -114,6 +114,18 @@ export default async function DriftMonitoringDetailPage({
           <CardDescription className="text-xs">
             Each retained drift run, newest first, with the engine that produced it — a genuine
             Evidently execution is distinguishable from the PSI fallback.
+            {/* WHOSE runs these are. Before a run recorded its project, this table was the whole org's
+                runs keyed by this project's threshold — two projects on different datasets showed each
+                other's reports. It is scoped now, and when it cannot be (runs predating attribution) the
+                reader is told rather than left to assume. */}
+            {detail.scoped ? (
+              ' These are this project’s own runs.'
+            ) : (
+              <span className="text-amber-700 dark:text-amber-500">
+                {' '}No run has been attributed to this project yet, so these are the organisation’s recent
+                runs shown for context — not this project’s history.
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>

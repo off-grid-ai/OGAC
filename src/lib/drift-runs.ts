@@ -44,6 +44,11 @@ export async function ensureDriftSchema(): Promise<void> {
     // attribution is now recorded at the moment the check is run.
     await db.execute(sql`ALTER TABLE drift_runs ADD COLUMN IF NOT EXISTS dataset text;`);
     await db.execute(sql`ALTER TABLE drift_runs ADD COLUMN IF NOT EXISTS app_id text;`);
+    // The run -> PROJECT link. Without it a monitoring project's "history" was the whole ORG's runs keyed
+    // by the project's threshold, so two projects on different datasets showed each other's reports. Same
+    // fix as app_id: record the attribution when the check runs rather than reconstructing it after.
+    await db.execute(sql`ALTER TABLE drift_runs ADD COLUMN IF NOT EXISTS project_id text;`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS drift_runs_project_idx ON drift_runs (org_id, project_id);`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS drift_runs_app_idx ON drift_runs (org_id, app_id);`);
   })();
   return ensurePromise;
@@ -93,15 +98,17 @@ export async function recordDriftRun(
     dataset?: string | null;
     /** The app this check was run for, when it was run for one. */
     appId?: string | null;
+    /** The monitoring project this check belongs to, when it was run from one. */
+    projectId?: string | null;
   },
   orgId: string = DEFAULT_ORG,
 ): Promise<void> {
   await ensureDriftSchema();
   const attribution = run.attribution ? JSON.stringify(run.attribution) : null;
   await db.execute(
-    sql`INSERT INTO drift_runs (id, org_id, engine, status, drift_share, baseline, current, attribution, dataset, app_id)
+    sql`INSERT INTO drift_runs (id, org_id, engine, status, drift_share, baseline, current, attribution, dataset, app_id, project_id)
         VALUES (${run.id}, ${orgId}, ${run.engine}, ${run.status}, ${run.driftShare}, ${run.baseline}, ${run.current}, ${attribution}::jsonb,
-                ${run.dataset ?? null}, ${run.appId ?? null});`,
+                ${run.dataset ?? null}, ${run.appId ?? null}, ${run.projectId ?? null});`,
   );
 }
 
@@ -147,6 +154,27 @@ export async function listDriftRunsForApp(
   const { rows } = await db.execute<DriftRunRow>(
     sql`SELECT id, org_id, engine, status, drift_share, baseline, current, started_at, attribution
         FROM drift_runs WHERE org_id = ${orgId} AND app_id = ${appId}
+        ORDER BY started_at DESC LIMIT ${limit};`,
+  );
+  return rows.map(toDriftRun);
+}
+
+/**
+ * Drift checks belonging to ONE monitoring project.
+ *
+ * Only runs whose `project_id` was recorded are returned — deliberately not "the org's runs filtered by
+ * this project's threshold", which is what the history used to be and which showed two projects each
+ * other's reports.
+ */
+export async function listDriftRunsForProject(
+  projectId: string,
+  orgId: string = DEFAULT_ORG,
+  limit = 50,
+): Promise<DriftRun[]> {
+  await ensureDriftSchema();
+  const { rows } = await db.execute<DriftRunRow>(
+    sql`SELECT id, org_id, engine, status, drift_share, baseline, current, started_at, attribution
+        FROM drift_runs WHERE org_id = ${orgId} AND project_id = ${projectId}
         ORDER BY started_at DESC LIMIT ${limit};`,
   );
   return rows.map(toDriftRun);

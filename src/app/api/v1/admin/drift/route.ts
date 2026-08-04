@@ -30,9 +30,10 @@ export async function POST(req: Request) {
     itemId?: unknown;
     columnOverrides?: unknown;
     driftShareThreshold?: unknown;
-    /** Optional attribution: which dataset, and which app this check was run for. */
+    /** Optional attribution: which dataset, which app, and which monitoring project. */
     dataset?: unknown;
     appId?: unknown;
+    projectId?: unknown;
   };
   const itemId = typeof body.itemId === 'string' ? body.itemId : '';
   const columnOverrides: DriftMethodOverride[] = Array.isArray(body.columnOverrides)
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
         // was run org-wide, which is the honest majority case.
         dataset: typeof body?.dataset === 'string' ? body.dataset : null,
         appId: typeof body?.appId === 'string' ? body.appId : null,
+        projectId: typeof body?.projectId === 'string' ? body.projectId : null,
         id: runId,
         engine: typeof attr.engine === 'string' ? attr.engine : result.data.engine,
         status: result.data.status,
