@@ -62,7 +62,10 @@ const TAB_META: { tab: AppTab; label: string; hint: string; group: AppTabGroup }
     tab: 'quality',
     group: 'settings',
     label: 'Quality',
-    hint: "This pipeline's evals, golden set, and drift — run and gate on them",
+    // Was "This pipeline's evals, golden set, and drift" — jargon, and inaccurate now that the tab
+    // states plainly that drift is NOT tracked per app. A hint that describes the wrong thing is worse
+    // than none, because the reader trusts it before they trust the page.
+    hint: 'Whether this app is working — checks, real cases it has decided, and what else is watching it',
   },
   {
     tab: 'access',

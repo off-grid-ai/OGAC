@@ -124,7 +124,9 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
       name: 'Quality on real cases',
       what: 'A judge scores finished cases in the background.',
       state: 'here',
-      detail: realCases.sentence,
+      // Points at the card above rather than repeating its sentence verbatim — the list has to stay
+      // complete to be a coverage list, but a duplicated paragraph reads as a rendering fault.
+      detail: 'Shown in full at the top of this tab.',
     },
     {
       name: 'Corrections from real use',
