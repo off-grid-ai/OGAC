@@ -14,6 +14,12 @@ import { withGatewayScope } from '../lib/gateway-scope';
 import type { AppSpec, AppStep } from '../lib/app-model';
 import { runApp as _unusedRunApp, executeStep, defaultDeps } from '../lib/app-run';
 import type { StepResult, AppRunContext, AppRunDeps } from '../lib/app-run';
+import {
+  MAX_PERSIST_ATTEMPTS,
+  describePersistFailure,
+  isTerminalStatus,
+  persistBackoffMs,
+} from '../lib/persist-retry';
 import type { AppRunWorkflowInput } from '../lib/app-run-durable';
 import type { AppRunState } from '../lib/app-run-plan';
 import type { PipelineContract } from '../lib/pipeline-enforcement';
@@ -147,10 +153,39 @@ export async function persistState(
   runInput: Record<string, unknown>,
   orgId?: string,
 ): Promise<void> {
-  try {
-    const { upsertAppRunState } = await import('../lib/app-run-store');
-    await upsertAppRunState(state, runInput, orgId ?? 'default');
-  } catch {
-    /* app-run-store / DB unreachable — degrade to no-op; the workflow state is authoritative. */
+  const { upsertAppRunState } = await import('../lib/app-run-store');
+  const org = orgId ?? 'default';
+  let lastError: unknown = null;
+
+  // RETRY, then SAY SO. The workflow state is authoritative, so the run is never lost — but the console's
+  // view of it is, and that is what every person and every audit reads. Swallowing this silently left a
+  // completed run showing whatever the last successful write said, with no error anywhere.
+  for (let attempt = 1; attempt <= MAX_PERSIST_ATTEMPTS; attempt++) {
+    try {
+      await upsertAppRunState(state, runInput, org);
+      return;
+    } catch (err) {
+      lastError = err;
+      const wait = persistBackoffMs(attempt);
+      if (wait === null) break;
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  }
+
+  // Out of attempts. The failure CANNOT be recorded in the database we just failed to reach, so it goes to
+  // the worker log with the run id — the one thing that makes it repairable.
+  const line = describePersistFailure({
+    runId: state.runId,
+    orgId: org,
+    attempts: MAX_PERSIST_ATTEMPTS,
+    status: state.status,
+    error: lastError,
+  });
+  if (isTerminalStatus(state.status)) {
+    // A terminal run whose write is lost leaves a PERMANENTLY wrong record — nothing later will correct it.
+    console.error(line);
+  } else {
+    // A mid-run write will very likely be superseded by the next step's write, so this is a warning.
+    console.warn(line);
   }
 }
