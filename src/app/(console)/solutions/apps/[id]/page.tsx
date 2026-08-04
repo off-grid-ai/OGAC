@@ -19,6 +19,7 @@ import {
   statusLabel,
   type WorkRun,
 } from '@/lib/app-work-queue';
+import { ownershipVerdict } from '@/lib/app-ownership';
 import { getApp } from '@/lib/apps-store';
 import { disambiguate } from '@/lib/my-work';
 import { currentOrgId } from '@/lib/tenancy';
@@ -221,6 +222,37 @@ export default async function AppWorkPage({
     }),
   });
 
+  // WHO OWNS THIS PROCESS, and whether they can actually act on it. The field existed and was populated
+  // the whole time; it was never shown, and nothing checked the owner was reachable — on this tenant all
+  // three live apps are owned by an account that has never signed in.
+  const owner = (app as { ownerId?: string | null }).ownerId ?? '';
+  const ownership = await (async () => {
+    try {
+      const [{ listUsers }, { lastAuditedActivityByEmail }, { activeCover }] = await Promise.all([
+        import('@/lib/store'),
+        import('@/lib/access-activity'),
+        import('@/lib/cover-store'),
+      ]);
+      const today = new Date().toISOString().slice(0, 10);
+      const [users, activity, cover] = await Promise.all([
+        listUsers(orgId),
+        lastAuditedActivityByEmail(orgId).catch(() => null),
+        activeCover(today, orgId).catch(() => []),
+      ]);
+      const key = owner.trim().toLowerCase();
+      const away = cover.find((c) => c.away.trim().toLowerCase() === key);
+      return ownershipVerdict({
+        owner,
+        known: users.some((u) => (u.email ?? '').trim().toLowerCase() === key),
+        // Unknown activity must not read as "never active" — that would accuse an owner on a failed read.
+        active: activity === null ? true : Boolean(activity[key]),
+        awayUncovered: Boolean(away && !away.coveredBy.trim()),
+      });
+    } catch {
+      return null;
+    }
+  })();
+
   const base = `/solutions/apps/${encodeURIComponent(id)}`;
 
   return (
@@ -229,6 +261,20 @@ export default async function AppWorkPage({
         {/* The headline DOMINATES. Everything else on this screen is context for it: what is waiting for
           you is the reason you opened the app, and it previously shared visual billing with "Needed a
           person 100%" — a number nobody acts on. */}
+        {/* Ownership, stated where the work is. Silent when the owner is real, reachable and present. */}
+        {ownership?.warning ? (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+            {ownership.warning}{' '}
+            <Link href={`${base}/access`} className="font-medium underline">
+              Change who owns it
+            </Link>
+          </div>
+        ) : owner ? (
+          <p className="text-xs text-muted-foreground">
+            Owned by <span className="text-foreground">{owner}</span>
+          </p>
+        ) : null}
+
         <header>
           <h2 className="max-w-4xl text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
             {queue.headline}
