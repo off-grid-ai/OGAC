@@ -1,6 +1,13 @@
 import { PageFrame } from '@/components/PageFrame';
+import { BrainAccessAbsent, BrainAccessCard } from '@/components/brain/BrainAccessCard';
 import { MemorySearch } from '@/components/brain/MemorySearch';
+import {
+  capabilityRows,
+  describeBrainAccess,
+  parseBrainGrants,
+} from '@/lib/brain-access-view';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +27,41 @@ export default async function OrganizationalMemoryPage() {
   // Same module gate as the rest of Knowledge: authorization for the search itself is enforced again in
   // the route, so this is defence in depth rather than the only check.
   await requireModuleForUser('knowledge');
+  const orgId = await currentOrgId();
+
+  // WHO MAY USE THIS. Enforcement was already in the run path; the missing half was visibility — a reader
+  // refused here had nowhere to see who is allowed, or to check the grant is as narrow as intended.
+  // Read-only: the policy is a deployment env var, and editing memory access from a web form would be a way
+  // to widen it by accident.
+  const rawPolicy = process.env.OFFGRID_ORGANIZATIONAL_BRAIN_ACCESS_POLICY;
+  let parsed: ReturnType<typeof parseBrainGrants> | null = null;
+  if (rawPolicy?.trim()) {
+    try {
+      parsed = parseBrainGrants(JSON.parse(rawPolicy), orgId);
+    } catch {
+      // Unparseable policy is NOT "no access" — it is a broken control, and parseBrainGrants' own
+      // `dropped` path words that. An empty array here would claim the policy grants nothing.
+      parsed = { grants: [], dropped: 1 };
+    }
+  }
+  const rows = parsed ? capabilityRows(parsed.grants) : [];
+
   return (
     <PageFrame>
-      <MemorySearch />
+      <div className="w-full space-y-4">
+        <MemorySearch />
+        {/* After the search: you come here to ask a question, and only wonder about permission when you are
+            refused — or when you are auditing who can read the organisation's memory. */}
+        {parsed ? (
+          <BrainAccessCard
+            rows={rows}
+            grants={parsed.grants}
+            sentence={describeBrainAccess(rows, parsed.grants, parsed.dropped)}
+          />
+        ) : (
+          <BrainAccessAbsent />
+        )}
+      </div>
     </PageFrame>
   );
 }
