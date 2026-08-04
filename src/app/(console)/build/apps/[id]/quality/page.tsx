@@ -1,10 +1,8 @@
 import { notFound } from 'next/navigation';
 import { AppQualityPanel } from '@/components/build/AppQualityPanel';
-import { AppQualityCoverage, type CoverageItem } from '@/components/build/AppQualityCoverage';
+import { AppQualityCoverage, type NotWatching } from '@/components/build/AppQualityCoverage';
 import { RealCaseQualityCard } from '@/components/build/RealCaseQualityCard';
-import { listDriftRuns } from '@/lib/drift-runs';
 import { FEEDBACK_SUITE } from '@/lib/feedback-map';
-import { listRollbackHistory } from '@/lib/pipeline-release';
 import { getAlertDestination } from '@/lib/qa/quality-alert-destination-store';
 import { SuggestedChecks } from '@/components/build/SuggestedChecks';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
@@ -97,85 +95,53 @@ export default async function AppQualityTab({ params }: Readonly<{ params: Promi
   // EVERYTHING THAT WATCHES THIS APP, and where each one stands. Built from what is genuinely
   // derivable for THIS app — anything that is not gets said, not faked.
   const pipelineId = app.pipelineId ?? null;
-  const [rollbacks, driftRuns, alertDest] = await Promise.all([
-    pipelineId ? listRollbackHistory(pipelineId, orgId).catch(() => []) : Promise.resolve([]),
-    listDriftRuns(5, orgId).catch(() => []),
-    getAlertDestination(orgId).catch(() => null),
-  ]);
+  const alertDest = await getAlertDestination(orgId).catch(() => null);
   const corrections = golden.filter((g) => g.suite === FEEDBACK_SUITE).length;
 
-  const coverage: CoverageItem[] = [
-    {
-      name: 'Quality checks',
-      what: 'Automated checks run against this app on demand.',
-      state: evals.length > 0 ? 'here' : 'off',
-      detail:
-        evals.length === 0
-          ? 'No checks attached, so nothing is verifying this app automatically.'
-          : `${evals.length} attached — their last results are below.`,
-    },
-    {
-      name: 'Test cases',
-      what: 'The examples those checks are measured against.',
-      state: 'here',
-      detail: `${golden.length} case${golden.length === 1 ? '' : 's'} on this app's pipeline.`,
-    },
-    {
-      name: 'Quality on real cases',
-      what: 'A judge scores finished cases in the background.',
-      state: 'here',
-      // Points at the card above rather than repeating its sentence verbatim — the list has to stay
-      // complete to be a coverage list, but a duplicated paragraph reads as a rendering fault.
-      detail: 'Shown in full at the top of this tab.',
-    },
-    {
+  // ONLY THE ABSENCES. Everything present is already on this tab in full; listing it again was noise,
+  // and the version that did contradicted the page (it counted raw golden rows, 18, while the section
+  // below dedupes to 7). Each entry below is derived, and the block disappears when nothing is missing.
+  const coverage: NotWatching[] = [];
+  if (evals.length === 0) {
+    coverage.push({
+      name: 'Automated checks',
+      reason: 'none are attached, so nothing verifies this app on demand',
+    });
+  }
+  if (corrections === 0) {
+    coverage.push({
       name: 'Corrections from real use',
-      what: 'When someone says a decision was wrong, it becomes a test case.',
-      state: corrections > 0 ? 'here' : 'off',
-      detail:
-        corrections > 0
-          ? `${corrections} correction${corrections === 1 ? '' : 's'} captured from real decisions.`
-          : 'Nobody has marked a decision wrong yet, so nothing has been learned from real use. The control is on each waiting case.',
-    },
-    {
-      name: 'Release gate',
-      what: 'Blocks publishing when the checks have not passed.',
-      state: pipelineId ? 'linked' : 'off',
-      detail: pipelineId
-        ? 'Configured on the pipeline this app runs on, not per app — several apps can share one pipeline, so the gate is theirs jointly.'
-        : 'This app is not bound to a pipeline, so nothing gates its releases.',
-      href: pipelineId ? `/runtime/pipelines/${encodeURIComponent(pipelineId)}/quality` : undefined,
-    },
-    {
-      name: 'Auto-rollback',
-      what: 'Returns to the last good version when quality drops.',
-      state: pipelineId ? 'linked' : 'off',
-      detail: pipelineId
-        ? `${rollbacks.length} rollback point${rollbacks.length === 1 ? '' : 's'} on the shared pipeline.`
-        : 'No pipeline bound, so there is no version to roll back to.',
-      href: pipelineId ? `/runtime/pipelines/${encodeURIComponent(pipelineId)}/quality` : undefined,
-    },
-    {
-      name: 'Drift',
-      what: 'Watches whether the incoming data has changed shape.',
-      state: 'linked',
-      // Deliberately NOT faked per app: drift_runs carry org and dataset only — no app or pipeline —
-      // so any per-app drift number here would be invented. Checked, not assumed.
-      detail:
-        driftRuns.length === 0
-          ? 'No drift run recorded for this organization. Drift is tracked per DATASET, not per app, so it cannot be attributed to this one.'
-          : `${driftRuns.length} recent drift run${driftRuns.length === 1 ? '' : 's'} for this organization. Tracked per DATASET, not per app, so none of them is attributable to this app.`,
-      href: '/insights/quality/drift',
-    },
-    {
+      reason:
+        'nobody has marked a decision wrong yet, so nothing has been learned from real work — the control sits on each waiting case',
+    });
+  }
+  if (pipelineId) {
+    coverage.push({
+      name: 'Release gate and auto-rollback',
+      reason:
+        'they belong to the pipeline this app shares with others, not to this app alone, so its releases are gated jointly',
+      href: `/runtime/pipelines/${encodeURIComponent(pipelineId)}/quality`,
+    });
+  } else {
+    coverage.push({
+      name: 'Release gate and auto-rollback',
+      reason: 'this app is bound to no pipeline, so nothing gates its releases and there is no version to roll back to',
+    });
+  }
+  coverage.push({
+    // Checked, not assumed: drift_runs carry org_id and dataset with no app or pipeline column, so a
+    // per-app drift figure here would be invented.
+    name: 'Drift',
+    reason:
+      'it is tracked per dataset, not per app, so none of this organization’s drift runs can be attributed to this one',
+    href: '/insights/quality/drift',
+  });
+  if (!alertDest) {
+    coverage.push({
       name: 'Quality alerts',
-      what: 'Tells someone when quality drops, without them looking.',
-      state: alertDest ? 'here' : 'off',
-      detail: alertDest
-        ? 'A destination is configured, so a drop is reported out of band.'
-        : 'No destination configured, so a quality drop is only visible to someone who opens this tab.',
-    },
-  ];
+      reason: 'no destination is configured, so a drop is only visible to someone who opens this tab',
+    });
+  }
 
   const lastRuns = lastRunPerCheck(
     evals.map((d) => ({ id: d.id, metric: d.metric, pipelineId: app.pipelineId ?? null })),
