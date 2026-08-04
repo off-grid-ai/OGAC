@@ -27,8 +27,16 @@ operator IA: `/data/*`, `/governance/*`, `/runtime/*`, `/insights/*`.
 
 It is **not** an instruction to expose 94 capabilities to a department person. Ninety-four links would
 be a worse product, and the 17 pure-infrastructure services (PostgreSQL, Redis, Jaeger, the OTel
-collector, the forwarders, the tunnel, device management) are **correctly invisible** — a claims handler
-should never meet them. Counting them as gaps would be theatre.
+collector, the forwarders, the tunnel, device management) must stay **invisible by name** — a claims
+handler should never meet the word Jaeger.
+
+**But invisible is not the same as delivering nothing.** Those 17 carry one thing a department person
+genuinely needs and it was reaching them nowhere: *can I trust what I am looking at, and can I work right
+now?* A person deciding a case could not tell "this queue is empty because the work is done" from "this
+queue is empty because part of the platform is down" — the failure-presents-as-emptiness defect at
+platform scale. `platformPlain` (2026-08-04) states it as an outcome and names no engine: *"One part of
+the platform is not responding. Your cases are safe, but this screen may be missing some of them until it
+recovers."* It shows nothing when everything is normal, so the band never becomes wallpaper.
 
 The founder's model is the test:
 
@@ -47,12 +55,12 @@ outcome language, without the person ever opening the operator page?**
 | Access / RBAC / ABAC (5) | **Yes** — the app's Access tab, plus the owner banner naming an owner who never signs in |
 | Guardrails / masking / recognizers (9) | **Yes (2026-08-04)** — the app's "What protects this" panel states them in plain language, from its own pipeline |
 | Data sources / connectors (15) | **Partly** — the app's steps name what they read, and the source-health warning now appears on the deployed app too (2026-08-04) |
-| Knowledge indexes / retrieval (8) | **Partly** — reached through the app's steps, never summarised as "what this app knows" |
+| Knowledge indexes / retrieval (8) | **Yes (2026-08-04)** — the app names what it reads, and where each source comes from |
 | Drift monitoring (7) | **Yes (2026-08-04)** — drift checks record the app they were run for; the Quality tab answers it both ways round |
 | Model routing / where it ran (7) | **Yes (2026-08-04)** — every governed call records the endpoint it went to; "Where the data went" states the record |
-| Lineage (4) | **No** — no per-app "where this data came from" |
+| Lineage (4) | **Yes (2026-08-04)** — `describeLineage` gives the per-app chain (domain → system → resource) from what the app itself declares |
 | Replication / ETL / orchestration (15) | **Correctly operator-only** — a department person does not run pipelines |
-| SIEM / audit / posture (6+) | **Correctly operator-only** |
+| SIEM / audit / posture (6+) | **Operator-only, plus one closure** — subject-indexed access ("who has looked at this person's file?") is now answerable, see below |
 
 ## The two I first refused — and then closed properly
 
@@ -108,13 +116,34 @@ is often the business changing.
 - **A refusal stopped reading as breakage** — the case picker showed "Could not look up cases · Try
   again" to anonymous readers of a public app, with a retry that could never succeed.
 
+### 3. Subject-indexed access — **CLOSED 2026-08-04**
+
+`WHATS_MISSING_2.md` #2: the audit trail is indexed by actor and never by data subject, so "who in the
+bank looked at Meera Malhotra's file, and when?" could not be answered.
+
+Most of the answer already existed and nobody had joined it: `subject_chunk_index` maps a salted subject
+fingerprint → the runs mentioning that person (152 rows live, built for erasure), and every run records
+who decided it. `/api/v1/admin/subject-access` is the join. Verified live: *"1 person has decided a case
+about this person: anjali.desai@bharatunion.example"* with three dated events; an unknown identifier
+returns *"No records mentioning this person were found, so nothing is known about who has seen their
+data"* — never "nobody accessed it".
+
+Deliberately **not** joined through `audit_events_v2.run_id`: that column is empty on these runs, so the
+ledger join returns nothing and would report "nobody accessed this file" about a person whose file twelve
+runs had touched. The raw identifier is never stored or echoed — only its masked form — because asking
+who accessed someone's file must not itself create a new record of them. And where the index names more
+records than can be opened (12 indexed, 3 readable — the rest went when their apps were deleted) the trail
+**says so**, rather than presenting a partial history as the whole of it.
+
 ## Next, in value order
 
-1. **"What this app knows"** — the knowledge and data domains it reads, summarised on the app, instead of
-   being visible only inside individual steps.
-2. **Lineage per app** — "where this data came from", which today has no per-app join.
-3. **Subject-indexed audit** — the audit trail names an actor, never a data subject, so "who looked at
-   this customer's file?" is still unanswerable (`WHATS_MISSING_2.md` #2).
+Nothing on the capability map is now delivering zero value to a non-technical person. What remains is
+depth rather than absence:
+
+1. **Fairness checks on decisioning apps** — zero exist, on a tenant whose apps underwrite loans
+   (`WHATS_MISSING_2.md` #5). The highest-value remaining governance gap.
+2. **Adverse-decision artefact** — a declined applicant cannot be given reasons (#6).
+3. **Consent withdrawal** — consent can be recorded but not revoked (#4).
 
 The lesson from the two closures above is the one worth carrying: *"the data does not exist"* is a
 statement about today's recording, not a boundary on the work. Refusing to fake a join is right; leaving

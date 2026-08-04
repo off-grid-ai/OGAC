@@ -14,6 +14,7 @@ import type { AppSurface } from '@/lib/app-surface';
 import { statsForShape, showsWaitingQueue, type LatestResult } from '@/lib/app-front-door';
 import type { Protection } from '@/lib/app-protections';
 import type { EgressSummary } from '@/lib/egress-record';
+import type { LineageLine, PlatformPlain } from '@/lib/app-platform-plain';
 import type { AppShape } from '@/lib/app-work-queue';
 import { utcStamp } from '@/lib/timestamp';
 import type { CockpitMetrics, TrendPoint } from '@/lib/cockpit-metrics';
@@ -64,6 +65,8 @@ export function AppUseShell({
   protections,
   egress,
   reads,
+  lineage,
+  platform,
 }: Readonly<{
   /** Passed to the run panel so a case can be picked from the app's bound data. */
   appId?: string;
@@ -138,6 +141,16 @@ export function AppUseShell({
   egress?: EgressSummary | null;
   /** The named data this app reads, and how many references could not be resolved. */
   reads?: { names: string[]; unresolved: number } | null;
+  /** Where each thing it reads comes from — the per-app answer lineage never gave the app. */
+  lineage?: LineageLine[] | null;
+  /**
+   * Whether the platform is fit to work on, in the reader's terms and naming no engine.
+   *
+   * The 17 pure-infrastructure services carry exactly one thing a department person needs and it reached
+   * them nowhere: an empty queue because the work is done and an empty queue because a part of the
+   * platform is down looked identical.
+   */
+  platform?: PlatformPlain | null;
 }>) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -220,6 +233,20 @@ export function AppUseShell({
 
       {view === 'work' ? (
         <div className="space-y-5">
+          {/* FIRST, when it matters. A reader must know whether to trust the screen before reading it;
+              nothing is shown when everything is normal, so the band never becomes wallpaper. */}
+          {platform && platform.state !== 'ok' ? (
+            <p
+              className={`rounded-lg border px-4 py-3 text-sm ${
+                platform.trustCaveat
+                  ? 'border-destructive/40 bg-destructive/[0.06] text-destructive'
+                  : 'border-amber-500/40 bg-amber-500/[0.06] text-amber-800 dark:text-amber-300'
+              }`}
+            >
+              {platform.sentence}
+            </p>
+          ) : null}
+
           {/* Above the headline: if the app is reading nothing, every number below it is about a process
               that has stopped receiving work, and reading them first would mislead. */}
           {sourceWarning ? (
@@ -376,6 +403,17 @@ export function AppUseShell({
                     ? ` — and ${reads.unresolved} more this screen could not name.`
                     : ''}
                 </p>
+              ) : null}
+              {/* WHERE IT CAME FROM. Naming what it reads answers half the question; a reader checking
+                  whether the app is looking at the right records needs the system behind each one. */}
+              {lineage && lineage.length > 0 ? (
+                <ul className="mt-2 space-y-0.5">
+                  {lineage.map((l) => (
+                    <li key={`${l.label}-${l.origin}`} className="text-[11px] text-muted-foreground">
+                      <span className="text-foreground">{l.label}</span> {l.origin}
+                    </li>
+                  ))}
+                </ul>
               ) : null}
               <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 {protections.map((p) => (

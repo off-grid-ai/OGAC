@@ -13,6 +13,9 @@ import { buildAppDashboard } from '@/lib/app-dashboard';
 import { isDeclinedByPerson } from '@/lib/app-run-progress';
 import { latestResult } from '@/lib/app-front-door';
 import { describeProtections, describeReads, type RoutingRule } from '@/lib/app-protections';
+import { describeLineage, platformPlain } from '@/lib/app-platform-plain';
+import { getConnector } from '@/lib/connector-detail';
+import { probeService } from '@/lib/status';
 import { listDomains } from '@/lib/data-domains-store';
 import { summariseEgress, type EgressEvent } from '@/lib/egress-record';
 import { getPipeline } from '@/lib/pipelines';
@@ -229,6 +232,55 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
     domains.map((d) => ({ id: d.id, label: d.label })),
   );
 
+  // WHERE THE DATA CAME FROM. Lineage's value never reached the app. There is no join from an app to the
+  // warehouse catalogue — but the app's own steps declare the domains they read, and each domain names the
+  // connector and resource behind it, which is a genuine per-app answer assembled from what the app itself
+  // declares rather than from a catalogue it is not connected to.
+  const domainById = new Map(domains.map((d) => [d.id, d]));
+  const domainByLabel = new Map(domains.map((d) => [d.label.toLowerCase(), d]));
+  const lineageSources = await Promise.all(
+    (app.steps ?? [])
+      .filter((st) => st.kind === 'connector-query')
+      .map(async (st) => {
+        const ref = ((st as { domain?: string }).domain ?? '').trim();
+        const dom = domainById.get(ref) ?? domainByLabel.get(ref.toLowerCase());
+        if (!dom) return null;
+        const conn = dom.connectorId
+          ? await getConnector(dom.connectorId, orgId).catch(() => null)
+          : null;
+        return {
+          label: dom.label,
+          // The connector's own name for itself. Never a guess: an unnamed system is dropped downstream.
+          system: (conn as { name?: string; type?: string } | null)?.name ?? '',
+          resource: dom.resource ?? '',
+        };
+      }),
+  );
+  const lineage = describeLineage(lineageSources.filter((x): x is NonNullable<typeof x> => Boolean(x)));
+
+  // CAN I TRUST THIS SCREEN, AND CAN I WORK RIGHT NOW. The 17 pure-infrastructure services carry exactly
+  // one thing a department reader needs, and it reached them nowhere: an empty queue because the work is
+  // done and an empty queue because a part of the platform is down looked identical.
+  // Only the one service whose absence a department reader would actually feel: if the AI gateway is not
+  // answering, this app cannot run at all. The database is proven by this page having rendered. A short
+  // timeout and a catch, because a health check must never be the reason a screen fails to load.
+  const gatewayProbe = await probeService(process.env.OFFGRID_GATEWAY_URL ?? '', '/v1/models', 1200).catch(
+    () => null,
+  );
+  const platform = platformPlain(
+    gatewayProbe
+      ? [
+          {
+            id: 'inference',
+            // A 401 is the gateway ANSWERING and refusing an unauthenticated probe — it is up. Treating
+            // an auth refusal as an outage is the same mistake that reported the search index offline.
+            status: gatewayProbe.status === 'down' ? 'down' : 'up',
+            ms: gatewayProbe.ms,
+          },
+        ]
+      : [],
+  );
+
   const fields = deriveRunFields(app.inputForm, prompt);
   const surface = sharedSurface(resolved.slug);
   // The read-only viewer's write controls must annotate themselves — that is the documented half of the
@@ -254,6 +306,8 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           sourceWarning={health.warning}
           protections={protections}
           reads={reads}
+          lineage={lineage}
+          platform={platform}
           egress={egress}
           shape={queue.shape}
           howWorkArrives={queue.howWorkArrives}
