@@ -56,16 +56,23 @@
    var(--og-…) reference, so it re-resolves per element — the same mechanism the dark theme
    already uses. */
 .og-landing {
-  --og-background: #f0e8da; /* Light/Background */
-  --og-surface: #fafaf9; /* the white page-cards that sit on the cream ground */
-  --og-surface-light: #e3d8c5; /* Light/Background Alt */
-  --og-text: #1d1d1d; /* Light/Text 100 */
-  --og-text-secondary: rgba(28, 28, 28, 0.8); /* Light/Text 75 */
-  --og-text-muted: rgba(28, 28, 28, 0.66); /* Light/Text 50 */
-  --og-border: rgba(29, 29, 29, 0.25); /* Light/Text 25 */
-  --og-border-light: rgba(46, 46, 46, 0.1); /* Light/Text 10 */
+  /* These are the tokens the design page ACTUALLY BINDS, resolved from the fills on its own
+     breakpoint — not picked from the token library by name. That distinction matters: the library
+     also contains a leftover `Light/*` family from the purchased template, whose `Light/Background`
+     is a strong cream (#F0E8DA). Reading the library and assuming the page used it produced a
+     cream site that looked nothing like the design, which is white. The page's hero is literally
+     `rgb(255,255,255)`, and its sections bind the bare-named `Background` / `Background Alt` /
+     `Text *` set. Verify fills, not names. */
+  --og-background: #fdfbf6; /* Background - near-white with a faint warmth */
+  --og-surface: #ffffff; /* the hero and the page-cards are pure white */
+  --og-surface-light: #f3ede1; /* Background Alt */
+  --og-text: #2c2c2d; /* Text 100 */
+  --og-text-secondary: #606060; /* Text 75 */
+  --og-text-muted: rgba(96, 96, 96, 0.72); /* Text 50 */
+  --og-border: rgba(44, 44, 45, 0.14); /* the hairline on cards and dividers */
+  --og-border-light: rgba(44, 44, 45, 0.1); /* Text 10 */
   /* The diagonal hatch that fills section eyebrow rules and chart bars. */
-  --og-grid: rgba(74, 72, 68, 0.14); /* Light/Grid on Light */
+  --og-grid: rgba(44, 44, 45, 0.14); /* Grid on Light */
   /* Headings only. A system stack for now so no webfont, no CSP change and no layout shift;
      swapping in the real display face later is this one line. */
   --og-font-display: ui-sans-serif, -apple-system, 'Segoe UI', Inter, sans-serif;
