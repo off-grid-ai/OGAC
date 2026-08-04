@@ -6,22 +6,26 @@ Measured against `SERVICE_CAPABILITY_AUDITS` on **2026-08-04**. The map records 
 (`upstream` / `adapter` / `ui` / `workflow`), so "under-leveraged" has an exact definition: **the upstream
 service says YES and one of ours says NO.**
 
-## The measurement
+## The measurement — and a correction to it
 
-**31 of 196 capabilities are under-leveraged** — the OSS supports it, we do not yet use it.
+> **I got this number wrong four times before checking it properly.** I first reported "31 of 196", and
+> repeated it in four summaries. The 31 was the number of rows that survived `tail -60` on my own
+> diagnostic — I read a truncated list as the total. **The real figure is 126 of 196** (64%), not 31 (16%).
+> Recounted after today's promotions: **124**.
+>
+> The lesson is the one this session kept teaching in other forms: a number that arrives from a pipe you
+> did not bound is not a measurement. It is what fitted on the screen.
 
-Split by which gate fails:
+**124 of 196 capabilities are under-leveraged** — the upstream service supports it and one of our gates
+does not.
 
-| Failing gate(s) | What it means | Count |
-| --- | --- | --- |
-| `workflow` only | Adapter and UI exist; never proven end to end on the deployment | ~11 |
-| `ui` / `ui+workflow` | Adapter works; no console surface owns it | ~9 |
-| `adapter…` | Code we have to write | ~8 |
-| all three | Host-owned or a deliberate ownership choice | ~3 |
-
-The `adapter`-only ones are the real backlog, because the others are mostly deploy-config or a conscious
-decision to keep something in its own surface (Superset authoring, LiteLLM guardrails — governance stays in
-the Off Grid pipeline spine, which is a valid choice and is recorded as one rather than as a gap).
+A large share are `partial` on `adapter` or `workflow` for reasons the entries themselves record as
+deliberate: OTel collector configuration says *"keep committed YAML deployment-owned … do not expose a raw
+editor"*; LiteLLM guardrails say governance stays in the Off Grid pipeline spine; Superset authoring stays
+in its own authenticated surface. For those, the current state **is** the best state, and counting them as
+debt would be theatre. What the number does honestly say is that most capabilities are proven as
+primitives and not yet bound into a product workflow — which is exactly what the Redpanda item turned out
+to be.
 
 ## Closed on 2026-08-04
 
