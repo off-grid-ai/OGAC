@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table';
 import {
   regressionHeadline,
+  subjectDisplayName,
   type QualityRegressionView,
   type RegressionStatus,
 } from '@/lib/qa/quality-regression';
@@ -32,7 +33,7 @@ const STATUS_LABEL: Record<RegressionStatus, string> = {
 const pct = (n: number): string => `${Math.round(n * 100)}%`;
 
 export function AnswerQualityCard({ view }: Readonly<{ view: QualityRegressionView }>) {
-  const { subjects, measured, retained } = view;
+  const { subjects, measured, retained, names } = view;
   const headline = regressionHeadline(subjects);
 
   return (
@@ -79,7 +80,20 @@ export function AnswerQualityCard({ view }: Readonly<{ view: QualityRegressionVi
                   {subjects.map((s) => (
                     <TableRow key={s.subjectId}>
                       <TableCell className="font-medium">
-                        {s.subjectId}
+                        {/* The app's own name. This printed the raw `app:bhapp_reimb` key. */}
+                        {(() => {
+                          const d = subjectDisplayName(s.subjectId, names ?? {});
+                          return d.unresolved && d.kind ? (
+                            <span title={s.subjectId}>
+                              {d.name}
+                              <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                                (no longer exists)
+                              </span>
+                            </span>
+                          ) : (
+                            <span title={s.subjectId}>{d.name}</span>
+                          );
+                        })()}
                         {s.status === 'regressed' ? (
                           // TableCell is whitespace-nowrap; without this override the sentence forces
                           // the column to its full width and pushes the score columns off-screen.

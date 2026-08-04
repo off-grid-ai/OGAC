@@ -138,7 +138,11 @@ export function DriftCatalog({ engineStatus }: Readonly<{ engineStatus: DriftEng
   }
 
   return (
-    <div className="space-y-4">
+    // @container, because this catalog lives in a NARROW SIDE RAIL (2 of 5 columns) on the drift page.
+    // Its inner grids used viewport breakpoints, so at an xl viewport they went three-across inside a
+    // ~440px rail: the preset cards clipped their own text and the "recommended" badge overlapped the
+    // next card's title. Container queries size the columns off the rail, which is what they respond to.
+    <div className="@container space-y-4">
       <p className="max-w-3xl text-sm text-muted-foreground">
         Pick a standard <span className="font-medium text-foreground">drift</span> preset or a
         per-column drift method, set how many columns must drift before the dataset counts as
@@ -148,12 +152,12 @@ export function DriftCatalog({ engineStatus }: Readonly<{ engineStatus: DriftEng
       </p>
 
       {/* Search + filters */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="@md:flex-row @md:flex-wrap @md:items-center flex flex-col gap-2">
         <Input
           placeholder="Search drift tests (e.g. PSI, KS, chi-square, data quality)…"
           value={filter.q}
           onChange={(e) => setParam({ dc_q: e.target.value })}
-          className="sm:max-w-xs"
+          className="@md:max-w-xs"
         />
         <div className="flex flex-wrap gap-1.5">
           <Button
@@ -201,7 +205,7 @@ export function DriftCatalog({ engineStatus }: Readonly<{ engineStatus: DriftEng
                 {KIND_LABEL[g.kind]}
               </h3>
             ) : null}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="@md:grid-cols-2 @3xl:grid-cols-3 grid grid-cols-1 gap-3">
               {g.items.map((item: DriftCatalogItem) => {
                 const avail = driftItemAvailability(item, engineStatus);
                 const badge = AVAIL_BADGE[avail.status];
@@ -256,7 +260,7 @@ export function DriftCatalog({ engineStatus }: Readonly<{ engineStatus: DriftEng
       )}
 
       {/* Run bar — threshold + run + verdict */}
-      <div className="flex flex-col gap-3 rounded-md border border-border bg-muted/30 p-3 lg:flex-row lg:items-end lg:justify-between">
+      <div className="@2xl:flex-row @2xl:items-end @2xl:justify-between flex flex-col gap-3 rounded-md border border-border bg-muted/30 p-3">
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1">
             <label htmlFor="dc-thr" className="text-xs font-medium text-foreground">

@@ -66,12 +66,20 @@ function ProjectCard({
     <Card className="flex flex-col shadow-sm transition-colors hover:border-primary/40">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="min-w-0">
-          <CardTitle className="truncate text-sm">
+          {/* truncate has to sit on the TEXT, not on a box whose child is a flex row: an overflowing
+              flex child is hard-clipped with no ellipsis, which cut "Loan underwriting drift" off
+              mid-word and gave the reader no sign that a word was missing. */}
+          <CardTitle className="text-sm">
             <Link
               href={`/solutions/quality/drift-monitoring/${p.id}`}
-              className="inline-flex items-center gap-2 hover:text-primary"
+              className="flex min-w-0 items-center gap-2 hover:text-primary"
+              title={p.name}
             >
-              <ChartLine className="size-4 text-primary" /> {p.name}
+              <ChartLine className="size-4 shrink-0 text-primary" />
+              {/* Wrap, don't truncate. A project's NAME is the one thing the card exists to tell you,
+                  and at a quarter of the grid's width "Loan underwriti…" tells you nothing. Two lines
+                  cost a few pixels of card height; a cut-off name costs the reader the card. */}
+              <span className="line-clamp-2 break-words">{p.name}</span>
             </Link>
           </CardTitle>
           <p className="mt-1 truncate text-[11px] text-muted-foreground">
@@ -266,14 +274,14 @@ export function DriftMonitoringProjects({ projects }: Readonly<{ projects: Proje
   return (
     <div className="w-full space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-medium text-foreground">Drift monitoring</h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            Turn one-off drift checks into a monitored trend. A project groups your drift reports for a
-            dataset or pipeline, keeps a time-ordered history, and charts drift share against your
-            breach line so you can see when quality is slipping.
-          </p>
-        </div>
+        {/* No <h1> here. The console layout already titles this page "Drift monitoring" with its own
+            description, so this component was printing the same heading a second line below the first.
+            What it keeps is the part the short layout description does not say: what a project IS. */}
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          A project groups the drift reports for one dataset or pipeline, keeps them in time order, and
+          charts drift share against your breach line — so a slide shows up as a trend rather than as
+          one alarming one-off check.
+        </p>
         <Button size="sm" onClick={() => setPanel('new-project')}>
           <Plus className="size-4" />
           New project
@@ -287,7 +295,7 @@ export function DriftMonitoringProjects({ projects }: Readonly<{ projects: Proje
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => (
             <ProjectCard key={p.id} p={p} onDelete={onDelete} />
           ))}

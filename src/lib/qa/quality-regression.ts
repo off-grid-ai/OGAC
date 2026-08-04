@@ -163,6 +163,30 @@ export function regressionHeadline(
 
 // ─── thin read (I/O) ──────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Turn a scoring subject id into the name its owner uses for it.
+ *
+ * The drift surface printed the raw `subjectId` — an operator was shown `app:bhapp_reimb` where the
+ * app is called "Reimbursement Approval". An internal id in a column headed "App or agent" is not an
+ * answer to that column.
+ *
+ * Falls back to the id when the entity is not in the map, deliberately: a scored subject that has since
+ * been deleted must still appear as a row (its scores are real history), and inventing a friendly name
+ * for something we cannot resolve would be worse than showing the key we actually have.
+ *
+ * Pure.
+ */
+export function subjectDisplayName(
+  subjectId: string,
+  names: Readonly<Record<string, string>>,
+): { name: string; kind: 'App' | 'Agent' | null; unresolved: boolean } {
+  const direct = names[subjectId];
+  const [prefix] = subjectId.split(':', 1);
+  const kind = prefix === 'app' ? 'App' : prefix === 'agent' ? 'Agent' : null;
+  if (direct?.trim()) return { name: direct.trim(), kind, unresolved: false };
+  return { name: subjectId, kind, unresolved: true };
+}
+
 export interface QualityRegressionView {
   retained: number;
   /** false ⇒ nothing has been judged yet. An empty result is "not measured", NOT "all clear". */
@@ -171,6 +195,11 @@ export interface QualityRegressionView {
   regressed: RegressionVerdict[];
   /** The standing per-subject averages, from the same read — so callers need only one query. */
   trend: QualityTrend[];
+  /**
+   * subjectId → the name its owner uses. Resolved in the same read so every surface showing these
+   * verdicts names the app the same way, instead of each one re-deriving it (or, as before, not at all).
+   */
+  names: Record<string, string>;
 }
 
 /**
@@ -194,5 +223,48 @@ export async function readQualityRegression(
     subjects,
     regressed: regressedSubjects(subjects),
     trend: summarizeQuality(scores),
+    names: await resolveSubjectNames(
+      subjects.map((s) => s.subjectId),
+      orgId,
+    ),
   };
+}
+
+/**
+ * Look up the titles behind a set of scoring subject ids.
+ *
+ * Best-effort by design: a failed or partial lookup leaves the id in place (see subjectDisplayName)
+ * rather than dropping the row, because the verdict is real evidence even when its subject has since
+ * been renamed or deleted.
+ */
+async function resolveSubjectNames(
+  subjectIds: readonly string[],
+  orgId: string,
+): Promise<Record<string, string>> {
+  const names: Record<string, string> = {};
+  const appIds = subjectIds.filter((id) => id.startsWith('app:')).map((id) => id.slice(4));
+  if (appIds.length > 0) {
+    try {
+      const { listApps } = await import('@/lib/apps-store');
+      for (const a of await listApps(orgId)) {
+        if (a.title?.trim()) names[`app:${a.id}`] = a.title.trim();
+      }
+    } catch {
+      // Leave the ids; the surface degrades to keys, never to a blank column.
+    }
+  }
+  const agentIds = subjectIds.filter((id) => id.startsWith('agent:'));
+  if (agentIds.length > 0) {
+    try {
+      // listManagedAgents, not the runnable catalog: a DISABLED agent's past scores are still real
+      // history and its row must still carry its name.
+      const { listManagedAgents } = await import('@/lib/agents');
+      for (const a of await listManagedAgents(orgId)) {
+        if (a.name?.trim()) names[`agent:${a.id}`] = a.name.trim();
+      }
+    } catch {
+      // Same: honest keys beat a fabricated name.
+    }
+  }
+  return names;
 }
