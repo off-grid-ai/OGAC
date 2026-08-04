@@ -368,11 +368,20 @@ proved selection really did read a value straight out of Redis — when g6 resol
 something worked once; it cannot notice the transport dying underneath it later. Any gate whose
 evidence is a one-time probe is a claim about the past.
 
-**The wider blast radius.** `offgrid-g6.local` does not resolve at all, so the entire auxiliary tier is
-dark: tracing, BI dashboards, device management, PII detection and masking, ETL orchestration, and the
-data-integration API. All of them were forwarded through ports that a bound socket makes look healthy.
-Every g6-backed gate in this document needs re-auditing before it is trusted — this is the second time
-today a cluster of gates turned out to have been assessed while its transport was silently dead.
+**The wider blast radius — and my wrong first call about it.** `offgrid-g6.local` did not resolve from
+S1, so every service forwarded through it was unreachable: tracing, BI dashboards, device management,
+PII detection and masking, ETL orchestration, the data-integration API. I concluded the tier was dark
+and that the node needed someone physically present. **That was wrong.** The node was up the whole time
+with every service listening. The office runs **two WiFi networks** and the nodes hop between them, so a
+healthy node's `.local` name and last-known IP both go stale from whichever network S1 is on. g6 was at
+192.168.1.25 (the inventory said .66); g3 had moved too.
+
+A name that does not resolve is not evidence that a machine is down. Find the host and ask it who it is
+(`ssh admin@<ip> hostname`) before drawing a conclusion about its health.
+
+Every g6-backed gate in this document still needs re-auditing, for the reason above rather than the
+reason I first gave: those gates were assessed through transport that was dead at the time, so their
+evidence describes a moment that has passed. The services themselves were fine.
 
 **Fixed.** Redis now runs on S1 from the repo's own compose profile; cross-process sharing is proven by
 a separate client reading back an entry the adapter wrote. The forwarder now prints `** DEAD **` beside

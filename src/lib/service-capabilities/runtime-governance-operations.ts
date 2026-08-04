@@ -1422,7 +1422,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Cache governed responses across Console processes with bounded expiry.',
         '/operations/services/redis',
         'Inspect Redis',
-        'CLOSED 2026-08-04. Rendering the counters found the cache was NOT shared on this deployment: OFFGRID_REDIS_URL pointed at a forwarder on :8937 whose target host (offgrid-g6.local) no longer resolves, so every read and write silently fell back to per-process memory while the hit rate looked perfect. Redis now runs on S1 (compose profile "caching", :6379), the console points straight at it, and a separate client read back an entry the adapter wrote (TTL live) — cross-process sharing proven, not inferred.',
+        'CLOSED 2026-08-04. Rendering the counters found the cache was NOT shared on this deployment: OFFGRID_REDIS_URL pointed at a forwarder on :8937 whose target host name (offgrid-g6.local) had stopped resolving from S1 — the node was healthy the whole time; the office has two WiFi networks and the nodes hop between them, so a name and a pinned IP both go stale, so every read and write silently fell back to per-process memory while the hit rate looked perfect. Redis now runs on S1 (compose profile "caching", :6379), the console points straight at it, and a separate client read back an entry the adapter wrote (TTL live) — cross-process sharing proven, not inferred.',
         [
           'yes',
           'Redis 7.4 provides key/value storage and expiry.',
