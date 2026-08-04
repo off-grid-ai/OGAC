@@ -6,6 +6,42 @@ Measured against `SERVICE_CAPABILITY_AUDITS` on **2026-08-04**. The map records 
 (`upstream` / `adapter` / `ui` / `workflow`), so "under-leveraged" has an exact definition: **the upstream
 service says YES and one of ours says NO.**
 
+## THE COMPLETE ASSESSMENT — all 196 items, classified (2026-08-04)
+
+Earlier passes sampled. This is every item, classified from its own gap text and gate evidence:
+
+| Class | Items | Share | What it means |
+| --- | --- | --- | --- |
+| **Fully leveraged** | **70** | 36% | all four gates `yes` — nothing to do |
+| Open build work | 73 | 37% | ours to build, no external dependency |
+| Needs a proof run | 26 | 13% | adapter + UI exist; never exercised end-to-end on this deployment |
+| **Deliberate — current state IS best** | **17** | 9% | the entry itself says keep it deployment-owned / don't expose an editor / governance stays in the spine |
+| Blocked on an operator | 8 | 4% | a credential to mint, a host to enrol, sudo on the box |
+| Upstream doesn't support it | 2 | 1% | not our gap at all |
+
+**At their best possible state today: 89 of 196 (45%)** — the 70 fully leveraged, plus the 17 where the
+architecture deliberately declined, plus the 2 upstream cannot do.
+
+**Genuinely actionable by us: 99** (73 build + 26 proof runs). **8 need an operator.**
+
+### What that means for the goal as written
+
+"All to the best possible state" is reachable for **99 items** and *already true* for **89**. It is **not**
+reachable for the 17 deliberate ones without building what the architecture rejected — an OTel config
+editor the entry says not to expose, LiteLLM guardrails that would split governance away from the Off Grid
+spine, Superset authoring pulled out of its own authenticated surface. Driving those to `yes` would make
+the product worse while making the map greener, which is the definition of a metric gamed.
+
+So the honest statement of this goal is: **89 are at their best state, 99 are executable work, 8 need an
+operator, and 17 are already correct as they stand.** That is the whole of 196, assessed — not sampled.
+
+### The 26 proof runs are the cheapest real progress
+
+They need no code: enrol a host, produce and consume a record, create-to-archive a flag, run a drill. Each
+is an afternoon with the box, and each converts a `partial` into a `yes` with a retained artefact. Two were
+done today (the vault restore drill; the Redpanda produce/consume) and one of those revealed that the *gap
+text* had been wrong for months.
+
 ## The measurement — and a correction to it
 
 > **I got this number wrong four times before checking it properly.** I first reported "31 of 196", and
