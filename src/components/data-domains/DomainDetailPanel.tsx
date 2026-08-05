@@ -251,7 +251,7 @@ export function DomainDetailPanel({
           ) : (
             <div className="flex flex-wrap gap-2">
               {referencedByApps.map((a) => (
-                <Link key={a.id} href={`/apps/${a.id}`}>
+                <Link key={a.id} href={`/solutions/apps/${a.id}`}>
                   <Badge
                     variant="outline"
                     className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"

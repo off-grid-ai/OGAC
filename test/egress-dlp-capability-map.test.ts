@@ -34,7 +34,13 @@ test('cloud egress DLP belongs to the gateway and reports its bounded, honest re
   assert.match(capability.gates.upstream.evidence, /fail-closed/i);
   assert.match(capability.gates.upstream.evidence, /admin opt-out/i);
   assert.match(capability.gates.adapter.evidence, /before forwardToCloud/);
-  assert.match(capability.gap, /only the chat\/stream cloud-model path/);
+  // CORRECTED 2026-08-04 (see the gap text): the gap used to be "only the chat/stream cloud-model
+  // path is protected" — that undercounted real coverage. The governed-run (agent) seam is now the
+  // majority of the live evidence (21 of 24 retained decisions) and outbound sinks mask too, so the
+  // only genuinely unproven seam left is an app model call on a cloud-permitted pipeline — this
+  // tenant forces every app run on-prem, so there is no live artefact for that specific path.
+  assert.match(capability.gap, /APP model call on a cloud-permitted pipeline/);
+  assert.match(capability.gap, /no live artefact/);
   assert.doesNotMatch(capability.gap, /DEFAULT_ORG/);
   assert.match(capability.gates.adapter.evidence, /current orgId/);
   assert.match(capability.gates.workflow.evidence, /org_bharat/);

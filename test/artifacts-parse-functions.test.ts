@@ -62,30 +62,37 @@ test('buildSrcDoc: svg is centered on a dark canvas', () => {
   assert.ok(doc.includes('<svg></svg>'));
 });
 
-test('buildSrcDoc: mermaid escapes the source and loads mermaid from the CDN', () => {
+// LIVE FINDING (2026-08-04, superseding the CDN-based version of this test): a published page must
+// not depend on an external host, so mermaid/React/Babel were vendored under public/vendor/* (see
+// buildSrcDoc's own comment) instead of being pulled from jsdelivr. The iframe now loads
+// `${cdn}/vendor/mermaid/mermaid.esm.min.mjs` — `cdn` defaults to '' (our own origin) and is only a
+// hostname override for a hosted context, never a public CDN base.
+test('buildSrcDoc: mermaid escapes the source and loads mermaid from vendored assets, not a CDN', () => {
   const doc = buildSrcDoc({ kind: 'mermaid', code: 'graph TD; A-->B & C' });
   // escapeHtml turns & into &amp; inside the <pre class="mermaid"> block.
   assert.ok(doc.includes('&amp;'), 'ampersand should be HTML-escaped');
-  assert.ok(doc.includes('mermaid@11'));
+  assert.ok(doc.includes('/vendor/mermaid/mermaid.esm.min.mjs'));
 });
 
-test('buildSrcDoc: react strips import/export syntax and bootstraps React/Babel', () => {
+test('buildSrcDoc: react strips import/export syntax and bootstraps React/Babel from vendored assets', () => {
   const doc = buildSrcDoc({
     kind: 'react',
     code: "import React from 'react';\nexport default function App(){ return null }",
   });
-  assert.ok(doc.includes('@babel/standalone'));
+  // Vendored under public/vendor/babel/ (see public/vendor/*), not the @babel/standalone CDN package.
+  assert.ok(doc.includes('/vendor/babel/babel.min.js'));
   // The import line is stripped and `export default function App` → `function App`.
   assert.ok(!doc.includes("import React from 'react'"));
   assert.ok(doc.includes('function App'));
   assert.ok(!doc.includes('export default function App'));
 });
 
-test('buildSrcDoc: the bridge injects the window.offgrid.complete proxy and honors a custom cdn', () => {
+test('buildSrcDoc: the bridge injects the window.offgrid.complete proxy and honors a custom cdn base', () => {
   const doc = buildSrcDoc(
     { kind: 'react', code: 'export default function App(){return null}' },
     { bridge: true, cdn: 'https://example.test/cdn' },
   );
   assert.ok(doc.includes('window.offgrid'));
-  assert.ok(doc.includes('https://example.test/cdn/npm/react@18'));
+  // `cdn` is a hostname override for the vendored asset path, not a public package CDN.
+  assert.ok(doc.includes('https://example.test/cdn/vendor/react/react.production.min.js'));
 });

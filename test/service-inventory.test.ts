@@ -71,7 +71,20 @@ test('capability coverage is projected from the canonical audit registry without
   const corebank = inventory.entries.find((entry) => entry.id === 'enterprise-source-corebank');
 
   assert.equal(evidently?.capabilityAudit.status, 'audited');
-  assert.deepEqual(evidently?.productionWorkflowCapabilityIds, ['dataset-drift']);
+  // LIVE FINDING (2026-08-05): the drift sidecar used to always run DataDriftPreset regardless of
+  // the requested preset/method, so only 'dataset-drift' had a yes workflow gate. The rebuilt
+  // sidecar now really constructs the requested preset/method (data-summary, data-quality,
+  // psi-method, stat-tests) and drift-monitoring projects are a proven list->detail surface
+  // (projects-history-monitoring) — five more capabilities closed live. Only column-overrides
+  // stays 'partial': the contract is proven but no product flow sends more than one column yet.
+  assert.deepEqual(evidently?.productionWorkflowCapabilityIds, [
+    'dataset-drift',
+    'data-summary',
+    'data-quality',
+    'psi-method',
+    'stat-tests',
+    'projects-history-monitoring',
+  ]);
   assert.ok((evidently?.explicitCapabilityGaps.length ?? 0) > 0);
   assert.ok((presidio?.productionWorkflowCapabilityIds.length ?? 0) > 0);
   assert.deepEqual(postgres?.capabilityAudit, {
@@ -162,8 +175,12 @@ test('all 49 records carry routes, system-of-record provenance, and an honest ne
 test('URL-style inventory filters search identity, IA facets, audit recency, and readiness', () => {
   const entries = reconcileServiceInventory({ platformServices: canonicalServices() }).entries;
 
+  // 'telemetry' used to be unique to otel-collector's description ("OpenTelemetry collector"), but a
+  // live finding on victoriametrics' next action ("the collector's own self-telemetry reaches the
+  // store...") now also contains the substring, so it is no longer a unique needle. 'OTLP' — the
+  // ingest protocol name, appearing only in otel-collector's description — still selects it alone.
   assert.deepEqual(
-    filterServiceInventory(entries, { query: 'telemetry' }).map((entry) => entry.id),
+    filterServiceInventory(entries, { query: 'OTLP' }).map((entry) => entry.id),
     ['otel-collector'],
   );
   assert.equal(filterServiceInventory(entries, { family: 'observability' }).length, 8);

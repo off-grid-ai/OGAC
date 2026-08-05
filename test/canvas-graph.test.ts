@@ -61,14 +61,20 @@ test('specToGraph: one node per step (id === step id) and one edge per AppEdge',
   assert.equal(g.edges[1].target, 's3');
 });
 
-test('specToGraph: nodes are laid out in a vertical column at the fixed geometry', () => {
+// RENAMED (was "...laid out in a vertical column at the fixed geometry"): the layout now runs
+// left→right and wraps boustrophedon (see canvas-graph.ts's NODE_X/NODES_PER_ROW comment) so a
+// growing app stays readable instead of zooming out into an unreadable sliver. x is no longer a
+// single fixed column — only the first node in each row sits at NODE_X, the rest step across by
+// NODE_W + NODE_GAP_X (and back, on odd rows). Assert against the SAME pure geometry the component
+// renders (`nodePosition`) rather than a hand-rolled formula that would drift from it.
+test('specToGraph: nodes are laid out at the fixed serpentine geometry nodePosition() defines', () => {
   const g = specToGraph(threeStepApp());
   g.nodes.forEach((n, i) => {
-    assert.equal(n.position.x, NODE_X);
-    // The layout serpentines now, so assert against the SAME pure geometry the component renders
-    // rather than a hand-rolled formula that would drift from it.
     assert.deepEqual(n.position, nodePosition(i));
   });
+  // The three-step app fits in row 0, so this fixture alone doesn't exercise the wrap — pin the first
+  // node's x to NODE_X to still catch a regression in the row-0 base case.
+  assert.equal(g.nodes[0].position.x, NODE_X);
 });
 
 test('specToGraph: node color + index reflect the step kind and order', () => {
