@@ -144,17 +144,22 @@ const HOST_HINT = process.env.HOST_HINT || '127.0.0.1'; // for display in info U
 // FALLBACK topology — the last-known-good hardcoded pool. The live pool is fetched
 // from the console (fleet_nodes SSOT) by refreshPool(); if that's ever unreachable we
 // keep serving from this, so routing can NEVER go down because of the DB/console.
+// ONE MODEL ON THE FLEET (2026-08-05): Qwythos on the g7 RPC cluster (g2/g4 are its workers, reached
+// through the head — never routed to directly). g1, g3 and g5 were converted to plain service hosts, so
+// vision (qwen3-vl-8b), image generation (juggernaut-xl-v9) and gemma-4-e4b are no longer served at all.
+//
+// This fallback previously listed five nodes with models that DID NOT MATCH reality — it claimed g1
+// served qwythos and g7 served qwen3-vl. Harmless while the SSOT pull works, and a fiction the moment it
+// doesn't: a console outage would have routed real traffic by a wrong map, to nodes that no longer serve
+// a model. A cold-start fallback that disagrees with the fleet is worse than a small one.
+//
+// Port 8439 is the cluster head's, not the 7878 the single-node gateways used.
 const FALLBACK_POOL = [
-  { name: 'g1',  host: 'offgrid-g1.local', port: 7878, vision: true,  kind: 'chat', model: 'qwythos-9b' },
-  { name: 'g2',  host: 'offgrid-g2.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
-  { name: 'g4',  host: 'offgrid-g4.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
-  { name: 'g5',  host: 'offgrid-g5.local', port: 7878, vision: true,  kind: 'chat', model: 'gemma-4-e4b' },
-  { name: 'g7',  host: 'offgrid-g7.local', port: 7878, vision: true,  kind: 'chat', model: 'qwen3-vl-8b' },
-  // g8 (offgrid-g8.local / 192.168.1.64) was pulled from the fleet and repurposed as an
-  // Off Grid AI Desktop test machine — kept out of the cold-start fallback so a pool-API
-  // outage can't route back to it. Live authority is the fleet_nodes DB (refreshPool()).
+  { name: 'g7', host: 'offgrid-g7.local', port: 8439, vision: true, kind: 'chat', model: 'qwythos-9b-1m' },
 ];
-const FALLBACK_IMAGE_POOL = [{ name: 'g3', host: 'offgrid-g3.local', port: 1234, model: 'juggernaut-xl-v9' }];
+// EMPTY ON PURPOSE. There is no image model on the fleet any more; an image request must fail honestly
+// rather than be routed at a node that cannot serve it.
+const FALLBACK_IMAGE_POOL = [];
 
 // Live, refreshable pools (let, not const — refreshPool() reassigns). OFFGRID_POOL /
 // OFFGRID_IMAGE_POOL env still override (highest precedence) for pinned/dev setups.
