@@ -21,24 +21,15 @@ export async function prepareActionOutcomeSchema(label) {
     );
     await client.query(`CREATE SCHEMA ${schema}`);
     await client.query(`SET search_path TO ${schema}`);
-    await client.query(`CREATE TABLE apps (
-      id text PRIMARY KEY,
-      org_id text NOT NULL,
-      owner_id text NOT NULL
-    )`);
-    await client.query(`CREATE TABLE app_runs (
-      id text PRIMARY KEY,
-      org_id text NOT NULL,
-      app_id text NOT NULL,
-      status text NOT NULL DEFAULT 'done',
-      trigger jsonb NOT NULL DEFAULT '{"kind":"on-demand"}'::jsonb,
-      input jsonb NOT NULL DEFAULT '{}'::jsonb,
-      steps jsonb NOT NULL DEFAULT '[]'::jsonb,
-      outcome text NOT NULL DEFAULT '',
-      provenance jsonb,
-      started_at timestamptz NOT NULL DEFAULT now(),
-      finished_at timestamptz
-    )`);
+    // The two parent tables are CLONED from the migrated public schema (LIKE ... INCLUDING ALL:
+    // columns, types, defaults, NOT NULLs, checks, indexes; foreign keys are deliberately not
+    // copied, so the clone needs no `pipelines`/`orgs` rows). They used to be hand-written here —
+    // and that copy DRIFTED: it lacked app_runs.data_classification / app_version / policy_version /
+    // lawful_basis, so every store read (which selects the full schema.ts column list) died with
+    // `column "data_classification" does not exist`. Cloning the real table means the fixture cannot
+    // drift from src/db/schema.ts again, and the suite exercises the REAL row shape.
+    await client.query(`CREATE TABLE apps (LIKE public.apps INCLUDING ALL)`);
+    await client.query(`CREATE TABLE app_runs (LIKE public.app_runs INCLUDING ALL)`);
     await client.query(migration);
   } catch (error) {
     await client.query('SET search_path TO public').catch(() => undefined);
