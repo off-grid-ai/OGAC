@@ -48,7 +48,11 @@ describe('assessReview — risk', () => {
   test('a high-value case raises risk and says why', () => {
     const a = assessReview([read(), { kind: 'output', status: 'queued' }], { amount: 250000 });
     assert.equal(a.risk.level, 'high');
-    assert.ok(a.risk.reasons.some((r) => /250,000/.test(r)), JSON.stringify(a.risk.reasons));
+    // Grouped the Indian way via the shared money module (2,50,000 — 2 lakh 50 thousand), not the
+    // old western 250,000. The product moved to INR/lakh-crore grouping; this bare figure has no
+    // currency symbol (the record doesn't state one) but must still group the same way as the
+    // ₹-prefixed figures elsewhere on the same screen.
+    assert.ok(a.risk.reasons.some((r) => /2,50,000/.test(r)), JSON.stringify(a.risk.reasons));
     assert.ok(a.risk.reasons.some((r) => /high-value threshold/.test(r)));
   });
 
