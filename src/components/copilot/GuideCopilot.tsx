@@ -63,6 +63,11 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
 
   const questions = useMemo(() => guideQuestionsForTenant(tenantSlug), [tenantSlug]);
 
+  // Something typed, but not yet enough for `submit` to accept it. Drives the composer hint so the
+  // "enter to ask" affordance never claims to work when it will not.
+  const trimmed = question.trim();
+  const tooShort = trimmed.length > 0 && trimmed.length < MIN_QUESTION_LENGTH;
+
   const submit = useCallback(
     (q: string) => {
       const text = q.trim();
@@ -100,7 +105,10 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       {open ? (
         <section
           aria-label="Guide"
-          className={`fixed inset-y-0 right-0 z-40 hidden flex-col border-l border-border bg-background shadow-2xl md:flex ${PANEL_WIDTH}`}
+          // Entrance uses the shared motion layer in globals.css (`animate-in` + the slide/fade
+          // utilities), not a bespoke keyframe — so it inherits the app's easing tokens and the global
+          // `prefers-reduced-motion` opt-out for free.
+          className={`fixed inset-y-0 right-0 z-40 hidden flex-col border-l border-border bg-background shadow-2xl animate-in slide-in-from-right fade-in-0 md:flex ${PANEL_WIDTH}`}
         >
           {/* Header */}
           {/* COLOUR DISCIPLINE. This surface previously carried emerald in four places at once — the
@@ -112,7 +120,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
             <Compass className="mt-0.5 size-4 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[11px] uppercase tracking-widest text-foreground">Guide</p>
-              <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
+              <p className="mt-0.5 text-[13px] leading-snug text-foreground/80">
                 Ask what you want to know. Every answer comes with a screen you can go and check it on.
               </p>
             </div>
@@ -160,7 +168,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                   <p className="border-t border-border pt-3 text-xs text-destructive">{error}</p>
                 ) : null}
                 {result ? (
-                  <div className="border-t border-border pt-3">
+                  <div className="og-fade-in border-t border-border pt-3">
                     <CopilotAnswerView result={result} />
                   </div>
                 ) : null}
@@ -191,8 +199,14 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
               className="w-full resize-none bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                enter to ask
+              {/* "Enter to ask" was a LIE for a short question. `submit` returns early below
+                  MIN_QUESTION_LENGTH, so typing "Hi" and pressing Enter did nothing at all and the
+                  only signal was the Ask button sitting at 40% opacity — which reads as styling, not
+                  as a rejection. Say which state we are in instead of failing silently. */}
+              <span
+                className={`font-mono text-[10px] uppercase tracking-widest ${tooShort ? 'text-foreground' : 'text-muted-foreground'}`}
+              >
+                {tooShort ? 'a few more characters' : 'enter to ask'}
               </span>
               <button
                 type="button"
@@ -261,12 +275,13 @@ function Destinations({
           Go and see it
         </p>
       )}
-      {resolution.destinations.map((d) => (
+      {resolution.destinations.map((d, i) => (
         <button
           key={`${d.href}-${d.label}`}
           type="button"
           onClick={() => onGo(d)}
-          className="group block w-full rounded border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-muted/60"
+          style={{ animationDelay: `${Math.min(i, 6) * 30}ms` }}
+          className="og-rise group block w-full rounded border border-border bg-card px-3 py-2.5 text-left transition-colors duration-150 hover:border-primary hover:bg-muted/60"
         >
           <span className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
             {d.label}
@@ -304,16 +319,25 @@ function Starters({
         return (
           <div key={theme.id} className="space-y-1">
             {/* Neutral, not emerald: three of these stack vertically, so an accent on each turned the
-                list into a green ladder and left nothing for the eye to land on. */}
+                list into a green ladder with nothing for the eye to land on. */}
             <p className="border-b border-border/60 pb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {theme.label}
             </p>
-            {items.map((q) => (
+            {items.map((q, i) => (
+              // CONTRAST: these questions are the CONTENT of the panel, so they are `text-foreground`.
+              // Rendering them in `muted-foreground` (as they were) put every readable thing on the
+              // surface in light grey and the whole panel read as washed out and disabled — removing
+              // the emerald overload is only half the fix; the remaining text has to carry the
+              // hierarchy. Emerald returns on hover only, as the affordance that this is clickable.
+              //
+              // Stagger via inline animation-delay is the cheap pattern globals.css sanctions for a
+              // single hero region. Capped at 6 steps so a long list never feels like it is loading.
               <button
                 key={q.id}
                 type="button"
                 onClick={() => onPick(q.question)}
-                className="block w-full rounded border border-transparent px-2 py-1.5 text-left text-[12.5px] leading-snug text-muted-foreground transition-colors hover:border-border hover:bg-muted/60 hover:text-foreground"
+                style={{ animationDelay: `${Math.min(i, 6) * 25}ms` }}
+                className="og-rise block w-full rounded border border-transparent px-2 py-1.5 text-left text-[12.5px] leading-snug text-foreground transition-colors duration-150 hover:border-border hover:bg-muted/60 hover:text-primary"
               >
                 {q.question}
               </button>
