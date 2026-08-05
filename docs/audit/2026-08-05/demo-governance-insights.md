@@ -100,3 +100,65 @@ neutral-muted rather than destructive-red.
 "Set controls once and inherit them everywhere" hero, same five tiles. Two nav destinations, one
 screen. If he clicks Posture expecting depth, the audience sees him go nowhere.
 
+### G6 [DEMO-BLOCKER] `/governance/evidence/retention` renders a completely WHITE page — twice
+**Screens:** `/tmp/audit/demo-gov/governance_evidence_retention.png` and `.dark.png` — **both are a
+blank 1600×1000 white rectangle. No sidebar, no header, nothing.**
+**Reproduced two ways:** two independent navigations both produced an empty document; and a direct
+fetch of the route returned **200 in 34.0 s / 368 KB** on the shared dev server. The markup *is* in
+that payload (it contains a `destructive` badge reading **"kept forever"** from
+`src/components/governance/StoreRetentionPosture.tsx:117-148`), so the page is not broken — it is
+**slow enough to blow a 30 s navigation timeout**, and there is no loading fallback below
+`src/app/(console)/governance/loading.tsx`, so the interim state is a white screen rather than a
+skeleton.
+**What the audience sees:** he clicks **Evidence → Retention** and the projector goes white for half a
+minute. Worst possible failure mode on stage — indistinguishable from a crash.
+**Caveat, stated honestly:** this is `next dev` on a server shared with five other reviewers, so the
+34 s is not a production number. **Re-time this route against `npm run build && next start` before the
+conference.** The structural facts are production-relevant regardless: the route awaits several live
+service reads serially with no Suspense island, and the only loading boundary in the whole Governance
+subtree is at the section root.
+**Same class, same evidence:** `/governance/guardrails`
+(`/tmp/audit/demo-gov/governance_guardrails.png`) was still showing its **skeleton** — four grey stat
+placeholders and eight grey table rows — after networkidle + 3.5 s. It at least has a skeleton;
+Retention and Policies do not.
+**Cheapest fix:** add `loading.tsx` to `governance/evidence/`, `governance/policies/` and
+`governance/guardrails/`, and pre-warm those three routes in the browser before he goes on stage.
+
+### G7 [DEMO-RISK] Provenance is the section's best screen — and its `Signature` column is empty on every row
+**Screen:** `/tmp/audit/demo-gov/governance_evidence_provenance.png`
+**Good news first, and it matters:** this is the strongest governance screen in the product.
+`SIGNED RECORDS 29 / VERIFIED 29 / UNVERIFIED 0`, a `Signing key` card with `Rotate signing key`, a
+`Verify all (29)` button, "29 of 29 records can be re-verified on demand against the active signing
+key", and a ledger where every row carries a green `verified` badge and a per-row `Verify` action.
+**Re-score of** governance.md BLOCKER 4 ("a failed read renders as 0 signed records"): live it reads
+**29/29/0**, so the three-zeros screen is **not** what he will show — this drops to DEMO-RISK (it only
+fires if the DB read fails during the demo, in which case the tamper-evidence page claims nothing is
+signed). Likewise governance.md BLOCKER 3 (cross-tenant provenance) has **no visible symptom on the
+default demo org** — the run ids just look like run ids to an audience.
+**What IS visibly wrong, and it is on the money screen:** the **`Signature` column shows `–` on every
+single row.** A table whose purpose is to prove signatures has an empty Signature column. Beside it,
+`Signer` is a truncated PEM (`Ed25519 · -----BEGIN PUBLI…`) repeated 29 times, `Subject` is raw
+internal ids (`agent_system_ai_quality_judge · run_3c5a7892`, `agent_30e80f87 · run_9c99cd82`), and the
+`ACTIVE PUBLIC KEY` card prints a raw PEM blob. From row 10 the table reads as three columns of
+identical grey noise and one empty column.
+**Cheapest fix (copy only, no logic):** render a short signature fingerprint (first 12 chars) instead
+of `–`; collapse `Signer` to `Ed25519` and drop the truncated PEM; and put the app/agent's *display
+name* in `Subject` with the id as a tooltip. Same screen, and it then reads as evidence rather than
+a dump.
+
+### G8 [DEMO-BLOCKER] `/governance/access` — an unresolved `Loading…` spinner over an empty page
+**Screen:** `/tmp/audit/demo-gov/governance_access.dark.png`
+**What the audience sees:** `Users / People with console access.`, a `Search users…` box, an
+`+ Add user` button — and a spinner reading **"Loading…"** that had still not resolved after
+networkidle + 3.5 s. Below it, ~600 px of empty page: the content occupies the top 400 px of a
+1600 px-wide screen and the rest is blank. Even when the list does arrive it is 3 users
+(per the `PEOPLE WITH ACCESS 3` tile) in a card that consumes a quarter of the viewport.
+**Why:** the user list is a client fetch against the identity service, and this is the same read that
+produced the red `Unavailable` tile in G5 — it is the slowest/flakiest read in Governance.
+**Demo cost:** "Access" is the first place a security buyer asks to see, and the honest answer today
+is a spinner. Combined with G1 (blank Policies) and G6 (white Retention), **three of the eight
+Governance rail items do not have their content on screen when a person looks at them.**
+**Cheapest fix:** server-render the list from the console `users` table (which is fast and already
+org-scoped) and reconcile with the identity service in the background; fill the empty right-hand two
+thirds with the roles/sessions summary that already exists one tab over.
+

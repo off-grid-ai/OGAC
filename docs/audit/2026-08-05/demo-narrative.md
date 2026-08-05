@@ -10,22 +10,35 @@ Method: read all nine sibling audit files first (do not re-derive their findings
 **open** the screenshots of the narrative path at 1600px dark, follow the real links between sections,
 resolve real ids from the live box, and judge each image as a projected 16:9 seen from row 10.
 
-Status: IN PROGRESS — appended as confirmed. (A previous run of this audit lost five teams to a
-session limit; this file is the durable artefact.)
+Status: **COMPLETE.**
 
 ---
 
 ## Coverage log
 
 - [x] `demo-lens.md`
-- [x] Sibling audits: `governance.md`, `insights.md`, `data.md`, `solutions-build.md`,
-      `work-workspace.md`, `operations.md` (read); `gateway.md`, `operations-observability.md`,
-      `runtime.md`, `demo-gateway-operations.md` (pending)
-- [ ] `docs/APP_AS_PRODUCT.md`
-- [ ] Landing copy `src/app/page.tsx` + `src/app/_landing/**` — the promise
-- [ ] Shoot 1: narrative spine `/,/overview,/data,/build,/build/studio,/work,/governance,/governance/evidence,/insights,/solutions,/operations`
-- [ ] Shoot 2: the transitions (real ids — app detail, run detail, evidence detail, quality tab)
-- [ ] Judge every PNG as a projected image
+- [x] All nine sibling audits read (`governance`, `insights`, `data`, `solutions-build`,
+      `work-workspace`, `operations`, `gateway`, `operations-observability`, `runtime`,
+      `demo-gateway-operations`) — findings re-scored on the demo lens, never re-derived
+- [x] `docs/APP_AS_PRODUCT.md`
+- [x] Landing promise: `src/app/page.tsx`, `src/lib/landing-copy.ts`, `src/lib/demo-tenants.ts`,
+      `src/app/_landing/see-it-live.tsx`
+- [x] **23 screens opened and judged as projected 16:9 images** — my own shoot
+      (`/tmp/audit/demo-path/`: `/`, `/overview`, `/data`, `/build`, `/work`, `/governance`,
+      `/governance/evidence`, `/insights`) plus the siblings' shots followed along the real link
+      graph (`/work/tasks`, `/solutions/apps`, `/solutions/apps/new`, an app front door, a run detail,
+      `/solutions/reviews` + its detail, `/solutions`, `/data/catalog`, `/runtime/pipelines`,
+      `/runtime/models`, `/operations`, `/operations/services`, the capability map,
+      `/governance/posture`, `/governance/trust/regulatory`)
+- [x] Transitions resolved with **real ids** on the signed-in tenant (`app_e8b19b50`, `app_bdd24eab`,
+      `seedrun_reimb_04`) and cross-tenant ids tested for the 404 behaviour
+- **Not verified, stated as such:** the refine/canvas phase after "Build the steps" (no screenshot
+  exists in this audit — see N13), and `/insights` sub-pages below the section root. The shared dev
+  server was saturated by five concurrent reviewers; I did not treat its slowness as a product defect.
+- **Hard limit on this environment:** the dev credentials provider is a single fixed identity
+  (`dev@offgrid.local` → org `default`, `src/auth.config.ts:60-68`), so **every screen above is the
+  `default` tenant.** The seeded bank/insurer tenants are separate hosts bound to their own orgs and
+  are read-only. That limitation is itself finding N1.
 
 ---
 
@@ -545,4 +558,242 @@ right-hand spec panel. This is a credible "Route" beat.
   `ctx unknown · Context window unknown · License unknown · On fleet no`. Four "unknown"s and a "no" in
   the detail panel. Pre-select `Qwythos 9B · 1M (cluster)` (512K ctx, `live`) instead — a one-line
   change to what the page opens on.
+
+### N22 — THE STRUCTURAL FINDING: every section HUB page is worse than the page one level below it. Skip all six.
+
+This is the pattern that only shows up when you walk the whole thing. Each section has an overview /
+hub page that aggregates the section's numbers, and on this deployment **every one of them aggregates
+zeros, red tiles and warnings** while the working surface sits one click down.
+
+| hub (do not open) | what it renders | go here instead |
+| --- | --- | --- |
+| `/data` | red `INGEST ATTENTION 1`, `Data quality Offline`, self-contradicting `3 vectors / 0 documents`, dead `Manage sources` CTA | *(nothing — tell the data story inside the app, see below)* |
+| `/solutions` | red `BLUEPRINTS READY TO DEPLOY 0 of 3`, `REUSABLE TEMPLATES 0`, `DEPLOYED 0`, and the sentence *"No App currently satisfies a blueprint contract"* **twice** | `/solutions/apps` |
+| `/work` | `WAITING ON YOU 9` (wrong) + `PROJECTS 0 · CONVERSATIONS 0 · ARTIFACTS 0` | `/work/tasks` |
+| `/governance` (= `/governance/posture`, same screen) | `CLOUD EGRESS Allowed`, red `SOURCES WITHOUT A LAWFUL BASIS 5`, red `ACCESS CERTIFIED Never`, `TEAMS 0`, activity feed of `qwen3-vl-8b` | `/governance/evidence` → `/governance/evidence/security` |
+| `/operations` | three red `Unavailable` tiles, guaranteed by a 1500 ms budget on a 20–37 s probe | `/operations/services/capability-map` |
+| `/insights` | see N23 | *(nothing — do not enter this section)* |
+
+The hubs are also where the platform jargon concentrates (`/solutions`: blueprint / app / deployment /
+contract / data domains / pipeline in one paragraph; `/runtime/pipelines`' subtitle; `/data`'s "governed
+solution context"). **The demo should never land on a section root.** Every beat below is a deep link.
+
+### N23 — DEMO-BLOCKER — Do not enter Insights. Its front page shows three tiles that do not add up and a feed of raw internal plumbing.
+
+Screenshot: `/tmp/audit/demo-path/insights.png`. Judged as a projected image, two things end this
+section's candidacy before the deeper problems in `insights.md` even come up:
+
+1. **`RECENT RUNS 50 · COMPLETED 29 · ERRORED 0`.** Fifty runs, twenty-nine completed, zero errored —
+   **twenty-one runs unaccounted for, with no third bucket on the screen.** Anyone in the audience does
+   that subtraction in two seconds. (And `ERRORED 0` is described as *"Runs that halted on a guardrail,
+   policy, or failure"* — another zero on the guardrail claim.)
+2. **`Recent activity` is six rows of the platform's own internals, verbatim**, under a page headed
+   *"Prove business impact, quality, and ROI"*:
+   - `One sentence: what is answer-quality drift?` — `agent_system_ai_quality_judge · done`
+   - `Answer the question` — `agent_30e80f87 · done`
+   - `Answer the question` — `agent_c6b8d40d · done`
+   - **`CONTEXT FROM PRIOR STEPS: — [agent] No question was provided`** — `agent_system_ai_quality_judge · done`
+   - two more identical `Answer the question` rows
+
+   Raw agent ids, an internal prompt fragment leaked as a case title, and four identical rows. This is
+   the most damaging single feed in the console.
+
+The h1 and subtitle are actually good (*"Prove business impact, quality, and ROI"* / *"Prove where AI
+makes work faster, better, or cheaper…"*) and the sidebar IA (Outcomes / AI behavior / Usage / Cost) is
+sensible — which makes this a data-and-copy problem, not a missing section.
+
+Beneath that, `insights.md` (complete, measured live on this box) says *"the numbers in this section
+cannot currently be trusted, and it is demonstrable on the live box rather than arguable."* The specific
+things that would appear on a projected screen deeper in:
+
+- **Three of four retained drift runs say "drift detected — engine proven"** when the only thing that
+  changed between the compared windows is which evaluator ran (mean 90.3 → 32.3 by evaluator mix).
+- **Six live `pii_leakage` runs scored 0** — a *perfect* result on a lower-better metric — averaged into
+  the org quality mean as 0% quality.
+- **A "Performance degradation: p95 812 ms recent versus 0 ms baseline" banner that fires by
+  construction** whenever all traffic is newer than two days.
+- **"Trace records: 0"** when the tracing store is unreachable, and the drift page reporting an adapter
+  crash as *"At least four recorded evaluation runs are required…"*.
+- **The nav into quality is three redirect hops** and `INSIGHTS_QUALITY_DESTINATIONS` still points at
+  `redirect()` stubs, so the section has no working way into its own quality tabs.
+
+"Here is whether the AI is any good" is a question the demo must answer — but it should be answered on
+the **`Trust checks` panel of the review screen** (N15), per-run and per-check, not from this section's
+aggregates. That is also what `quality-plain.ts` already does correctly.
+
+---
+
+## Demo readiness
+
+### The verdict
+
+**Yes, there is a 10-minute demo here — but not the one in the brief, and not on the account he is
+currently signed into.** The product has roughly eight genuinely good screens, and they line up into a
+coherent human story: *work is waiting → a person decides, with the machine's reasoning shown → the app
+that did it was described in plain language → it ran on a governed on-prem pipeline → here is the
+evidence → here is the fleet, all verified.*
+
+What breaks it is not missing features. It is, in order of how much damage it does:
+
+1. **Every section hub page is a wall of zeros and red tiles** (N22). The narrative in the brief walks
+   hub to hub, which is the worst possible route through this console.
+2. **The demo account is `dev@offgrid.local` on the `default` org** — the tenant with the draft apps, the
+   orphaned runs, the zero masking rules and the 30-day-stale cases (N1, N2).
+3. **A handful of wrong numbers that repeat across screens** — 9 vs 5 on five surfaces (N18), ₹ vs $ on
+   one case across three screens (N14), `0 signed answers` vs 78 (N19), `Allowed` vs `0% egress` (N9).
+   None of these needs a refactor. All of them are visible to the audience.
+4. **The climax screen says nothing was checked** (N15) — one good run away from being the best moment
+   in the talk.
+
+### What is genuinely impressive — the three images that should carry the talk
+
+1. **`/work/tasks`** — `/tmp/audit/work/work_tasks.png`. Four real Indian-BFSI cases with a plain-English
+   headline and oldest-first ordering. The only screen in the console that makes a non-technical viewer
+   say "I understand what this does for me." (Fix the badge, the SLA banner, the 30-day lines, `INV-1 $200`.)
+2. **The review detail** — `/tmp/audit/work2/review_detail.png`. `Approve $63,000 — Reimbursement
+   Approval?` · `Paused at Manager review` · *What the app recommends: Over quota by $23,000* · `The
+   request` (Amount / Category / Employee) · *"WHY THIS NEEDS YOU — This step is configured to require a
+   person to sign off before the run continues."* · a required reason · `Reject · Escalate · Approve`.
+   Nothing else in the product delivers "governed AI, with a human in the loop" this directly.
+3. **`/runtime/pipelines`** — `/tmp/audit/runtime/runtime_pipelines.png`. Seven pipelines, all
+   `published`, all `On-Prem Cluster` + `on-prem`, each with a `Data ceiling`, all named after real BFSI
+   processes. This is the single most convincing image of the product's actual positioning.
+
+Runners-up worth a beat each: the **run detail with its ticking steps + RISK/CONFIDENCE panels**
+(`work2/…runs_seedrun_reimb_04.png`), **`/solutions/apps`** for its intro copy and four app cards, and
+**`/operations/services/capability-map`** for `49 / 49 · current · verified · 0 stale · 0 pending`.
+
+---
+
+## The recommended 10-minute demo
+
+**Preconditions (do these first, they are not optional):**
+- Sign in as a **named business persona** (not `dev@offgrid.local`), on **one** tenant, decided in advance.
+- Every step below is a **deep link**. Never click a sidebar section header — see N22.
+- Have `/solutions/apps` open in a **second tab** as the fallback for step 5.
+- Prefer light theme for a projector unless the room is dark; both render, but the light shots read
+  better at distance (`work_tasks.png` vs `work.dark.png`).
+
+| # | Route | ~time | What to say | What to point at |
+| --- | --- | --- | --- | --- |
+| 1 | `/overview` | 0:00–0:45 | "This is what a person sees when they open it. Not a dashboard — a job." | The lead band: **"5 cases are waiting for you to decide."** Then the `CLOUD EGRESS 0% — fully on-prem, nothing left` tile. Do **not** linger on the Cost band. |
+| 2 | `/work/tasks` | 0:45–2:00 | "Four processes, real cases, oldest first. Nobody configured a screen for this — the apps route their own work here." | The four case subjects: `₹63,000 Client-Entertainment`, `PAN ABCPD1234K · Rohan Desai`, `FOIR 47 · ₹12,00,000`, `TN09EF4567 · CLM-20501`. |
+| 3 | click a case → its **run detail** | 2:00–3:30 | "Here is what the machine actually did, step by step, and where it stopped." | The three numbered steps ticking (`Fetch quota ✓` → `Assess ✓` → `Manager review ⚠ Exceeds quota — needs L2 sign-off`), then `RISK LOW` / `CONFIDENCE HIGH`. |
+| 4 | `/solutions/reviews` → open the reimbursement card | 3:30–5:00 | "And here is the decision itself. The person is told what they are approving, why it needs them, and what it will do." | `Approve … Reimbursement Approval?` · `WHY THIS NEEDS YOU` · `The request` (Employee: Anjali Nair) · the required reason field · `Reject · Escalate · Approve`. **Approve it live.** |
+| 5 | `/solutions/apps` | 5:00–5:45 | "Where did that app come from? Not from us. Somebody in the department described it." | The intro paragraph (*"An app does a piece of your work — describe it in plain language and it gets built… so you do not set any of that up"*) and the four app cards with `Runs on: <pipeline>`. |
+| 6 | `/solutions/apps/new` → type → **Build the steps** | 5:45–7:30 | "In plain English. Watch." Type the **rehearsed** sentence. | The typed description, then the steps it produces. **If it stalls or the steps look thin, switch to the fallback tab and open a finished app instead.** |
+| 7 | `/runtime/pipelines` | 7:30–8:30 | "Every one of those apps runs on one of these. The rules are bound once, here, and the app inherits them. All of it on your own hardware." | The seven `published` cards, the `On-Prem Cluster` + `on-prem` badges, and one card's `Data ceiling: 3 domains`. |
+| 8 | `/governance/evidence` → `/governance/evidence/security` | 8:30–9:15 | "And it is all on the record." | `Audit log 422 events recorded`, then **`Security events 94 refusals recorded`** — this is the "show me it blocking something" answer. Click through to the refusals list. |
+| 9 | `/operations/services/capability-map?service=<one>` | 9:15–10:00 | "Forty-nine services, all of it yours, every one verified — nothing phones home." | `INVENTORY 49 · CURRENT AUDITS 49 · STALE 0 · PENDING 0`, all rows `current` / `verified`. **Open it with a service already selected** or the right 60% is blank. |
+
+**Why "Data" has no beat of its own.** The brief's narrative opens on Data. It cannot: `/data` has two
+red indicators, a self-contradicting tile and a dead primary CTA (N8), and its first drill-down is four
+zeros (N20). But the data *story* is stronger told inside the app anyway — `read 1 source · AI assessed
+it` on the case, `All 1 source were read and narrowed to this case` on the run, and `Data ceiling: 3
+domains` on the pipeline. That is the repo's own doctrine (*deliver capabilities inside their app, never
+as more links*). If a prospect asks where the data comes from, answer from the pipeline card in step 7.
+
+**Why "Insights" has no beat.** N23. The question it answers belongs on the `Trust checks` panel in
+step 4 — once one run has a real grounding score (see fix #2 below).
+
+**If he only gets 3 minutes:** steps 2 → 4 → 7. Queue, decision, governed on-prem pipeline. That is the
+whole product and all three screens hold up.
+
+---
+
+## Do not open these on stage
+
+| Route / click | Why |
+| --- | --- |
+| `/insights` (and anything under it) | `RECENT RUNS 50 · COMPLETED 29 · ERRORED 0` — 21 runs unaccounted for; and a `Recent activity` feed of raw agent ids plus the literal string `CONTEXT FROM PRIOR STEPS: — [agent] No question was provided`. |
+| `/operations` | Three red **`Unavailable`** tiles, every time — the 1500 ms budget cannot beat a 20–37 s probe. |
+| `/operations/services` | Every card spins on `checking` forever; every readiness chip truncates to `DEPLOY… REACHA… FUNCTI…`; internal hosts and ports (`offgrid-s1.local:4000/:8800/:8010`) on screen. |
+| `/governance` **and** `/governance/posture` (the same screen) | `CLOUD EGRESS Allowed` contradicting the home page's `0% — nothing left`; red `SOURCES WITHOUT A LAWFUL BASIS 5`; red `ACCESS CERTIFIED Never`; `TEAMS 0`; activity rows reading `qwen3-vl-8b`. |
+| `/governance/trust/regulatory` + the **Download** on it | Headline **`OVERALL POSTURE 63%`**; `PII masking (A9)` as a red gap chip that is a **false negative**; framework count says 4 (landing) / 5 (cards) / 3 (copy). The downloadable pack carries another tenant's audit events. |
+| `/data` | Red `INGEST ATTENTION 1`; red `Data quality Offline`; `3 vectors / 0 source documents` in one tile; `Manage sources` navigates to the page you are on. |
+| `/data/catalog` (i.e. clicking the `DATASETS 4` tile) | `DATASETS 0 · HOLDING PII 0 · FRESHNESS ALERTS 0 · TOTAL ROWS 0` and "No datasets catalogued yet" — 75% empty screen, directly contradicting the tile he clicked. |
+| `/solutions` | Red `BLUEPRINTS READY TO DEPLOY 0 of 3`; `REUSABLE TEMPLATES 0`; `DEPLOYED 0`; *"No App currently satisfies a blueprint contract"* stated **twice**. |
+| `/work` (the hub) | `WAITING ON YOU 9` (the wrong number) beside `PROJECTS 0 · CONVERSATIONS 0 · ARTIFACTS 0`. |
+| `/build` — or any pre-migration `/apps`, `/studio`, `/evals` bookmark | Chromeless full-page **"Page not found"** with no sidebar. Purge every stale bookmark and slide link before the talk. |
+| **Any app id from a different tenant** | Same chromeless 404 — the whole console blanks. Verified across eight routes. |
+| Opening **Motor Claim FNOL Triage** | Opens with a red banner (*"could not read Read the claim & policy… working from nothing"*) and an amber one naming `service@offgrid.local` as an absent owner; `HANDLED 0`; a `Recently handled` row titled *"In one line, what does this app do for the bank?"*. |
+| The **guardrail tester** (`/governance/guardrails/*`, the Test panel) | It is a `method="GET"` form: whatever PAN/Aadhaar he types goes **into the address bar**, on the projector, under the sentence "Nothing is stored." |
+| `/solutions/quality/drift` and the drift catalog | "Drift detected — engine proven" verdicts that are artifacts of which evaluator ran, and `score_psi` / `share_drifted` rendered as bare numbers. |
+| Any **Insights → Quality** nav row | Three redirect hops onto `redirect()` stubs; the shell never renders. |
+| `/governance/egress`, `/governance/policies/bundles`, `/insights/copilot`, `/insights/finops` | Live pages that no navigation links to — if he lands on one he cannot get back except via the sidebar. |
+
+---
+
+## The 5 cheapest fixes that most improve the demo
+
+Ranked by (damage removed ÷ effort). All five are seed data, one UPDATE, or one line of copy — no refactors.
+
+### 1. Make one tenant coherent, and sign in as a person — **60–90 minutes**
+Decide the demo tenant, then on that tenant:
+- create a **named business user** so the home page reads *"Welcome back, Priya"* instead of *"Welcome back, Dev"* (avatar `DE`, `dev@offgrid.local`);
+- **delete the runs of the two orphaned apps** (`app_4108cf57`, `app_d9f008e3`, 4 `awaiting_human` runs since 2026-07-09). One statement fixes **the 9-vs-5 contradiction on five surfaces** (N18) *and* the *"nobody has picked this up in 30 days"* line on four cards *and* the `WAITING ON YOU 9` tile;
+- **re-date the remaining demo runs to the last 48 hours** so nothing says "30 days";
+- **publish both demo apps** so the `Draft — check it, then publish` pill disappears, and reassign `app_e8b19b50`'s owner away from `service@offgrid.local`;
+- fix or delete the `Invoice: INV-1 $200` case and the `In one line, what does this app do for the bank?` run.
+
+This one item removes more visible damage than the other four combined.
+
+### 2. One reimbursement run with a real grounding score and a real guardrail finding — **1–2 hours**
+The climax screen currently says `Faithful to sources — Not scored` and `No guardrail findings recorded`
+(N15). Run the reimbursement app once with the eval judge and guardrails actually engaged, retain the
+verdict, and demo **that** run. Payoff: the review screen stops disclaiming itself, and it becomes the
+answer to "how do you know the AI is any good?" — which lets him skip the entire Insights section.
+
+### 3. Fix the currency, everywhere it renders — **30–60 minutes**
+`₹63,000` on `/work/tasks` → `$63,000` on `/solutions/reviews` → `$40,000 / $23,000 / 63,000` in the run
+steps, for **one case** (N14); `₹12,00,000` → `$1,200,000` for the loan. Format from one money helper
+(`money.ts` exists) and correct the seeded step outputs. A banker catches this instantly and it discredits
+every other number.
+
+### 4. Six copy / default changes, one sitting — **60–90 minutes total**
+Each is a single line, each removes a specific projected embarrassment:
+- **Set the org policy to leashed** so `/governance` stops saying `CLOUD EGRESS Allowed` two clicks from the home page's `0% — nothing left` (N9). *(5 min, one setting.)*
+- **Set a decision target (SLA) on the four demo apps** so the amber *"No decision target is set for 4 processes"* banner leaves the top of the best screen. *(10 min.)*
+- **Rewrite the `/runtime/pipelines` subtitle** — it is five platform terms in one sentence on one of the three best screens (N12). *(5 min.)*
+- **Drop `0 tools` / `0 KB docs` from the builder's inheritance strip** when the count is zero, and stop printing `policy v10` (N13). *(15 min.)*
+- **Pre-select `Qwythos 9B · 1M (cluster)`** on `/runtime/models` instead of the model whose panel is four `unknown`s, and hide `http://offgrid-s1.local:8800/v1` (N21). *(15 min.)*
+- **Open the capability map with a service selected** so its right 60% is not blank (N11). *(10 min.)*
+
+### 5. Seed one project, one conversation, one artifact — **20 minutes**
+`/work` currently reads `PROJECTS 0 · CONVERSATIONS 0 · ARTIFACTS 0` (N17). This does not earn a demo
+beat, but it is the most likely **off-script** click in the whole console (the sidebar's Work group is
+right under My tasks), and three zeros is what he lands on.
+
+**Explicitly NOT on this list, despite being real:** thread `orgId` through `computeControls`, fix the
+`63%` posture, reconcile the two dataset registries, raise the `/operations` timeout budget, wire the
+worker readiness probes, un-truncate the readiness chips. Each is hours-to-days of real work, and the
+demo route above simply does not open the screens they affect. Fix them after the conference.
+
+---
+
+## Out of scope for the demo (one line each)
+
+- The `Next.js` dev-overlay pill (`N 1 Issue ✕`, bottom-left of several shots) is a dev-server artefact and will not appear on the production box — but confirm he is not presenting from `next dev`.
+- The landing page's full-page capture shows sections 01–07 as blank because `BlurFade inView` needs a real scroll to fire; this is a screenshot artefact, not a live defect. Scroll it once to confirm before the talk.
+- Under five concurrent audit shooters the shared dev server took >30 s to answer `/api/auth/csrf` and 20–37 s for `/api/v1/status`; the 20–37 s figure is corroborated by `operations.md` and is a real product issue for `/operations`, but the rest is load from this audit, not the product.
+- `/solutions/apps` says `LIVE 3 · DRAFTS 1` while both apps I opened show a `Draft` pill — worth a two-minute check, but it resolves either way once fix #1 publishes them.
+- Framework count 4 (landing) vs 5 (regulatory cards) vs 3 ("three real frameworks ship in the box") — same page family, low audience impact, folded into "do not open regulatory".
+- All backend correctness findings from the nine sibling audits (org-scoping, the approve/reject race, self-approval, `expectStatus`, `unverified` in the numerator, audit action strings) are real and unaffected by demo prep — they stay in their own files.
+
+### One negative result worth recording (so nobody re-derives it)
+
+I HTTP-probed 23 plausible off-script routes as the signed-in user. **Every one returned `200`** —
+`/solutions/quality`, `/solutions/quality/performance`, `/solutions/library`, `/solutions/templates`,
+`/solutions/deployed`, `/solutions/tools`, `/governance/evidence/provenance`,
+`/governance/trust/regulatory`, `/data/lake`, `/work/chat`, `/operations/runs`,
+`/runtime/models/cache` and the rest. So **the off-script risk is not HTTP 404s** — it is the two
+chromeless-404 cases proven by screenshot (bare `/build`, and any app id the signed-in org does not own)
+plus the empty and red-tiled surfaces catalogued above.
+
+A detector caveat, recorded because it nearly became a false finding: my probe flagged the literal
+string `Page not found` in the response body of **every** page, including ones the sibling teams have
+clean screenshots of. The global not-found copy is present in the RSC payload of every route, so that
+signal is worthless — **do not build a "404 sweep" on a body-text match.** Latencies in the same probe
+ran 7–32 s per route, but five audit shooters were hammering the box, so those numbers say nothing about
+the product.
 

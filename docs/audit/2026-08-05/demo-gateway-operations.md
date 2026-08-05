@@ -122,3 +122,182 @@ rather than inventing one — until he clicks Open and the node pool on the deta
 It reads fine, but a stat band (nodes, models served, requests today) would fill it and make the screen
 feel like infrastructure rather than four cards.
 
+### 8. [DEMO-BLOCKER] `/operations/devices` is a "Coming soon" roadmap slide, and the nav rail advertises it
+Screenshot: `/tmp/audit/demo-ops/operations_devices.dark.png`.
+**What the audience sees:** a pale banner with a **`Coming soon`** pill titled "Device management", then
+six cards — Device inventory & health, Enrollment, Remote lock & wipe, Configuration push, Compliance
+posture, Governed by the same policy — each a paragraph of *future* tense ("light up here when the
+control plane ships"). **Zero buttons, zero inputs, zero data.** It is a well-designed marketing slide
+sitting inside a working console, and the footer names `FleetDM/osquery`.
+**Worse, it advertises itself:** the left rail renders **`Managed devices  SOON`** on *every* Operations
+page (`modules/registry.ts:127-146` `comingSoon: true`). Any screen in this section carries a visible
+"not built yet" badge in the founder's peripheral vision, and an audience member will read it and ask.
+**And it is not even honest in the other direction:** `EnrollDeviceButton.tsx` (107 lines) and
+`FleetTools.tsx` (456 lines) are fully implemented and mounted nowhere, and `/operations/devices/[id]`
+renders live device facts, a live policy bundle, an audit table, a working kill switch and role
+reassignment — but **nothing anywhere in the app links to it**, and on a fresh install the `devices`
+table is empty so **every id 404s**. Two adjacent routes in one module make opposite claims about
+whether device management exists.
+**Demo call:** hide this nav item for the conference build (one flag), or wire the real detail surface
+and seed two devices. Showing a Coming-soon card is strictly worse than not having the menu entry.
+
+### 9. [DEMO-RISK] One service tile is genuinely red, and its label reads "Great Expectations Core 1.19"
+`data-quality` (`services-directory.ts:329-338`, `http://127.0.0.1:8944`) has no backend and no container
+on the box — 502. So the services grid legitimately renders a **red `Down` tile** whose description is
+*"Data-quality engine (Great Expectations Core 1.19) — persistent expectation suites…"*. A single red tile
+is survivable ("that's a service we're mid-migration on") but it will be the first thing a technical eye
+locks onto, and the copy hands the audience a third-party product name and version number. **Cheapest
+demo fix: mark it `probe:'optional'` for the conference build, or stand the container up.**
+Related, same grid: because `isHealthy` treats `optional` as healthy, absent optional services count
+toward the green numerator — invisible on stage, listed in Out of scope.
+
+### 10. [DEMO-RISK] A registry read failure prints a curl command on the projector
+**Where:** `GatewaysManager.tsx:419-420`, reached via `registry/page.tsx:22` +
+`withTimeout(..., 5000, [])` (`with-timeout.ts:26-28` collapses reject AND timeout into `[]`).
+**What the audience sees** if the DB hiccups or the 5s budget is blown on conference wifi — and note the
+dev server was answering a cached page in **21 s** during this audit, so a 5 s timeout is a live risk:
+
+> **No gateways registered yet. Add one, or seed the samples with `POST /api/v1/admin/gateways/seed`.**
+
+An infrastructure failure stated as a fact about his data, plus an internal API path in monospace, on
+the screen where he has just said "here are the model endpoints your pipelines run on". There is no
+ERROR/PARTIAL/retry state on this surface, and `registry/page.tsx:18` claims a `loading.tsx` skeleton
+that does not exist. **Cheapest fix: raise the timeout and change the copy to two sentences that do not
+contain a route** — e.g. "Couldn't read the gateway registry just now. Retry." with a Retry button.
+
+### 11. [DEMO-RISK] Every observability tab is one failed fetch away from either a raw error string or a confident wrong "nothing here"
+All four Platform-health tabs share this shape, and each failure mode is a distinct bad projection:
+- **Logs** (`LogsExplorer.tsx:92`) does `r.json()` with no `r.ok`; on a 403 the un-guarded line 203
+  **throws and blanks the page**. The page gate is `platform-health`, not admin, so a non-admin operator
+  with the module gets a white panel. Its histogram discards `hits.error` (`:93,98`) and prints
+  **"No matching log volume in this window."** above a table that may hold real rows.
+- **Traces** (`TraceSearch.tsx:238-242` + `:288-294`) renders **"Could not reach Jaeger: forbidden"** and,
+  directly beneath it, **"No traces in this window. Widen the time range or clear filters."** — a raw
+  engine name in a red error box, plus advice that cannot work, stacked. The service dropdown silently
+  stays empty on any non-2xx (`:60-80`), which reads as "no instrumented services".
+- **Saved queries** (`MetricsSavedQueries.tsx:48,100-101`) swallow load and DELETE failures — "No saved
+  queries yet", and a deleted row that just stays on screen if he demos a delete.
+- The tab descriptions themselves say "VictoriaMetrics", "PromQL", "LogsQL", "Jaeger"
+  (`operations-destinations.ts:1-27`).
+**Stage cost:** none of these is guaranteed to fire, but every one of them turns a *service* problem into
+a *product* problem in front of the room, and the words the audience reads are engine names.
+
+### 12. [DEMO-BLOCKER] Projector legibility: the services grid is built out of 9–11px type
+Hard numbers, not opinion: `ServiceReadiness.tsx:62` gate chips are `text-[9px] uppercase` + `truncate`
+inside `grid-cols-5`; `ServicesDirectory.tsx:87,93` the "Capability audit" label is `text-[10px]` and its
+ratio badge `text-[9px]`; there are **41** `text-[9|10|11]px` occurrences across `src/components/services/`.
+At 1600px logical width projected 16:9, 9px type is sub-pixel from row 10 — the audience sees coloured
+smudges. Every card also carries a host:port line in mono at the same scale.
+**Fix for the demo:** bump the chip/ratio scale to `text-[11px]`/`text-xs` and drop from five gates to
+two on the card (Reachable + Functional). Nothing structural; a class change.
+
+---
+
+## Safe to show / not safe to show
+
+| Surface | Verdict |
+| --- | --- |
+| `/runtime/gateways` (list) | **SAFE — the best screen in this scope.** Fix the two `not configured` tiles first. |
+| `/runtime/gateways/[id]` (detail) | **SAFE with one caveat** — do not narrate the node count out loud; if a node is degraded the header contradicts the pool below it. |
+| `/operations/services` (list) | **NOT SAFE AS-IS, but the highest-upside screen he has.** All-spinner health + 9px truncated chips + one red tile. Two small fixes make it the centrepiece. |
+| `/operations/services/[id]` (detail) | **NOT SAFE** — "Live probe: Checking", "Latency: —", "Collecting first sample…" can sit there indefinitely, and the dependency chips are raw ids (`postgres`, `litellm`, `qdrant`). |
+| `/operations/devices` | **DO NOT OPEN.** Coming-soon card, zero interactive elements. Detail route 404s. |
+| `/operations/health` → `/…/metrics/explorer` | **NOT SAFE** — lands on an empty PromQL box; the suggested query returns "No data". |
+| `/operations/health/metrics/alerts` | **DO NOT OPEN** — `Firing 0 · Pending 0 · Alert rules 0 · No active alerts` with no rule engine running. |
+| `/operations/health/metrics` (legacy) | **NOT SAFE** — 2 of 4 panels permanently "Not emitting yet" + `Targets up: awaiting emission`. Worth fixing, see below. |
+| `/operations/health/alerts` (legacy) | **DO NOT OPEN** — the tab says Alerts and renders the traces table. |
+| `/operations/health/logs` | **CONDITIONALLY SAFE** — good when VictoriaLogs answers; a 403 blanks the page and a hits-endpoint failure prints "No matching log volume" over real rows. Rehearse it on the venue network. |
+| `/operations/health/traces` + `traces/[traceId]` | **PROBABLY THE BEST OBSERVABILITY PROOF HE HAS** — real spans, real waterfall, a real deep-linked detail route. Risk is the raw "Could not reach Jaeger" error string if it fails. |
+| Any `/gateway/*` URL | **AVOID** — duplicate mount with no redirect; every in-page link exits to the canonical space, so it is a one-way trapdoor. |
+
+## Demo readiness
+
+### The story (2 minutes, in this order)
+
+"This is your own private AI infrastructure — and here it is running."
+
+1. **`/operations/services`** (~40 s). Open on the full grid. This is the only screen in the product that
+   shows the *whole* stack at once, grouped Console → Gateway → Internal services. Say the line: "every
+   one of these is open source, running on your hardware, and the console watches all of them."
+   *Precondition: health must paint green within ~2 s and the chips must be readable. Today it does not.*
+2. **`/runtime/gateways`** (~35 s). "Here is where the models actually run." Point at the two chips:
+   green **data stays on-prem** vs amber **data leaves (cloud)**. This is the single most persuasive
+   pixel-level asset in my scope — one glance communicates the entire residency pitch.
+3. **Click Open on On-Prem Cluster** (~25 s). Node pool + model catalog: "three nodes, this is the model
+   they serve, and no request leaves the building." Don't dwell on the node ratio.
+4. **`/operations/health/traces`** → **click one trace** (~30 s). "And every single request through it is
+   traced end to end, on your own box." The trace detail is a real route with a real waterfall — the
+   strongest 'this is a real platform' beat available here.
+5. **Stop.** Do not continue into Metrics, Alerts or Managed devices.
+
+### What to avoid on stage
+- The `Managed devices` nav item (and the `SOON` badge that sits in the rail on every Operations page).
+- The Alerts tab in either of its two URLs.
+- The Metrics tab, until the metric names are fixed — it opens on an empty query prompt.
+- Typing the placeholder query in the metrics explorer; it returns "No data".
+- Any capability-map link that points at `/operations/health/metrics` or `/operations/health/alerts`.
+- Narrating "N of N nodes up" as a fact.
+- Zooming a service card — the gate chips are 9px and truncated.
+
+### Cheapest wins, ranked
+
+1. **Fix three strings in `src/lib/victoria-metrics.ts` and one in `MetricsExplorer.tsx:129`** —
+   `otelcol_receiver_accepted_spans_total` → `otelcol_receiver_accepted_spans` (`:51`),
+   `otelcol_exporter_send_failed_spans_total` → `otelcol_receiver_refused_spans` (`:57`), and
+   drop/replace the `sum(up)` "Targets up" tile (`:112`). Then give the explorer route a default
+   `?q=otelcol_processor_batch_batch_send_size_sum` so it lands on a chart, not a prompt.
+   **Worth:** four to five lines converts the section's *default landing page* from zero live pixels into
+   a live emerald time series, takes the legacy preset grid from 2-dead-of-4 to 4-live-of-4, removes a
+   permanent "awaiting emission" label, and makes his first Run in the query box return real data. Nothing
+   else in my scope buys as much stage credibility per line. **Do this one even if you do nothing else.**
+2. **Make a failed service-health fetch render as a state, not as an eternal spinner**
+   (`ServicesDirectory.tsx:136-144`, `ServiceDetail.tsx:52,64`). The correct pattern is already in
+   `WorkerReadinessPanel.tsx:31-38` — copy it. **Worth:** the difference between "34 services, all live"
+   and "34 services, all thinking about it".
+3. **Two class changes on the service card** — chips `text-[9px]`→`text-xs`, and show 2 gates instead of 5
+   (or hide the `n/m in workflow` ratio on the list). **Worth:** the grid stops reading as debug output.
+4. **Data-only, zero code:** configure keys for the OpenAI/Anthropic gateway rows (or delete them) so all
+   gateway tiles are live; stand up or `optional`-ise `data-quality` so the grid has no red tile and the
+   words "Great Expectations Core 1.19" leave the screen.
+5. **Hide the `Managed devices` module for the conference build** (`comingSoon` entry in
+   `modules/registry.ts:127-146`). One line removes a dead section *and* the `SOON` badge from every
+   Operations screen. If you'd rather keep it, fix the alerts probe instead
+   (`adapters/victoriametrics.ts:120-132`) so the genuinely good "No alerting engine deployed — deploy
+   vmalert and point it at this instance" card renders in place of `Alert rules 0`.
+6. **Registry empty-state copy** (`GatewaysManager.tsx:419-420`): delete
+   `POST /api/v1/admin/gateways/seed` from user-facing text and raise the 5 s `withTimeout` budget.
+
+## Method / confidence
+
+- Screenshots shot at 1600px against the shared dev server (`/tmp/audit/demo-ops/`): `runtime_gateways`,
+  `operations_services`, `operations_devices` — read and judged as projected images. **The `--dark` copies
+  rendered light**: the shell theme is attribute-driven, so `prefers-color-scheme` emulation does not flip
+  it; all judgements above are on the light theme.
+- The remaining routes could not be captured: the shared server degraded to **~21 s for a cached page**
+  (six audit teams running Playwright at once) and the run stalled after three routes. Findings 4, 5, 6,
+  10 and 11 are therefore **code-confirmed and string-exact but not pixel-confirmed** — every quoted
+  string is read from the component that renders it, and the route chain for each was traced by hand.
+  Re-shoot `/operations/health/metrics/explorer`, `/operations/health/metrics/alerts`,
+  `/operations/health/{logs,traces}`, `/operations/nodes`, `/operations/edge` and a service detail when
+  the server is quiet.
+- Screenshots are viewport-height only (1000px): the console shell scrolls internally, so `fullPage`
+  captures one screen. Cards below the fold on `/operations/services` (including the red `data-quality`
+  tile) are inherited from `docs/audit/2026-08-05/gateway.md`, not seen by me.
+
+## Out of scope for the demo (real, invisible on stage — one line each)
+
+- `probeCloud` ignores HTTP status; 401/403/404 render green "up" / "provider reachable" (`gateways.ts:325-331`).
+- `isHealthy` counts `optional` (absent) services in the green numerator (`service-health.ts:15-17`).
+- `service-readiness-probe.ts:24-38` promotes `functional: 'pass'` from a 401 under copy saying a gate is only green on proof.
+- `status.ts:30` treats any `httpStatus < 500` as up.
+- No egress enforcement anywhere — `egressClass` feeds badges and `<select>` labels only; the residency lock is a separate axis never joined to gateway selection.
+- `gateway/fleet/[id]/page.tsx:145` performs a data-plane WRITE during a GET render and then renders the status it just wrote.
+- Probed hosts are Off Grid's own production domains, hardcoded (`services-directory.ts:40,49,58`); malformed `OFFGRID_SERVICES` silently falls back to them.
+- `admin/gateways/seed/route.ts:16` writes into `org_bharat` on every call regardless of caller.
+- Cloud gateways probe the env provider URL, not the row's `baseUrl` — two rows with different URLs report identical health.
+- `GatewayDetail.tsx:217,259` keep navigational/mode state in `useState`, unkeyed on `gateway.id`; `?panel=edit-gateway&id=X` for a missing row silently opens CREATE mode.
+- `ServiceDetail.tsx:81` `uptimePct` counts `optional` as up → absent services show 100% uptime.
+- `GatewayDetail.tsx:459` a failed pipelines query renders "0 pipelines bound", used to justify deletion.
+- No `error.tsx` under `gateway/**`; no incident entity/route/CRUD exists anywhere in Operations.
+- `/gateway/{registry,services,fleet}` duplicate mounts have no redirect (nav trapdoor, not a broken pixel).
+

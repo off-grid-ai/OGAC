@@ -1,3 +1,4 @@
+import { groupForCurrency } from '@/lib/money';
 // ─── Risk and confidence for a pending approval — pure ─────────────────────────────────────────────
 //
 // Flow 6 in `docs/roadmap-real.md`: *"Reviewer sees risk and confidence."* Nothing implemented it. A
@@ -49,10 +50,16 @@ export function caseAmount(caseRecord: Record<string, unknown> | null | undefine
   return null;
 }
 
-/** Group digits without a currency symbol — the record does not state one (see agent-prompt-rules.ts). */
+/**
+ * Group digits without a currency symbol — the record does not state one (see agent-prompt-rules.ts).
+ *
+ * Grouped the Indian way (12,00,000 not 1,200,000) via the shared money module, so a bare figure here
+ * cannot sit beside a ₹-prefixed lakh-grouped figure on the same screen and disagree about what the
+ * number means. The symbol is still omitted deliberately: the record does not say which currency.
+ */
 function group(n: number): string {
   const [whole, fraction] = Math.abs(n).toString().split('.');
-  const g = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const g = groupForCurrency(whole, 'INR');
   return `${n < 0 ? '-' : ''}${g}${fraction ? `.${fraction}` : ''}`;
 }
 

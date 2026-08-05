@@ -13,12 +13,18 @@ Every screenshot judged as a projected 16:9 image seen from row 10. Shots in `/t
 - [x] Shot + judged: `/data`, `/data/sources`, `/data/domains`, `/data/lake`, `/data/etl`(→flows/orchestration),
       `/data/catalog`, `/data/catalog/governance`, `/data/knowledge`, `/data/knowledge/indexes`,
       `/data/knowledge/indexes/collections`, `/data/knowledge/memory`, `/data/lineage`
-- [x] Live DB checks on the box: the two dataset registries, connector credential storage
 - [x] Shot + judged: `/data/warehouse`, `/data/warehouse/models`, `/data/warehouse/query`, `/data/flows`,
-      `/data/flows/replication`, `/data/flows/orchestration/{namespaces,catalog}`, `/data/lineage/{datasets,runs}`,
-      `/data/connectors/con_erp`
-- [ ] Not covered: `/data/sources/[id]/objects` browser, `/data/warehouse/[table]`, `/data/domains/[id]`,
-      `/data/catalog/[id]`, `/data/knowledge/[id]`, `/data/flows/orchestration/[id]`
+      `/data/flows/orchestration`, `/data/flows/orchestration/namespaces`, `/data/lineage/datasets`
+- [x] Live checks on the box (read-only): the two dataset registries and their per-org counts, connector
+      credential storage (`secret_ref` vs inline), the replication engine's connections + job history, the
+      lineage store's namespaces + owners, per-org knowledge-collection counts
+- [ ] **Could not screenshot** — the shared dev server timed out repeatedly under load from the other concurrent
+      audits: `/data/flows/replication`, `/data/connectors/[id]`, `/data/lineage/runs`,
+      `/data/flows/orchestration/catalog`. Findings on those routes are from page source + the live service APIs
+      and are marked as such.
+- [ ] Not covered at all: `/data/sources/[id]/objects` browser (blocked by the missing scope — see finding),
+      `/data/warehouse/[table]`, `/data/domains/[id]`, `/data/catalog/[id]`, `/data/knowledge/[id]`,
+      `/data/flows/orchestration/[id]`, `/data/lineage/[destination]` sub-views other than the two judged
 
 ---
 
@@ -234,114 +240,6 @@ bucket.
 rename `provit` and add one credible bucket (`claims-documents`).
 **Screenshot:** `data_lake.png`.
 
----
-
-## Demo readiness
-
-### The root cause of most of it: the demo org is the wrong org
-
-Verified on the box — the rich Indian-BFSI seed lives under `org_bharat` / `org_suraksha`, but the console signs
-in as `default`, and the two seeds cover **different tables**:
-
-| table | `default` | `org_bharat` | `org_suraksha` |
-|---|---|---|---|
-| `connectors` | 8 | 7 | 3 |
-| `data_domains` | 5 | 23 | 14 |
-| `datasets` (legacy) | **4** | 0 | 0 |
-| `ingest_jobs` | **7** | 0 | 0 |
-| `data_assets` (catalogue) | **0** | 12 | 4 |
-| `data_classifications` | **0** | 23 | 4 |
-| `org_knowledge_collections` | **0** | 6 | 1 |
-| `etl_jobs` | **0** | **0** | **0** |
-
-So `/data/catalog`, `/data/catalog/governance` and `/data/knowledge` are empty purely because their tables were
-never seeded for `default`. **Do not fix this by switching the demo to `org_bharat`** — that would empty the hub's
-Datasets and Ingest tiles instead. Copy the missing rows INTO `default`. `etl_jobs` is empty for every org and
-needs new rows.
-
-### The story — strongest 2 minutes in Data, in order
-
-1. **`/data`** (the hub) — open here. Four real tiles, an "Inside data" card grid. Say the positioning sentence
-   over this screen. **Do not click "Manage sources" or the "Connected sources" tile** (both no-op) and **do not
-   scroll past the Data-catalog card** — the Vector-DB-inspector debug panel is below it.
-2. **`/data/domains`** — the money screen, and the best-looking one in the section. Five plausible BFSI domains,
-   then the **Test resolve** box: type *"check the employee reimbursement quota"* and show it binding
-   deterministically to Policy Admin → `employee_quota`. "Your language, routed to the right system, by rule,
-   never a guess." Needs the classification / lawful-basis seed first, or the grid is ten amber gap badges.
-3. **`/data/warehouse`** — 22 tables · 5 databases · **801,826 rows**, grouped, with credible fact/dim names.
-   The "and it all lands in your own warehouse" beat. Needs the `AIRBYTE_INTERNAL` group hidden and the amber
-   "18d ago" badges refreshed.
-4. **`/data/warehouse/query`** — finish here. Click the **"Non-performing loans by product"** starter query and
-   Run it. Business-language SQL over the customer's own data on their own hardware. *Rehearse this: I did not
-   verify that a result table renders.*
-5. **`/data/catalog/governance`** — ONLY after the seed + one **Apply retention now** run. Then it becomes the
-   compliance close: classified assets, PII count, a green "Last applied <timestamp>" card with per-class
-   outcomes. Today it is six zeros and an amber warning.
-6. *(optional)* **`/data/lineage`** — read only the counts band aloud (4 namespaces · 54 jobs · 100 datasets ·
-   160 edges) and do not scroll into the rows.
-
-### What to avoid on stage
-
-- **`/data/catalog` and `/data/catalog/governance`** (pre-seed) — six zero tiles, "No datasets catalogued yet".
-- **Any connector detail page** (`/data/connectors/con_erp`, `con_corebank`, `con_policyadmin`) — projects a
-  plaintext database password and `127.0.0.1` ports.
-- **The "Browse objects" button** on either S3 source — always dead-ends on "Approve an object scope first".
-- **`/data/knowledge`** (empty: "No collections yet") and **`/data/knowledge/memory`** (three amber "Nobody
-  holds this" + "change it on the host").
-- **`/data/knowledge/indexes`** — "TOTAL VECTORS 0", `qdrant` ×3, `offgrid-s1.local:6333`, `offgrid-brain`.
-- **`/data/flows`** (two empty link cards) and **`/data/flows/orchestration`** (one empty box).
-- **`/data/warehouse/models`** — "ClickHouse" ×2, three stacked headings, empty list, disabled button.
-- **Scrolling the bottom of `/data`** — the "Vector DB inspector" debug panel with a `qdrant/lancedb` dropdown
-  and an api-key field.
-- **Clicking any lineage row** — raw hashes, `NO INPUTS` ×12, an `UNKNOWN` badge.
-- **The "Sources" sidebar item and the "Manage sources" button** — they navigate to the page you are on.
-
-### Cheapest wins, ranked
-
-1. **Copy the catalogue + knowledge seed into `default`** (`data_assets`, `data_classifications`,
-   `retention_policies`, `org_knowledge_collections` + `org_knowledge_docs`, cloned from `org_bharat`). One SQL
-   script, no code. This alone converts THREE dead screens (`/data/catalog`, `/data/catalog/governance`,
-   `/data/knowledge`) into the governance story, and unlocks demo beat #5.
-2. **Mask the connector endpoint** — strip `user:pass@` at
-   `src/app/(console)/data/connectors/[id]/page.tsx:132-138` using the existing `toDisplayHost`. One line, and it
-   removes the only genuinely damaging thing on any Data screen.
-3. **Fill in classification + lawful basis on the five data domains** (existing UI, ~2 minutes of clicking) and
-   press **Apply retention now** once. Turns the best screen from ten amber gap badges into proof, and turns the
-   governance panel's amber "never applied" card green.
-4. **Copy/visibility sweep, ~10 small edits:** drop `qdrant`/`:6333`/`offgrid-brain` on the retrieval screen;
-   `ClickHouse` ×4 in the warehouse-model strings; render unknown vector counts as "—" not `0`; hide the
-   `airbyte_internal` database group from `/data/warehouse`; hide the Vector-DB-inspector panel; remove the
-   duplicated heading block on `/data/warehouse/models`.
-5. **Make the dead links live and fill the empty boxes:** point Sources / "Manage sources" / the sources tile at
-   `/data#connectors`; add one S3-bound data domain so "Browse objects" works; seed 2–3 `etl_jobs`; bring the
-   data-quality sidecar up (or drop it from the health band) so the hub has no red "Offline" badge; clear the one
-   failed ingest job so "INGEST ATTENTION" is not a red tile.
-
----
-
-## Out of scope for the demo
-
-- `src/components/lake/DataLakeManager.tsx:48-53` — `loadBuckets` has no `res.ok` check or error state, so an
-  object-store outage would render "No buckets yet."; the sibling `loadObjects` (same file, :55-73) does it
-  correctly. Store is up, so no demo symptom.
-- `src/app/api/v1/admin/lake/buckets/route.ts:14-18` — GET has no try/catch; a failure becomes an unhandled 500.
-- Bucket **delete** exists in the API (`:36-49`) but has no UI affordance; objects have one, buckets don't.
-- Seven Data page files plus `src/app/(console)/storage/page.tsx` are shadowed by permanent redirects
-  (`src/modules/route-migrations.mjs:8,78-84`) — dead code; two are still used as content components.
-- Two parallel dataset registries (`datasets` in `src/lib/store.ts:1067` vs `data_assets` in
-  `src/lib/data-catalog-store.ts:129`) with no migration path — "Seed from connectors"
-  (`src/app/api/v1/admin/data-assets/seed/route.ts:19-28`) derives from connectors/domains and can never bridge
-  them, so anything registered as a legacy `dataset` stays outside classification, retention and erasure.
-  Visible symptom is the 4-vs-0 contradiction already logged as a DEMO-BLOCKER; the structural half is post-demo.
-- `src/lib/data-catalog-store.ts` exposes `orgId: string = DEFAULT_ORG` defaults on ~18 functions; every call
-  site in this section passes an explicit org, so no visible leak.
-- Collection rows on `/data/knowledge/indexes` don't link to their existing detail route and offer only Delete.
-- Engine names only reachable when a service is unconfigured: `SeaweedFS`
-  (`src/components/lake/DataLakeManager.tsx:139`), `Marquez` (`src/components/lineage/LineageGraph.tsx:24`).
-- `Airbyte` in a replication schedule hint (`src/components/data/ConnectionScheduleManager.tsx:310`) and
-  `Kafka or Redpanda` in a source form title (`src/components/integrations/KafkaSourceForm.tsx:152`) — only
-  visible inside edit/create dialogs.
-
 ### [DEMO-BLOCKER] `/data/knowledge` — the first screen under Knowledge — is empty: "No collections yet"
 
 **Persona:** business audience; the "your documents become answers" beat
@@ -498,3 +396,150 @@ inspection.
 datasets) and recount; rename the `seedds_*` datasets and drop `S1 ingest verify`; scope the catalogue to the
 signed-in org's namespaces so `bhcon_*` cannot appear. Until then, do not open this tab.
 **Screenshot:** `data_lineage_datasets.png`.
+
+### [DEMO-BLOCKER] `/data/flows/orchestration/namespaces` has a broken layout and lists `tutorial` / `system` scaffolding
+
+**Persona:** business audience; one click off-script from Orchestration
+**Where:** `src/app/(console)/data/flows/orchestration/namespaces/page.tsx`,
+`src/app/(console)/data/flows/layout.tsx`
+**What:** The page content starts flush under the console header with no title block or top padding — unlike
+every other Data page, which opens with a breadcrumb + heading block — and the **fourth card (`system`) runs to
+the right edge with its border cut off** at 1600px. The five namespaces listed are the workflow engine's own:
+`offgrid`, `offgrid.etl`, `offgrid.production`, **`system`**, **`tutorial`**. The description reads
+*"Scopes that group your workflows and the config/secret keys they read."*
+**Why it matters:** A visibly mis-laid-out page with a card running off the screen looks like an unfinished
+build, and `tutorial` / `system` are the orchestration engine's demo scaffolding — the audience is being shown
+the engine's insides, not a product.
+**Fix (cheap):** add the missing page header/padding wrapper and change the grid so four cards fit; filter
+`system` and `tutorial` out of the list; reword the description in product language ("Groups your data jobs and
+the settings they read").
+**Screenshot:** `data_flows_orchestration_namespaces.png`.
+
+### [DEMO-RISK] Replication has exactly one connection, on a "manual" schedule, last run 18 days ago
+
+**Persona:** business audience; this was going to be the "your systems keep flowing" beat
+**Where:** `src/app/(console)/data/flows/replication/page.tsx:14,27-33`, detail copy at
+`src/components/data/ConnectionScheduleManager.tsx:310`
+**What:** Read live from the replication engine on the box: **one** connection — *"CoreBank to Off Grid
+Warehouse"*, status `active`, schedule **`manual`** — with **one** historical sync (succeeded, 76,573 records)
+that ran on 2026-07-17, i.e. ~18 days ago. That single run is also why every warehouse table shows an amber
+"18d ago" badge. So the page renders one pipeline card, one job row and one schedule card on a 1600px frame, and
+opening the connection detail shows the hint *"How often **Airbyte** replicates …"*.
+**Why it matters:** "Governed, scheduled replication from your core systems" is told over one manual, three-week-
+old connection — and the follow-up click names the engine.
+**Fix (cheap):** run the sync once before the demo (fresh timestamps everywhere, including the warehouse
+badges), set the schedule to hourly/daily so the card says something other than "manual", add a second
+connection (Policy admin or CRM → warehouse), and change that one string to "How often {name} is refreshed".
+**Note:** this route could not be screenshotted — the shared dev server timed out on it three times under load
+from concurrent audits. Findings here are from the live engine API + the page source.
+
+
+---
+
+## Demo readiness
+
+### The root cause of most of it: the demo org is the wrong org
+
+Verified on the box — the rich Indian-BFSI seed lives under `org_bharat` / `org_suraksha`, but the console signs
+in as `default`, and the two seeds cover **different tables**:
+
+| table | `default` | `org_bharat` | `org_suraksha` |
+|---|---|---|---|
+| `connectors` | 8 | 7 | 3 |
+| `data_domains` | 5 | 23 | 14 |
+| `datasets` (legacy) | **4** | 0 | 0 |
+| `ingest_jobs` | **7** | 0 | 0 |
+| `data_assets` (catalogue) | **0** | 12 | 4 |
+| `data_classifications` | **0** | 23 | 4 |
+| `org_knowledge_collections` | **0** | 6 | 1 |
+| `etl_jobs` | **0** | **0** | **0** |
+
+So `/data/catalog`, `/data/catalog/governance` and `/data/knowledge` are empty purely because their tables were
+never seeded for `default`. **Do not fix this by switching the demo to `org_bharat`** — that would empty the hub's
+Datasets and Ingest tiles instead. Copy the missing rows INTO `default`. `etl_jobs` is empty for every org and
+needs new rows.
+
+### The story — strongest 2 minutes in Data, in order
+
+1. **`/data`** (the hub) — open here. Four real tiles, an "Inside data" card grid. Say the positioning sentence
+   over this screen. **Do not click "Manage sources" or the "Connected sources" tile** (both no-op) and **do not
+   scroll past the Data-catalog card** — the Vector-DB-inspector debug panel is below it.
+2. **`/data/domains`** — the money screen, and the best-looking one in the section. Five plausible BFSI domains,
+   then the **Test resolve** box: type *"check the employee reimbursement quota"* and show it binding
+   deterministically to Policy Admin → `employee_quota`. "Your language, routed to the right system, by rule,
+   never a guess." Needs the classification / lawful-basis seed first, or the grid is ten amber gap badges.
+3. **`/data/warehouse`** — 22 tables · 5 databases · **801,826 rows**, grouped, with credible fact/dim names.
+   The "and it all lands in your own warehouse" beat. Needs the `AIRBYTE_INTERNAL` group hidden and the amber
+   "18d ago" badges refreshed (running the one replication sync fixes the badges).
+   *Replacing the earlier suggestion of `/data/flows/replication` here — it holds one manual, 18-day-old
+   connection and is too thin to carry a beat until a second connection and a schedule exist.*
+4. **`/data/warehouse/query`** — finish here. Click the **"Non-performing loans by product"** starter query and
+   Run it. Business-language SQL over the customer's own data on their own hardware. *Rehearse this: I did not
+   verify that a result table renders.*
+5. **`/data/catalog/governance`** — ONLY after the seed + one **Apply retention now** run. Then it becomes the
+   compliance close: classified assets, PII count, a green "Last applied <timestamp>" card with per-class
+   outcomes. Today it is six zeros and an amber warning.
+6. *(optional)* **`/data/lineage`** — read only the counts band aloud (4 namespaces · 54 jobs · 100 datasets ·
+   160 edges) and do not scroll into the rows.
+
+### What to avoid on stage
+
+- **`/data/catalog` and `/data/catalog/governance`** (pre-seed) — six zero tiles, "No datasets catalogued yet".
+- **Any connector detail page** (`/data/connectors/con_erp`, `con_corebank`, `con_policyadmin`) — projects a
+  plaintext database password and `127.0.0.1` ports.
+- **The "Browse objects" button** on either S3 source — always dead-ends on "Approve an object scope first".
+- **`/data/knowledge`** (empty: "No collections yet") and **`/data/knowledge/memory`** (three amber "Nobody
+  holds this" + "change it on the host").
+- **`/data/knowledge/indexes`** — "TOTAL VECTORS 0", `qdrant` ×3, `offgrid-s1.local:6333`, `offgrid-brain`.
+- **`/data/flows`** (two empty link cards) and **`/data/flows/orchestration`** (one empty box).
+- **`/data/warehouse/models`** — "ClickHouse" ×2, three stacked headings, empty list, disabled button.
+- **Scrolling the bottom of `/data`** — the "Vector DB inspector" debug panel with a `qdrant/lancedb` dropdown
+  and an api-key field.
+- **Clicking any lineage row** — raw hashes, `NO INPUTS` ×12, an `UNKNOWN` badge.
+- **The "Sources" sidebar item and the "Manage sources" button** — they navigate to the page you are on.
+
+### Cheapest wins, ranked
+
+1. **Copy the catalogue + knowledge seed into `default`** (`data_assets`, `data_classifications`,
+   `retention_policies`, `org_knowledge_collections` + `org_knowledge_docs`, cloned from `org_bharat`). One SQL
+   script, no code. This alone converts THREE dead screens (`/data/catalog`, `/data/catalog/governance`,
+   `/data/knowledge`) into the governance story, and unlocks demo beat #5.
+2. **Mask the connector endpoint** — strip `user:pass@` at
+   `src/app/(console)/data/connectors/[id]/page.tsx:132-138` using the existing `toDisplayHost`. One line, and it
+   removes the only genuinely damaging thing on any Data screen.
+3. **Fill in classification + lawful basis on the five data domains** (existing UI, ~2 minutes of clicking) and
+   press **Apply retention now** once. Turns the best screen from ten amber gap badges into proof, and turns the
+   governance panel's amber "never applied" card green.
+4. **Copy/visibility sweep, ~10 small edits:** drop `qdrant`/`:6333`/`offgrid-brain` on the retrieval screen;
+   `ClickHouse` ×4 in the warehouse-model strings; render unknown vector counts as "—" not `0`; hide the
+   `airbyte_internal` database group from `/data/warehouse`; hide the Vector-DB-inspector panel; remove the
+   duplicated heading block on `/data/warehouse/models`.
+5. **Make the dead links live and fill the empty boxes:** point Sources / "Manage sources" / the sources tile at
+   `/data#connectors`; add one S3-bound data domain so "Browse objects" works; seed 2–3 `etl_jobs`; bring the
+   data-quality sidecar up (or drop it from the health band) so the hub has no red "Offline" badge; clear the one
+   failed ingest job so "INGEST ATTENTION" is not a red tile.
+
+
+---
+
+## Out of scope for the demo
+
+- `src/components/lake/DataLakeManager.tsx:48-53` — `loadBuckets` has no `res.ok` check or error state, so an
+  object-store outage would render "No buckets yet."; the sibling `loadObjects` (same file, :55-73) does it
+  correctly. Store is up, so no demo symptom.
+- `src/app/api/v1/admin/lake/buckets/route.ts:14-18` — GET has no try/catch; a failure becomes an unhandled 500.
+- Bucket **delete** exists in the API (`:36-49`) but has no UI affordance; objects have one, buckets don't.
+- Seven Data page files plus `src/app/(console)/storage/page.tsx` are shadowed by permanent redirects
+  (`src/modules/route-migrations.mjs:8,78-84`) — dead code; two are still used as content components.
+- Two parallel dataset registries (`datasets` in `src/lib/store.ts:1067` vs `data_assets` in
+  `src/lib/data-catalog-store.ts:129`) with no migration path — "Seed from connectors"
+  (`src/app/api/v1/admin/data-assets/seed/route.ts:19-28`) derives from connectors/domains and can never bridge
+  them, so anything registered as a legacy `dataset` stays outside classification, retention and erasure.
+  Visible symptom is the 4-vs-0 contradiction already logged as a DEMO-BLOCKER; the structural half is post-demo.
+- `src/lib/data-catalog-store.ts` exposes `orgId: string = DEFAULT_ORG` defaults on ~18 functions; every call
+  site in this section passes an explicit org, so no visible leak.
+- Collection rows on `/data/knowledge/indexes` don't link to their existing detail route and offer only Delete.
+- Engine names only reachable when a service is unconfigured: `SeaweedFS`
+  (`src/components/lake/DataLakeManager.tsx:139`), `Marquez` (`src/components/lineage/LineageGraph.tsx:24`).
+- `Kafka or Redpanda` in a source form title (`src/components/integrations/KafkaSourceForm.tsx:152`) — only
+  visible inside edit/create dialogs.

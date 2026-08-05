@@ -24,6 +24,18 @@ and it reads well. Off the scripted path, no.** Novel descriptions come back wit
 mid-sentence ("Decide whether the credit can be", "And have the tax manager approve") and an invented
 read of the wrong data source. Every fix below is seed data or copy. None is a refactor.
 
+**The single most important sentence in this report: the *building* is in good shape; the *demo data* is
+not.** Nine of the fourteen blockers are one `UPDATE` or one seed script away, and they are what makes the
+finished screens look broken. The section overview shows `Blueprints ready 0 of 3` in a red tile,
+`Reusable templates 0` and `Deployed 0` — because `solution_deployments` is **empty on all three tenants**
+and the demo tenant has **zero templates**, so *"Start from a template"* (the second button on the front
+door) is a dead end. Budget an hour of seeding, not a sprint of engineering.
+
+**The two assets worth building the talk around:** (1) the compile of the built-in example — five clean
+governed steps in 20s; (2) the **"WHAT HAPPENS WHEN YOU RUN THIS"** panel on the Run screen, which tells a
+reader in plain language exactly what the app will do *before* it runs, including *"You'll be asked to
+decide."* That panel is the acceptance bar, met — point at it.
+
 ### Environment fact — verified, do not re-derive
 `127.0.0.1:3005` is an **SSH forward to the box** (`ssh -f -N -L 3005:127.0.0.1:3005 offgrid-tunnel`,
 pid 46157). The console runs from `/Users/admin/offgrid/console` against the **box** Postgres. The local
@@ -36,8 +48,10 @@ because it read the local DB. Query the box (`node -e` + `pg`, read-only) for an
 - [x] **Live compile driven** for all three built-in examples + one novel Indian-tax description (`scratchpad/probe-compile*.mjs`)
 - [x] Live box DB: every app, trigger kind, publish state, slug, owner, run dates, data-domain ids/labels
 - [x] Trigger substrate traced end to end (`triggers.ts` → `trigger-dispatch.ts` → `app-builder.ts` → `app-model.ts` → the POST route)
-- [x] `/solutions` hub read by code (D11) — **not screenshotted**
-- [ ] **NOT COVERED — pick up here.** `/solutions/templates`, `/solutions/library` + blueprint detail, `/solutions/deployed`, `/solutions/reviews`, and the app's `Reports` / `Quality` / `Access` / `Schedule` / `Input` tabs were never screenshotted: the **shared dev server on :3005 stopped responding** (three `curl /solutions`, 45s each, no reply; a second back-to-back compile dropped with `socket hang up`). Everything above is either pixel-confirmed or box-DB-confirmed; these five surfaces are unjudged. Re-shoot them when the server is free — `/solutions/templates` matters most, since "Start from a template" is the second button on the Apps front door.
+- [x] **`/solutions` overview** — pixel-confirmed (D12) and its four tiles reconciled against the box DB
+- [x] **`/solutions/apps/[id]/input`** (Start a case / Run) — pixel-confirmed (D14)
+- [x] Box DB: templates per org, blueprints per org, `solution_deployments` (empty everywhere)
+- [ ] **NOT COVERED — pick up here.** `/solutions/templates`, `/solutions/library` + blueprint detail, `/solutions/deployed`, `/solutions/reviews`, and the app's `Reports` / `Quality` / `Access` / `Schedule` / `History` tabs. The **shared dev server on :3005 kept failing** (`report.json` for these shows 90s `networkidle` timeouts, HTTP 408 on `layout.css`, `ERR_EMPTY_RESPONSE`, `ERR_CONNECTION_REFUSED`). Two routes painted anyway and are judged above; `/solutions/templates` and `/solutions/library` produced no usable pixels and `/…/reports` returned an empty response. **Those server errors are harness/contention artifacts — do NOT report them as product defects.** Highest value to re-shoot: **`/solutions/templates`** (D13 says it is empty on the demo tenant; what it *says* when empty is unverified), then `/solutions/library` + a blueprint detail (D12 says all 3 are non-adoptable — the "See what is missing" click).
 
 **Reusable harness for whoever resumes:** `scratchpad/probe-compile2.mjs` compiles all three built-in
 examples against the box and prints the step list as the refine screen would label it — that is the fastest
@@ -305,8 +319,98 @@ bookmark). One stale link or mistype on stage blanks the entire console. The cop
 exist" with "your deployment doesn't have this", so if he demos a restricted role a **permission** outcome
 reads as a broken product.
 
-### D11 — The Solutions section landing page gives its five data reads 1.5 seconds, then renders "0 of 0" on a populated system
-Screen: **`/solutions`** — what the sidebar's "Solutions" row opens; the section overview.
+### D12 — The Solutions overview's central story — Blueprint → App → Deployed — terminates in ZERO, in a red tile, with the same warning printed twice
+Screen: **`/solutions`** — what the sidebar's "Solutions" row opens.
+Screenshot: `/tmp/audit/build4/solutions.png`. Numbers verified against the box DB.
+
+The headline copy is strong (*"Turn high-value processes into governed AI"*) and the "HOW THIS FITS
+TOGETHER" explainer is genuinely good. Then the page proves nothing:
+
+| tile | shows | box DB |
+| --- | --- | --- |
+| PUBLISHED APPS | `3 of 4` ✓ | correct |
+| BLUEPRINTS READY TO DEPLOY | **`0 of 3`** — in a **red/destructive-bordered card** | 3 blueprints, none adoptable |
+| REUSABLE TEMPLATES | **`0`** | `default` org has **0** templates (D13) |
+| `03 · DEPLOYED` | **`0`** + an amber warning box | **`solution_deployments` is EMPTY across all three tenants** |
+
+And the same negative sentence is printed **twice on one screen** — once full-width above the chain and
+once inside the Deployed card:
+> *"No App currently satisfies a blueprint contract. Open a blueprint to see which data domains, actions
+> or pipeline it still needs."*
+
+So two of four tiles are zero, one of them styled as an error, the third stage of the three-stage chain is
+empty with a warning, and the only call to action there is **"See what is missing →"**. Projected, the
+section overview reads as a system where nothing has been achieved.
+
+`docs/APP_AS_PRODUCT.md` claims this was fixed — *"Deployed is no longer a dead end — bank tenant shows an
+ACTIVE adoption (`scripts/seed-solution-deployment.mts`)"*. **On this box that is false: the
+`solution_deployments` table has zero rows for every org.** Either the seed was never run here or it was
+wiped. Re-running that script is the fix, and it is data-only.
+
+Jargon on the same screen for a business audience: *"blueprint contract"*, *"data domains, actions or
+pipeline"*, *"governed pipeline"*, *"versioned proof"*.
+
+### D13 — "Start from a template" — the second button on the Apps front door — is a dead end on the demo tenant
+Box DB, templates usable by each tenant:
+```
+default      | 0   <-- the org the demo login lands in
+org_bharat   | 3
+org_suraksha | 2
+```
+`/solutions/apps` puts **"Start from a template"** immediately left of "New app" at the top right
+(`build/studio/page.tsx:70-73`, visible in `/tmp/audit/build/build_apps.png`), and `/solutions` counts
+**REUSABLE TEMPLATES 0**. On the tenant he demos, that button leads to an empty page.
+
+`listTemplates` (`apps-store.ts:962-975`) requires `is_template = true` AND
+`visibility IN ('public','org')` scoped to the current org — the six templates the progress log describes
+were seeded into `org_bharat`/`org_suraksha` only. **"Reuse a previous app / select from templates" is one
+of the founder's named requirements**, so this is a headline capability with nothing behind it on the demo
+tenant. Fix: publish 2–3 of the `default` org's apps as templates (the real `publish-as-template` route
+already exists), or demo from the bank tenant.
+
+I could not screenshot `/solutions/templates` itself (server died), so what the empty page *says* is
+unverified — it may or may not be a good empty state. **Check that page before the talk.**
+
+### D14 — The Run screen sits on a permanent "Looking for cases…" and offers a leaked test prompt as the example case
+Screen: **`/solutions/apps/app_e8b19b50/input`** — "Start a case", the run-it-live moment.
+Screenshot: `/tmp/audit/build4/solutions_apps_app_e8b19b50_input.png`.
+
+Three things a business audience reads:
+1. **"Looking for cases…"** — the case picker never resolves. This is the fix for
+   `docs/APP_AS_PRODUCT.md` **GAP 0** (*"why is this free text? all of the data is already in the
+   organization"*), and on screen it is a spinner that never finishes. **Two candidate causes and I cannot
+   separate them from one shot:** the app's data-source bindings are broken (D2 — `domain:"claims"` is a
+   label, so `case-candidates` cannot resolve a connector), *and* the shared dev server was refusing
+   connections during this capture (`report.json`: `ERR_CONNECTION_REFUSED`). **Re-check after fixing D2.**
+   Either way, a never-resolving spinner is the lens's canonical blocker.
+2. **The example case is a leaked test prompt.** Both the help line and the input read:
+   > *"Or describe it by hand: … For example: **In one line, what does this app do for the bank?**"*
+
+   `app-input-prompt.ts` derives the example from *"a REAL previous case from that app"* — and this app's
+   real previous case is a junk probe run. So on the run screen of a **motor-insurance** app, the suggested
+   case to work on is a meta-question about the app. The same string appears as the top row of "Recently
+   handled" on the Work tab (D1's screenshot), marked *"Could not finish"*. Delete that probe run and the
+   example becomes a real claim.
+3. **"Amounts in USD ($)."** — D3 again, here in the largest description text on the screen.
+
+**Worth protecting — this is the best thing in the section.** The right-hand panel is excellent and should
+be the thing he points at:
+> **WHAT HAPPENS WHEN YOU RUN THIS** — 1 Read the claim & policy · 2 Look up the customer & vehicle ·
+> 3 Decide cashless vs surveyor · 4 **Claims officer approval** — *"You'll be asked to decide."* ·
+> 5 Claim decision + audit note
+> *"This app pauses for a human decision. After you submit, the run shows up on the Review tab for
+> approval before it finishes."*
+
+That is truthful, plain-language, pre-run disclosure of exactly what the app will do — the thing the
+acceptance bar asks for — and the **"Rehearse it" / "Run for real"** pair beside it is the best copy in the
+section. Lead with this panel.
+
+### D11 — *(CORRECTED — DOWNGRADED TO A RISK)* The Solutions overview caps its data reads at 1.5s
+**I predicted this would render `0 of 0` on a populated system. The live screen shows `3 of 4`, which is
+correct.** Recording the correction rather than the prediction: the reads landed inside the cap, so the
+symptom I described did **not** occur. Keeping it as a RISK because the mechanism is real and the box is
+demonstrably slow (it stopped answering HTTP entirely during this audit), not because I observed it.
+
 File: `src/app/(console)/solutions/page.tsx:27-33,50`.
 
 ```ts
@@ -334,12 +438,16 @@ that signal away on the next line**: `(apps ?? [])`, `(blueprints ?? [])`, `(dep
 `publishedApps === 0 && (apps ?? []).length > 0` (`:63`), which a `null` read can never satisfy — so the
 zeros render **calm and neutral**, indistinguishable from a brand-new empty org.
 
-This is the lens's canonical DEMO-BLOCKER — an empty chart on a populated system — on the page the
-sidebar's section row opens. **Caveat, stated honestly: I could not screenshot it.** The shared dev server
-became unresponsive before I got the shot, so this is code-confirmed and timing-plausible, not
-pixel-confirmed. **Load `/solutions` twice cold in rehearsal and look at those two numbers.** Raising the
-caps to ~8s (or rendering the `null` as "couldn't load — retry" instead of `0 of 0`) is a one-line fix
-either way.
+The residual risk is real but unobserved: if any of those six reads *does* exceed its cap on the day, the
+page renders `0 of 0` **calm and neutral** rather than "couldn't load", because `state:'attention'` requires
+`(apps ?? []).length > 0` (`:63`) — a condition a `null` read can never satisfy. Raising the caps to ~8s, or
+rendering the `null` as "couldn't load — retry", is a one-line fix. **Lower priority than D12/D13, which
+are about the same page and are confirmed.**
+
+**Method note for whoever resumes:** this is the second prediction I made from code alone that the
+screenshot refuted (the first was the pipeline-binding claim in D5's correction). Both times the code
+reading was right about the mechanism and wrong about the outcome. Do not promote a code-derived symptom to
+a blocker without the image.
 
 ---
 
@@ -441,6 +549,12 @@ with no explanation of what it does.
 - **Typing `/build`** or following any pre-migration link — chromeless 404 (D10).
 - **Reading the Apps stat band aloud** — "9 waiting" vs 5 openable (D8).
 - **A second compile back to back** (R1).
+- **`/solutions`** (the sidebar's own Solutions row) until D12 is seeded — two zero tiles, one of them red,
+  a chain ending in 0, and the same warning printed twice.
+- **"Start from a template"** — empty on the demo tenant (D13).
+- **The Run screen's "Start a case" card** until D2/D14 are fixed — a permanent "Looking for cases…" and an
+  example case reading *"In one line, what does this app do for the bank?"*. The panel to its **right** is
+  excellent; show that one.
 
 ### Cheapest wins, ranked — all data or copy, no refactors
 1. **Re-date the seeded runs forward** so they fall inside the dashboard window (D4). One UPDATE. Turns

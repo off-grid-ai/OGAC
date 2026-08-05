@@ -39,6 +39,7 @@ import {
   type ActionReceipt,
 } from '@/lib/action-contract';
 import type { AppStep } from '@/lib/app-model';
+import { formatMoney } from '@/lib/money';
 
 // ─── the minimal app shape the inbox/detail needs (structural — no store import) ──────────────────
 export interface ReviewAppLike {
@@ -164,19 +165,18 @@ export function actionEvidenceForReview(
   };
 }
 
-// ─── amount / threshold formatting (USD) ──────────────────────────────────────────────────────────
-// A plain Intl 'en-US' currency formatter produces "$500,000". Non-numeric / absent ⇒ null (no amount
-// to show). One place, reused by the decision line, the at-a-glance label, and the input rows.
+// ─── amount / threshold formatting ────────────────────────────────────────────────────────────────
+// Routed through formatMoney, which is INR with Indian digit grouping (₹12,00,000 — lakh/crore, not
+// 1,200,000). This used to be a hardcoded Intl 'en-US' + 'USD' formatter, so every approval question
+// on an Indian BFSI deployment read "Approve $1,200,000 — Personal Loan Underwriting for Arjun
+// Pillai?". The money module already existed and already had the right default; this call site simply
+// predated it. Non-numeric / absent ⇒ null (no amount to show).
 export function formatAmount(value: unknown): string | null {
   let n = Number.NaN;
   if (typeof value === 'number') n = value;
   else if (typeof value === 'string' && value.trim() !== '') n = Number(value);
   if (!Number.isFinite(n)) return null;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n);
+  return formatMoney(n);
 }
 
 // The keys we treat as "the amount" for the at-a-glance line + the decision question, in priority
