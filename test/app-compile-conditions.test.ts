@@ -11,6 +11,7 @@
 // Additive; imports existing exports only.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
 import {
   type ModelPlan,
   assembleFromPlan,
@@ -304,9 +305,16 @@ test('gatewayDecompose: a fetch that throws is caught → null (catch arm)', asy
 
 // ─── defaultDeps.loadDomains — runs the real org-context assembler over the DB ─────────────────────
 
-// Hits real Postgres (the org-context assembler) — skip where no DB is provisioned (CI unit lane);
+// Hits real Postgres (the org-context assembler) — skip where no DB is reachable (CI unit lane);
 // exercised locally + in the integration lane, and loadDomains is I/O glue (outside the coverage bar).
-test('defaultDeps.loadDomains: returns an array (only connector-bound domains) for a real org', { skip: !process.env.DATABASE_URL }, async () => {
+//
+// Gated on REACHABILITY, not on DATABASE_URL merely being set. A connection string can be present and
+// point at nothing — which is exactly what happens when CI, or a local run simulating it, exports a
+// placeholder: the old `!process.env.DATABASE_URL` guard then let the test run and fail with a
+// connection error dressed up as an assertion failure. `dbReachable()` is the shared probe the rest of
+// the integration suites already use.
+const DB_UP = await dbReachable();
+test('defaultDeps.loadDomains: returns an array (only connector-bound domains) for a real org', { skip: DB_UP ? false : SKIP_MESSAGE }, async () => {
   const domains = await defaultDeps.loadDomains('default');
   assert.ok(Array.isArray(domains));
   // Every returned domain MUST carry a connector + resource (the filter arm) — the honesty guarantee.
