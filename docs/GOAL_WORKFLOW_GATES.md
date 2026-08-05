@@ -134,11 +134,34 @@ declares its own) and threaded onto the durable path too, since the WORKER creat
 Also found, and NOT fixed here: 14 capability rows claim four `yes` gates while their gap text says
 otherwise — logged as **G-208** in `docs/GAPS_BACKLOG.md`. The map test is red because of it.
 
-### Next up — cluster 2, governed object I/O (5 items)
+**2026-08-05 — cluster 2, `seaweedfs/lifecycle-versioning`: adapter and ui closed, workflow open.**
 
-SeaweedFS runs and serves; nothing governed reads or writes through it. Same shape as this one: the
-primitive is proven, the BINDING is missing. Do not rebuild the client — check for an existing
-adapter first, the way `kafka-enterprise-source.ts` already existed here.
+Verifying first paid for itself: the adapter gate said the port "does not manage bucket lifecycle
+policy" and it already did. Three real defects surfaced while proving it, none visible from the code:
+clearing a rule was a PUT of an empty document that SeaweedFS accepts and IGNORES (so "remove"
+reported success and changed nothing); the response parser read a `<Transition><Days>` as an EXPIRY,
+so the panel would have said "deleted after 1 day" about data meant only to move, and saving would
+have made it true; and a bucket whose objects live in folders rendered "Empty bucket." All fixed.
+
+`RetentionPanel` on `/data/lake` is the ui gate. **workflow stays `no`, and that is the honest
+remaining work:** nothing binds a retention policy to the buckets the console itself writes to. A
+person sets it per bucket, so a bucket created any other way keeps everything forever — which is not
+a retention policy, it is a retention screen.
+
+### Next up — the rest of cluster 2 (4 items)
+
+The three `enterprise-source-minio` rows and `seaweedfs/topology-repair`. Governed object read/write
+is the valuable one: SeaweedFS serves, and no governed pipeline step reads or writes through it.
+Same shape as the stream trigger — the primitive is proven, the BINDING is missing. Check for an
+existing adapter before writing one; `s3-object-store.ts` already has the full port, exactly as
+`kafka-enterprise-source.ts` already existed for cluster 1.
+
+**Two standing traps this session hit, worth reading before the next slice:**
+- A live proof needs the WORKER restarted, not just the console — `app-worker.mts` bundles its
+  workflow at startup, and three deploy rounds were spent before that was the answer.
+- The dev server on the box issues `__Secure-` cookies for the production host, so a browser refuses
+  them over `http://127.0.0.1:3005`. Start it with `AUTH_URL=http://127.0.0.1:3005` to screenshot
+  an authed page.
 
 ## Measuring it
 
