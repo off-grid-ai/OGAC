@@ -55,9 +55,13 @@ function run(p: Partial<AppRunView> = {}): AppRunView {
 }
 
 // ─── formatAmount ────────────────────────────────────────────────────────────────────────────────────
-test('formatAmount: en-US grouping for numbers + numeric strings, null otherwise', () => {
-  assert.equal(formatAmount(500000), '$500,000');
-  assert.equal(formatAmount('500000'), '$500,000');
+// formatAmount is routed through money.ts, which is INR with Indian (lakh/crore) digit grouping — the
+// product's default currency and market. This used to assert a hardcoded en-US "$500,000"; that was the
+// stale expectation, not the code (money.ts predated this call site and already did the right thing —
+// see the comment on formatAmount in review-inbox.ts). Renamed to describe what it actually checks now.
+test('formatAmount: INR with Indian digit grouping for numbers + numeric strings, null otherwise', () => {
+  assert.equal(formatAmount(500000), '₹5,00,000');
+  assert.equal(formatAmount('500000'), '₹5,00,000');
   assert.equal(formatAmount('  '), null);
   assert.equal(formatAmount('abc'), null);
   assert.equal(formatAmount(undefined), null);
@@ -66,9 +70,10 @@ test('formatAmount: en-US grouping for numbers + numeric strings, null otherwise
 
 // ─── decisionQuestion ──────────────────────────────────────────────────────────────────────────────
 test('decisionQuestion: amount + requester + subject fallbacks', () => {
+  // ₹5,00,000 (Indian grouping), not the old $500,000 — see the formatAmount test above.
   assert.equal(
     decisionQuestion(app(), { amount: 500000, employeeId: 'EMP00001' }),
-    'Approve $500,000 — Reimbursement Approver for EMP00001?',
+    'Approve ₹5,00,000 — Reimbursement Approver for EMP00001?',
   );
   // subject overrides app title as the noun; no amount.
   assert.equal(decisionQuestion(app(), { subject: 'Travel claim' }), 'Approve Travel claim?');
@@ -78,7 +83,8 @@ test('decisionQuestion: amount + requester + subject fallbacks', () => {
 
 // ─── amountLabelFor / requestedByFor ─────────────────────────────────────────────────────────────
 test('amountLabelFor + requestedByFor read the priority keys', () => {
-  assert.equal(amountLabelFor({ quote: 12500000 }), '$12,500,000');
+  // 12500000 grouped the Indian way is 1,25,00,000 (1 crore 25 lakh), not the western 12,500,000.
+  assert.equal(amountLabelFor({ quote: 12500000 }), '₹1,25,00,000');
   assert.equal(amountLabelFor({}), null);
   assert.equal(requestedByFor({ requester: 'Asha' }), 'Asha');
   assert.equal(requestedByFor({ emp_id: 'EMP42' }), 'EMP42');
@@ -135,7 +141,8 @@ test('isReviewerFor: owner, admin, approver role/user, approve allow-list, and d
 test('summarizeInboxItem: maps run+app to a scannable row with canApprove', () => {
   const a = app({ policy: policy({ approval: { approverRoles: ['manager'], thresholdAttribute: 'amount', maxThreshold: 100000 } }) });
   const item = summarizeInboxItem(run({ input: { amount: 90000, employeeId: 'EMP1' } }), a, caller());
-  assert.equal(item.amountLabel, '$90,000');
+  // ₹90,000 — INR, Indian grouping (unchanged from western at this magnitude, but still ₹ not $).
+  assert.equal(item.amountLabel, '₹90,000');
   assert.equal(item.requestedBy, 'EMP1');
   assert.equal(item.stepLabel, 'Manager approval');
   assert.equal(item.canApprove, true);
@@ -222,20 +229,24 @@ test('recommendationFrom: pending outcome, else last prior, else run outcome, el
 });
 
 // ─── policyContextFrom ───────────────────────────────────────────────────────────────────────────
-test('policyContextFrom: threshold explained in plain USD, or generic', () => {
+// Renamed from "...in plain USD, or generic" — the product moved to INR (money.ts), so this now checks
+// the threshold is explained in plain, Indian-grouped rupees, not dollars.
+test('policyContextFrom: threshold explained in plain INR, or generic', () => {
   const a = app({ policy: policy({ approval: { thresholdAttribute: 'amount', maxThreshold: 100000 } }) });
-  assert.match(policyContextFrom(a, { amount: 500000 }), /\$500,000 is above the \$100,000 auto-approval limit/);
+  assert.match(policyContextFrom(a, { amount: 500000 }), /₹5,00,000 is above the ₹1,00,000 auto-approval limit/);
   // amount not present → the "amounts above X" form.
-  assert.match(policyContextFrom(a, {}), /Amounts above \$100,000 need a manager/);
+  assert.match(policyContextFrom(a, {}), /Amounts above ₹1,00,000 need a manager/);
   // no approval config → generic.
   assert.match(policyContextFrom(app(), {}), /require a person to sign off/);
 });
 
 // ─── inputPairs + humanizeKey ────────────────────────────────────────────────────────────────────
-test('inputPairs: labelled rows, amount as USD, objects stringified, skips null', () => {
+// Renamed from "...amount as USD..." — amount fields are formatted as INR now (money.ts), Indian grouping
+// and the ₹ symbol, not the old western "$500,000".
+test('inputPairs: labelled rows, amount as INR, objects stringified, skips null', () => {
   const pairs = inputPairs({ amount: 500000, employeeId: 'EMP1', meta: { a: 1 }, empty: null });
   assert.deepEqual(pairs, [
-    { key: 'Amount', value: '$500,000' },
+    { key: 'Amount', value: '₹5,00,000' },
     { key: 'Employee Id', value: 'EMP1' },
     { key: 'Meta', value: '{"a":1}' },
   ]);
@@ -280,8 +291,9 @@ test('buildReviewDetail: full plain-language detail with citations, faithfulness
     [{ ref: 'doc:1', title: 'Reimbursement Policy', snippet: '…limit $100k…', score: 0.7, supported: true }],
   );
   const detail = buildReviewDetail(r, a, t, caller());
-  assert.equal(detail.question, 'Approve $500,000 — Reimbursement Approver for EMP00001?');
-  assert.equal(detail.amountLabel, '$500,000');
+  // ₹5,00,000 — INR, Indian grouping (money.ts), not the old western $500,000.
+  assert.equal(detail.question, 'Approve ₹5,00,000 — Reimbursement Approver for EMP00001?');
+  assert.equal(detail.amountLabel, '₹5,00,000');
   assert.equal(detail.requestedBy, 'EMP00001');
   assert.equal(detail.stepLabel, 'Manager sign-off');
   assert.equal(detail.recommendation, 'Recommend approval');
@@ -289,7 +301,7 @@ test('buildReviewDetail: full plain-language detail with citations, faithfulness
   assert.equal(detail.citations.length, 1);
   assert.equal(detail.citations[0].scorePct, 70);
   assert.equal(detail.citations[0].supported, true);
-  assert.match(detail.policyContext, /above the \$100,000/);
+  assert.match(detail.policyContext, /above the ₹1,00,000/);
   // $500,000 > manager's $100,000 authority → cannot approve, reason surfaced.
   assert.equal(detail.canApprove, false);
   assert.match(detail.approveBlockedReason ?? '', /exceeds approver authority/);
