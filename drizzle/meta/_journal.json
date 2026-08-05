@@ -78,6 +78,34 @@
       "when": 1784283498285,
       "tag": "0010_solution_blueprint_contracts",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784500000000,
+      "tag": "0011_sop_template_reuse",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784600000000,
+      "tag": "0012_action_outcome_observations",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785930226317,
+      "tag": "0013_schema_drift_close",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785930613451,
+      "tag": "0014_migration_baseline_repair",
+      "breakpoints": true
     }
   ]
 }
