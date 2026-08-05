@@ -37,6 +37,16 @@ const INTERNAL = [
   [/\bkestra\b/gi, 'orchestrator'],
   [/\bkeycloak\b/gi, 'identity'],
   [/\bopenbao\b|\bvault\b/gi, 'secret store'],
+  // Added 2026-08-05. The guide copilot falls back to the ⌘K route index for a query it has no
+  // curated answer for, and that index — written for operators — has the title "Policy rules
+  // (ABAC / OPA)". Sending a visitor a label naming the policy engine is the same leak as
+  // `brain.retrieve.qdrant`, and `leaksInternalName` could not even detect it because these five
+  // engines were missing from the list. A guard that silently passes is worse than no guard.
+  [/\bopa\b|\brego\b/gi, 'policy engine'],
+  [/\bpresidio\b/gi, 'pattern detection'],
+  [/\blitellm\b/gi, 'model router'],
+  [/\bmarquez\b/gi, 'lineage store'],
+  [/\bsuperset\b/gi, 'dashboards'],
 ] as const;
 
 /**

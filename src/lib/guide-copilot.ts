@@ -193,6 +193,10 @@ export const GUIDE_QUESTIONS: readonly GuideQuestion[] = [
       'anonymize',
       'gdpr',
       'dpdp',
+      'prompt',
+      'paste',
+      'types in',
+      'enters',
     ],
     destinations: [
       {
@@ -584,9 +588,20 @@ function words(text: string): string[] {
 }
 
 /**
- * Score a question against free text: how many of its terms the text contains. Multi-word keywords
- * must appear as a phrase; single words must match a whole word (so "cost" does not match
- * "costume", and — the case that actually bit — "up" does not match "upgrade").
+ * Whole-word match, tolerant of a naive plural only. Substring matching is what makes a keyword index
+ * feel like it is guessing — "run" should not match "Run & schedule backups" — so a term has to line
+ * up with a whole word. The plural tolerance exists because a visitor writes "someone pastes a PAN"
+ * where the table says "paste".
+ */
+function hasWord(set: ReadonlySet<string>, term: string): boolean {
+  if (set.has(term)) return true;
+  if (set.has(`${term}s`)) return true;
+  return term.endsWith('s') && set.has(term.slice(0, -1));
+}
+
+/**
+ * Score a question against free text: how many of its terms the text contains. A multi-word keyword
+ * must appear as a phrase and counts double (a phrase is a much stronger signal than a word).
  */
 function score(question: GuideQuestion, text: string): number {
   const lower = ` ${text.toLowerCase()} `;
@@ -596,7 +611,7 @@ function score(question: GuideQuestion, text: string): number {
     const t = term.toLowerCase();
     if (t.includes(' ')) {
       if (lower.includes(t)) hits += 2;
-    } else if (set.has(t)) {
+    } else if (hasWord(set, t)) {
       hits += 1;
     }
   }
@@ -642,14 +657,23 @@ export function resolveGuideDestinations(
   }
 
   const ranked = GUIDE_QUESTIONS.map((q) => ({ q, s: score(q, text) }))
-    .filter((r) => r.s >= MIN_TOPIC_SCORE)
+    .filter((r) => r.s > 0)
     .sort((a, b) => b.s - a.s);
-  if (ranked.length) {
-    const destinations = dedupe(forTenant(ranked[0].q.destinations, tenantSlug)).filter((d) =>
+  const best = ranked[0];
+  if (best && best.s >= MIN_TOPIC_SCORE) {
+    const destinations = dedupe(forTenant(best.q.destinations, tenantSlug)).filter((d) =>
       isReadOnlySafeHref(d.href),
     );
     if (destinations.length) return { destinations, match: 'topic' };
   }
+
+  // A query the curated table HALF recognised (one weak hit, below the threshold) stops here.
+  // "run" is the case that showed why: it scores 1 against several questions and, left to fall
+  // through, the keyword index sent it to "Run & schedule backups" — a confident-looking answer to a
+  // question nobody asked. Guessing from a keyword index on top of an already-weak signal is a guess
+  // on a guess, and this audience reads a wrong destination as a broken product. Only a query the
+  // table knows NOTHING about (score 0) is worth a "closest match".
+  if (best) return { destinations: [], match: 'none' };
 
   // Reuse the console's existing route index rather than inventing a second one. Its labels are
   // written for operators and some of them name an engine, so they go through the sanitiser the
