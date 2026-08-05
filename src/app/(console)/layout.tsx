@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import { auth } from '@/auth';
 import { ConsoleContent } from '@/components/ConsoleContent';
+import { GuideCopilot } from '@/components/copilot/GuideCopilot';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { Hellobar } from '@/components/Hellobar';
 import { MobileGate } from '@/components/MobileGate';
@@ -42,6 +43,13 @@ export default async function ConsoleLayout({ children }: Readonly<{ children: R
             write in the browser and explains it once, instead of letting ~216 armed controls each fail
             with their own generic message. Enforcement stays server-side; this is affordance only. */}
         <ViewerWriteInterceptor />
+        {/* The floating guide. Public demo links hand a read-only account to investors and founders
+            who open the console ALONE with nobody presenting; the 2026-08-05 viewer audit found they
+            have to guess what to click. This is the way in — ask a question, get taken to the screen
+            that proves it. Tenant slug is passed because some destinations are anchored to a seeded
+            entity that exists on one tenant only (a hardcoded run id returned an EMPTY page on the
+            other tenant — org scoping working, but a dead destination). */}
+        <GuideCopilot tenantSlug={slug} />
         {/* Desktop-first: below `md` the console shows a "use a bigger screen" gate, not a broken
             layout. CSS-only (md:hidden) so no hydration flash. Landing site stays mobile-friendly. */}
         <MobileGate />
