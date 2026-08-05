@@ -224,6 +224,15 @@ export interface AppRunDeps {
     cfg: { topic?: string; key?: string },
     ctx: { runId: string; orgId: string; appId: string; outcome: string },
   ) => Promise<{ ok: boolean; configured: boolean; reason: string; partition?: number; offset?: string }>;
+  /**
+   * Save the governed outcome as an object inside an APPROVED DATA DOMAIN. The step names a domain and
+   * a file name; the bucket and prefix come from the domain binding, never from step config, so an app
+   * cannot be edited to write outside what its tenant approved.
+   */
+  saveToLake: (
+    cfg: { domain?: string; filename?: string; contentType?: string },
+    ctx: { runId: string; orgId: string; body: string },
+  ) => Promise<{ ok: boolean; configured: boolean; reason: string; key?: string; bytes?: number }>;
   /** Org's declared data domains (the rule engine's inputs). */
   listDomains: (orgId: string) => Promise<DomainLike[]>;
   /** Fetch a connector by id, org-scoped. Null if absent. */
@@ -363,6 +372,10 @@ export function defaultDeps(
     async sendToTopic(cfg, ctx) {
       const { sendToTopic } = await import('@/lib/adapters/sinks/topic');
       return sendToTopic(cfg, ctx);
+    },
+    async saveToLake(cfg, ctx) {
+      const { saveToLake } = await import('@/lib/adapters/sinks/lake');
+      return saveToLake(cfg, ctx);
     },
     inferenceEndpoint() {
       return process.env.OFFGRID_GATEWAY_URL ?? '';
@@ -1235,7 +1248,8 @@ async function executeOutputStep(
     step.sink === 'webhook' ||
     step.sink === 'slack' ||
     step.sink === 'whatsapp' ||
-    step.sink === 'topic'
+    step.sink === 'topic' ||
+    step.sink === 'lake'
   ) {
     return deliverGovernedSink(step.sink, spec, step, outcome, ctx, deps);
   }
@@ -1292,6 +1306,25 @@ async function deliverGovernedSink(
     return errorResult(step, `${descriptor.label} send held: ${decision.reason}`);
   }
 
+  // THE DATA CEILING APPLIES TO WRITES, NOT ONLY READS. A connector-query is checked against the
+  // pipeline's data allowlist before the connector is hit; a sink that WRITES into a data domain has to
+  // clear the same gate, or the lake sink becomes a way out of the ceiling — an app could be edited to
+  // write into a domain its pipeline was never approved for. Proven necessary live 2026-08-05: with the
+  // check absent, a run whose output domain had been REVOKED from the allowlist still wrote the object.
+  if (sink === 'lake') {
+    const denied = await lakeCeilingDenial(step, ctx, deps);
+    if (denied) {
+      auditEnforcement(
+        enforceCtx,
+        'pipeline.data.deny',
+        `data:${denied.domainId}`,
+        'blocked',
+        denied.reason,
+      );
+      return errorResult(step, `save denied by pipeline: ${denied.reason}`);
+    }
+  }
+
   const body = decision.body;
   const result = await dispatchSinkDelivery(sink, step, body, spec, ctx, deps);
   if (!result.configured) {
@@ -1336,6 +1369,30 @@ async function deliverGovernedSink(
 }
 
 // Dispatch the leash-approved, masked body to the concrete sink deps fn. THIN — no governance here.
+/**
+ * Is this lake sink's destination domain outside the bound pipeline's data ceiling?
+ *
+ * Returns the denial, or null when the write is permitted. Resolved through the SAME domain matcher and
+ * the SAME pure enforceDataAccess the read path uses, so the two cannot drift into different answers
+ * about the same domain.
+ */
+async function lakeCeilingDenial(
+  step: Extract<AppStep, { kind: 'output' }>,
+  ctx: AppRunContext,
+  deps: AppRunDeps,
+): Promise<{ domainId: string; reason: string } | null> {
+  const named = typeof step.config?.domain === 'string' ? step.config.domain.trim() : '';
+  // No domain named: the sink itself degrades honestly ("nothing is saved"); there is nothing to gate.
+  if (!named) return null;
+  const domains = await deps.listDomains(ctx.orgId);
+  const { resolveDomain } = await import('@/lib/data-domains');
+  const { domainMatchTokens } = await import('@/lib/pipelines-policy');
+  const resolved = resolveDomainByIdOrLabel(named, domains, resolveDomain);
+  if (!resolved) return { domainId: named, reason: `no data location binds "${named}"` };
+  const verdict = enforceDataAccess(ctx.contract ?? null, resolved.id, domainMatchTokens(resolved));
+  return verdict.allow ? null : { domainId: resolved.id, reason: verdict.reason };
+}
+
 function dispatchSinkDelivery(
   sink: DeliverSinkKind,
   step: Extract<AppStep, { kind: 'output' }>,
@@ -1361,6 +1418,12 @@ function dispatchSinkDelivery(
     return deps.sendToTopic(
       { topic: str(cfg.topic), key: str(cfg.key) },
       { runId: ctx.runId, orgId: ctx.orgId, appId: spec.id, outcome: body },
+    );
+  }
+  if (sink === 'lake') {
+    return deps.saveToLake(
+      { domain: str(cfg.domain), filename: str(cfg.filename), contentType: str(cfg.contentType) },
+      { runId: ctx.runId, orgId: ctx.orgId, body },
     );
   }
   // whatsapp

@@ -17,6 +17,7 @@ import {
   type ObjectSourceQueryFailureCode,
   type ObjectSourceRow,
 } from '@/lib/object-source-query';
+import { scopedObjectKey } from '@/lib/object-store';
 
 export interface S3ObjectCountRow {
   count: number;
@@ -218,5 +219,74 @@ export async function queryGovernedObjectSource(input: {
       }
     }
     return failed('source-unavailable', 'The approved object source is unavailable.');
+  }
+}
+
+// ─── The WRITE half ──────────────────────────────────────────────────────────────────────────────
+//
+// Governed object READ deliberately refuses to let a caller name a bucket — the data domain owns the
+// bucket and prefix, the connector owns the credential, the tenant owns both. A write that accepted a
+// bucket from step config would hand straight back the authority the read path is built to withhold:
+// an app could be edited to write anywhere that keypair reaches, including over its own source data.
+//
+// So this takes a domain and a single file NAME. The bucket and prefix are derived from the same
+// binding the read uses, and scopedObjectKey is what refuses a name that tries to leave the prefix.
+
+export type ObjectWriteFailureCode = S3ObjectQueryFailureCode | 'write-failed';
+
+export type ObjectWriteOutcome =
+  | { ok: true; result: { bucket: string; key: string; bytes: number; domainLabel: string } }
+  | { ok: false; error: { code: ObjectWriteFailureCode; message: string } };
+
+/** Write one object inside an approved data domain. The destination is derived, never supplied. */
+export async function writeGovernedObject(input: {
+  orgId: string;
+  connectorId: string;
+  domainId: string;
+  /** A single path segment — validated by the pure policy before this is called. */
+  filename: string;
+  body: string;
+  contentType: string;
+}): Promise<ObjectWriteOutcome> {
+  try {
+    const binding = await resolveConnectorObjectBinding(input);
+    const scoped = scopedObjectKey(binding.scope, input.filename);
+    if (!scoped.ok) {
+      return { ok: false, error: { code: 'scope-denied', message: scoped.error } };
+    }
+    const bytes = Buffer.from(input.body, 'utf8');
+    await binding.store.putObject(
+      binding.scope.bucket,
+      scoped.key,
+      bytes,
+      input.contentType,
+    );
+    return {
+      ok: true,
+      result: {
+        bucket: binding.scope.bucket,
+        key: scoped.key,
+        bytes: bytes.length,
+        domainLabel: binding.scope.domainLabel,
+      },
+    };
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? (error as { code: ConnectorObjectBindingFailure }).code
+        : null;
+    if (code && ['unknown-source', 'not-object-store', 'unapproved-scope', 'missing-credential'].includes(code)) {
+      return {
+        ok: false,
+        error: { code, message: error instanceof Error ? error.message : 'Object source is unavailable.' },
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        code: 'write-failed',
+        message: error instanceof Error ? error.message : 'The object could not be written.',
+      },
+    };
   }
 }
