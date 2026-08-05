@@ -182,3 +182,17 @@ test('mimeFromKey: by extension, octet-stream fallback', () => {
   assert.equal(mimeFromKey('data/rows.parquet'), 'application/vnd.apache.parquet');
   assert.equal(mimeFromKey('noext'), 'application/octet-stream');
 });
+
+test('every control character is rejected in an object key, escapes or not', () => {
+  // The character class here held RAW control bytes rather than escape text, which made the whole
+  // module read as BINARY to grep/rg — invisible to code search, and easy to "fix" into something
+  // subtly different. Rewritten as \u escapes; this pins that the rule did not change with it.
+  assert.equal(validateObjectKey('exports/claims-2026-08.csv').ok, true);
+  assert.equal(validateObjectKey('a space is fine').ok, true);
+  for (let code = 0; code <= 0x1f; code++) {
+    const key = `pre${String.fromCharCode(code)}post`;
+    assert.equal(validateObjectKey(key).ok, false, `control char 0x${code.toString(16)} must be refused`);
+  }
+  // The boundary above the class is NOT a control character and must still pass.
+  assert.equal(validateObjectKey(`pre${String.fromCharCode(0x20)}post`).ok, true);
+});
