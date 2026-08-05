@@ -72,7 +72,13 @@ export function parseLifecycleXml(xml: string): LifecycleRule[] {
   const out: LifecycleRule[] = [];
   for (const m of xml.matchAll(/<Rule>([\s\S]*?)<\/Rule>/g)) {
     const block = m[1];
-    const days = Number(/<Days>\s*(\d+)\s*<\/Days>/.exec(block)?.[1]);
+    // The <Days> MUST come from inside <Expiration>. A <Transition><Days>1</Days> rule (move to cold
+    // storage after a day) also carries a Days, and reading it as an expiry was actively dangerous:
+    // the panel would show "deleted after 1 day" for data that was only ever meant to MOVE, and
+    // saving that list back would turn the transition into a real deletion. Caught by the test that
+    // asked what happens to a rule this model cannot express.
+    const expiration = /<Expiration>([\s\S]*?)<\/Expiration>/.exec(block)?.[1] ?? '';
+    const days = Number(/<Days>\s*(\d+)\s*<\/Days>/.exec(expiration)?.[1]);
     if (!Number.isFinite(days) || days < 1) continue; // only expiry-by-days rules are represented
     const id = /<ID>([\s\S]*?)<\/ID>/.exec(block)?.[1]?.trim() ?? '';
     // Prefix can be nested under Filter (v2) or a bare <Prefix> (v1).

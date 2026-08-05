@@ -240,6 +240,23 @@ export function createS3ObjectStore(config: S3ObjectStoreConfig): ObjectStorePor
     },
 
     async setLifecycle(bucket, rules) {
+      // CLEARING IS A DELETE, NOT A PUT OF NOTHING. SeaweedFS accepts an empty LifecycleConfiguration
+      // with a 200 and keeps the existing rules — so removing the last rule reported success and
+      // changed nothing, which is worse than failing. Verified live 2026-08-05.
+      if (rules.length === 0) {
+        const del = await request(`${endpoint}/${encodeURIComponent(bucket)}?lifecycle=`, {
+          method: 'DELETE',
+        });
+        if (!del.ok && del.status !== 204 && del.status !== 404) {
+          const body = await del.text().catch(() => '');
+          return {
+            supported: false,
+            rules: [],
+            note: `clearing the retention rules failed (${del.status}) ${body.slice(0, 200)}`,
+          };
+        }
+        return this.getLifecycle(bucket);
+      }
       const res = await request(`${endpoint}/${encodeURIComponent(bucket)}?lifecycle=`, {
         method: 'PUT',
         headers: { 'content-type': 'application/xml' },

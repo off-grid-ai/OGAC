@@ -214,11 +214,11 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
         'no', 'No bucket or identity management UI exists.',
         'partial', 'Configured buckets support workflows; the console does not provision or rotate them.',
       ]),
-      capability('lifecycle-versioning', 'Lifecycle and versioning', 'Apply retention, versioning, expiry, and object-lock policies.', '/operations/services/seaweedfs', 'Inspect SeaweedFS', 'No lifecycle, versioning, retention, or legal-hold adapter is present.', [
-        'yes', 'SeaweedFS exposes S3 lifecycle and versioning-compatible behavior for supported configurations.',
-        'no', 'The storage port does not manage bucket lifecycle policy.',
-        'no', 'No lifecycle or versioning UI exists.',
-        'no', 'No production workflow manages retention through this surface.',
+      capability('lifecycle-versioning', 'Lifecycle and versioning', 'Apply retention, versioning, expiry, and object-lock policies.', '/data/lake', 'Manage bucket retention', 'Retention is set per bucket by hand; no product workflow applies a policy to the buckets the console itself writes (audit exports, artifacts), so a bucket created outside this screen keeps everything forever by default. Versioning and object-lock remain unimplemented.', [
+        'yes', 'SeaweedFS 3.80 exposes the S3 lifecycle API.',
+        'yes', 'The storage port reads, writes and CLEARS bucket lifecycle rules. Verified live 2026-08-05: PUT of a 30-day expiry on exports/ read back identically, and clearing returned rules=[]. Two defects were found and fixed doing it — clearing was a PUT of an empty document, which SeaweedFS accepts with a 200 and IGNORES (so removing the last rule reported success and changed nothing; it is a DELETE now), and the response parser matched any <Days> in a rule block, so a <Transition><Days>1</Days> rule read back as a 1-day EXPIRY and saving the list would have converted a move-to-cold-storage into a real deletion.',
+        'yes', 'RetentionPanel on /data/lake beside the bucket contents: current rules in days-to-keep, add by folder + days, remove with confirmation. Written for the compliance reader who has to answer for the period, not in lifecycle vocabulary. A failed read says the rules are UNKNOWN rather than rendering as "nothing is deleted on a schedule", and an unsupported store says so instead of silently accepting.',
+        'no', 'No production workflow applies retention. A person sets it per bucket; nothing binds a policy to the buckets the console writes to on its own.',
       ]),
       capability('topology-repair', 'Volume topology, replication, and repair', 'Inspect masters, filers, volumes, replication placement, and repair state.', '/operations/services/seaweedfs', 'Inspect SeaweedFS', 'Only boundary health is visible. Add read-only topology evidence and keep repair actions guarded by fleet runbooks.', [
         'yes', 'SeaweedFS provides master, filer, volume, replication, and maintenance operations.',
