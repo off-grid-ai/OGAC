@@ -180,17 +180,27 @@ an actionable gap rather than irreversible loss. `upstream` dropped to `partial`
 It also caught a governance defect: destinations were derived from `listApps`, which hides `[autotest]`
 apps *for presentation*. A presentation filter had reached a compliance calculation.
 
-### Next up — the rest of cluster 2 (2 items) then clusters 3–6
+**2026-08-05 — `seaweedfs/topology-repair`: adapter + ui closed, workflow PARTIAL and honestly so.**
+The console could say the store was UP, which is the least interesting thing about it. `/data/lake` now
+leads with "if a disk fails, what happens to these files?" — and on this deployment the answer is that
+replication is `000`, one copy, losing a disk loses it. Shown in red with a needs-attention badge, not
+a green tick. `workflow` stays `partial` because the row is topology, replication **and repair**, and
+rebalancing/EC repair are destructive operations that stay native until ownership and rollback
+boundaries exist. Observing is bound; acting is not.
+
+### Next up — the rest of cluster 2 (1 item) then clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
   not exist. The gap says keep privileged lifecycle deployment-owned until tenant-safe rollback and
-  audit boundaries exist; **read the entry before building**, it may be deliberate.
-- `seaweedfs/topology-repair` — volume topology and repair. Operator surface, lowest product value.
+  audit boundaries exist; **read the entry before building**, it may be deliberate. Note also that the
+  deployed store cannot even hold a retention window over 255 days (G-209), so object-lock and
+  versioning claims on it would need measuring before they are believed.
 Then clusters 3 (data quality, 6), 4 (gateway routing, 3), 5 (retention/alerting, ~10), 6 (CDC, 2).
 
-**Running tally:** cluster 1 closed (1 item), cluster 2 closed 4 of 5 (object read/write, bucket
-discovery, lifecycle adapter+ui+workflow) with `versioning-retention-events` and
-`seaweedfs/topology-repair` open. 85 of 196 fully leveraged, from 83. Three defects found by proving
+**Running tally:** cluster 1 closed (1 item); cluster 2 closed object read/write, bucket discovery and
+lifecycle (all gates), plus topology observability — only `versioning-retention-events` is untouched,
+and `topology-repair`'s acting half stays deliberately partial. 85 of 196 fully leveraged from 83, with
+two rows correctly reclassified as **upstream cannot** rather than counted as ours. Three defects found by proving
 things live that no test would have caught: runs never recorded their trigger, the data ceiling gated
 reads but not writes, and a presentation filter had reached a compliance calculation.
 
