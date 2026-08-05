@@ -1,5 +1,6 @@
 import { PageFrame } from '@/components/PageFrame';
 import { RetentionPanel } from '@/components/data/RetentionPanel';
+import { StoreRetentionPosture } from '@/components/governance/StoreRetentionPosture';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listRetentionRules, listRetentionRuns } from '@/lib/retention-store';
 import { currentOrgId } from '@/lib/tenancy';
@@ -31,6 +32,10 @@ export default async function RetentionEvidencePage() {
           rules={rules}
           runs={sweeps.map((r) => ({ ...r, ranAt: r.ranAt.toISOString() }))}
         />
+        {/* The sweep above covers database records. The metric and log stores set retention as a deploy
+            flag, so no sweep touches them — and a retention claim that silently excludes the audit log
+            store is not the claim anyone thinks it is. */}
+        <StoreRetentionPosture />
       </div>
     </PageFrame>
   );
