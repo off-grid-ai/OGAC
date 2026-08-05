@@ -1,7 +1,7 @@
 name: CI
 
 # The same gate the pre-push hook enforces locally, now enforced in CI on every push + PR:
-# typecheck, tests, coverage >= 85% on all of statements/branches/functions/lines/conditions
+# typecheck, tests, coverage >= 80% on all of statements/branches/functions/lines/conditions
 # (c8 --check-coverage, thresholds in .c8rc.json), and a clean production build.
 # A push/PR that drops below the bar fails here, not just on a developer's machine.
 
@@ -45,7 +45,7 @@ jobs:
         working-directory: console
         run: npm run typecheck
 
-      - name: Tests + coverage gate (>=85% all dimensions, enforced)
+      - name: Tests + coverage gate (>=80% all dimensions, enforced)
         working-directory: console
         run: npm run coverage:check
 
