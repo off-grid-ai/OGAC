@@ -103,11 +103,16 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
           className={`fixed inset-y-0 right-0 z-40 hidden flex-col border-l border-border bg-background shadow-2xl md:flex ${PANEL_WIDTH}`}
         >
           {/* Header */}
-          <header className="flex items-start gap-3 border-b border-border bg-muted/40 px-5 py-4">
+          {/* COLOUR DISCIPLINE. This surface previously carried emerald in four places at once — the
+              icon, the title, every section heading and the button — which reads as a green box rather
+              than a terminal surface with an accent. The brand rule is emerald ON black/white, one
+              accent per surface. Structure is now carried by borders and `muted-foreground`; emerald is
+              reserved for the icon and the single primary action. */}
+          <header className="flex items-start gap-3 border-b border-border bg-card px-5 py-4">
             <Compass className="mt-0.5 size-4 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[11px] uppercase tracking-widest text-primary">Guide</p>
-              <p className="mt-0.5 text-[13px] leading-snug text-foreground">
+              <p className="font-mono text-[11px] uppercase tracking-widest text-foreground">Guide</p>
+              <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
                 Ask what you want to know. Every answer comes with a screen you can go and check it on.
               </p>
             </div>
@@ -298,7 +303,9 @@ function Starters({
         if (items.length === 0) return null;
         return (
           <div key={theme.id} className="space-y-1">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-primary">
+            {/* Neutral, not emerald: three of these stack vertically, so an accent on each turned the
+                list into a green ladder and left nothing for the eye to land on. */}
+            <p className="border-b border-border/60 pb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {theme.label}
             </p>
             {items.map((q) => (

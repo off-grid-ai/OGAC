@@ -1,4 +1,4 @@
-import { QueryPageContent } from '@/app/(console)/data/query/page';
+import { QueryPageContent } from '@/app/(console)/data/query/content';
 
 export default function WarehouseQueryPage({
   searchParams,

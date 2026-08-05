@@ -1,4 +1,4 @@
-import { RegulatorySurface } from '@/app/(console)/governance/regulatory/page';
+import { RegulatorySurface } from '@/app/(console)/governance/regulatory/content';
 
 export default function TrustRegulatoryPage({
   searchParams,

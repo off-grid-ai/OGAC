@@ -1,4 +1,4 @@
-import { AuditLogSurface } from '@/app/(console)/insights/audit/page';
+import { AuditLogSurface } from '@/app/(console)/insights/audit/content';
 
 export default function EvidenceAuditPage({
   searchParams,

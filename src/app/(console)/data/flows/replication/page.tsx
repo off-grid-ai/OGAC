@@ -1,6 +1,6 @@
 import { ArrowRight, Clock } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
-import { PipelinesContent } from '@/app/(console)/data/pipelines/page';
+import { PipelinesContent } from '@/app/(console)/data/pipelines/content';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { currentEtlConnections } from '@/lib/etl-scope';

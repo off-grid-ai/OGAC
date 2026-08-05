@@ -1,4 +1,4 @@
-import { AnalyticsInsightsSource } from '@/app/(console)/insights/analytics/page';
+import { AnalyticsInsightsSource } from '@/app/(console)/insights/analytics/content';
 
 export default function UsageDashboardsPage({
   searchParams,

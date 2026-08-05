@@ -1,4 +1,4 @@
-import { EtlJobDetailContent } from '@/app/(console)/data/etl/[id]/page';
+import { EtlJobDetailContent } from '@/app/(console)/data/etl/[id]/content';
 
 export default function OrchestrationJobPage({
   params,

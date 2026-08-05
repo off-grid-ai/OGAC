@@ -1,4 +1,4 @@
-import { AccountingInsightsSource } from '@/app/(console)/insights/accounting/page';
+import { AccountingInsightsSource } from '@/app/(console)/insights/accounting/content';
 
 export default function CostUsersPage({
   searchParams,

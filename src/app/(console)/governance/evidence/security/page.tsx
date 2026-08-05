@@ -1,4 +1,4 @@
-import { SiemSurface } from '@/app/(console)/insights/siem/page';
+import { SiemSurface } from '@/app/(console)/insights/siem/content';
 
 export default function EvidenceSecurityPage({
   searchParams,
