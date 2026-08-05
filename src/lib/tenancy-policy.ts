@@ -108,3 +108,37 @@ export function visibleTenants<T extends { id: string }>(
 export function mayManageTenant(callerOrg: string, targetId: string): boolean {
   return callerOrg === DEFAULT_ORG || callerOrg === targetId;
 }
+
+/**
+ * Is this caller the PLATFORM OPERATOR (not bound to any tenant)?
+ *
+ * Same definition `bindTenantOrg` / `visibleTenants` use — DEFAULT_ORG means "no tenant binding".
+ * Named, because it reads as an intent at the call site where a bare `=== DEFAULT_ORG` reads as a
+ * magic-string comparison, and because it is now the gate for whole SURFACES rather than just rows.
+ */
+export function isPlatformOperatorOrg(callerOrg: string): boolean {
+  return callerOrg === DEFAULT_ORG;
+}
+
+/**
+ * Destinations a caller may see on an operations sub-nav.
+ *
+ * WHY A WHOLE SURFACE, NOT JUST ITS ROWS. `/operations/admin/tenants` was first fixed by scoping the
+ * LIST so a tenant saw only its own row. That closed the disclosure but left the wrong product: a
+ * customer looking at a "Tenants — provision and remove tenant organizations" page containing exactly
+ * one row, themselves. It exposes that they are one of several on shared infrastructure, invites the
+ * question "who else is in here?", and offers provisioning controls a tenant must never operate.
+ *
+ * Tenant provisioning is a platform-operator surface, so for a tenant org it should not exist at all —
+ * hidden from the sub-nav AND `notFound()` on a direct URL, since hiding a link is not access control.
+ *
+ * `operatorOnly` is opt-in per destination: a destination without it stays visible to everyone, so
+ * adding one here can only ever REMOVE something from a tenant's view, never grant it.
+ */
+export function visibleDestinations<T extends { id: string; operatorOnly?: boolean }>(
+  destinations: readonly T[],
+  callerOrg: string,
+): T[] {
+  if (isPlatformOperatorOrg(callerOrg)) return [...destinations];
+  return destinations.filter((d) => d.operatorOnly !== true);
+}

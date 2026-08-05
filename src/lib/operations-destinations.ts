@@ -91,6 +91,9 @@ export const ADMIN_DESTINATIONS = [
     label: 'Tenants',
     description: 'Provision and remove tenant organizations and their enabled modules.',
     route: '/operations/admin/tenants',
+    // PLATFORM OPERATOR ONLY. A customer must not see a tenant-provisioning surface at all — not even
+    // showing only their own row, which is how this was first fixed. See visibleDestinations().
+    operatorOnly: true,
   },
 ] as const;
 

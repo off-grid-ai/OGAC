@@ -12,7 +12,14 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEFAULT_ORG, mayManageTenant, visibleTenants } from '../src/lib/tenancy-policy.ts';
+import { ADMIN_DESTINATIONS } from '@/lib/operations-destinations';
+import {
+  DEFAULT_ORG,
+  isPlatformOperatorOrg,
+  mayManageTenant,
+  visibleDestinations,
+  visibleTenants,
+} from '../src/lib/tenancy-policy.ts';
 
 const INSURER = 'org_suraksha';
 const BANK = 'org_bharat';
@@ -91,4 +98,58 @@ test('a platform operator (DEFAULT_ORG) may manage every tenant', () => {
 test('a blank/unresolved caller org may not manage any real tenant — fails closed', () => {
   assert.equal(mayManageTenant('', INSURER), false);
   assert.equal(mayManageTenant('org_unknown', INSURER), false);
+});
+
+// ─── The tenant-provisioning SURFACE, not just its rows ──────────────────────────────────────────
+//
+// This was first fixed by scoping the tenant LIST so a customer saw only its own row. That closed the
+// disclosure and left the wrong product: a page titled "Tenants — provision and remove tenant
+// organizations" containing exactly one row, themselves. It tells a customer they are one of several on
+// shared infrastructure, invites "who else is in here?", and offers provisioning controls a tenant must
+// never operate. So the whole destination is platform-operator-only now.
+
+test('a tenant never sees the tenant-provisioning destination', () => {
+  const DESTS = [
+    { id: 'organization' },
+    { id: 'tenants', operatorOnly: true },
+  ] as const;
+  for (const org of ['org_suraksha', 'org_bharat']) {
+    const ids = visibleDestinations(DESTS, org).map((d) => d.id);
+    assert.ok(!ids.includes('tenants'), `${org} must not see the tenants destination`);
+    assert.ok(ids.includes('organization'), 'unmarked destinations stay visible');
+  }
+});
+
+test('the platform operator still sees everything', () => {
+  // The surface has to keep working for whoever actually provisions tenants, or the fix breaks the job.
+  const DESTS = [{ id: 'organization' }, { id: 'tenants', operatorOnly: true }] as const;
+  assert.deepEqual(
+    visibleDestinations(DESTS, DEFAULT_ORG).map((d) => d.id),
+    ['organization', 'tenants'],
+  );
+});
+
+test('operatorOnly is opt-in, so it can only ever remove — never grant', () => {
+  // A destination with no flag is visible to everyone. This matters because the alternative default
+  // (allow-list) would silently hide every NEW destination from tenants the moment someone added one.
+  const DESTS = [{ id: 'a' }, { id: 'b', operatorOnly: false }, { id: 'c', operatorOnly: true }] as const;
+  assert.deepEqual(visibleDestinations(DESTS, 'org_bharat').map((d) => d.id), ['a', 'b']);
+});
+
+test('the real ADMIN_DESTINATIONS marks tenants operator-only and leaves a tenant something to see', () => {
+  // Against the SHIPPED array, not a fixture — so this fails if someone adds a tenant-provisioning
+  // destination without the flag, or marks everything operator-only and leaves a tenant an empty page.
+  const forTenant = visibleDestinations(ADMIN_DESTINATIONS, 'org_suraksha');
+  assert.ok(!forTenant.some((d) => d.id === 'tenants'));
+  assert.ok(forTenant.length > 0, 'a tenant must still have at least one admin destination');
+  assert.equal(visibleDestinations(ADMIN_DESTINATIONS, DEFAULT_ORG).length, ADMIN_DESTINATIONS.length);
+});
+
+test('isPlatformOperatorOrg names the same rule the rest of the boundary uses', () => {
+  // One definition of "platform operator", shared by visibleTenants / mayManageTenant /
+  // visibleDestinations. Two definitions that drift is how a boundary quietly opens.
+  assert.equal(isPlatformOperatorOrg(DEFAULT_ORG), true);
+  for (const org of [INSURER, BANK, '', 'not-default']) {
+    assert.equal(isPlatformOperatorOrg(org), false, `${org} is not the platform operator`);
+  }
 });
