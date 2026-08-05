@@ -220,6 +220,25 @@ multi-column drift source, not more adapter work. **88 of 196 fully leveraged.**
 Also found: `drift_by_columns` lives on the SECOND metric of a preset expansion. Reading `metrics[0]`
 gave every column `drifted=false` while the dataset beside it said 100% drifted.
 
+**2026-08-05 — cluster 4, gateway routing: `load-balance-failover` CLOSED, `proxy-guardrails`
+reclassified as deliberate.**
+Evidence: [`docs/evidence/2026-08-05-gateway-failover-drill.md`](evidence/2026-08-05-gateway-failover-drill.md).
+A dead peer was added under a live model name at runtime; requests came back with `attempted-retries`
+1–2 AND the healthy deployment as the server — the router trying the dead one and finishing elsewhere.
+Pool restored.
+
+**The first drill was invalid and that is in the evidence.** Six identical prompts all returned 200,
+one of them naming the DEAD deployment as its server — impossible, because response caching is enabled
+and Redis was answering. A green drill that proves nothing is worse than no drill: it would have entered
+the ledger as evidence. Any routing or latency drill on this proxy must defeat the cache.
+
+**G-210:** failover is real in the proxy and INERT in practice — every model has one deployment, so
+there is nothing to fail over to. That is a second inference host, so it belongs to the fleet.
+
+`proxy-guardrails` is now recorded as an ownership choice, not a gap awaiting code: splitting governance
+between the pipeline spine and the proxy would leave two places to configure, two to audit, and no single
+answer to "what governed this run". **89 of 196 fully leveraged.**
+
 ### Next up — the rest of clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
