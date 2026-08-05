@@ -14,7 +14,13 @@ export type { DocAcl } from '@/lib/retrieval/acl';
 // inference port (gateway by default, deterministic fallback offline), so swapping the model
 // endpoint never touches this file. One dimension throughout.
 const LANCEDB_PATH = process.env.LANCEDB_PATH ?? './.lancedb';
-const TABLE = 'documents';
+/**
+ * The Brain's LanceDB table. EXPORTED because the retrieval evidence layer must name the store a
+ * retrieval actually read, and a second literal over there would drift silently the moment this is
+ * renamed — the evidence would keep naming a table that no longer exists.
+ */
+export const BRAIN_TABLE = 'documents';
+const TABLE = BRAIN_TABLE;
 
 // Retrieval backend selection — mirrors the registry's OFFGRID_ADAPTER_<CAP> convention so the
 // Brain honours the same swap as the adapters surface. Default (unset / 'lancedb') = LanceDB.

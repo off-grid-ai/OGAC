@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getLineage } from '@/lib/adapters/registry';
+import { BRAIN_TABLE } from '@/lib/brain';
 import { lineageRunUuid } from '@/lib/correlation';
 import { SOURCES } from './sources';
 import {
@@ -36,6 +37,8 @@ export interface RetrievalRouteDeps {
   randomUuid?: () => string;
   selectedProvider?: string;
   qdrantCollection?: string;
+  /** Override the LanceDB table name in tests; production reads the Brain's own constant. */
+  lanceTable?: string;
 }
 
 export function classify(query: string): RouteDecision {
@@ -88,6 +91,7 @@ export async function route(
     correlationId: context?.correlationId,
     selectedProvider: deps.selectedProvider ?? process.env.OFFGRID_ADAPTER_RETRIEVAL,
     qdrantCollection: deps.qdrantCollection ?? process.env.OFFGRID_QDRANT_COLLECTION,
+    lanceTable: deps.lanceTable ?? BRAIN_TABLE,
     selectedSourceIds: selected.map((source) => source.id),
     orgId: context?.orgId,
     options: opts,

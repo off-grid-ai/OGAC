@@ -163,17 +163,17 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
     summary:
       'Embedded LanceDB is a swappable local knowledge backend. Table and vector operations are wired through the shared knowledge port, but no service-attributed record proves LanceDB was selected for a live workflow.',
     items: [
-      capability('tables-schema', 'Table and schema lifecycle', 'Create vector tables, inspect schema, and delete local indexes.', '/data/knowledge/indexes', 'Manage indexes', 'Persist the selected provider and LanceDB table identity on a live index lifecycle run.', [
-        'yes', 'LanceDB 0.30.0 supports embedded table create, open, list, and drop operations.',
-        'yes', 'The LanceDB adapter implements the shared knowledge index lifecycle.',
-        'yes', 'Knowledge Indexes manages the backend through provider-neutral controls.',
-        'partial', 'Local knowledge workflows can select LanceDB, but no retained workflow evidence attributes a run to it.',
+      capability('tables-schema', 'Table and schema lifecycle', 'Create vector tables, inspect schema, and delete local indexes.', '/data/knowledge/indexes', 'Manage indexes', 'THIS DEPLOYMENT DOES NOT SELECT LANCEDB. OFFGRID_ADAPTER_RETRIEVAL=qdrant, so the Brain reads Qdrant and no live LanceDB retrieval exists here to attribute. The attribution code is correct and unit-proven; proving it end to end needs a deployment that selects lancedb. That is a configuration boundary, not a code gap.', [
+        'yes', 'LanceDB provides table and vector-search primitives.',
+        'yes', 'The retrieval evidence records the store identity PER PROVIDER, and for LanceDB that is the TABLE, threaded from the Brain\'s own exported BRAIN_TABLE so there is one source of truth rather than a second literal that drifts silently on a rename.',
+        'yes', 'The retrieval summary renders provider=lancedb collection=<table> when LanceDB is the selected provider.',
+        'partial', 'ATTRIBUTION FIXED AND UNIT-PROVEN 2026-08-05: collection was Qdrant-only and hard-coded to null for every other provider, so a LanceDB retrieval recorded WHICH provider ran but not WHAT it read - which made \"the provider-neutral port selected LanceDB\" unfalsifiable. It now names the table. NOT claimed as live: a real retrieval on this box returned providerId=qdrant collection=offgrid-brain, because the deployment selects Qdrant. Measured, not assumed.',
       ]),
-      capability('vector-search', 'Vector search and metadata filters', 'Insert embedded chunks and retrieve nearest records with metadata constraints.', '/data/knowledge/indexes', 'Manage retrieval indexes', 'Record LanceDB table and query correlation on a live retrieval before claiming the provider-neutral Brain workflow selected LanceDB.', [
-        'yes', 'LanceDB provides vector search and SQL-style filtering.',
-        'yes', 'The adapter writes and queries real LanceDB tables.',
-        'yes', 'Knowledge search displays scored records.',
-        'partial', 'Brain retrieval uses the provider-neutral knowledge port; selected LanceDB execution is not service-attributed.',
+      capability('vector-search', 'Vector search and metadata filters', 'Insert embedded chunks and retrieve nearest records with metadata constraints.', '/data/knowledge/indexes', 'Manage retrieval indexes', 'Same configuration boundary as tables-schema: this deployment selects Qdrant, so a live LanceDB vector search cannot be demonstrated here. Query correlation and store identity are now recorded for whichever provider runs.', [
+        'yes', 'LanceDB provides table and vector-search primitives.',
+        'yes', 'Retrieval evidence carries correlationId, the store identity, the search mode and the applied filters for every provider, LanceDB included.',
+        'yes', 'The retrieval view shows the provider, the store it read, the mode and the filter fields.',
+        'partial', 'A live retrieval on this deployment 2026-08-05 recorded providerId=qdrant, collection=offgrid-brain, a correlation id, mode=vector, the tenant filter org_id and a delivered lineage receipt - so the attribution path works end to end. It attributes QDRANT because that is what this box selects; the LanceDB branch is unit-proven only and is reported that way rather than borrowing this evidence.',
       ]),
       capability('record-maintenance', 'Record update and deletion', 'Inspect, update, and remove indexed records by source or identifier.', '/data/knowledge/indexes', 'Inspect index records', 'Bulk source cleanup is wired, but arbitrary record edit and compaction evidence are incomplete. Add bounded record maintenance with verification.', [
         'yes', 'LanceDB supports update, delete, and table maintenance operations.',

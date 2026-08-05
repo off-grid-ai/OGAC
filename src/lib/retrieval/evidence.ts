@@ -13,6 +13,14 @@ export interface RetrievalFilterEvidence {
 export interface RetrievalExecutionEvidence {
   correlationId: string | null;
   providerId: RetrievalProviderId;
+  /**
+   * The STORE IDENTITY a retrieval actually read — a Qdrant collection, or the LanceDB table.
+   *
+   * This used to be Qdrant-only and hard-coded to null for every other provider, so a LanceDB
+   * retrieval recorded which provider ran but not what it read. "The provider-neutral port selected
+   * LanceDB" was therefore an unfalsifiable claim: nothing in the evidence distinguished it from a
+   * retrieval that never touched a store at all.
+   */
   collection: string | null;
   selectedSourceIds: string[];
   mode: SearchMode;
@@ -23,6 +31,17 @@ export interface RetrievalExecutionEvidence {
 export function retrievalProviderId(selected: string | undefined): RetrievalProviderId {
   if (selected === 'qdrant' || selected === 'pgvector') return selected;
   return 'lancedb';
+}
+
+function storeIdentity(
+  providerId: RetrievalProviderId,
+  input: { qdrantCollection?: string; lanceTable?: string },
+): string | null {
+  if (providerId === 'qdrant') return input.qdrantCollection?.trim() || 'offgrid-brain';
+  if (providerId === 'lancedb') return input.lanceTable?.trim() || null;
+  // pgvector stores documents in a table too, but nothing threads its name yet — null here means
+  // "not recorded", and the surface says so rather than inventing a name.
+  return null;
 }
 
 function metadataFilter(condition: MetaCondition): RetrievalFilterEvidence {
@@ -58,6 +77,8 @@ export function buildRetrievalExecutionEvidence(input: {
   correlationId?: string;
   selectedProvider?: string;
   qdrantCollection?: string;
+  /** The LanceDB table name, threaded from the Brain so there is one source of truth. */
+  lanceTable?: string;
   selectedSourceIds: readonly string[];
   orgId?: string;
   options?: RetrievalOptions;
@@ -86,8 +107,9 @@ export function buildRetrievalExecutionEvidence(input: {
   return {
     correlationId: input.correlationId?.trim() || null,
     providerId,
-    collection:
-      providerId === 'qdrant' ? input.qdrantCollection?.trim() || 'offgrid-brain' : null,
+    // Named per provider rather than defaulted to null: every provider HAS a store identity, and
+    // recording it is what makes "this retrieval read LanceDB" checkable instead of asserted.
+    collection: storeIdentity(providerId, input),
     selectedSourceIds: [...input.selectedSourceIds],
     mode: input.options?.mode === 'hybrid' ? 'hybrid' : 'vector',
     filters,
