@@ -73,6 +73,7 @@ import { getEgressPolicy } from '@/lib/egress-policy-store';
 // Safety checks run on every request; the LLM-as-judge score runs out-of-band (see scoreRun) so it
 // never adds latency to the response.
 import type { EgressDecision } from '@/lib/tool-primitives';
+import { InferenceUnavailableError, inferenceTimeoutMs } from '@/lib/inference-timeout';
 const ANSWER_MODEL = process.env.OFFGRID_GROUNDING_MODEL ?? 'gemma-local';
 
 export interface RunStep {
@@ -228,6 +229,10 @@ async function gatewayAnswer(
     }
   }
 
+  // The abort budget is CONFIGURED, not hardcoded. It was 20 000 ms, which silently truncated every
+  // governed app prompt that read a real source on on-prem hardware — see inference-timeout.ts for
+  // the measurement (a real claim-assessment prompt needs 262s on this node) and the rationale for
+  // defaulting to the aggregator's own 300s upstream allowance instead.
   try {
     const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
@@ -239,15 +244,24 @@ async function gatewayAnswer(
         ...gatewayAttribution({ userId: caller, orgId }),
       }),
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(inferenceTimeoutMs(process.env)),
     });
-    if (!res.ok) return null;
+    // A non-2xx is the UPSTREAM's failure, and it used to be flattened into the same `null` as "the
+    // model answered with nothing" — so the caller could not tell an outage from an empty reply and
+    // substituted a fabricated answer for both. Throwing keeps the two apart.
+    if (!res.ok) {
+      throw new InferenceUnavailableError(`gateway returned HTTP ${res.status}`);
+    }
     const payload = await res.json();
     const usage = extractUsage(payload);
     if (usage) onUsage?.(usage);
     return extractText(payload);
-  } catch {
-    return null;
+  } catch (err) {
+    if (err instanceof InferenceUnavailableError) throw err;
+    // A transport error or the abort above. Named explicitly, because "timed out after 300s" and
+    // "connection refused" send an operator to completely different places.
+    const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    throw new InferenceUnavailableError(reason);
   }
 }
 
@@ -280,12 +294,26 @@ async function compose(
   const cacheKey = `${model}\n${system}\n${query}\n${context}`;
   const cached = await cacheLookup(cacheKey);
   if (cached.hit && cached.answer) return cached.answer;
+  // gatewayAnswer THROWS InferenceUnavailableError when the model was not reached; that propagates to
+  // the caller (the app executor turns it into an honest `error` step). It is deliberately NOT caught
+  // here. What used to live at the bottom of this function was:
+  //
+  //     return hits[0] ? `Based on ${hits.length} source(s): ${hits[0].snippet}` : 'No sources found.'
+  //
+  // …which took the verbatim first SOURCE and returned it AS THE ANSWER. On the live demo box that put
+  // a raw JSON dump of a claim document where the Death-Claim Assessment app's risk verdict belonged,
+  // signed it for provenance and published it — and because it looked like output, nothing reported a
+  // problem. A fabricated answer is strictly worse than a visible failure, so the fallback is gone.
   const answer = await gatewayAnswer(query, context, system, model, caller, orgId, onUsage);
   if (answer) {
     await cacheStore(cacheKey, answer);
     return answer;
   }
-  return hits[0] ? `Based on ${hits.length} source(s): ${hits[0].snippet}` : 'No sources found.';
+  // A 200 carrying no text IS an honest empty answer (not an outage) — say so plainly, and never
+  // dress a source up as a conclusion.
+  return hits.length
+    ? 'The model returned no answer for these sources.'
+    : 'No sources were available to answer from.';
 }
 
 // Bound the ReAct step budget from env (OFFGRID_AGENT_MAX_ITERATIONS); the pure loop clamps to
@@ -351,7 +379,16 @@ function makeGovernedPlanner(
     const prompt = buildPlannerPrompt(input);
     // The planner reply is NOT the final answer, so it must not be cached under the compose key;
     // call the gateway directly with the ReAct system + prompt.
-    const reply = await gatewayAnswer(input.goal, prompt, system, model, caller, orgId, onUsage);
+    // An UNREACHABLE model ends the loop instead of propagating, because by this point the loop may
+    // already have done real tool work whose trajectory is worth keeping — but it ends SAYING SO. The
+    // one thing it must never do is return a plausible-looking answer it did not get from a model.
+    let reply: string | null;
+    try {
+      reply = await gatewayAnswer(input.goal, prompt, system, model, caller, orgId, onUsage);
+    } catch (err) {
+      if (!(err instanceof InferenceUnavailableError)) throw err;
+      return { kind: 'finish' as const, answer: `Could not plan the next step — ${err.message}` };
+    }
     const action = reply ? parseAgentAction(reply) : null;
     if (action) return action;
     // No usable action — end the loop honestly with whatever the model said (or a fallback).
