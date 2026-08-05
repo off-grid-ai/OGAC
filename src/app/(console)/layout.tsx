@@ -10,6 +10,7 @@ import { Topbar } from '@/components/Topbar';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ViewerModeProvider } from '@/components/ViewerModeProvider';
+import { ViewerWriteInterceptor } from '@/components/ViewerWriteInterceptor';
 import { readDemoBanner } from '@/lib/demo-hellobar';
 import { tenantSlugFromHost } from '@/lib/route-access';
 import { currentTenantSlug } from '@/lib/tenancy';
@@ -37,6 +38,10 @@ export default async function ConsoleLayout({ children }: Readonly<{ children: R
         </div>
         <GlobalSearch />
         <Toaster />
+        {/* Mounted below <Toaster/> because it reports through it. For a read-only viewer this stops a
+            write in the browser and explains it once, instead of letting ~216 armed controls each fail
+            with their own generic message. Enforcement stays server-side; this is affordance only. */}
+        <ViewerWriteInterceptor />
         {/* Desktop-first: below `md` the console shows a "use a bigger screen" gate, not a broken
             layout. CSS-only (md:hidden) so no hydration flash. Landing site stays mobile-friendly. */}
         <MobileGate />

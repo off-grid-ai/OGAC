@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { AppUseShell } from '@/components/app-use/AppUseShell';
+import { Toaster } from '@/components/ui/sonner';
 import { ViewerModeProvider } from '@/components/ViewerModeProvider';
+import { ViewerWriteInterceptor } from '@/components/ViewerWriteInterceptor';
 import { CrossSellSourceUnavailable } from '@/components/app-use/CrossSellCustomerJourney';
 import { CrossSellOpportunityQueue } from '@/components/app-use/CrossSellOpportunityQueue';
 import type { RunField } from '@/components/app-use/RunPanel';
@@ -354,6 +356,11 @@ export default async function DeployedAppPage({ params }: Readonly<{ params: Pro
           }))}
         />
       </div>
+      {/* This surface renders OUTSIDE the (console) layout, so it carries its own Toaster — without one
+          the interceptor would block the write silently and the control would look simply inert. The
+          same omission is why this page once showed the viewer a full-strength Approve button. */}
+      <Toaster />
+      <ViewerWriteInterceptor />
     </div>
     </ViewerModeProvider>
   );
