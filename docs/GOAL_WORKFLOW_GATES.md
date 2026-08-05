@@ -88,6 +88,32 @@ product value.
 4. **Data quality bound to a live pipeline** (cluster 3).
 5. **Retention and alerting** (cluster 5) — a compliance claim, so it cannot stay open indefinitely.
 
+## Progress log
+
+**2026-08-05 — cluster 1, policy layer landed.** `src/lib/topic-trigger-policy.ts` + 12 tests (49 pass
+across the trigger suite). `topic` is a registered `TriggerKind`, validated and normalised through that
+one policy by both `validateTrigger` and `normalizeTrigger`, and **deliberately gated as coming-soon
+with a test asserting it stays gated** until a consumer exists. The gate is still `no` — correctly.
+
+**Do not rebuild what is already there.** Before writing the consumer, read
+`src/lib/kafka-enterprise-source.ts`: it already provides the governed read path —
+`parseKafkaSourceReadRequest`, `validateResolvedKafkaSourceBinding`, `authorizeKafkaSourceRead`,
+`kafkaConsumerGroup`, `resolveKafkaPartitionWindows`, `KafkaSourceRecord` and a provenance record with
+`consumerGroup` / `consumedAt`. The consumer is a LOOP over that existing seam plus the delivery
+semantics in `topic-trigger-policy.ts` — not a new client. Duplicating it would be exactly the DRY
+defect the merge gate rejects.
+
+Remaining to close this gate, in order:
+1. A consumer loop in the worker (workers run `src/` via tsx — rsync + restart, not a `.next` deploy):
+   poll → `dispositionFor` → dispatch a governed run → persist → **only then** commit the offset.
+2. Move `topic` from `COMING_SOON_TRIGGER_KINDS` to `CONFIGURED_TRIGGER_KINDS` **in the same change**,
+   and update the guard test that currently asserts it is gated.
+3. Live proof on the box: produce a record → a governed run appears with its provenance → the offset
+   advances → replay the same offset and confirm it does NOT run twice. Retain the artefact.
+
+Only after step 3 does the gate move to `yes`. A passing consumer test does not close it — see the
+acceptance bar above.
+
 ## Measuring it
 
 Only the script counts. Re-run it after every merge; it fails if the buckets stop reconciling to 196.
