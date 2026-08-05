@@ -13,6 +13,14 @@ import {
   type AppRunState,
   type PersistedStepRow,
 } from '@/lib/app-run-plan';
+// @ts-expect-error shared JS reachability helper
+import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+
+// The resumed run below drives a real live-mode CRM action, whose execRestConnectorRequest ->
+// resolveConnectorTarget resolves a per-connector secret via Postgres before touching this test's
+// local HTTP server (see crm-writeback.test.ts for the full trace). The durable-resolution test
+// below is a pure function call with no I/O and is unaffected.
+const dbUp = await dbReachable();
 
 const ACTION: ActionStep = {
   id: 'act',
@@ -61,7 +69,10 @@ function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
 // covered by app-run-controls.test.ts).
 process.env.OFFGRID_ALLOW_LIVE_ACTIONS = '1';
 
-test('approved inline action persists impact and signed receipt through the existing run trace', async (t) => {
+test(
+  'approved inline action persists impact and signed receipt through the existing run trace',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   const server = createServer(async (req, res) => {
     const body = await readJson(req);
     res.writeHead(201, {
@@ -135,7 +146,8 @@ test('approved inline action persists impact and signed receipt through the exis
     rebuilt.steps.find((step) => step.id === 'act')?.actionImpact,
     actionState.actionImpact,
   );
-});
+  },
+);
 
 test('durable human resolution projects authenticated reviewer identity', async () => {
   const { resolveHumanStep } = await import('@/worker/app-run.workflow');
