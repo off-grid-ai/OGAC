@@ -188,7 +188,19 @@ a green tick. `workflow` stays `partial` because the row is topology, replicatio
 rebalancing/EC repair are destructive operations that stay native until ownership and rollback
 boundaries exist. Observing is bound; acting is not.
 
-### Next up — the rest of cluster 2 (1 item) then clusters 3–6
+**2026-08-05 — `enterprise-source-minio/versioning-retention-events`: state surfaced, acting deferred
+ON PURPOSE.** Measured before building, and the store DOES support versioning (`status: Suspended`), so
+this is not an upstream-cannot. The bucket panel now says previous versions are NOT kept — overwriting a
+file there is permanent — which is the more surprising of the two retention truths and nothing said it
+before. Turning versioning on, object lock, and bucket events stay deployment-owned: privileged, partly
+irreversible, and this store is already measured to truncate a lifecycle window over 255 days (G-209),
+so a compliance control on it needs measuring per operation before it can be believed. Gates say
+`partial` with the reason rather than `yes`.
+
+**Cluster 2 is now worked through.** Four rows closed on all gates; two carry honest `partial`s naming
+what is deliberately not built; one (`lifecycle-versioning`) is `upstream cannot` because of G-209.
+
+### Next up — clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
   not exist. The gap says keep privileged lifecycle deployment-owned until tenant-safe rollback and
