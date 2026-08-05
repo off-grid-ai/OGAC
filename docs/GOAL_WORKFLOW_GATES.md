@@ -291,6 +291,26 @@ about all the data.
 store — the one holding the audit trail — sets **no retention flag at all**, so it runs on the built-in
 7-day default. Reported as ASSUMED, saying nobody chose it. Screenshot verified.
 
+**2026-08-05 — G-208 CLOSED. The ledger no longer contradicts itself, and the count went DOWN.**
+Fourteen rows claimed four `yes` gates while their own gap text named unfinished work. Twelve were a
+closure narrative or a cross-reference in the wrong field — moved into the gate evidence. **Three were
+demoted rather than tidied**, because the remaining work was real (jaeger exporter-failure state, the
+per-process cache counters, and failover's missing redundancy → `upstream partial`, G-210). One had
+drifted the other way: a `partial` gate with an EMPTY gap, the same dishonesty inverted.
+
+**Fully leveraged fell 89 → 85.** That is the point. `test/service-capability-map.test.ts` is green for
+the first time in this work.
+
+**2026-08-05 — the two LanceDB attribution rows: code fixed, rows kept PARTIAL on purpose.**
+`collection` was Qdrant-only and null for everything else, so a LanceDB retrieval recorded which provider
+ran but not what it read — making "the port selected LanceDB" unfalsifiable. Now named per provider, from
+the Brain's own exported constant so a rename cannot desync it.
+
+**I could have closed both off the unit tests. The live check is why I did not:** a real retrieval on the
+box returns `providerId=qdrant collection=offgrid-brain`, because `OFFGRID_ADAPTER_RETRIEVAL=qdrant`.
+This deployment does not select LanceDB, so there is no live LanceDB retrieval here to attribute. Same
+shape as G-210 — a configuration boundary, measured rather than assumed.
+
 ### Next up — the rest of clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
