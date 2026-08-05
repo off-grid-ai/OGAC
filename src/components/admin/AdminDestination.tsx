@@ -16,6 +16,7 @@ import {
 import type { AdminDestinationId } from '@/lib/operations-destinations';
 import { getOrgSystemPrompt, listTenants } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
+import { visibleTenants } from '@/lib/tenancy-policy';
 import { tenantHost, tenantUrl } from '@/lib/tenant-domain';
 import { MODULES } from '@/modules/registry';
 
@@ -54,7 +55,13 @@ export async function AdminDestination({
     return <OrganizationDestination orgPrompt={orgPrompt} />;
   }
 
-  const tenants = await listTenants();
+  // Tenant admin list — LIVE LEAK found 2026-08-05: rendered every tenant's name/host/plan
+  // identically on both demo tenants, so a read-only viewer on either public demo link learned who
+  // the other customers were. `listTenants()` carries no org awareness at all, so the caller must
+  // apply the boundary: a genuine platform operator (DEFAULT_ORG) sees every tenant (this IS the
+  // provisioning surface); anyone else sees only their own tenant's row (visibleTenants in
+  // tenancy-policy.ts).
+  const tenants = visibleTenants(await listTenants(), await currentOrgId());
   const modules = MODULES.filter((module) => !module.internal).map((module) => ({
     id: module.id,
     label: module.label,

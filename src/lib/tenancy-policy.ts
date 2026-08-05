@@ -76,3 +76,35 @@ export function mayLoginToTenant(
   if (role === 'admin') return true;
   return !!userOrg && userOrg === tenantOrg;
 }
+
+/**
+ * The tenant ADMIN LIST boundary (found live 2026-08-05: `/operations/admin/tenants` rendered every
+ * tenant's name/host/plan identically on both demo tenants — a read-only viewer on either public
+ * demo link learned who the other customers were). `listTenants()` returns the whole platform
+ * directory with no org awareness at all, so the boundary has to be applied by every caller.
+ *
+ * The rule mirrors `bindTenantOrg`: `callerOrg` is already the EFFECTIVE org from `currentOrgId()`,
+ * which hard-binds a subdomain admin and never widens a non-member's scope — so DEFAULT_ORG here means
+ * "not bound to any tenant," i.e. a genuine platform operator, who sees every tenant (this is the
+ * existing tenant-provisioning surface). Any other caller is a member of exactly ONE tenant and sees
+ * ONLY that tenant's own row — never another's, and never "all" as a fallback.
+ */
+export function visibleTenants<T extends { id: string }>(
+  tenants: readonly T[],
+  callerOrg: string,
+): T[] {
+  if (callerOrg === DEFAULT_ORG) return [...tenants];
+  return tenants.filter((t) => t.id === callerOrg);
+}
+
+/**
+ * Whether `callerOrg` may create/edit/delete the tenant `targetId` (the WRITE side of the same
+ * boundary — `PATCH`/`DELETE /api/v1/admin/tenants/[id]` took an id with no org check at all, so any
+ * caller who cleared `requireAdmin` could edit or delete ANOTHER tenant's row by guessing its id).
+ * Same shape as `visibleTenants`: a platform operator (DEFAULT_ORG) manages every tenant; anyone else
+ * manages only their own. There is no target for CREATE (a brand-new tenant has no id yet) — callers
+ * gate that action on `callerOrg === DEFAULT_ORG` directly.
+ */
+export function mayManageTenant(callerOrg: string, targetId: string): boolean {
+  return callerOrg === DEFAULT_ORG || callerOrg === targetId;
+}
