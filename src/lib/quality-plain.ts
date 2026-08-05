@@ -32,6 +32,43 @@ const PLAIN: Record<string, string> = {
   similarity: 'Checks the answer is close enough to the expected one.',
 };
 
+/** Short plain-language NAMES, for a label or a stat tile where a full sentence will not fit. */
+const LABEL: Record<string, string> = {
+  faithfulness: 'Faithful to sources',
+  answer_relevancy: 'Answers the question',
+  context_precision: 'Pulled the right sources',
+  context_recall: 'Found all the sources',
+  pii_leakage: 'No personal data leaked',
+  toxicity: 'Acceptable wording',
+  prompt_injection: 'Resists hidden instructions',
+  hallucination: 'No invented claims',
+  groundedness: 'Every claim traceable',
+  bias: 'No skew for or against a group',
+  refusal: 'Declines what it should',
+  exact_match: 'Exact match to expected',
+  similarity: 'Close to expected',
+  golden: 'Known-good answers',
+  geval: 'Reviewed by a model',
+};
+
+/**
+ * A short name for a check, from its stored engine id.
+ *
+ * Two jobs. It strips the ENGINE SUFFIX — ids arrive as `faithfulness:ragas`, `answer_relevancy:ragas`,
+ * `pii_leakage:heuristic` — because the library that computed a score is not something a business
+ * reader should have to see, and this vocabulary leaked onto every quality surface. And it falls back
+ * to a humanised metric name rather than null, because unlike `checkDescription` this is used where a
+ * label is structurally required; showing the raw id there is the failure mode being fixed.
+ */
+export function checkLabel(engine: string): string {
+  const raw = (engine ?? '').trim();
+  if (!raw) return 'Unattributed check';
+  const metric = raw.split(':')[0].toLowerCase();
+  const known = LABEL[metric];
+  if (known) return known;
+  return metric.replace(/[_-]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
+}
+
 /**
  * A sentence describing what a check does, or null when we do not have one.
  *

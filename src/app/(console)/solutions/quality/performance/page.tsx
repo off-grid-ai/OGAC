@@ -17,6 +17,7 @@ import { listEvalRuns } from '@/lib/evals';
 import { requireModuleForUser } from '@/lib/module-access';
 import { evaluateThresholdAlerts } from '@/lib/observability-settings';
 import { readQaStatus } from '@/lib/qa/status';
+import { checkLabel } from '@/lib/quality-plain';
 import { buildQualityPerformance, type PerformanceStatus } from '@/lib/quality-operator-view';
 import { currentOrgId } from '@/lib/tenancy';
 
@@ -36,7 +37,19 @@ export default async function QualityPerformancePage() {
     listEvalRuns(100, orgId).catch(() => []),
     readQaStatus(orgId).catch(() => null),
   ]);
-  const performance = buildQualityPerformance(runs);
+  // Carry the engine and the degraded flag through, so the pure layer can exclude a run that measured
+  // NOTHING (persisted as score 0, indistinguishable from total failure) and any lower-better metric
+  // like pii_leakage, where 0 is the PERFECT result. Without these two fields this page announced the
+  // product's own AI as `degraded 32.5%` on entirely artificial numbers.
+  const performance = buildQualityPerformance(
+    runs.map((r) => ({
+      id: r.id,
+      score: r.score,
+      startedAt: r.startedAt,
+      engine: r.engine,
+      degraded: (r.attribution as { degraded?: boolean } | null | undefined)?.degraded === true,
+    })),
+  );
   const alerts = await evaluateThresholdAlerts({
     driftScore: status?.drift.metrics[0]?.value ?? null,
     evalPassRate: performance.latestScore === null ? null : performance.latestScore / 100,
@@ -81,6 +94,26 @@ export default async function QualityPerformancePage() {
           Threshold breached: {alert.message}
         </div>
       ))}
+
+      {/* Say WHAT the headline measures. A single quality % across mixed evaluators is not a weaker
+          measurement, it is not a measurement — this deployment stores different checks on different
+          scales, so an unlabelled number moved when the evaluator mix changed rather than when quality
+          did. Naming the check is what makes the figure defensible to an auditor. */}
+      {performance.measuredBy ? (
+        <p className="text-xs text-muted-foreground">
+          These figures compare <span className="font-medium text-foreground">{checkLabel(performance.measuredBy)}</span>{' '}
+          against itself over time — the check with the most recorded results.
+          {performance.setAsideEngines && performance.setAsideEngines.length > 0 ? (
+            <>
+              {' '}
+              {performance.setAsideEngines.length} other{' '}
+              {performance.setAsideEngines.length === 1 ? 'check is' : 'checks are'} recorded separately,
+              because scores from different checks are not comparable and averaging them would describe
+              nothing.
+            </>
+          ) : null}
+        </p>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric label="Performance">

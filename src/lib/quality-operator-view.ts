@@ -9,10 +9,59 @@ export interface QualityRunInput {
   id: string;
   score: number;
   startedAt: string;
+  /**
+   * Which evaluator produced this. Needed for two reasons, both of which were silently corrupting the
+   * headline number:
+   *
+   * 1. SOME METRICS ARE LOWER-BETTER. `pii_leakage` scores 0 when NO PII leaked — a perfect result —
+   *    and averaging that into a "quality" mean as 0% reported the best possible outcome as the worst.
+   *    Six such runs on the live deployment were dragging the org's quality figure down.
+   * 2. Mixing evaluators in one mean makes the number meaningless anyway; carrying the engine lets a
+   *    caller see which ones are in the window.
+   */
+  engine?: string | null;
+  /**
+   * True when the engine ran but measured nothing. Such a run persists `score = 0`, which is
+   * indistinguishable from "everything failed" — so it must be EXCLUDED from a mean, not averaged in.
+   */
+  degraded?: boolean;
+}
+
+/**
+ * Metrics where a LOW score is the good outcome.
+ *
+ * Matched on the engine token rather than a hardcoded list of ids, so a new `*_leakage` or `*_toxicity`
+ * evaluator is handled without another edit here. Being wrong in the safe direction matters: excluding a
+ * metric that turns out to be higher-better loses one input, while INCLUDING a lower-better one inverts
+ * the headline verdict.
+ */
+export function isLowerBetter(engine: string | null | undefined): boolean {
+  return /leak|toxic|refus|violation|hallucinat|unsafe|bias/i.test(engine ?? '');
+}
+
+/**
+ * Is this run usable as evidence of quality?
+ *
+ * Excludes a degraded run (nothing measured, persisted as 0), an unusable score, and any lower-better
+ * metric — the last because this view aggregates into ONE "how good is the AI" number, and a metric
+ * whose good direction is inverted cannot go into that average without corrupting it.
+ */
+export function countsTowardQuality(run: QualityRunInput): boolean {
+  if (run.degraded) return false;
+  if (isLowerBetter(run.engine)) return false;
+  return scorePercent(run.score) !== null;
 }
 
 export interface QualityPerformanceView {
   status: PerformanceStatus;
+  /**
+   * Which evaluator the headline numbers describe, and how many others were set aside.
+   *
+   * Present because a single "quality %" across mixed evaluators is not a weaker version of the
+   * measurement — it is not a measurement. Naming the evaluator is what makes the number defensible.
+   */
+  measuredBy?: string | null;
+  setAsideEngines?: string[];
   latestScore: number | null;
   currentMean: number | null;
   baselineMean: number | null;
@@ -30,9 +79,8 @@ export interface QualityPerformanceView {
  * averaged those fractions against golden's 87.8 as though the units matched. See eval-score-scale.ts
  * for the measured evidence.
  *
- * Unusable values still collapse to 0 here because every downstream field in this view is a number; the
- * distinction between "unmeasurable" and "zero" is preserved in eval-score-scale's meanScore for callers
- * that can represent null.
+ * Unusable values collapse to 0 ONLY after countsTowardQuality has already removed them from the set;
+ * they are never averaged. The `?? 0` here is a type convenience for the trend line, not a judgement.
  */
 function finiteScore(value: number): number {
   return scorePercent(value) ?? 0;
@@ -49,7 +97,32 @@ export function performanceStatus(delta: number): PerformanceStatus {
 }
 
 export function buildQualityPerformance(runs: QualityRunInput[]): QualityPerformanceView {
-  const normalized = runs
+  // Filtered BEFORE anything is averaged: a run that measured nothing persists `score = 0`
+  // (indistinguishable from total failure), and a lower-better metric like pii_leakage scores 0 for a
+  // PERFECT result. Both were being averaged into the headline.
+  const usable = runs.filter(countsTowardQuality);
+
+  // AND THEN GROUPED BY EVALUATOR, which is the part that actually matters. A mean across different
+  // evaluators is not a weaker measurement, it is not a measurement: this deployment stores golden on
+  // 0-97, ragas on 37-100 and faithfulness:grounding on 0-23, so mixing them produced a headline that
+  // moved when the evaluator MIX changed and not when quality did. Removing only the direction and
+  // degraded artefacts made the number worse, not better — measured on the live box — because the
+  // scale mixing was the dominant term all along.
+  const byEngine = new Map<string, QualityRunInput[]>();
+  for (const run of usable) {
+    const key = (run.engine ?? 'unattributed').trim() || 'unattributed';
+    const bucket = byEngine.get(key);
+    if (bucket) bucket.push(run);
+    else byEngine.set(key, [run]);
+  }
+
+  // The evaluator with the most usable runs carries the headline; every other one is named as set
+  // aside rather than silently folded in.
+  const ranked = [...byEngine.entries()].sort((a, b) => b[1].length - a[1].length);
+  const [primaryEngine, primaryRuns] = ranked[0] ?? [null, [] as QualityRunInput[]];
+  const setAsideEngines = ranked.slice(1).map(([engine]) => engine);
+
+  const normalized = primaryRuns
     .map((run) => ({ ...run, score: finiteScore(run.score) }))
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   const trend = [...normalized].reverse().map((run, index) => ({
@@ -61,6 +134,8 @@ export function buildQualityPerformance(runs: QualityRunInput[]): QualityPerform
   if (normalized.length < 4) {
     return {
       status: 'insufficient',
+      measuredBy: primaryEngine,
+      setAsideEngines,
       latestScore: normalized[0] ? Number(normalized[0].score.toFixed(1)) : null,
       currentMean: normalized.length
         ? Number(mean(normalized.map((run) => run.score)).toFixed(1))
@@ -81,6 +156,8 @@ export function buildQualityPerformance(runs: QualityRunInput[]): QualityPerform
   const delta = Number((currentMean - baselineMean).toFixed(1));
   return {
     status: performanceStatus(delta),
+    measuredBy: primaryEngine,
+    setAsideEngines,
     latestScore: Number(normalized[0].score.toFixed(1)),
     currentMean,
     baselineMean,
