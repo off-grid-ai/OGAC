@@ -1,4 +1,5 @@
 import { withGatewayScope } from '@/lib/gateway-scope';
+import { boundSourceContext } from '@/lib/source-context';
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
@@ -300,7 +301,13 @@ async function compose(
   orgId?: string,
   onUsage?: (usage: RunUsage) => void,
 ): Promise<string> {
-  const context = hits.map((h, i) => `[${i + 1}] ${h.title}: ${h.snippet}`).join('\n');
+  // BOUNDED. This used to join every hit's full snippet, so however much the retriever returned went
+  // into the prompt verbatim — which is why the insurer's apps (a claim document plus six premium rows)
+  // took 262s on a node that answers a trivial prompt in 3.79s, and then stopped answering at all. On
+  // CPU-class on-prem hardware prefill dominates, so an unbounded context is an unanswerable prompt.
+  // The trim is reported, not silent: see source-context.ts for why that matters in a grounding product.
+  const bounded = boundSourceContext(hits);
+  const context = bounded.context;
   const system = systemFor(agent);
   const model = agent.model || ANSWER_MODEL;
   // The system prompt + model are part of the cache key so different agents never collide.
@@ -1250,8 +1257,12 @@ async function runAgentImpl(
     const loopModel = agent.model || ANSWER_MODEL;
     const loopSystem = systemFor(agent);
     const budget = clampAgentIterations(process.env.OFFGRID_AGENT_MAX_ITERATIONS);
-    const context = routed.hits.length
-      ? `\n\nKNOWN SOURCES:\n${routed.hits.map((h, i) => `[${i + 1}] ${h.title}: ${h.snippet}`).join('\n')}`
+    // Same bound as the linear composer. The autonomous loop is MORE exposed, not less: it re-sends the
+    // goal (and therefore this context) on every iteration, so an unbounded dump is paid up to
+    // `maxIterations` times over.
+    const loopSources = boundSourceContext(routed.hits);
+    const context = loopSources.includedCount
+      ? `\n\nKNOWN SOURCES:\n${loopSources.context}`
       : '';
     const loop = await runAgentLoop({
       goal: `${modelQuery}${context}`,
