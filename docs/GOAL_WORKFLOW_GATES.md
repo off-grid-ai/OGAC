@@ -77,7 +77,27 @@ Being explicit so nobody "closes" these by building the wrong thing:
 | BI & Dashboards — advanced SQL and chart authoring (1) | Blocked behind Superset embed registration; the real fix is the Superset OIDC cutover, which deletes the stored credential too. |
 | Identity & SSO — federation and MFA policy (1) | Sequenced behind `IDENTITY_ONE_DOOR.md`; doing it before that is rework. |
 
-**So the genuinely buildable subset is ~34 of the 41**, and clusters 1 and 2 (11 items) carry most of the
+### Added 2026-08-05, after working all six clusters — 6 more that are NOT build work
+
+Each of these says, in its own gap text, to keep privileged administration deployment-owned. They were
+being counted as open work because nobody had promoted that sentence into a decision. Same precedent as
+the OpenTelemetry and Presidio entries above.
+
+| Item | Why it is not open build work |
+| --- | --- |
+| `opensearch/cluster-snapshots-security` | "Keep privileged administration deployment-owned." A browser-triggered cluster snapshot or security-config change is not a capability worth having. |
+| `warehouse/cluster-operations` | "Retain fleet ownership." Privileged ClickHouse administration from a web session is a blast radius, not a feature. |
+| `jaeger/storage-retention-admin` | Retention and topology of the all-in-one deployment are deploy flags. The console reads and reports them; writing them is the deployment's. |
+| `lancedb/versioning-index-tuning` | "Keep these deployment-owned." Table-version rollback and compaction are destructive and irreversible. |
+| `victoriametrics/retention-backup-cluster` | Retention is now READ and reported (2026-08-05). Backup/restore/cluster stay deployment-owned deliberately. |
+| `victorialogs/retention-alerts-tenancy` | Retention is now read and reported honestly. Writing it is a deploy flag; per-tenant retention does not exist on a single-node topology. |
+
+**The pattern worth naming:** across all six clusters, a large share of what looked like a backlog was
+either already built (a stale gate), owned by the deployment on purpose, or blocked on something outside
+this repo. That is not an excuse — it is the finding. **Twelve of the rows examined had a gate claiming
+something absent that already existed, or a root cause different from the one the gap named.**
+
+**So the genuinely buildable subset is ~28 of the 41**, and clusters 1 and 2 (11 items) carry most of the
 product value.
 
 ## Order of work
