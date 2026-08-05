@@ -376,6 +376,11 @@ export const GUIDE_QUESTIONS: readonly GuideQuestion[] = [
         href: '/governance/trust/reports',
         what: 'Pre-built response packs for the regulators you answer to, each assembled from the evidence above rather than written by hand.',
       },
+      {
+        label: 'See how we score ourselves',
+        href: '/governance/trust',
+        what: 'Every control we claim, scored honestly against the frameworks you are held to — including the ones still in progress.',
+      },
     ],
   },
   {
@@ -436,13 +441,17 @@ export const GUIDE_QUESTIONS: readonly GuideQuestion[] = [
       'service',
       'infrastructure',
     ],
+    // NOT /operations/services, which would be the obvious answer. Live check 2026-08-05: that page
+    // renders the name of every OSS component the platform is assembled from (nineteen of them in one
+    // response). It is the right screen for an operator and the wrong one for a visitor, so the
+    // liveness proof here is the run history and a signature you can re-verify on the spot instead.
     destinations: [
-      {
-        label: 'Check what is live right now',
-        href: '/operations/services',
-        what: 'Every part of the platform with its live health and response time, plus what each one is actually being used for.',
-      },
       RUNS_LIST,
+      {
+        label: 'Verify a signature yourself',
+        href: '/governance/evidence/provenance',
+        what: 'Fifty signed run records. Press Verify on any of them and the signature is re-checked in front of you — a mock-up cannot do that.',
+      },
     ],
   },
 

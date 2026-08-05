@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { publicLabel } from '@/lib/lineage-labels';
 
 export type EgressStrictness = 'mask' | 'block';
 
@@ -161,8 +162,14 @@ export function CloudEgressPanel({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-xs text-muted-foreground">
+          {/* Live finding, 2026-08-05 (viewer audit, confirmed again the same day): this line rendered
+              the raw OSS product name — "Engine: llm-guard" — on the face of the screen a buyer opens
+              to ask "does our data leave the network?". The mapper for exactly this already existed;
+              this screen simply was not passing through it. A visitor should never learn which parts we
+              assembled from, so the name goes through publicLabel() and the raw value stays in the API
+              response for operators. */}
           <p>
-            Engine: <span className="font-mono text-foreground">{engine.name}</span>
+            Detector: <span className="font-mono text-foreground">{publicLabel(engine.name)}</span>
           </p>
           <p>
             The detector is managed at deploy time (fleet configuration). Protection fails closed: if
