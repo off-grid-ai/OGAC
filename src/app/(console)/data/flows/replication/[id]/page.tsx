@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { PageFrame } from '@/components/PageFrame';
 import { airbyteEtl } from '@/lib/adapters/airbyte';
 import { normalizeConnectionDetail } from '@/lib/airbyte-schedule-model';
+import { isEtlConnectionVisible } from '@/lib/etl-scope';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -14,11 +15,17 @@ export const dynamic = 'force-dynamic';
 // connection: its schedule, per-stream sync modes, and a state-reset control. Consumes the live
 // Airbyte adapter directly (server component); the pure model shapes the read. Every mutation runs
 // through the governed /api/v1/admin/data/airbyte routes. Deep-linkable: /data/flows/replication/[id].
+//
+// Guarded by isEtlConnectionVisible() BEFORE the fetch — the list on the page one click back is
+// scoped (see replication/page.tsx), but this detail route takes an id straight from the URL, so a
+// tenant that guessed/enumerated another org's connectionId would otherwise see it directly. 404,
+// same as an unknown id — never a 403, which would confirm the id belongs to someone else.
 export default async function ReplicationConnectionDetailPage({
   params,
 }: Readonly<{ params: Promise<{ id: string }> }>) {
   await requireModuleForUser('data');
   const { id } = await params;
+  if (!(await isEtlConnectionVisible(id))) notFound();
 
   const raw = await airbyteEtl.getConnectionRaw(id);
   if (!raw) notFound();

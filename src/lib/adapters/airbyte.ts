@@ -43,6 +43,11 @@ export interface EtlPort {
   // reshapes it via the pure airbyte-schedule-model, and posts it back). null when unreachable /
   // not found.
   getConnectionRaw(connectionId: string): Promise<Record<string, unknown> | null>;
+  // Raw SourceRead for a single source — the tenant-scoping seam (etl-tenancy.ts / etl-scope.ts)
+  // reads its `connectionConfiguration.database` to decide which org's connectors registry the
+  // connection's backing system belongs to. null when unreachable / not found (treated as
+  // unattributable by the pure scoping rule, never as "shared").
+  getSourceRaw(sourceId: string): Promise<Record<string, unknown> | null>;
   // Post a ConnectionUpdate (built by the pure model) to /connections/update. Returns true on 2xx.
   updateConnection(update: Record<string, unknown>): Promise<boolean>;
   // Submit an update then CONFIRM it landed by re-reading the connection — Airbyte's /connections/
@@ -184,6 +189,14 @@ export const airbyteEtl: EtlPort = {
     // reshapes it; this adapter only fetches. null on any failure so the route returns an honest 404.
     if (!connectionId) return null;
     return post<Record<string, unknown>>('connections/get', { connectionId });
+  },
+
+  async getSourceRaw(sourceId: string) {
+    // /sources/get → the full SourceRead (connectionConfiguration, …). Only fetch — the pure model
+    // (etl-tenancy.ts) reads the database field. null on any failure, same degrade-to-empty contract
+    // as every other read here.
+    if (!sourceId) return null;
+    return post<Record<string, unknown>>('sources/get', { sourceId });
   },
 
   async updateConnection(update: Record<string, unknown>) {
