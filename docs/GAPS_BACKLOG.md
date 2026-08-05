@@ -2304,3 +2304,26 @@ version of this drill — six identical prompts — was served from Redis and re
 *naming the dead deployment as the server*. Any future load-balancing or latency drill on this proxy
 MUST send unique prompts or `cache: {"no-cache": true}`, or it measures the cache instead of the thing
 under test. A green drill that proves nothing is worse than no drill.
+
+## G-211 — seeded fixture connectors keep their password inline, not in the vault
+
+Found 2026-08-05 while proving credential rotation
+(`docs/evidence/2026-08-05-credential-rotation.md`). Every seeded enterprise-fixture connector stores
+its password **inline in the endpoint URL** in the `connectors` table, with `secret_ref: null`:
+
+```
+mysql://policyadmin:policyadmin@127.0.0.1:3307/policyadmin   secret_ref: null
+```
+
+The vaulted shape is supported and works — `con_f5c959` uses a credential-free endpoint plus an
+org-scoped OpenBao reference and connects fine — and rotation through it is now proven. The seeds simply
+do not use it, which is what the capability rows meant by "seeded outside the public self-serve
+validation path".
+
+Impact is bounded on this box: it is a demo deployment with demo credentials, and the memory note that
+these are not production secrets still holds. It matters anyway for two reasons: the seeds are the
+example every future fixture is copied from, and a connector whose credential is in a database column
+cannot be rotated without an endpoint rewrite.
+
+**Fix:** seed fixtures with a credential-free endpoint and `persistConnectorSecret`, the way
+`con_f5c959` already is. Owner: whoever owns the seed scripts (`scripts/seed-*.mts`).
