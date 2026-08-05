@@ -277,8 +277,13 @@ export function runSubject(input: unknown): string | null {
   // well ("Meera Malhotra · submitted · 41,346.44"). Reusing that rule keeps the queue row and the row the
   // person clicked to create it worded the same way, instead of two descriptions of one record drifting apart.
   const described = toCaseCandidate(record, 0);
-  // Its label falls back to "Record 1" when nothing is recognisable; that is not a subject.
-  if (!/^Record \d+$/.test(described.label)) {
+  // Its label falls back to "Record 1" when nothing is recognisable; that is not a subject. It ALSO falls
+  // back to the bare identifier value (e.g. a policy_number) when there is no name field — good enough for
+  // a picker where the id itself distinguishes rows, but here it reproduces the exact defect the identifier
+  // rules below exist to prevent: a lone "88123" reads as an unlabelled quantity, not a policy number. So a
+  // label that is really just the record's own id (label === id, not a real NAME_KEYS match) is treated the
+  // same as "nothing recognisable" and falls through to the labelled first-fields description below.
+  if (!/^Record \d+$/.test(described.label) && described.label !== described.id) {
     return [described.label, described.detail].filter(Boolean).join(' · ').slice(0, MAX_SUBJECT);
   }
 

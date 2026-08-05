@@ -153,8 +153,15 @@ test('an explicit subject-ish field wins', () => {
 
 test('with no named subject, the first fields describe the case with readable labels', () => {
   // A non-technical reader must never see a database-shaped key.
-  const subject = runSubject({ claim_amount: '12400', customer_name: 'Priya Sharma' });
-  assert.equal(subject, 'Claim amount: 12,400 · Customer name: Priya Sharma');
+  //
+  // NOTE: claim_amount/customer_name (the original fixture here) is now recognised by the case-PICKER
+  // rule runSubject reuses (app-case-candidates NAME_KEYS/AMOUNT_KEYS) and renders as "Priya Sharma ·
+  // ₹12,400" instead — a genuinely better subject, not a defect, so it no longer exercises THIS branch
+  // (no named subject at all). Swapped to fields the case-candidate rule does not recognise, so this
+  // test still covers what it says it covers: the fallback "first two fields, humanised" path. Also
+  // moved to INR (₹12,400, not $12,400 / 12,400) — the product's currency, not the old USD default.
+  const subject = runSubject({ total_price: '12400', vendor_code: 'V-9182' });
+  assert.equal(subject, 'Total price: ₹12,400 · Vendor code: V-9182');
   assert.doesNotMatch(subject ?? '', /_/);
 });
 
@@ -185,8 +192,9 @@ test('identifiers are NEVER grouped — only quantities are', () => {
   assert.equal(runSubject({ policy_number: 88123 }), 'Policy number: 88123');
   assert.equal(runSubject({ account_number: '50100234567' }), 'Account number: 50100234567');
   assert.equal(runSubject({ pan: 'ABCDE1234F' }), 'Pan: ABCDE1234F');
-  // …while a quantity field IS grouped.
-  assert.equal(runSubject({ premium: 145000 }), 'Premium: 145,000');
+  // …while a quantity field IS grouped, the Indian way with the ₹ symbol now that the product's
+  // default currency is INR (src/lib/money.ts) — 1,45,000, not the old western "145,000".
+  assert.equal(runSubject({ premium: 145000 }), 'Premium: ₹1,45,000');
 });
 
 test('amounts read as money in the org currency, grouped the Indian way', () => {
