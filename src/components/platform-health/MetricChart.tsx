@@ -47,10 +47,15 @@ export function MetricChart({ chart, hint }: Readonly<{ chart: ChartData; hint?:
       </CardHeader>
       <CardContent>
         {chart.error ? (
-          <p className="py-8 text-center text-xs text-destructive">Query error: {chart.error}</p>
+          <p className="py-8 text-center text-xs text-destructive">
+            This could not be read: {chart.error}
+          </p>
         ) : !chart.emitting ? (
           <div className="flex h-[180px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border text-center">
-            <span className="text-xs font-medium text-muted-foreground">Not emitting yet</span>
+            {/* "Not emitting yet" read as a fault in the pipeline when it only ever meant "no series
+                came back". Two of these four charts sat in this state permanently because the metric
+                NAME was wrong, so the sentence was describing our own bug. */}
+            <span className="text-xs font-medium text-muted-foreground">Nothing recorded yet</span>
             {hint ? (
               <span className="max-w-xs px-4 text-[11px] text-muted-foreground/70">{hint}</span>
             ) : null}

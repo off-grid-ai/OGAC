@@ -52,18 +52,22 @@ async function MetricsDestination() {
     <div className="space-y-4">
       {error ? (
         <p className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
-          Could not reach VictoriaMetrics: {error}
+          The metrics store could not be reached: {error}
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-3 text-sm">
+        {/* "Targets up: awaiting emission" was permanent — nothing scrapes this store, so the metric
+            behind it was never going to arrive, and "awaiting" implied it was on its way. This counts
+            the collectors actually reporting, which is the equivalent fact this topology can answer. */}
         <span className="rounded-md border border-border px-3 py-1.5">
-          Targets up:{' '}
+          Collectors reporting:{' '}
           <span className="font-semibold tabular-nums text-foreground">
-            {targetsUp ?? 'awaiting emission'}
+            {targetsUp ?? 'not reported'}
           </span>
         </span>
         <span className="text-xs text-muted-foreground">
-          A chart marked not emitting yet is connected, but has no data in the current window.
+          Last 24 hours. A flat line means the platform was idle in that period, not that it is
+          disconnected — a chart says so explicitly when it cannot read at all.
         </span>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">

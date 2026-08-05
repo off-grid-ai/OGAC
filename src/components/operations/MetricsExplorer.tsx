@@ -126,7 +126,9 @@ export function MetricsExplorer({
             list="vm-metric-names"
             defaultValue={q}
             key={q}
-            placeholder='e.g. sum(rate(otelcol_receiver_accepted_spans_total[5m]))'
+            // The suggested query must RETURN SOMETHING: this previously named a metric that does not
+            // exist (the `_total` suffix), so an operator's first Run answered "No data".
+            placeholder='e.g. sum(rate(otelcol_receiver_accepted_spans[5m]))'
             className="font-mono text-sm"
           />
           <datalist id="vm-metric-names">

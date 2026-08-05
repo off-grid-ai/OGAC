@@ -44,30 +44,45 @@ export interface ChartSpec {
   hint: string; // one-line "why empty" hint shown in the honest empty state
 }
 
+// EVERY QUERY HERE IS VERIFIED AGAINST THE DEPLOYED STORE'S OWN METRIC LIST.
+// Two of these named metrics did not exist (`..._accepted_spans_total`,
+// `..._exporter_send_failed_spans_total` — the `_total` suffix is a Prometheus convention this
+// collector build does not use), so the charts rendered the honest "Not emitting yet" empty state while
+// telemetry was flowing the whole time. A working pipeline reading as dead is worse than a broken one,
+// because nobody investigates it.
+//
+// Check the names before editing this list — do not guess a suffix:
+//   curl -s 'http://127.0.0.1:8428/api/v1/label/__name__/values'
+//
+// Every series is wrapped in `sum(...)`. Without it a chart inherits the collector's full label set
+// (`service.instance.id`, `service.version`, `exporter`, `data_type`…) and the legend alone destroys the
+// card — three wrapped monospace label sets clipped off the edge.
 export const PLATFORM_CHARTS: ChartSpec[] = [
   {
-    title: 'Request rate',
-    unit: 'req/s',
-    query: 'sum(rate(otelcol_receiver_accepted_spans_total[5m]))',
-    hint: 'No span/request throughput reported yet — awaiting OTel receiver traffic.',
+    title: 'Spans received',
+    unit: 'spans/s',
+    query: 'sum(rate(otelcol_receiver_accepted_spans[5m]))',
+    hint: 'No traced activity in this window yet — run a workflow and it appears here.',
   },
   {
-    title: 'Error rate',
-    unit: 'err/s',
-    query: 'sum(rate(otelcol_exporter_send_failed_spans_total[5m]))',
-    hint: 'No export failures reported (good) or the exporter is not emitting counters yet.',
+    title: 'Spans rejected',
+    unit: 'spans/s',
+    // Refused (back-pressure) and failed (malformed / pipeline error) are the two ways a span is lost
+    // on the way in. Both series exist; the previously-named exporter failure counter does not.
+    query: 'sum(rate(otelcol_receiver_refused_spans[5m])) + sum(rate(otelcol_receiver_failed_spans[5m]))',
+    hint: 'Nothing was rejected in this window. A flat line here is the healthy reading.',
   },
   {
-    title: 'Data points processed',
-    unit: 'pts/s',
-    query: 'sum(rate(otelcol_processor_batch_batch_send_size_sum[5m]))',
-    hint: 'No processed data points yet — awaiting pipeline throughput.',
+    title: 'Spans delivered to storage',
+    unit: 'spans/s',
+    query: 'sum(rate(otelcol_exporter_sent_spans[5m]))',
+    hint: 'Nothing delivered in this window yet — this follows the received line once a workflow runs.',
   },
   {
-    title: 'Collector queue size',
+    title: 'Waiting to be written',
     unit: 'items',
-    query: 'otelcol_exporter_queue_size',
-    hint: 'No exporter queue metric yet — awaiting OTel collector self-telemetry.',
+    query: 'sum(otelcol_exporter_queue_size)',
+    hint: 'Nothing is queued. A flat line at zero here means storage is keeping up.',
   },
 ];
 
@@ -78,8 +93,11 @@ export interface PlatformMetrics {
   error?: string;
 }
 
-const RANGE_SECONDS = 60 * 60; // 1h window
-const STEP_SECONDS = 60; // 1m resolution
+// 24h, not 1h. Measured on the deployment: 0 spans in the last hour and 120 over 24 hours — so an
+// hour-wide window renders a flat line at zero on a box that is genuinely doing work, just not
+// continuously. A window has to be wide enough to contain the activity it is meant to show.
+const RANGE_SECONDS = 24 * 60 * 60;
+const STEP_SECONDS = 5 * 60; // 5m resolution — 288 points across 24h, enough shape without noise
 
 // Best-effort combined read-back for the Metrics tab — never throws. Each chart is fetched via
 // query_range; a per-chart failure yields an empty-but-honest chart, not a page error. `now` is
@@ -109,7 +127,10 @@ export async function safePlatformMetrics(
       const upRes = await vmQuery(
         BASE,
         fetcher,
-        `/api/v1/query?query=${encodeURIComponent('sum(up)')}`,
+        // NOT `sum(up)`: nothing scrapes this store — it is remote-write/push-fed, so `up` is never
+        // produced and the tile read "awaiting emission" permanently, implying it was on its way.
+        // Counting distinct reporting collectors is the equivalent fact that this topology can answer.
+        `/api/v1/query?query=${encodeURIComponent('count(count by (service_instance_id) (otelcol_receiver_accepted_spans))')}`,
       );
       targetsUp = scalarValue(upRes);
     } catch {
