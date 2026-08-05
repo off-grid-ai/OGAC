@@ -149,6 +149,48 @@ function markdownComponents(cite: CiteFn): Parameters<typeof ReactMarkdown>[0]['
     p({ children }) {
       return <p className="my-2 whitespace-pre-wrap first:mt-0 last:mb-0">{cite(children)}</p>;
     },
+    // Headings, emphasis and rules are mapped for the same reason the elements above are: react-markdown
+    // falls back to BROWSER DEFAULTS for anything absent from this map, so an unmapped `##` renders as a
+    // 2em serif-weight heading in the middle of a mono/emerald surface. The model chooses its own
+    // formatting, so every element it can plausibly emit needs a house style — otherwise the answer is
+    // correct and looks broken.
+    h1({ children }) {
+      return (
+        <h1 className="mb-2 mt-4 text-[15px] font-semibold tracking-tight first:mt-0">
+          {cite(children)}
+        </h1>
+      );
+    },
+    h2({ children }) {
+      return (
+        <h2 className="mb-2 mt-4 text-sm font-semibold tracking-tight first:mt-0">
+          {cite(children)}
+        </h2>
+      );
+    },
+    h3({ children }) {
+      return (
+        <h3 className="mb-1 mt-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground first:mt-0">
+          {cite(children)}
+        </h3>
+      );
+    },
+    strong({ children }) {
+      return <strong className="font-semibold text-foreground">{cite(children)}</strong>;
+    },
+    em({ children }) {
+      return <em className="italic">{cite(children)}</em>;
+    },
+    blockquote({ children }) {
+      return (
+        <blockquote className="my-2 border-l-2 border-border pl-3 text-muted-foreground">
+          {children}
+        </blockquote>
+      );
+    },
+    hr() {
+      return <hr className="my-3 border-border" />;
+    },
   };
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, CaretDown, Compass, X } from '@phosphor-icons/react/dist/ssr';
+import { ArrowRight, Compass, X } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { CopilotAnswerView } from '@/components/copilot/CopilotAnswerView';
@@ -38,7 +38,17 @@ import { publicLabel } from '@/lib/lineage-labels';
 // the same call ⌘K (GlobalSearch) makes. It survives navigation for free because the console layout
 // stays mounted across a client-side push, so "take me there" keeps the guide open on the new screen.
 
-const PANEL_MAX_HEIGHT = 'max-h-[min(38rem,calc(100vh-8rem))]';
+// WHY A SIDE PANEL AND NOT A FLOATING CARD. It was a 26rem card pinned to the bottom-right corner,
+// capped at 38rem tall. These answers are long — a conclusion, then an evidence list of eight to ten
+// cited records — so the useful part was always scrolled out of a box the size of a support widget, and
+// the citation list underneath it never had room to sit beside the claim it supports. A full-height
+// rail gives the answer a real reading column and keeps the "go and see it" destinations visible at the
+// same time, which is the entire point of the surface.
+//
+// Width is capped in BOTH directions on purpose: wide enough for the evidence list, but `42vw` so it
+// never eats the screen it is pointing at — a visitor needs to see the console behind it to follow
+// "take me there".
+const PANEL_WIDTH = 'w-[min(34rem,42vw)]';
 
 export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | null }>) {
   const [open, setOpen] = useState(false);
@@ -86,14 +96,14 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   return (
     // Hidden below `md`: the console already shows a "use a bigger screen" gate there, and a launcher
     // floating over that gate would be the one thing on top of an otherwise deliberate dead end.
-    <div className="pointer-events-none fixed bottom-0 right-0 z-40 hidden flex-col items-end gap-2 p-4 md:flex">
+    <>
       {open ? (
         <section
           aria-label="Guide"
-          className={`pointer-events-auto flex w-[26rem] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl ${PANEL_MAX_HEIGHT}`}
+          className={`fixed inset-y-0 right-0 z-40 hidden flex-col border-l border-border bg-background shadow-2xl md:flex ${PANEL_WIDTH}`}
         >
           {/* Header */}
-          <header className="flex items-start gap-3 border-b border-border bg-muted/40 px-4 py-3">
+          <header className="flex items-start gap-3 border-b border-border bg-muted/40 px-5 py-4">
             <Compass className="mt-0.5 size-4 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[11px] uppercase tracking-widest text-primary">Guide</p>
@@ -101,26 +111,20 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                 Ask what you want to know. Every answer comes with a screen you can go and check it on.
               </p>
             </div>
-            <button
-              type="button"
-              aria-label="Collapse the guide"
-              onClick={() => setOpen(false)}
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <CaretDown className="size-4" />
-            </button>
+            {/* X collapses back to the launcher — the affordance a panel is expected to have. Dismissing
+                it for the whole session is a separate, deliberately quieter control in the footer. */}
             <button
               type="button"
               aria-label="Close the guide"
-              onClick={() => setDismissed(true)}
+              onClick={() => setOpen(false)}
               className="text-muted-foreground transition-colors hover:text-foreground"
             >
-              <X className="size-3.5" />
+              <X className="size-4" />
             </button>
           </header>
 
           {/* Body */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {isViewer ? (
               <p className="mb-3 rounded border border-border bg-muted/50 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground">
                 You are signed in to look around. Nothing you click here can change anything.
@@ -152,7 +156,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                 ) : null}
                 {result ? (
                   <div className="border-t border-border pt-3">
-                    <CopilotAnswerView result={result} compact />
+                    <CopilotAnswerView result={result} />
                   </div>
                 ) : null}
 
@@ -166,7 +170,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
           </div>
 
           {/* Composer — the one deliberately narrow element on the surface: a single focused input. */}
-          <footer className="border-t border-border px-4 py-3">
+          <footer className="border-t border-border px-5 py-4">
             <textarea
               ref={inputRef}
               value={question}
@@ -194,24 +198,36 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                 {loading ? 'thinking' : 'ask'}
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setDismissed(true)}
+              className="mt-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70 transition-colors hover:text-foreground"
+            >
+              hide for this visit
+            </button>
           </footer>
         </section>
       ) : null}
 
-      {/* Launcher — obvious on arrival, one click to collapse, one to dismiss for good. */}
-      <button
-        type="button"
-        onClick={() => {
-          setOpen((o) => !o);
-          if (!open) setTimeout(() => inputRef.current?.focus(), 60);
-        }}
-        aria-expanded={open}
-        className="pointer-events-auto flex items-center gap-2 rounded-full border border-primary bg-primary px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest text-primary-foreground shadow-lg transition-opacity hover:opacity-90"
-      >
-        <Compass className="size-4" />
-        {open ? 'Hide guide' : 'Show me around'}
-      </button>
-    </div>
+      {/* Launcher — only while the panel is closed. Keeping it visible alongside an open rail put two
+          controls for the same thing on screen at once, and it would sit on top of the composer. */}
+      {open ? null : (
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(true);
+            setTimeout(() => inputRef.current?.focus(), 60);
+          }}
+          aria-expanded={false}
+          // Hidden below `md`: the console already shows a "use a bigger screen" gate there, and a
+          // launcher floating over that gate would be the one thing on top of a deliberate dead end.
+          className="fixed bottom-4 right-4 z-40 hidden items-center gap-2 rounded-full border border-primary bg-primary px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest text-primary-foreground shadow-lg transition-opacity hover:opacity-90 md:flex"
+        >
+          <Compass className="size-4" />
+          Show me around
+        </button>
+      )}
+    </>
   );
 }
 
