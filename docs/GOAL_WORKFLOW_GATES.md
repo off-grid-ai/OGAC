@@ -165,17 +165,34 @@ them. Verified live (real buckets and folders in the picker, screenshot confirme
 down store — never an empty list. Discovery never accepts an endpoint from the caller and never returns
 object content. **85 of 196 fully leveraged.**
 
+**2026-08-05 — `seaweedfs/lifecycle-versioning` workflow: CLOSED. And it found G-209.**
+Evidence: [`docs/evidence/2026-08-05-lake-retention.md`](evidence/2026-08-05-lake-retention.md).
+`lake_objects` is a class in the SAME sweep as app runs, destinations derived from the apps that write
+there, enforcement pushed down to each bucket's own schedule. Proven live: a 200-day policy applied and
+filed `1/1 destinations keep files 200 days`.
+
+**The store truncates the expiry day count to one byte** — 3650 becomes 66. The sector needs 2555 and
+3650, so the required windows are exactly the ones that wrap, downward, scheduling records for deletion
+years early. The policy now refuses any window over 255 days and leaves the bucket unbounded, which is
+an actionable gap rather than irreversible loss. `upstream` dropped to `partial`, so this row counts as
+**upstream cannot** rather than leveraged — correct for a customer whose window is 3650 days.
+
+It also caught a governance defect: destinations were derived from `listApps`, which hides `[autotest]`
+apps *for presentation*. A presentation filter had reached a compliance calculation.
+
 ### Next up — the rest of cluster 2 (2 items) then clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
   not exist. The gap says keep privileged lifecycle deployment-owned until tenant-safe rollback and
   audit boundaries exist; **read the entry before building**, it may be deliberate.
 - `seaweedfs/topology-repair` — volume topology and repair. Operator surface, lowest product value.
-- `seaweedfs/lifecycle-versioning` **workflow** is still open and now matters MORE: apps can write to
-  the lake, so nothing bounds what those writes accumulate. The binding is a retention policy applied
-  to the buckets the console itself writes to, not another screen.
-
 Then clusters 3 (data quality, 6), 4 (gateway routing, 3), 5 (retention/alerting, ~10), 6 (CDC, 2).
+
+**Running tally:** cluster 1 closed (1 item), cluster 2 closed 4 of 5 (object read/write, bucket
+discovery, lifecycle adapter+ui+workflow) with `versioning-retention-events` and
+`seaweedfs/topology-repair` open. 85 of 196 fully leveraged, from 83. Three defects found by proving
+things live that no test would have caught: runs never recorded their trigger, the data ceiling gated
+reads but not writes, and a presentation filter had reached a compliance calculation.
 
 **Verify before building — it has now paid off four times in two clusters.** Every row picked up so
 far had at least one gate claiming something absent that was already there. Reproduce the gap live
