@@ -200,7 +200,27 @@ so a compliance control on it needs measuring per operation before it can be bel
 **Cluster 2 is now worked through.** Four rows closed on all gates; two carry honest `partial`s naming
 what is deliberately not built; one (`lifecycle-versioning`) is `upstream cannot` because of G-209.
 
-### Next up — clusters 3–6
+**2026-08-05 — cluster 3, the five Evidently rows: ONE root cause, now fixed.**
+The sidecar accepted only `reference`/`current` and always constructed `DataDriftPreset`, so the preset,
+the stat-test method and the per-column overrides the console had been sending for months were silently
+discarded — and the console then printed `Evidently ran "<selection>"`, a claim about work that never
+happened. It also fell back to a local PSI with the same response shape, so an approximation was
+indistinguishable from a real verdict.
+
+Every response now names the engine, the preset really executed, and the test really applied per column
+(using Evidently's own `stattest_name` — evidence, not intent). Live: `method=ks` → `K-S p_value`
+threshold 0.05; two columns `score=psi`/`latency=ks` → `PSI 14.2504` and `K-S p_value 1.0`;
+`data_summary` honestly reports it ran `data_quality` because 0.4.40 has no such preset.
+
+`data-quality`, `psi-method` and `stat-tests` closed on all four gates. `data-summary` is `upstream
+partial` (the preset does not exist in 0.4.40). `column-overrides` is `workflow partial` — the contract
+and engine both apply overrides, but the product drift flow compares ONE column, so closing it needs a
+multi-column drift source, not more adapter work. **88 of 196 fully leveraged.**
+
+Also found: `drift_by_columns` lives on the SECOND metric of a preset expansion. Reading `metrics[0]`
+gave every column `drifted=false` while the dataset beside it said 100% drifted.
+
+### Next up — the rest of clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
   not exist. The gap says keep privileged lifecycle deployment-owned until tenant-safe rollback and
