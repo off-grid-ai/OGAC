@@ -10,12 +10,36 @@ import { serviceProbeAdapter } from '@/lib/service-probes';
 
 // Shared service-health probing — one place, used by both the authenticated Services page
 // (/api/v1/services/health, with latency detail) and the public status API (/api/v1/status,
-// up/down only). A gate that answers 401/302 still counts as UP (it's responding); only a
-// 5xx or a network/timeout error counts as DOWN.
+// up/down only).
+//
+// A 401 or a 302 still counts as UP: the service is serving and refusing us, which proves it is alive.
+// A 5xx or a network error is DOWN.
+//
+// BUT A 404 IS NEITHER, and treating it as UP is how three services on the audited fleet looked
+// healthy while nothing was checking them (2026-08-05). A 404 at the probe path means the path is
+// wrong, so all we proved is that SOME HTTP server answered — not that the service works. Two of those
+// were worse than useless: Temporal's UI serves index.html with a 200 for ANY path, so a wrong path
+// there returns a confident 200 forever.
+//
+// So `expectStatus` lets an entry declare what alive looks like for ITS probe (an OTLP receiver
+// answering 405 to a GET is genuinely healthy), and anything unexpected is reported as `unverified`
+// rather than quietly counted as up.
+export function judgeProbeStatus(
+  httpStatus: number,
+  expectStatus?: readonly number[],
+): 'up' | 'down' | 'unverified' {
+  if (expectStatus?.length) return expectStatus.includes(httpStatus) ? 'up' : 'unverified';
+  if (httpStatus >= 500) return 'down';
+  // Auth refusal proves the service is serving. A missing path proves only that something answered.
+  if (httpStatus === 404 || httpStatus === 405) return 'unverified';
+  return 'up';
+}
+
 export async function probeService(
   url: string,
   healthPath?: string,
   timeoutMs = 5000,
+  expectStatus?: readonly number[],
 ): Promise<RawProbe> {
   const target = new URL(healthPath ?? '/', url).toString();
   const started = Date.now();
@@ -27,7 +51,7 @@ export async function probeService(
       signal: AbortSignal.timeout(timeoutMs),
     });
     const ms = Date.now() - started;
-    return { status: res.status >= 500 ? 'down' : 'up', httpStatus: res.status, ms };
+    return { status: judgeProbeStatus(res.status, expectStatus), httpStatus: res.status, ms };
   } catch (e) {
     return {
       status: 'down',
@@ -67,7 +91,7 @@ export interface StatusEntry {
   // 'embedded' (in-process backend) and 'optional' (on documented fallback / alternative — incl.
   // canonical planes not deployed on this fleet) are healthy, not outages; only 'down' is a real
   // failure.
-  status: 'up' | 'down' | 'embedded' | 'optional';
+  status: 'up' | 'down' | 'embedded' | 'optional' | 'unverified';
   performance: 'good' | 'degraded' | 'unknown'; // good/degraded when up (by latency); unknown otherwise
   ms: number | null;
 }

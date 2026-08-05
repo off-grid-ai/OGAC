@@ -8,7 +8,7 @@
 import type { ReadinessEvidence, ReadinessState } from './service-topology';
 
 /** The health verdict shape produced per service by `computeStatus()` in status.ts. */
-export type ProbeHealthStatus = 'up' | 'down' | 'embedded' | 'optional';
+export type ProbeHealthStatus = 'up' | 'down' | 'embedded' | 'optional' | 'unverified';
 
 export interface ServiceHealthResult {
   id: string;
@@ -35,6 +35,12 @@ function gatesFor(status: ProbeHealthStatus): Record<'deployed' | 'reachable' | 
     case 'optional':
       // Optional dependency not asserted by the probe — honestly unknown, never a pass.
       return { deployed: 'unknown', reachable: 'unknown', functional: 'unknown' };
+    case 'unverified':
+      // Something answered, but not in a way that proves THIS service works (a 404 at the probe path
+      // means the path is wrong). Reachable, because an HTTP server responded; FUNCTIONAL IS UNKNOWN,
+      // never a pass — counting it as a pass is precisely how three services read healthy while nothing
+      // was actually checking them.
+      return { deployed: 'pass', reachable: 'pass', functional: 'unknown' };
   }
 }
 
@@ -49,6 +55,8 @@ function summaryFor(gate: string, status: ProbeHealthStatus, ms?: number): strin
       return `Live health probe could not reach the service or it returned 5xx${latency}.`;
     case 'optional':
       return 'Optional dependency — not asserted by the liveness probe.';
+    case 'unverified':
+      return `Something answered at the health path but not in a way that proves this service works${latency} — the path is probably wrong, so this is unverified rather than healthy.`;
   }
 }
 

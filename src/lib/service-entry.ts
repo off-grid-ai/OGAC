@@ -8,6 +8,15 @@ export interface ServiceEntry {
   url: string;
   /** Path probed for health (server-side). Defaults to '/'. */
   healthPath?: string;
+  /**
+   * The HTTP statuses that mean THIS service is alive at THIS path.
+   *
+   * Declare it when the healthy answer is not a 2xx — an OTLP receiver answering 405 to a GET is
+   * genuinely healthy. Without it the default applies: under-500 is up, except 404/405 which report
+   * `unverified`, because a missing path proves only that some HTTP server answered. Three services on
+   * the fleet looked healthy on exactly that mistake.
+   */
+  expectStatus?: readonly number[];
   /** How it's protected — shown as a badge. */
   auth: 'session' | 'api-key' | 'public';
   /** Grouping for the UI. */

@@ -67,7 +67,12 @@ export interface DecisionRow {
 export interface ServiceHealthRow {
   id: string;
   label: string;
-  status: 'up' | 'down';
+  /**
+   * `unverified` means something answered the probe but not in a way that proves THIS service works —
+   * carried through rather than collapsed into 'up', because collapsing it is exactly how three
+   * services on the fleet read healthy while nothing was checking them.
+   */
+  status: 'up' | 'down' | 'unverified';
   ms: number | null;
 }
 

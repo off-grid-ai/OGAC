@@ -101,7 +101,10 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     label: 'Identity & SSO',
     description: 'Identity & access management — SSO, realm, service accounts.',
     url: process.env.OFFGRID_KEYCLOAK_URL ?? 'http://127.0.0.1:8080',
-    healthPath: '/health/ready',
+    // /health/ready is a 404 on this build — Keycloak only serves it with --health-enabled and on its
+    // management port. Probing the master realm proves the realm is actually being SERVED, which is
+    // what "identity is up" has to mean. Measured 2026-08-05.
+    healthPath: '/realms/master',
     auth: 'session',
     kind: 'api',
   },
@@ -348,7 +351,7 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     description:
       "Workflow orchestration engine — runs the compiled data-movement jobs (extract → transform → load) under the console's governance.",
     url: process.env.OFFGRID_KESTRA_URL ?? 'http://127.0.0.1:8945',
-    healthPath: '/health', // Kestra management endpoint → 200 when up
+    healthPath: '/ping', // Kestra answers `pong`. /health is a 404 on the OSS main port — measured 2026-08-05
     auth: 'api-key',
     kind: 'api',
   },
@@ -381,6 +384,11 @@ const DEFAULT_SERVICES: ServiceEntry[] = [
     description:
       'OpenTelemetry collector — the OTLP ingest that fans spans/metrics/logs to the backends.',
     url: resolveOtelConfig().baseUrl ?? 'not-configured://otel-collector',
+    // A GET on the OTLP trace receiver answers 405, and that is the healthy signal: the receiver is
+    // routing and refusing the wrong verb. The collector's health-check extension is not enabled here,
+    // and the bare root answers 404 — which proved nothing. Measured 2026-08-05.
+    healthPath: '/v1/traces',
+    expectStatus: [405, 200],
     auth: 'api-key',
     kind: 'api',
     probe: 'optional',
@@ -421,7 +429,8 @@ export function getServices(): ServiceEntry[] {
 // The raw outcome of a network probe (see src/lib/status.ts#probeService). Split out so the
 // state decision below stays pure and unit-testable without any I/O.
 export interface RawProbe {
-  status: 'up' | 'down';
+  /** `unverified` = something answered but not in a way that proves THIS service works (see status.ts). */
+  status: 'up' | 'down' | 'unverified';
   httpStatus: number | null;
   ms: number | null;
   error?: string;
