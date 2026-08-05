@@ -32,6 +32,9 @@ export const HEALTH_UI: Record<
     label: 'Embedded',
   },
   optional: { dot: 'bg-muted-foreground/50', text: 'text-muted-foreground', label: 'Optional' },
+  // Amber, not green: something answered but did not prove THIS service works. A green dot here is
+  // how a service with a wrong health path reads as fine while nothing is checking it.
+  unverified: { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', label: 'Unverified' },
 };
 
 export function withLiveReachability(

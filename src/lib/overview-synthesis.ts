@@ -72,7 +72,7 @@ export interface ServiceHealthRow {
    * carried through rather than collapsed into 'up', because collapsing it is exactly how three
    * services on the fleet read healthy while nothing was checking them.
    */
-  status: 'up' | 'down' | 'unverified';
+  status: 'up' | 'down' | 'unverified' | 'embedded' | 'optional';
   ms: number | null;
 }
 
@@ -132,7 +132,7 @@ export interface OperatorHome {
     total: number;
     tone: 'good' | 'warn' | 'bad';
     tile: HomeTile;
-    items: { id: string; label: string; status: 'up' | 'down'; ms: number | null }[];
+    items: ServiceHealthRow[];
   };
   activity: ActivityRow[];
   /** The cross-module governance feed: audit ∪ policy ∪ guardrails blocking events in the window. */

@@ -9,7 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { toDisplayHostname } from '@/lib/display-host';
 import { summarizeServiceCapabilityAudit } from '@/lib/service-capability-map';
 import type { ServiceTopologyDirectoryEntry } from '@/lib/service-directory-view';
-import { isHealthy, type ServiceHealth } from '@/lib/service-health';
+import { isProvenHealthy, type ServiceHealth } from '@/lib/service-health';
 import { HEALTH_UI, ReadinessStrip } from './ServiceReadiness';
 
 const AUTH_LABEL: Record<ServiceTopologyDirectoryEntry['auth'], string> = {
@@ -151,7 +151,10 @@ export function ServicesDirectory({
     };
   }, []);
 
-  const upCount = Object.values(health).filter((h) => isHealthy(h.status)).length;
+  // isProvenHealthy, not isHealthy: an absent optional dependency on its fallback, or a service whose
+  // probe answered without proving anything, must not sit in a green numerator. An absent CONTENT
+  // GUARDRAIL counting as healthy is the version of this that matters.
+  const upCount = Object.values(health).filter((h) => isProvenHealthy(h.status)).length;
   const checkedCount = Object.keys(health).length;
 
   return (
@@ -195,7 +198,7 @@ export function ServicesDirectory({
         if (group.length === 0) return null;
         const groupUp = group.filter((s) => {
           const st = health[s.id]?.status;
-          return st != null && isHealthy(st);
+          return st != null && isProvenHealthy(st);
         }).length;
         const groupChecked = group.filter((s) => health[s.id]).length;
         return (
