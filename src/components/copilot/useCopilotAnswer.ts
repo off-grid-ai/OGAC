@@ -59,11 +59,10 @@ export function useCopilotAnswer(): CopilotAsk {
     setError(null);
     setResult(null);
     try {
-      const res = await fetch('/api/v1/admin/copilot', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ question: query }),
-      });
+      // GET, not POST. Asking a question changes nothing, and the read-only `viewer` role that every
+      // public demo link uses is blocked from mutating methods at the edge — a POST here returned 403
+      // to the entire audience of the floating guide (verified live 2026-08-05). See the route.
+      const res = await fetch(`/api/v1/admin/copilot?q=${encodeURIComponent(query)}`);
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         setError(body?.error ?? `Request failed (${res.status})`);
