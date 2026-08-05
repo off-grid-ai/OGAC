@@ -148,13 +148,26 @@ remaining work:** nothing binds a retention policy to the buckets the console it
 person sets it per bucket, so a bucket created any other way keeps everything forever — which is not
 a retention policy, it is a retention screen.
 
-### Next up — the rest of cluster 2 (4 items)
+**2026-08-05 — `enterprise-source-minio/object-read-write`: CLOSED, all four gates.**
+Evidence: [`docs/evidence/2026-08-05-governed-object-io.md`](evidence/2026-08-05-governed-object-io.md).
+Two of the three gates were stale again (S3 was already `ready` with a dialect, and the create form
+already existed). The write half genuinely did not exist; `sink: lake` is it, and it names a DATA
+DOMAIN rather than a bucket, because a connector's keypair usually reaches the whole store.
 
-The three `enterprise-source-minio` rows and `seaweedfs/topology-repair`. Governed object read/write
-is the valuable one: SeaweedFS serves, and no governed pipeline step reads or writes through it.
-Same shape as the stream trigger — the primitive is proven, the BINDING is missing. Check for an
-existing adapter before writing one; `s3-object-store.ts` already has the full port, exactly as
-`kafka-enterprise-source.ts` already existed for cluster 1.
+**The hole the proof found:** the pipeline hard ceiling gated READS only, so the new sink was a way
+out of it — a run whose output domain had been revoked still wrote the object. Fixed through the same
+`enforceDataAccess` the read uses, re-proven in both directions. **84 of 196 fully leveraged.**
+
+### Next up — the rest of cluster 2 (3 items)
+
+`enterprise-source-minio/bucket-discovery`, `…/versioning-retention-events`, and
+`seaweedfs/topology-repair`. Also still open: `seaweedfs/lifecycle-versioning` **workflow** — nothing
+binds a retention policy to the buckets the console itself writes to, and now that apps can write to
+the lake that matters more, not less.
+
+**Verify before building — it has now paid off four times in two clusters.** Every row picked up so
+far had at least one gate claiming something absent that was already there. Reproduce the gap live
+first; the gates rot faster than the code.
 
 **Two standing traps this session hit, worth reading before the next slice:**
 - A live proof needs the WORKER restarted, not just the console — `app-worker.mts` bundles its
