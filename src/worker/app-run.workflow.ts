@@ -118,7 +118,7 @@ export async function AppRunWorkflow(
     input.orgId,
   );
 
-  let state = initState(spec, input.runId);
+  let state = initState(spec, input.runId, null, input.trigger);
   const results: StepResult[] = [];
 
   // Pending resume decisions keyed by stepId. A signal that arrives before (or during) the pause is

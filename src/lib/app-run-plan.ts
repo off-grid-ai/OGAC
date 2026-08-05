@@ -18,7 +18,7 @@
 // leftover nodes deterministically) but does not itself reject invalid graphs — that is the model's
 // job. Keeping planning pure means the whole schedule is reproducible + testable without a run.
 
-import type { AppSpec, AppStep, AppStepKind } from '@/lib/app-model';
+import type { AppSpec, AppStep, AppStepKind, TriggerSpec } from '@/lib/app-model';
 
 // ─── StepRunStatus — the per-step lifecycle the reducer walks each step through ─────────────────
 //   queued          — not yet started (initial state for every step)
@@ -80,6 +80,15 @@ export interface AppRunState {
   dataClassification?: string | null;
   /** Why we were permitted to process what this run read; null = no personal-data source read. */
   lawfulBasis?: string | null;
+  /**
+   * WHAT STARTED THIS RUN. Carried like the version, and fixed at start.
+   *
+   * Without it every run records the schema default, `on-demand` — so a run a data feed or an
+   * inbound email began is indistinguishable from one a person clicked. That is not a cosmetic
+   * label: "did a human ask for this?" is the first question of any incident review, and answering
+   * it wrongly is worse than not answering it.
+   */
+  trigger?: TriggerSpec | null;
 }
 
 // ─── topoOrder — a stable topological order of the steps ─────────────────────────────────────────
@@ -233,7 +242,12 @@ export function planAdvance(spec: AppSpec, state: AppRunState): { runnable: AppS
 }
 
 // ─── initState — the initial AppRunState: every step queued, run queued ───────────────────────────
-export function initState(spec: AppSpec, runId: string, appVersion?: number | null): AppRunState {
+export function initState(
+  spec: AppSpec,
+  runId: string,
+  appVersion?: number | null,
+  trigger?: TriggerSpec | null,
+): AppRunState {
   const steps: StepState[] = topoOrder(spec).map((s) => ({
     id: s.id,
     kind: s.kind,
@@ -243,7 +257,17 @@ export function initState(spec: AppSpec, runId: string, appVersion?: number | nu
   // The version is fixed HERE, at the start, and carried for the life of the run — including across a
   // human pause that may last days. Reading it later would report whatever is current, which is the
   // opposite of what an incident needs.
-  return { runId, appId: spec.id, status: 'queued', steps, appVersion: appVersion ?? null };
+  // NOT defaulted to spec.trigger. An app whose declared trigger is a webhook can also be run by a
+  // person from the console, and recording that run as "a webhook did it" would be a false answer to
+  // the first question of any incident review. An undeclared trigger IS the interactive path.
+  return {
+    runId,
+    appId: spec.id,
+    status: 'queued',
+    steps,
+    appVersion: appVersion ?? null,
+    trigger: trigger ?? { kind: 'on-demand' },
+  };
 }
 
 // ─── The reducer's step-result input (a subset of StepState the orchestrator produces) ──────────

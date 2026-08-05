@@ -80,6 +80,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       orgId,
       actor: 'trigger:webhook',
       runId,
+      trigger: { kind: 'webhook' },
     });
     return NextResponse.json(
       {

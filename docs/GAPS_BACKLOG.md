@@ -2228,3 +2228,31 @@ projects named `Op`/`OPOP`/`Acme Support`, and 26 `code` artifacts belonging to 
 tenant sees them (`listDomains`/`listArtifacts`/project queries are all org-scoped, verified), so this is
 not a leak and not demo-blocking — but signing in as a non-tenant identity lands in `default` and shows
 that debris. Worth a cleanup before any demo that does not use a tenant subdomain.
+
+## G-208 — 13 capability rows say "all four gates yes" while their own gap text says otherwise
+
+Found 2026-08-05 while promoting the stream-consume gate. `test/service-capability-map.test.ts`
+enforces the rule that a gap is non-empty **iff** the four gates are not all `yes`. That test passed
+at `3abcc9ba` and fails at today's HEAD: 14 rows now break it. One (`qdrant/payload-filtering`) is
+fixed in this commit; the remaining 13 are listed here rather than mass-edited, because deciding
+which side is lying needs the evidence for each row.
+
+Two distinct shapes, and the second is the dangerous one:
+
+**(a) The gap field used as a changelog** — a "CLOSED 2026-08-04 …" narrative left in `gap` after the
+work landed. Harmless in substance, wrong in mechanism: closure evidence belongs in the gate's
+`evidence`, which is where a reader looks for proof. Mechanical fix, the one applied to qdrant.
+`langfuse/prompts-datasets`, `evidently/projects-history-monitoring`, `ragas/context-precision-recall`,
+`victoriametrics/metrics-query`, `console/retention-evidence`, `keycloak/human-sso`,
+`chat-worker/governed-chat-execution`, `redis/shared-response-cache`.
+
+**(b) Gates claim complete while the text names work that is NOT done** — "CLOSED … **Remaining:** X".
+This is the honesty drift the ledger exists to prevent: the count says leveraged, the prose says not
+quite, and only the count is read. Either the remaining item is out of the row's scope (then say so
+and clear the gap) or a gate is not `yes`. Needs a judgement per row, against the evidence.
+`streaming/produce-records` ("bind it to governed pipeline output"),
+`victoriametrics/ingest-remote-write`, `otel-collector/trace-export-jaeger`,
+`otel-collector/otlp-metrics`, `otel-collector/self-telemetry`, `redis/failure-fallback`.
+
+Until this is resolved the map test stays red, and `scripts/count-capability-gates.mts` is
+overstating "fully leveraged" by up to 6.

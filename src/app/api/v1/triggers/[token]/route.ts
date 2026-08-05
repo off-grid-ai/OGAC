@@ -101,7 +101,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     }
     let handle: Awaited<ReturnType<typeof submitAppRun>>;
     try {
-      handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId });
+      handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId, trigger: { kind: 'webhook' } });
     } catch (error) {
       const failure = pipelineBindingHttpFailure(error, {
         ingress: `webhook:${trigger.id}`,

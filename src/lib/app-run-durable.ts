@@ -11,7 +11,7 @@
 // — a `human` step suspends the run mid-workflow (HITL), and a suspended run must survive a process
 // restart. `shouldRunDurably` encodes exactly that: multi-step OR has-a-human ⇒ durable required.
 
-import type { AppSpec } from '@/lib/app-model';
+import type { AppSpec, TriggerSpec } from '@/lib/app-model';
 import type { Actor } from '@/lib/audit-event';
 import type { Asker } from '@/lib/retrieval/acl';
 
@@ -124,6 +124,13 @@ export interface AppRunWorkflowInput {
    * does. Null/absent means deliberately unbound; a stale explicit id fails closed in the activity.
    */
   pipelineId: string | null;
+  /**
+   * WHAT STARTED THIS RUN. Carried onto the durable path for the same reason the pipeline id is:
+   * the WORKER creates the run row, so anything the dispatch site knows and does not thread here is
+   * simply lost. Without it every durable run records the interactive default and an operator cannot
+   * tell whether a person asked for it.
+   */
+  trigger?: TriggerSpec | null;
   /**
    * SHADOW / LIVE run mode (BFSI blast-radius). The dispatch site resolves the effective mode
    * (app.shadowDefault ∨ requested) via the pure resolveRunMode and threads it here; the workflow

@@ -90,7 +90,7 @@ export async function POST(req: Request) {
     }
     let handle: Awaited<ReturnType<typeof submitAppRun>>;
     try {
-      handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId });
+      handle = await submitAppRun(app, input, { orgId, actor: actor.id, runId, trigger: { kind: 'email' } });
     } catch (error) {
       const failure = pipelineBindingHttpFailure(error, {
         ingress: `inbound-email:${trigger.id}`,

@@ -84,7 +84,7 @@ export async function ingestWhatsAppMessage(
   try {
     const input = buildTriggerInput('whatsapp', msg);
     const runId = newAppRunId();
-    await submitAppRun(app, input, { orgId: app.orgId, actor: 'trigger:whatsapp', runId });
+    await submitAppRun(app, input, { orgId: app.orgId, actor: 'trigger:whatsapp', runId, trigger: { kind: 'whatsapp' } });
     return { ok: true, runId };
   } catch (e) {
     return { ok: false, reason: 'error', error: (e as Error).message };

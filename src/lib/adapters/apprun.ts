@@ -158,6 +158,9 @@ async function trySubmitDurable(
     // BFSI blast-radius — carry the resolved run mode so the WORKER intercepts side-effecting sinks
     // on a shadow run identically to the inline path. Default 'live' (additive).
     mode: ctx.mode ?? 'live',
+    // The WORKER creates the run row, so a trigger the dispatch site knows but does not thread here
+    // is lost and the run records the interactive default instead.
+    trigger: ctx.trigger ?? null,
   };
   try {
     const client = await temporalClient(cfg);

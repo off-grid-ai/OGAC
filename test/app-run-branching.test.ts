@@ -121,3 +121,17 @@ test('planAdvance: an unguarded graph behaves exactly as before (no step ever sk
   assert.deepEqual(runnable.map((s) => s.id).sort(), ['cashless', 'surveyor'], 'both run when unguarded');
   assert.deepEqual(skip, []);
 });
+
+test('A RUN RECORDS WHAT STARTED IT — and never guesses from the app', () => {
+  // Every run used to persist the schema default, `on-demand`, so a run a data feed or an inbound
+  // email began was indistinguishable from one a person clicked. "Did a human ask for this?" is the
+  // first question of any incident review.
+  const spec: AppSpec = { ...diamond(), trigger: { kind: 'webhook' } };
+  assert.deepEqual(initState(spec, 'r_fed', null, { kind: 'topic', config: { topic: 'claims' } }).trigger, {
+    kind: 'topic',
+    config: { topic: 'claims' },
+  });
+  // And it must NOT fall back to the app's declared trigger: this same webhook app can be run by a
+  // person from the console, and recording that as "a webhook did it" is a false answer.
+  assert.deepEqual(initState(spec, 'r_manual').trigger, { kind: 'on-demand' });
+});

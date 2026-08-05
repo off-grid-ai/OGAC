@@ -87,6 +87,7 @@ export async function pollEmailTriggers(
           orgId: app.orgId,
           actor: 'trigger:email',
           runId: newAppRunId(),
+          trigger: app.trigger,
         });
         matched++;
         await client.markSeen(uid); // fire once

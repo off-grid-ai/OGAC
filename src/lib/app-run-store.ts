@@ -99,6 +99,10 @@ export async function upsertAppRunState(
     // insert only (absent from the `set` clause below) so a mid-flight policy change cannot
     // retroactively re-attribute a run that already started under the old one.
     ...(policyVersion > 0 ? { policyVersion } : {}),
+    // WHAT STARTED IT. Insert-only, like policyVersion: a run is attributed to the trigger it began
+    // under, and a later write must not re-attribute it. Absent ⇒ the column keeps its `on-demand`
+    // default, which is why every non-interactive trigger used to record as if a person had clicked.
+    ...(state.trigger ? { trigger: state.trigger } : {}),
     ...(finished ? { finishedAt: new Date() } : {}),
   };
   await db

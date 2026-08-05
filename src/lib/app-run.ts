@@ -27,7 +27,7 @@
 
 import { withGatewayScope } from '@/lib/gateway-scope';
 import { randomUUID } from 'node:crypto';
-import type { AppSpec, AppStep, ActionStep } from '@/lib/app-model';
+import type { AppSpec, AppStep, ActionStep, TriggerSpec } from '@/lib/app-model';
 import {
   hasApprovedMakerChecker,
   planActionImpact,
@@ -95,6 +95,12 @@ export interface AppRunContext {
   contract?: PipelineContract | null;
   /** Canonical resolved pipeline id for child-agent attribution and durable dispatch. */
   pipelineId?: string | null;
+  /**
+   * WHAT STARTED THIS RUN. Every non-interactive entry point (an inbound webhook, an email, a
+   * schedule, a record on a data feed) MUST set this, or the run records the interactive default and
+   * an operator cannot tell whether a human asked for it. Absent ⇒ a person ran it.
+   */
+  trigger?: TriggerSpec | null;
   /** Document-level retrieval identity carried into inline and Temporal child-agent runs. */
   asker?: Asker;
   /**
@@ -1402,7 +1408,7 @@ export async function runApp(
   // Stamp the app version this run executes. Best-effort: a version lookup must never stop a run, and
   // a null simply means "unversioned", which is honest for an app that predates version history.
   const appVersion = await currentAppVersion(spec.id, ctx.orgId);
-  const state = initState(spec, ctx.runId, appVersion);
+  const state = initState(spec, ctx.runId, appVersion, ctx.trigger);
   const posture = await runDataPosture(spec, ctx.orgId);
   state.dataClassification = posture.dataClassification;
   state.lawfulBasis = posture.lawfulBasis;

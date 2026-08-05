@@ -114,6 +114,32 @@ Remaining to close this gate, in order:
 Only after step 3 does the gate move to `yes`. A passing consumer test does not close it — see the
 acceptance bar above.
 
+**2026-08-05 — cluster 1 CLOSED. All three steps done, proven live.**
+Evidence: [`docs/evidence/2026-08-05-stream-trigger-live.md`](evidence/2026-08-05-stream-trigger-live.md).
+A published Suraksha app consumes `insurance.claim-events` and drives a governed run per record.
+17 historical records were NOT replayed; offset 20 produced `apprun_483326a5` with the feed named in
+its provenance; a hand-rewound cursor was redelivered and refused (`dup=1`, run count unchanged).
+
+`streaming/consumer-groups-offsets` workflow → `yes`. **Only that one.** The two
+`enterprise-source-kafka` rows were deliberately NOT promoted: they are about the Data Sources
+CONNECTOR catalogue, and their own gap text warns "do not reuse an admin proof as a source adapter".
+A stream trigger is not a data-source connector. Promoting them would be exactly that mistake.
+
+What the live proof caught that no test would have: **every run in the product recorded
+`trigger: on-demand`** — the schema default — because no code path had ever written the run's
+trigger. A run an inbound email or a schedule began was indistinguishable from one a person clicked.
+Fixed at the seam (`initState` takes it, `upsertAppRunState` writes it insert-only, every entry point
+declares its own) and threaded onto the durable path too, since the WORKER creates the run row.
+
+Also found, and NOT fixed here: 14 capability rows claim four `yes` gates while their gap text says
+otherwise — logged as **G-208** in `docs/GAPS_BACKLOG.md`. The map test is red because of it.
+
+### Next up — cluster 2, governed object I/O (5 items)
+
+SeaweedFS runs and serves; nothing governed reads or writes through it. Same shape as this one: the
+primitive is proven, the BINDING is missing. Do not rebuild the client — check for an existing
+adapter first, the way `kafka-enterprise-source.ts` already existed here.
+
 ## Measuring it
 
 Only the script counts. Re-run it after every merge; it fails if the buckets stop reconciling to 196.

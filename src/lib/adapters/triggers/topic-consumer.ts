@@ -209,6 +209,9 @@ async function runAppCycle(app: AppSpec, config: RedpandaConfig): Promise<AppCyc
           orgId: app.orgId,
           actor: 'trigger:topic',
           runId,
+          // The run records WHAT started it, naming the feed. Without this the run reads as though a
+          // person clicked it, and "did a human ask for this?" is the first question of any review.
+          trigger: { kind: 'topic', config: { topic, groupId } },
         });
         await recordDelivery({
           appId: app.id, orgId: app.orgId, deliveryKey: d.key, disposition: 'ran', runId,
