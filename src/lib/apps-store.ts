@@ -409,6 +409,23 @@ export async function listApps(orgId: string): Promise<AppSpec[]> {
     .filter((a) => !hideDemoTestArtifact(orgId, { title: a.title, ownerId: a.ownerId }));
 }
 
+// ─── listAppsForGovernance — every app in an org, UNFILTERED ────────────────────────────────────
+// listApps hides `[autotest]` apps on demo tenants so a customer-facing list stays clean. That filter
+// is a PRESENTATION concern and must never reach a governance calculation: an app hidden from a list
+// still runs, still reads data and still writes files, so a retention or coverage answer computed off
+// the filtered list would quietly exclude it and report itself complete. Found live 2026-08-05, when
+// lake retention derived from listApps reported "no workflow writes files to the object store" while
+// one demonstrably did.
+export async function listAppsForGovernance(orgId: string): Promise<AppSpec[]> {
+  await ensureAppsSchema();
+  const rows = await db
+    .select()
+    .from(apps)
+    .where(eq(apps.orgId, orgId || DEFAULT_ORG))
+    .orderBy(desc(apps.createdAt));
+  return rows.map(toAppSpec);
+}
+
 // ─── listStreamTriggeredApps — every published app listening on a topic, ALL orgs ──────────────
 // Deliberately NOT org-scoped, and the only lister here that is not. The stream consumer is a single
 // background process serving the whole deployment: there is no signed-in org to scope it to, and

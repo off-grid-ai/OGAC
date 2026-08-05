@@ -131,6 +131,25 @@ export async function listRetentionRuns(
 async function sweepOne(target: SweepTarget, orgId: string): Promise<SweepOutcome> {
   const base = { recordClass: target.recordClass, action: target.action };
   try {
+    if (target.recordClass === 'lake_objects') {
+      // Not a delete here — the window is pushed down to each destination bucket's own schedule, so it
+      // keeps holding when this process is not running. `affected` counts destinations CORRECTED and
+      // `remaining` counts those still not matching the policy, which is what the evidence needs to
+      // show: a non-zero remaining is a compliance statement that is not yet true.
+      const { applyLakeRetention } = await import('@/lib/adapters/lake-retention');
+      const report = await applyLakeRetention(orgId, target.retainDays);
+      const unmet = report.outcomes.filter((o) => o.after?.state !== 'matches');
+      return {
+        ...base,
+        action: 'delete',
+        affected: report.outcomes.filter((o) => o.applied).length,
+        remaining: unmet.length,
+        detail: [report.summary, ...report.outcomes.map((o) => o.line)].join(' '),
+        ...(unmet.some((o) => o.error)
+          ? { error: unmet.find((o) => o.error)!.error }
+          : {}),
+      };
+    }
     if (target.recordClass === 'app_runs') {
       if (target.action === 'delete') {
         const r = await db.execute<{ n: number }>(sql`

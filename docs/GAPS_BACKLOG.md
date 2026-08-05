@@ -2256,3 +2256,26 @@ and clear the gap) or a gate is not `yes`. Needs a judgement per row, against th
 
 Until this is resolved the map test stays red, and `scripts/count-capability-gates.mts` is
 overstating "fully leveraged" by up to 6.
+
+## G-209 — the object store cannot hold a BFSI retention window
+
+Found 2026-08-05 while binding retention to the buckets governed runs write to
+(`docs/evidence/2026-08-05-lake-retention.md`). Setting a bucket expiry of 30 days round-trips as 30;
+**365 reads back as 109 and 3650 reads back as 66** — those values modulo 256. The deployed store
+encodes the expiry-day count in a single byte and wraps silently, downward. Our request XML and our
+parser were both verified correct with no store involved.
+
+Why it matters more than a wrong number: the console's own retention rules use 2555 days (bank) and
+3650 (life insurer), because those are the windows the sector requires. So the values a regulated
+customer actually needs are exactly the ones that wrap, and they wrap by scheduling records for
+deletion years early while every surface reports the policy as applied.
+
+**Mitigated in the product, not fixed:** `retentionStateFor` returns an `unrepresentable` state for any
+window over 255 days and the adapter REFUSES to write the rule, naming the real number it would
+become. The bucket is left unbounded and the sweep reports `could NOT be set`. An unbounded bucket is a
+compliance gap someone can act on; early deletion is irreversible.
+
+**Still open, and NOT console-side:** either run an object store that holds the window (this is a
+deployment choice — the S3 lifecycle spec has no such limit), or add a console-side sweep for windows
+over 255 days, which means a second clock that only holds while our process runs. Prefer the former.
+Owner: `off-grid-ai/onprem-fleet-orchestration`.

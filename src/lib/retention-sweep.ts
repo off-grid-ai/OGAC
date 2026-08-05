@@ -30,6 +30,18 @@ export const RETAINABLE_CLASSES = [
     label: 'Indexed document text',
     detail: 'The searchable text extracted from uploaded documents.',
   },
+  {
+    // Added when apps gained the ability to WRITE to the object store. Until then the note on this
+    // surface said lake purging "stays with the data engine and is reported as deferred" — honest at
+    // the time, a hole afterwards: a governed run could accumulate files that no policy bounded, and
+    // "we do not keep this longer than N days" stopped being true for the newest thing we produce.
+    //
+    // Enforced by the BUCKET's own schedule rather than a delete loop here: the store already expires
+    // objects, and a second clock in the console would only hold the promise while our process runs.
+    id: 'lake_objects',
+    label: 'Files saved to the object store',
+    detail: 'Files that workflows write to the private object store, such as generated assessments and exports.',
+  },
 ] as const;
 
 export type RetainableClass = (typeof RETAINABLE_CLASSES)[number]['id'];
@@ -60,6 +72,12 @@ export interface SweepTarget {
   action: SweepAction;
   /** Everything created strictly before this instant is out of retention. */
   cutoff: Date;
+  /**
+   * The window itself, carried alongside the cutoff. A database sweep needs the instant; a store that
+   * expires objects on its own schedule needs the NUMBER OF DAYS, because that is what its rule says.
+   * Deriving days back out of a cutoff would drift by a day depending on when the sweep ran.
+   */
+  retainDays: number;
 }
 
 export interface SweepPlan {
@@ -95,6 +113,7 @@ export function planSweep(rules: readonly RetentionRule[], now: Date): SweepPlan
       recordClass: r.recordClass,
       action: r.action,
       cutoff: new Date(now.getTime() - r.retainDays * 86_400_000),
+      retainDays: r.retainDays,
     });
   }
   // Any class with no rule at all is a gap, and must read as one rather than as compliance.
@@ -115,6 +134,12 @@ export interface SweepOutcome {
   affected: number;
   /** Re-counted AFTER the work: rows still older than the cutoff. Non-zero means it did not finish. */
   remaining: number;
+  /**
+   * Optional per-destination narrative. A row count answers "how much"; for a class enforced somewhere
+   * else — an object store expiring files on its own schedule — the auditor also needs WHERE and on
+   * whose authority, and a bare number cannot carry that.
+   */
+  detail?: string;
   error?: string;
 }
 
