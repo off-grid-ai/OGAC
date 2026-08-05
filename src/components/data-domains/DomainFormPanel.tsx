@@ -7,6 +7,7 @@ import { FormSheet } from '@/components/ui/form-sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ObjectScopePicker } from '@/components/data-domains/ObjectScopePicker';
 import { validateDomainForm, type DomainFormResult } from '@/lib/data-domains-ui';
 import { LAWFUL_BASES } from '@/lib/lawful-basis';
 
@@ -230,19 +231,28 @@ export function DomainFormPanel({
               <p className="text-xs text-destructive">{errors.connectorId}</p>
             ) : null}
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="dom-resource">Resource</Label>
-            <Input
-              id="dom-resource"
-              placeholder="Account · transactions · invoices/"
-              value={resource}
-              onChange={(e) => setResource(e.target.value)}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              The table, object, or path within the connector this label reads from.
-            </p>
-            {errors.resource ? <p className="text-xs text-destructive">{errors.resource}</p> : null}
-          </div>
+          {/* An object store is picked, not typed: a bucket typed from memory saves cleanly and fails
+              at RUN time as "no records". Every other connector type keeps the free-text resource. */}
+          {connectors.find((c) => c.id === connectorId)?.type?.toLowerCase() === 's3' ? (
+            <div className="space-y-1.5">
+              <ObjectScopePicker connectorId={connectorId} value={resource} onChange={setResource} />
+              {errors.resource ? <p className="text-xs text-destructive">{errors.resource}</p> : null}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor="dom-resource">Resource</Label>
+              <Input
+                id="dom-resource"
+                placeholder="Account · transactions · invoices/"
+                value={resource}
+                onChange={(e) => setResource(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                The table, object, or path within the connector this label reads from.
+              </p>
+              {errors.resource ? <p className="text-xs text-destructive">{errors.resource}</p> : null}
+            </div>
+          )}
       </div>
     </FormSheet>
   );
