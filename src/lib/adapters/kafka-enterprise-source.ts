@@ -133,15 +133,45 @@ function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw abortError(signal);
 }
 
+/**
+ * How to reach a broker. Deliberately NOT a connector binding: reading an exact offset window is a
+ * transport concern, and the stream TRIGGER needs the same transport without a connector, a data
+ * domain or a schema-registry subject. Two callers, one reader — see createKafkaWindowReader.
+ */
+export interface KafkaTransport {
+  clientId: string;
+  brokers: string[];
+  tls: boolean;
+  sasl?: SASLOptions;
+}
+
 export function createNativeKafkaEnterpriseSourcePort(
   bindingInput: ResolvedKafkaSourceBinding,
 ): KafkaEnterpriseSourcePort {
   const binding = validateResolvedKafkaSourceBinding(bindingInput);
-  const kafka = new Kafka({
+  return createKafkaWindowReader({
     clientId: kafkaConsumerGroup(binding),
     brokers: [...binding.brokers],
-    ssl: binding.security.tls,
+    tls: binding.security.tls,
     sasl: kafkaSasl(binding),
+  });
+}
+
+/**
+ * Read an EXACT offset window, with the consumer's auto-commit off.
+ *
+ * That combination is the whole reason this exists rather than a plain subscription: the caller
+ * decides when a record is accounted for, because acknowledging on delivery loses work on a crash.
+ * The governed connector read and the stream trigger both need exactly this, so it lives in one
+ * place — duplicating a consumer loop is how two paths quietly acquire two different delivery
+ * guarantees.
+ */
+export function createKafkaWindowReader(transport: KafkaTransport): KafkaEnterpriseSourcePort {
+  const kafka = new Kafka({
+    clientId: transport.clientId,
+    brokers: [...transport.brokers],
+    ssl: transport.tls,
+    sasl: transport.sasl,
     connectionTimeout: 5_000,
     requestTimeout: KAFKA_SOURCE_TIMEOUT_MS,
     retry: { retries: 1 },
