@@ -182,6 +182,45 @@ export function ControlPlaneStage() {
     };
   }, [expand, reduce, snapOffset, scrollYProgress]);
 
+  // ── Deep link: /#animation must ARRIVE full bleed ───────────────────────────────────────────────
+  //
+  // The browser's own anchor jump lands on the section top, which is exactly where the stage has not
+  // begun to grow — so a shared link opened onto the contained stage under the hero copy, the opposite
+  // of the point. This re-targets to `snapOffset()`, the offset at which the stage is precisely
+  // 100vw x 100vh, so the link opens on the artwork filling the window.
+  //
+  // NOT the Fullscreen API: that requires a user gesture (transient activation) and a browser will
+  // reject it from a load handler, which would make the link look broken. The F key and the button
+  // still take it to true OS fullscreen, from a real gesture.
+  //
+  // Retried across a few frames because the geometry is only measurable after layout, and the browser
+  // performs its own anchor scroll after ours — the last write has to be this one.
+  useEffect(() => {
+    // Mobile and reduced-motion keep the contained stage: there is no pinned full-bleed frame to land
+    // on, and forcing one would fight the setting that asked us not to.
+    if (!expand || window.location.hash !== '#animation') return;
+    let raf = 0;
+    let tries = 0;
+    const land = (): void => {
+      const target = snapOffset();
+      if (target !== null) window.scrollTo({ top: target, behavior: 'instant' as ScrollBehavior });
+      if (++tries < 8) raf = requestAnimationFrame(land);
+    };
+    raf = requestAnimationFrame(land);
+    // A later click on the same link changes only the hash, which fires no navigation.
+    const onHash = (): void => {
+      if (window.location.hash !== '#animation') return;
+      tries = 0;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(land);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('hashchange', onHash);
+    };
+  }, [expand, snapOffset]);
+
   // Until measured (SSR / first paint), and on mobile, render the plain contained stage.
   //
   // `wrapRef` is attached HERE TOO, even though nothing scroll-driven happens in this branch. Returning

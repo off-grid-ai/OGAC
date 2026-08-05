@@ -38,7 +38,7 @@ for (const service of SERVICE_CAPABILITY_AUDITS as any[]) {
     } else {
       underLeveraged++;
       underLeveragedBy.push({
-        service: service.name ?? service.id,
+        service: service.serviceLabel ?? service.serviceId,
         item: item.name ?? item.id,
         missing: ours.filter((g) => status(g) !== 'yes').map((g) => `${g}:${status(g)}`),
       });

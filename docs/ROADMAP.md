@@ -10,6 +10,13 @@
 
 **This section decides what gets built next. The phase plan below it is the platform backlog.**
 
+> **Standing goal alongside this queue: [`GOAL_WORKFLOW_GATES.md`](./GOAL_WORKFLOW_GATES.md)** — bind the
+> proven primitives into product workflows. Baseline 2026-08-05: **83 of 196 fully leveraged**, 111
+> under-leveraged, and `workflow` is the weakest gate (103 yes / 51 partial / 42 no). 41 of those `no`
+> gates are ours; ~34 are genuinely buildable, and the streaming-inbound + governed-object-IO clusters
+> (11 items) carry most of the value. Counts are DERIVED — `npx tsx scripts/count-capability-gates.mts`,
+> never retyped.
+
 We are raising on the claim *"the product works,"* and the hero animation binds its four beats to
 product planes **"so the animation provably covers the whole product."** A CIO watches 22 seconds,
 then opens the seeded bank and insurer from the one-pager. So the unit of work is **a claim we are
