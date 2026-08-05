@@ -311,6 +311,17 @@ box returns `providerId=qdrant collection=offgrid-brain`, because `OFFGRID_ADAPT
 This deployment does not select LanceDB, so there is no live LanceDB retrieval here to attribute. Same
 shape as G-210 — a configuration boundary, measured rather than assumed.
 
+**2026-08-05 — `opensearch/index-lifecycle`: reading closed, and it found G-212.**
+Retention on the search index is an ISM POLICY, not a flag. Reading it returned `total_policies: 0` —
+**no lifecycle policies at all**, so the `security-auditlog-*` indices accumulate forever. That is the
+"unbounded audit store" the roadmap calls a promise we cannot keep, and it is the audit trail, so it is
+the one store a compliance reader asks about first.
+
+Surfaced as `unbounded` on the retention page, and it now blocks the deployment-wide claim: **1 of 3
+stores confirms a limit, 1 keeps data forever, 1 relies on a default nobody set.** Read through the
+console's own vaulted bearer credential — asking an operator for an OpenSearch login would itself be the
+defect. Authoring a policy is still absent, so the row stays `partial`.
+
 ### Next up — the rest of clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
