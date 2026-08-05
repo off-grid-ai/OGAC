@@ -65,6 +65,44 @@ test('triggerAvailability: on-demand/webhook/schedule always available + enabled
   }
 });
 
+test('A STREAM TRIGGER IS ONLY AVAILABLE WHERE A BROKER IS ACTUALLY CONFIGURED', () => {
+  // The kind is wired end-to-end, but "wired in the code" is not "usable on this deployment". On a
+  // box with no stream connection, offering it would promise an app owner that saving the trigger
+  // starts something — and the failure would present as an app that simply never runs, which is the
+  // hardest kind of failure to diagnose because nothing appears to be broken.
+  const off = triggerAvailability('topic', {});
+  assert.equal(off.state, 'coming-soon');
+  assert.equal(off.enabled, false);
+  assert.match(off.reason, /stream connection/i);
+
+  const on = triggerAvailability('topic', { OFFGRID_REDPANDA_BROKERS: 'broker.internal:9092' });
+  assert.equal(on.state, 'available');
+  assert.equal(on.enabled, true);
+  // An empty or comma-only value is not a broker list.
+  for (const blank of ['', '   ', ',', ' , ']) {
+    assert.equal(triggerAvailability('topic', { OFFGRID_REDPANDA_BROKERS: blank }).enabled, false);
+  }
+});
+
+test('a stream record reaches the app as text even when its body is not JSON', () => {
+  // A malformed body must not become an error the sender never sees; the app gets what arrived.
+  const plain = buildTriggerInput('topic', { value: 'CLM-9931 settled', key: 'k1' });
+  assert.equal(plain.input, 'CLM-9931 settled');
+  assert.equal(plain.raw, 'CLM-9931 settled');
+  assert.equal(plain.recordKey, 'k1');
+  assert.equal(plain.body, undefined);
+
+  // JSON is parsed, and the same primary-text keys a webhook honours apply, so one app body works
+  // from either trigger.
+  const json = buildTriggerInput('topic', {
+    value: JSON.stringify({ message: 'Review claim CLM-9931', claimId: 'CLM-9931' }),
+  });
+  assert.equal(json.input, 'Review claim CLM-9931');
+  assert.deepEqual(json.body, { message: 'Review claim CLM-9931', claimId: 'CLM-9931' });
+  // The raw text is always carried, so an app can read exactly what arrived if the two disagree.
+  assert.match(json.raw as string, /^\{"message"/);
+});
+
 test('triggerAvailability: email is coming-soon with NO env (air-gap default)', () => {
   const a = triggerAvailability('email', {});
   assert.equal(a.state, 'coming-soon');

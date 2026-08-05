@@ -55,6 +55,7 @@ import {
 } from '@/lib/app-builder';
 import { type AppSpec, type AppStepKind, type TriggerKind, validateAppSpec } from '@/lib/app-model';
 import { setStepTools } from '@/lib/app-tools';
+import { groupIdForApp } from '@/lib/topic-trigger-policy';
 import {
   analyzeGaps,
   analyzeSpec,
@@ -121,6 +122,11 @@ const TRIGGERS: { kind: TriggerKind; label: string; hint: string }[] = [
   { kind: 'on-demand', label: 'On demand', hint: 'A person runs it from a form' },
   { kind: 'webhook', label: 'Webhook', hint: 'An inbound HTTP call starts a run' },
   { kind: 'schedule', label: 'Schedule', hint: 'Runs on a recurring cron' },
+  {
+    kind: 'topic',
+    label: 'Live data feed',
+    hint: 'Each record on a feed starts a run',
+  },
   { kind: 'email', label: 'Email', hint: 'An incoming email starts a run (on-prem)' },
   {
     kind: 'whatsapp',
@@ -708,6 +714,15 @@ function GuidedRefine({
                 onClick={() => onSpec((s) => (s ? setTrigger(s, t.kind) : s))}
               />
             ))}
+            {spec.trigger.kind === 'topic' && (
+              <TopicTriggerFields
+                config={spec.trigger.config}
+                appKey={spec.slug || spec.id}
+                onChange={(config) =>
+                  onSpec((s) => (s ? setTrigger(s, 'topic', config) : s))
+                }
+              />
+            )}
           </CardContent>
         </Card>
         <Card className="shadow-sm">
@@ -1105,6 +1120,45 @@ function ViewToggle({ view, onChange }: Readonly<{ view: View; onChange: (v: Vie
         <TreeStructure className="size-3.5" />
         Advanced / visual
       </button>
+    </div>
+  );
+}
+
+// ─── TopicTriggerFields — naming the feed an app listens to ──────────────────────────────────────
+//
+// Exactly ONE field, on purpose. The delivery policy also needs a consumer group, but that is broker
+// vocabulary a claims or tax officer has no reason to know, and a wrong value silently splits the
+// feed between two apps so each sees only some records. So it is DERIVED from the app's own identity
+// (groupIdForApp) and never asked for. Offering a trigger with no way to name the feed would make the
+// kind unreachable; offering it with two cryptic fields would make it unusable. One field, in the
+// reader's language.
+function TopicTriggerFields({
+  config,
+  appKey,
+  onChange,
+}: Readonly<{
+  config?: Record<string, unknown>;
+  appKey: string;
+  onChange: (config: Record<string, unknown>) => void;
+}>) {
+  const topic = typeof config?.topic === 'string' ? config.topic : '';
+  return (
+    <div className="space-y-1.5 rounded-md border border-border bg-muted/30 px-3 py-2.5">
+      <Label htmlFor="topic-trigger-feed" className="text-xs">
+        Which feed?
+      </Label>
+      <Input
+        id="topic-trigger-feed"
+        value={topic}
+        placeholder="claims.submitted"
+        onChange={(e) => onChange({ topic: e.target.value, groupId: groupIdForApp(appKey) })}
+        className="font-mono text-xs"
+      />
+      <p className="text-[11px] leading-snug text-muted-foreground">
+        Every record that arrives on this feed starts one run. This app reads the feed on its own, so
+        it never competes with another app for records, and a record it has already handled is not
+        handled twice.
+      </p>
     </div>
   );
 }

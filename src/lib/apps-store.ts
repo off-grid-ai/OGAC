@@ -409,6 +409,22 @@ export async function listApps(orgId: string): Promise<AppSpec[]> {
     .filter((a) => !hideDemoTestArtifact(orgId, { title: a.title, ownerId: a.ownerId }));
 }
 
+// ─── listStreamTriggeredApps — every published app listening on a topic, ALL orgs ──────────────
+// Deliberately NOT org-scoped, and the only lister here that is not. The stream consumer is a single
+// background process serving the whole deployment: there is no signed-in org to scope it to, and
+// scoping it to one would silently stop consuming for every other tenant. Tenancy is preserved where
+// it actually matters — each run is submitted under its OWN app's orgId (submitAppRun refuses a
+// mismatch), and cursors and deliveries are keyed per app.
+export async function listStreamTriggeredApps(): Promise<AppSpec[]> {
+  await ensureAppsSchema();
+  const rows = await db
+    .select()
+    .from(apps)
+    .where(and(eq(apps.published, true), sql`${apps.trigger}->>'kind' = 'topic'`))
+    .orderBy(desc(apps.createdAt));
+  return rows.map(toAppSpec);
+}
+
 // ─── findAppByAgentId — canonical authored-agent ownership lookup ─────────────
 // Runtime custom-agent rows are an execution detail of an AppSpec. This lookup lets legacy
 // /build/agents/:id deep links resolve to the owning app lifecycle without exposing a second

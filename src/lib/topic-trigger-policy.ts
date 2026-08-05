@@ -90,6 +90,26 @@ export function parseTopicTriggerConfig(raw: unknown): ConfigResult {
 }
 
 /**
+ * The consumer group name for an app, derived rather than asked for.
+ *
+ * "Consumer group" is broker vocabulary. A person in a claims team choosing a data feed should not
+ * have to invent one, and if two apps were ever given the same name by accident they would silently
+ * split the feed between them and each would process only some of the records — a failure that looks
+ * like an app that works but misses things. Deriving it from the app's own identity makes that
+ * collision impossible.
+ */
+export function groupIdForApp(appIdOrSlug: string): string {
+  const token = appIdOrSlug
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 200);
+  return `offgrid-app-${token || 'unnamed'}`;
+}
+
+/**
  * The stable identity of a delivery.
  *
  * (topic, partition, offset) — the only triple a broker guarantees is unique and stable for a record.

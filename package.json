@@ -23,6 +23,7 @@
     "worker:apps": "tsx scripts/app-worker.mts",
     "worker:chat": "tsx scripts/chat-worker.mts",
     "trigger:email": "tsx scripts/email-trigger.mts",
+    "trigger:topic": "tsx scripts/topic-trigger.mts",
     "db:seed": "tsx src/db/seed.ts",
     "seed:domains": "tsx scripts/seed-data-domains.mts",
     "seed:tenants": "tsx scripts/seed-demo-tenants.mts",

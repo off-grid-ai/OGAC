@@ -23,14 +23,15 @@ test('isTriggerKind: only the six known kinds', () => {
   assert.equal(isTriggerKind(null), false);
 });
 
-test('isConfiguredKind: on-demand/webhook/schedule wired; topic/email/whatsapp gated', () => {
-  assert.deepEqual([...CONFIGURED_TRIGGER_KINDS], ['on-demand', 'webhook', 'schedule']);
-  assert.deepEqual([...COMING_SOON_TRIGGER_KINDS], ['topic', 'email', 'whatsapp']);
+test('isConfiguredKind: on-demand/webhook/topic/schedule wired; email/whatsapp gated', () => {
+  assert.deepEqual([...CONFIGURED_TRIGGER_KINDS], ['on-demand', 'webhook', 'topic', 'schedule']);
+  assert.deepEqual([...COMING_SOON_TRIGGER_KINDS], ['email', 'whatsapp']);
   assert.equal(isConfiguredKind('webhook'), true);
   assert.equal(isConfiguredKind('email'), false);
-  // `topic` has a tested policy but NO consumer subscribed yet. It must stay gated until one lands,
-  // or an app selects a trigger that can never fire. This assertion is the guard on that promise.
-  assert.equal(isConfiguredKind('topic'), false);
+  // `topic` moved here when scripts/topic-trigger.mts landed — a consumer now polls every published
+  // stream-triggered app and drives a governed run per record. The gate it was under said "no app may
+  // select a trigger that can never fire"; that promise is now kept by code, not by the gate.
+  assert.equal(isConfiguredKind('topic'), true);
 });
 
 test('a stream trigger is refused unless it names both a topic and a consumer group', () => {
@@ -39,7 +40,7 @@ test('a stream trigger is refused unless it names both a topic and a consumer gr
   assert.equal(validateTrigger({ kind: 'topic', config: { topic: 'a.b' } }).ok, false);
   const good = validateTrigger({ kind: 'topic', config: { topic: 'a.b', groupId: 'g' } });
   assert.equal(good.ok, true);
-  assert.equal(good.comingSoon, true);
+  assert.equal(good.comingSoon, false);
   // normalizeTrigger keeps only the two keys the consumer reads.
   assert.deepEqual(
     normalizeTrigger({ kind: 'topic', config: { topic: ' a.b ', groupId: 'g', stale: 'x' } }).config,

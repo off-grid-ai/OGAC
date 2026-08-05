@@ -5,6 +5,7 @@ import {
   deliveryKey,
   describeTopicTrigger,
   dispositionFor,
+  groupIdForApp,
   mayCommitOffset,
   parseTopicTriggerConfig,
   planTopicConsume,
@@ -210,4 +211,17 @@ test('the cursor never rewinds, so a late acknowledgement cannot re-run finished
   assert.equal(advanceCursor('8', '9'), '10');
   assert.equal(advanceCursor('10', '3'), '10'); // out-of-order ack is ignored
   assert.equal(advanceCursor('9007199254740993', '9007199254740993'), '9007199254740994');
+});
+
+test('the consumer group is DERIVED from the app, never asked for', () => {
+  // "Consumer group" is broker vocabulary. If two apps were handed the same one they would split the
+  // feed and each would silently process only some records — an app that works but misses things.
+  assert.equal(groupIdForApp('claims-triage'), 'offgrid-app-claims-triage');
+  assert.notEqual(groupIdForApp('app_a'), groupIdForApp('app_b'));
+  // Whatever a person types for a title, the derived name is broker-legal.
+  for (const raw of ['Claims Triage (2026)', 'सूचना', '  ', '--x--']) {
+    const g = groupIdForApp(raw);
+    assert.match(g, /^[a-zA-Z0-9._-]+$/, `${raw} produced an illegal group name: ${g}`);
+    assert.ok(parseTopicTriggerConfig({ topic: 'a.b', groupId: g }).ok);
+  }
 });

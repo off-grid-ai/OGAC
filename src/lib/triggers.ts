@@ -20,12 +20,17 @@ export type { TriggerKind, TriggerSpec } from '@/lib/app-model';
 // on-demand + webhook + schedule are fully wired (webhook = a real inbound POST route in Phase 4C;
 // schedule = app-schedules.ts here). email + whatsapp REQUIRE on-prem gateway config to be enabled —
 // they are "coming soon" until that config is present, and are NEVER auto-enabled (air-gap safety).
-export const CONFIGURED_TRIGGER_KINDS: readonly TriggerKind[] = ['on-demand', 'webhook', 'schedule'];
-// `topic` is GATED ON PURPOSE. Its config policy and delivery semantics exist and are tested
-// (topic-trigger-policy.ts), but no consumer is subscribed yet — so an app could select it and nothing
-// would ever arrive. Offering it as configured would be a promise the deployment cannot keep. Move it to
-// CONFIGURED_TRIGGER_KINDS in the same change that lands the consumer, not before.
-export const COMING_SOON_TRIGGER_KINDS: readonly TriggerKind[] = ['topic', 'email', 'whatsapp'];
+// `topic` joined this list when its consumer landed, not before — scripts/topic-trigger.mts polls
+// every published stream-triggered app and drives a governed run per record. Availability still
+// depends on a broker being configured, which triggerAvailability() checks per deployment; being
+// "configured" here means the code path exists end to end, not that every deployment has a broker.
+export const CONFIGURED_TRIGGER_KINDS: readonly TriggerKind[] = [
+  'on-demand',
+  'webhook',
+  'topic',
+  'schedule',
+];
+export const COMING_SOON_TRIGGER_KINDS: readonly TriggerKind[] = ['email', 'whatsapp'];
 const ALL_TRIGGER_KINDS: readonly TriggerKind[] = [
   'on-demand',
   'webhook',

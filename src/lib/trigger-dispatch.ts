@@ -37,6 +37,16 @@ export interface WebhookPayload {
   [k: string]: unknown;
 }
 
+/** One record off a stream, as the consumer hands it over. */
+export interface TopicPayload {
+  topic?: string;
+  partition?: number;
+  offset?: string;
+  key?: string | null;
+  /** The record body, as bytes decoded to text. Usually JSON, but nothing guarantees that. */
+  value?: string;
+}
+
 export interface EmailPayload {
   from?: string;
   to?: string;
@@ -74,6 +84,8 @@ export function buildTriggerInput(
   switch (kind) {
     case 'webhook':
       return buildWebhookInput(payload as WebhookPayload);
+    case 'topic':
+      return buildTopicInput(payload as TopicPayload);
     case 'email':
       return buildEmailInput(payload as EmailPayload);
     case 'whatsapp':
@@ -101,6 +113,36 @@ function buildWebhookInput(body: WebhookPayload): Record<string, unknown> {
   out.input = clampText(primary);
   // Carry the full body through (bounded) so multi-field apps can read structured fields.
   out.body = sanitizeBody(body);
+  return out;
+}
+
+/**
+ * A stream record → app-run input.
+ *
+ * A record body is USUALLY JSON but is not guaranteed to be, so parsing is attempted and never
+ * required: a malformed body must still reach the app as text rather than becoming an error the
+ * sender cannot see. The raw text is always carried alongside the parsed fields, so an app can read
+ * exactly what arrived when the two disagree.
+ */
+function buildTopicInput(rec: TopicPayload): Record<string, unknown> {
+  const r = isPlainObject(rec) ? rec : {};
+  const raw = clampText(r.value);
+  const out: Record<string, unknown> = {
+    input: raw,
+    raw,
+    recordKey: clampText(r.key ?? ''),
+  };
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (isPlainObject(parsed)) {
+      out.body = sanitizeBody(parsed);
+      // Honour the same primary-text keys a webhook does, so one app body works from either trigger.
+      const primary = firstString(parsed, ['input', 'text', 'message', 'prompt', 'content', 'query']);
+      if (primary) out.input = clampText(primary);
+    }
+  } catch {
+    // Not JSON. `input`/`raw` already carry the body verbatim; nothing is lost and nothing throws.
+  }
   return out;
 }
 
@@ -179,6 +221,21 @@ export function triggerAvailability(
 ): TriggerAvailability {
   if (!isTriggerKind(kind)) {
     return { kind, state: 'unknown-kind', enabled: false, reason: `Unknown trigger kind: ${kind}` };
+  }
+  if (kind === 'topic') {
+    // Wired end-to-end, but a deployment with no broker has nothing to listen to. Saying "available"
+    // there would promise an app owner that saving the trigger starts something, and nothing would
+    // ever arrive — the failure would look like an app that simply never runs.
+    const brokers = (env.OFFGRID_REDPANDA_BROKERS ?? '').split(',').filter((b) => b.trim());
+    return brokers.length > 0
+      ? { kind, state: 'available', enabled: true, reason: 'A stream connection is configured.' }
+      : {
+          kind,
+          state: 'coming-soon',
+          enabled: false,
+          reason:
+            'Stream triggers are disabled — set OFFGRID_REDPANDA_BROKERS to your on-prem stream connection to enable.',
+        };
   }
   if (isConfiguredKind(kind)) {
     return { kind, state: 'available', enabled: true, reason: 'Wired end-to-end.' };
