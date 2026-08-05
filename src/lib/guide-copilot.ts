@@ -578,17 +578,28 @@ function dedupe(destinations: GuideDestination[]): GuideDestination[] {
 }
 
 /**
+ * The destinations a question can actually offer THIS tenant: its own tenant's entities, no route a
+ * read-only visitor would be refused on, and no href twice. One rule, one place — the starter list and
+ * both resolution paths all go through here so they cannot drift apart.
+ */
+function offerable(
+  question: GuideQuestion,
+  tenantSlug: string | null | undefined,
+): GuideDestination[] {
+  return dedupe(forTenant(question.destinations, tenantSlug)).filter((d) =>
+    isReadOnlySafeHref(d.href),
+  );
+}
+
+/**
  * The starter questions to show this tenant, with tenant-specific destinations already filtered out.
  * A question whose every destination is another tenant's is dropped rather than shown dead — there
  * is currently no such question, and the test asserts that stays true.
  */
 export function guideQuestionsForTenant(tenantSlug: string | null | undefined): GuideQuestion[] {
-  return GUIDE_QUESTIONS.map((q) => ({
-    ...q,
-    destinations: dedupe(forTenant(q.destinations, tenantSlug)).filter((d) =>
-      isReadOnlySafeHref(d.href),
-    ),
-  })).filter((q) => q.destinations.length > 0);
+  return GUIDE_QUESTIONS.map((q) => ({ ...q, destinations: offerable(q, tenantSlug) })).filter(
+    (q) => q.destinations.length > 0,
+  );
 }
 
 const WORD_RE = /[a-z0-9]+/g;
@@ -660,22 +671,21 @@ export function resolveGuideDestinations(
   const clean = (label: string) => (sanitize ? sanitize(label) : label);
 
   const starter = starterFor(text);
-  if (starter) {
-    const destinations = dedupe(forTenant(starter.destinations, tenantSlug)).filter((d) =>
-      isReadOnlySafeHref(d.href),
-    );
-    if (destinations.length) return { destinations, match: 'starter' };
-  }
-
   const ranked = GUIDE_QUESTIONS.map((q) => ({ q, s: score(q, text) }))
     .filter((r) => r.s > 0)
     .sort((a, b) => b.s - a.s);
   const best = ranked[0];
-  if (best && best.s >= MIN_TOPIC_SCORE) {
-    const destinations = dedupe(forTenant(best.q.destinations, tenantSlug)).filter((d) =>
-      isReadOnlySafeHref(d.href),
-    );
-    if (destinations.length) return { destinations, match: 'topic' };
+
+  // A clicked chip is the strongest possible signal; otherwise the best-scoring question, if it
+  // scored well enough to be more than a coincidence.
+  const curated: { q: GuideQuestion; match: GuideMatch } | null = starter
+    ? { q: starter, match: 'starter' }
+    : best && best.s >= MIN_TOPIC_SCORE
+      ? { q: best.q, match: 'topic' }
+      : null;
+  if (curated) {
+    const destinations = offerable(curated.q, tenantSlug);
+    if (destinations.length) return { destinations, match: curated.match };
   }
 
   // A query the curated table HALF recognised (one weak hit, below the threshold) stops here.
