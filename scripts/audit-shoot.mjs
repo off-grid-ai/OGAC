@@ -69,6 +69,10 @@ const PASSWORD = arg('password', demo?.password ?? 'dev');
 // a null session, which looks like a wrong password rather than a wrong provider.
 const PROVIDER = arg('provider', demo ? 'password' : 'dev');
 
+// Ceiling for the grown-viewport capture (see the screenshot block below). Generous enough for any real
+// console page, low enough that a runaway list can't ask for a screenshot that dies out of memory.
+const MAX_SHOT_HEIGHT = Number(arg('max-height', '12000'));
+
 const routesFile = arg('routes-file', '');
 const routes = (routesFile ? readFileSync(routesFile, 'utf8').split('\n') : arg('routes', '/').split(','))
   .map((r) => r.trim())
@@ -159,8 +163,50 @@ for (const route of routes) {
     })
     .catch(() => null);
 
+  // GROW THE VIEWPORT TO THE CONTENT BEFORE CAPTURING.
+  //
+  // `fullPage: true` is not enough here and quietly produced a one-viewport crop for every shot taken
+  // on 2026-08-05 — so nine section audits judged only the top ~1000px of every tall page, and real
+  // defects below the fold (an app's whole Quality panel, contradictory stat tiles) were never seen. It
+  // was not a diligence failure; the evidence was cropped before anyone looked at it.
+  //
+  // The cause: this console's shell is `h-screen` with `overflow-hidden` at every level, so
+  // document.body NEVER scrolls. Playwright's fullPage measures the document, finds one viewport, and
+  // stops. The page's real scroll region is a NESTED DIV inside <main>.
+  //
+  // So: find the element that actually scrolls, then resize the viewport to its full scrollHeight and
+  // let the layout reflow. That turns the inner scroller into no scroller at all, and fullPage then
+  // genuinely captures everything.
+  const grew = await page
+    .evaluate(() => {
+      const OVERHEAD = 8; // rounding + sub-pixel borders, so the last row is never shaved off
+      let tallest = 0;
+      for (const el of Array.from(document.querySelectorAll('*'))) {
+        const style = getComputedStyle(el);
+        if (!/(auto|scroll)/.test(`${style.overflowY} ${style.overflow}`)) continue;
+        const extra = el.scrollHeight - el.clientHeight;
+        if (extra > tallest) tallest = extra;
+      }
+      // Also honour a body that DOES scroll (the landing page), so this helps both shells.
+      const bodyExtra = document.documentElement.scrollHeight - window.innerHeight;
+      return Math.max(tallest, bodyExtra, 0) + (tallest > 0 || bodyExtra > 0 ? OVERHEAD : 0);
+    })
+    .catch(() => 0);
+  if (grew > 0) {
+    // Capped: a virtualised or infinite list could otherwise ask for a 200k-pixel screenshot that
+    // exhausts memory and yields nothing. A capped shot is still far more than one viewport.
+    const target = Math.min(1000 + grew, MAX_SHOT_HEIGHT);
+    await page.setViewportSize({ width: WIDTH, height: target });
+    await page.waitForTimeout(700); // let the reflow settle (sticky headers, charts re-measuring)
+  }
+
   const shot = join(OUT, `${name}.png`);
   await page.screenshot({ path: shot, fullPage: true }).catch(() => {});
+  // Restore, so the next route is measured against the real desktop viewport rather than a tall one.
+  if (grew > 0) {
+    await page.setViewportSize({ width: WIDTH, height: 1000 });
+    await page.waitForTimeout(200);
+  }
   if (flag('dark')) {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.waitForTimeout(500);
