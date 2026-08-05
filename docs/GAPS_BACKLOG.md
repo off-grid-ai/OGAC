@@ -2254,8 +2254,27 @@ and clear the gap) or a gate is not `yes`. Needs a judgement per row, against th
 `victoriametrics/ingest-remote-write`, `otel-collector/trace-export-jaeger`,
 `otel-collector/otlp-metrics`, `otel-collector/self-telemetry`, `redis/failure-fallback`.
 
-Until this is resolved the map test stays red, and `scripts/count-capability-gates.mts` is
-overstating "fully leveraged" by up to 6.
+**RESOLVED 2026-08-05.** All 14 rows reconciled and `test/service-capability-map.test.ts` is green.
+
+Twelve were the mechanical shape — a closure narrative, or a cross-reference to work tracked on ANOTHER
+row, sitting in the `gap` field. Those moved into the gate's own evidence, where a reader looks for
+proof, and the gap was cleared.
+
+**Three were the dangerous shape and were DEMOTED rather than tidied**, because the remaining work is
+real and belongs to that row:
+- `otel-collector/trace-export-jaeger` → workflow `partial`: a run whose spans never left is still
+  indistinguishable from one that was never traced.
+- `redis/failure-fallback` → workflow `partial`: the counters are per-process and reset on restart, so
+  "when did it degrade" is unanswerable across a restart.
+- `litellm/load-balance-failover` → **upstream** `partial`: failover works, but the deployment has one
+  deployment per model, so there is nothing to fail over to (G-210). The blocker is the config, not us.
+
+And one had drifted the OTHER way — `otel-collector/self-telemetry` had a `partial` gate with an EMPTY
+gap, which is the same dishonesty inverted. It now states what is open: nothing alerts on the
+collector's own counters, so a collector that silently stops exporting is only found by someone looking.
+
+**Net effect on the count: "fully leveraged" fell from 89 to 85.** That is the point — the number was
+overstating by four, and a ledger that flatters itself is worse than no ledger.
 
 ## G-209 — the object store cannot hold a BFSI retention window
 

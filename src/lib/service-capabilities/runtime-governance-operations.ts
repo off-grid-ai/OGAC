@@ -176,7 +176,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Prove that records were deleted when the retention limit said they would be.',
         '/governance/evidence/retention',
         'Open retention evidence',
-        'CLOSED on a real tenant 2026-08-04. Warehouse and lake purging still stays with the data engine and is reported as deferred, not claimed — that part is an ownership boundary, not a gap.',
+        '',
         [
           'yes',
           'The release owns retention rules and a durable record of every sweep.',
@@ -185,7 +185,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'yes',
           'Rules and sweep evidence are a Console route under Evidence.',
           'yes',
-          'Applied on BOTH real tenants 2026-08-04. Rules set per record class with defensible windows for the sector — bank 2555 days on app runs, insurer 3650 (life records run longer), 365 on agent runs, 1095 on indexed document text — then a sweep executed and filed on each. It deleted nothing, correctly and explicitly: the oldest data is 55 days old, so nothing was past its window, and `remaining` is RE-COUNTED after the work so the record proves the deletion rather than asserting it. The artefact reads "0 records past their retention limit removed · nothing past the limit remains" per class, which is the honest outcome rather than a reassuring one.',
+          'Applied on BOTH real tenants 2026-08-04. Rules set per record class with defensible windows for the sector — bank 2555 days on app runs, insurer 3650 (life records run longer), 365 on agent runs, 1095 on indexed document text — then a sweep executed and filed on each. It deleted nothing, correctly and explicitly: the oldest data is 55 days old, so nothing was past its window, and `remaining` is RE-COUNTED after the work so the record proves the deletion rather than asserting it. The artefact reads "0 records past their retention limit removed · nothing past the limit remains" per class, which is the honest outcome rather than a reassuring one. CLOSED on a real tenant 2026-08-04. Warehouse and lake purging still stays with the data engine and is reported as deferred, not claimed — that part is an ownership boundary, not a gap.',
         ],
       ],
       [
@@ -550,7 +550,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Authenticate operators through the configured enterprise identity provider.',
         '/governance/access',
         'Manage access',
-        'CLOSED 2026-08-04 — the whole lifecycle, not just authentication.',
+        '',
         [
           'yes',
           'Keycloak 26.0.7 provides OIDC realms, clients, and user sessions.',
@@ -559,7 +559,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'yes',
           'Access and team surfaces manage product membership and roles.',
           'yes',
-          'Full lifecycle proven live 2026-08-04 against the deployed Keycloak: login issued access + refresh with expires_in 300s; userinfo 200; logout 204; the refresh token then returned invalid_grant "Session not active"; and the still-unexpired ACCESS token returned userinfo 401. That last step is the one that matters — revocation invalidates the access token too, not merely the refresh, so a logged-out session cannot keep reading for the remainder of its 5-minute window.',
+          'Full lifecycle proven live 2026-08-04 against the deployed Keycloak: login issued access + refresh with expires_in 300s; userinfo 200; logout 204; the refresh token then returned invalid_grant "Session not active"; and the still-unexpired ACCESS token returned userinfo 401. That last step is the one that matters — revocation invalidates the access token too, not merely the refresh, so a logged-out session cannot keep reading for the remainder of its 5-minute window. CLOSED 2026-08-04 — the whole lifecycle, not just authentication.',
         ],
       ],
       [
@@ -932,7 +932,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Serve governed chat turns with tenant, actor, policy, guardrail, and egress-DLP context intact.',
         '/workspace/chat',
         'Open chat',
-        'RE-VERIFIED 2026-08-04 on the durable path. Note for the next auditor: there is no chat_runs table — a chat run\'s durable record is its AUDIT event plus a signed provenance entry, so looking for a runs row and finding none reads as failure when the evidence is elsewhere. That cost a wrong conclusion here before the activity was read.',
+        '',
         [
           'yes',
           'The chat stream route applies governance (guardrails, egress-DLP) over the entity-consumption hierarchy.',
@@ -941,7 +941,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'yes',
           'The chat surface exposes the operator chat experience.',
           'yes',
-          'Live evidence retained 2026-08-04: the durable run left audit event chat.run outcome=ok model=onprem/qwen3-vl-8b org=org_bharat keyed to run chatrun_6b9b88d9 — a governed chat turn recorded through the worker rather than inline.',
+          'Live evidence retained 2026-08-04: the durable run left audit event chat.run outcome=ok model=onprem/qwen3-vl-8b org=org_bharat keyed to run chatrun_6b9b88d9 — a governed chat turn recorded through the worker rather than inline. RE-VERIFIED 2026-08-04 on the durable path. Note for the next auditor: there is no chat_runs table — a chat run\'s durable record is its AUDIT event plus a signed provenance entry, so looking for a runs row and finding none reads as failure when the evidence is elsewhere. That cost a wrong conclusion here before the activity was read.',
         ],
       ],
     ],
@@ -1422,7 +1422,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Cache governed responses across Console processes with bounded expiry.',
         '/operations/services/redis',
         'Inspect Redis',
-        'CLOSED 2026-08-04. Rendering the counters found the cache was NOT shared on this deployment: OFFGRID_REDIS_URL pointed at a forwarder on :8937 whose target host name (offgrid-g6.local) had stopped resolving from S1 — the node was healthy the whole time; the office has two WiFi networks and the nodes hop between them, so a name and a pinned IP both go stale, so every read and write silently fell back to per-process memory while the hit rate looked perfect. Redis now runs on S1 (compose profile "caching", :6379), the console points straight at it, and a separate client read back an entry the adapter wrote (TTL live) — cross-process sharing proven, not inferred.',
+        '',
         [
           'yes',
           'Redis 7.4 provides key/value storage and expiry.',
@@ -1431,7 +1431,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'yes',
           'The cache page (/runtime/models/cache) renders the counters as a distinct panel from the gateway cache, leading with the STATE because a degraded cache still posts a fine hit rate. Every process publishes its own snapshot and the panel sums them while keeping the split visible — a first version read only the rendering process, which serves pages and runs no inference, so it reported an idle cache while the workers used it. Stale snapshots are counted but marked; a failed read renders PARTIAL VIEW, never "nobody used the cache".',
           'yes',
-          'Live on the deployment 2026-08-04: shared store up -> sharedHits 1, sharedWrites 1, misses 1, verdict "shared" ("50% of 2 reads hit"); a 1-second TTL lapsed -> the read returned null and was counted a MISS not a hit; shared store unreachable -> fallbackHits 1, fallbackWrites 1, verdict "degraded" with the value still served. Hit, miss, expiry and the degradation transition are all evidenced.',
+          'Live on the deployment 2026-08-04: shared store up -> sharedHits 1, sharedWrites 1, misses 1, verdict "shared" ("50% of 2 reads hit"); a 1-second TTL lapsed -> the read returned null and was counted a MISS not a hit; shared store unreachable -> fallbackHits 1, fallbackWrites 1, verdict "degraded" with the value still served. Hit, miss, expiry and the degradation transition are all evidenced. CLOSED 2026-08-04. Rendering the counters found the cache was NOT shared on this deployment: OFFGRID_REDIS_URL pointed at a forwarder on :8937 whose target host name (offgrid-g6.local) had stopped resolving from S1 — the node was healthy the whole time; the office has two WiFi networks and the nodes hop between them, so a name and a pinned IP both go stale, so every read and write silently fell back to per-process memory while the hit rate looked perfect. Redis now runs on S1 (compose profile "caching", :6379), the console points straight at it, and a separate client read back an entry the adapter wrote (TTL live) — cross-process sharing proven, not inferred.',
         ],
       ],
       [
@@ -1448,7 +1448,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
           'The Redis adapter degrades to the in-process implementation AND records it. ANY fallback traffic makes the verdict degraded rather than being averaged into a healthy hit rate — one silently-local write is how "shared" stops being true, so it is not smoothed away.',
           'yes',
           'The verdict names the state and refuses both wrong readings: "Requests are still served, so nothing looks broken — but the cache is not shared, and two processes will disagree." An unexercised cache reports IDLE, never healthy.',
-          'yes',
+          'partial',
           'Failover drilled live 2026-08-04 in a fresh process against a dead endpoint (127.0.0.1:65533): health() false, the write and read both fell back, the value was STILL SERVED, and the verdict was degraded — proving continuity without hiding that the cache had stopped being shared. NOTE on method: a first attempt re-imported the module with a changed env and wrongly reported "shared", because REDIS_URL is captured at module load; only a fresh process exercises this path.',
         ],
       ],
@@ -1802,7 +1802,7 @@ export const RUNTIME_GOVERNANCE_OPERATIONS_AUDITS = [
         'Inspect routing health',
         'FAILOVER IS PROVEN; REDUNDANCY IS NOT CONFIGURED. The production config has exactly one deployment per model name, so there is nothing to fail over to — a single inference host going down still takes its model with it. Closing that means a second host serving the same model (G-210, owner: fleet repo), not more console work.',
         [
-          'yes',
+          'partial',
           'LiteLLM Router supports deployment groups, health-aware balancing, retries, and fallbacks.',
           'yes',
           'The generated config defines model groups, retry policy, and deployment metadata.',
