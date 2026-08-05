@@ -78,6 +78,14 @@ export interface GetObjectResult {
   size: number;
 }
 
+export interface VersioningPortState {
+  /** False when the store itself does not implement versioning — NOT the same as "off". */
+  supported: boolean;
+  /** 'Enabled' | 'Suspended' | 'Off' as the store reports it. */
+  status: string;
+  note?: string;
+}
+
 export interface LifecyclePortState {
   supported: boolean;
   rules: LifecycleRule[];
@@ -105,6 +113,11 @@ export interface ObjectStorePort {
   getObject(bucket: string, key: string): Promise<GetObjectResult | null>;
   deleteObject(bucket: string, key: string): Promise<boolean>;
   getLifecycle(bucket: string): Promise<LifecyclePortState>;
+  /**
+   * Is object versioning on for this bucket? `supported: false` means the STORE does not implement it,
+   * which is different from versioning being off — one is a deployment limitation, the other a choice.
+   */
+  getVersioning(bucket: string): Promise<VersioningPortState>;
   setLifecycle(bucket: string, rules: LifecycleRule[]): Promise<LifecyclePortState>;
 }
 
@@ -237,6 +250,22 @@ export function createS3ObjectStore(config: S3ObjectStoreConfig): ObjectStorePor
         return { supported: false, rules: [], note: `lifecycle read failed (${res.status})` };
       }
       return { supported: true, rules: parseLifecycleXml(await res.text()) };
+    },
+
+    async getVersioning(bucket) {
+      const res = await request(`${endpoint}/${encodeURIComponent(bucket)}?versioning=`, { method: 'GET' });
+      if (!res.ok) {
+        // 501/405 is the store saying it does not implement this. Anything else is a read failure, and
+        // both must be distinguishable from "versioning is off" — a bucket with no version history
+        // because the store cannot do it is not a bucket someone chose not to version.
+        if (res.status === 501 || res.status === 405) {
+          return { supported: false, status: 'unknown', note: `the store answered ${res.status} for GetBucketVersioning` };
+        }
+        return { supported: false, status: 'unknown', note: `versioning could not be read (${res.status})` };
+      }
+      const body = await res.text();
+      const status = /<Status>\s*([A-Za-z]+)\s*<\/Status>/.exec(body)?.[1] ?? 'Off';
+      return { supported: true, status };
     },
 
     async setLifecycle(bucket, rules) {

@@ -28,6 +28,7 @@ interface State {
   supported: boolean;
   rules: Rule[];
   note?: string;
+  versioning?: { supported: boolean; status: string; note?: string } | null;
 }
 
 export function RetentionPanel({ bucket }: Readonly<{ bucket: string }>) {
@@ -116,6 +117,19 @@ export function RetentionPanel({ bucket }: Readonly<{ bucket: string }>) {
           <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             {state.note ?? 'This object store does not support scheduled deletion.'} Anything kept here
             has to be removed by another process.
+          </p>
+        ) : null}
+
+        {/* Whether previous versions survive an overwrite is the same class of truth as how long files
+            are kept, and the more surprising one: without it, saving over a file destroys what was
+            there and nothing records that it existed. */}
+        {state?.versioning ? (
+          <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+            {!state.versioning.supported
+              ? `Whether previous versions are kept could not be read${state.versioning.note ? ` (${state.versioning.note})` : ''} — that is not the same as knowing they are.`
+              : state.versioning.status === 'Enabled'
+                ? 'Previous versions are kept: overwriting or deleting a file leaves the earlier copy recoverable.'
+                : 'Previous versions are NOT kept. Overwriting or deleting a file here is permanent — nothing keeps the earlier copy.'}
           </p>
         ) : null}
 

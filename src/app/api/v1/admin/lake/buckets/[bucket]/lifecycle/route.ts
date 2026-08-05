@@ -15,7 +15,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ bucket: 
   if (gate instanceof NextResponse) return gate;
   const { bucket } = await params;
   if (!validateBucketName(bucket).ok) return NextResponse.json({ error: 'bad bucket' }, { status: 400 });
-  return NextResponse.json(await store.getLifecycle(bucket));
+  // Versioning rides along: "how long are files kept" and "are previous versions kept" are one
+  // question for whoever answers for the data, and two round trips would let the surface show one
+  // without the other.
+  const [lifecycle, versioning] = await Promise.all([
+    store.getLifecycle(bucket),
+    store.getVersioning(bucket).catch(() => null),
+  ]);
+  return NextResponse.json({ ...lifecycle, versioning });
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ bucket: string }> }) {
