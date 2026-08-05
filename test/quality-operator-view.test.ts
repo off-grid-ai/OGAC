@@ -24,18 +24,23 @@ test('performance view reports insufficient history without inventing a baseline
   assert.equal(empty.latestScore, null);
   assert.equal(empty.currentMean, null);
 
-  // CONTRACT CHANGED DELIBERATELY. This previously asserted that a score of 120 CLAMPS to 100 — i.e. a
-  // writer bug became a perfect quality score, on the same numbers the release gate reads. An
-  // out-of-range value is now rejected (see eval-score-scale.ts), so it contributes 0 rather than
-  // claiming 100%. Understating a broken score is safe; overstating it can ship a failing model.
+  // CONTRACT TIGHTENED AGAIN (2026-08-05), and the previous version of this comment shows why it had
+  // to be. It said an out-of-range score "contributes 0 rather than claiming 100%", reasoning that
+  // understating is safer than overstating. True as far as it goes — but 0 is not an understatement,
+  // it is a DIFFERENT CLAIM: it reads as "everything failed" rather than "nothing was measured", and
+  // eval-score-scale.ts says exactly that about its own meanScore ("never 0, which would read as
+  // everything failed rather than nothing was measured"). This view was contradicting the rule the
+  // module beneath it documents.
+  //
+  // So an unusable score is now EXCLUDED, and the mean is null — reported on screen as "not recorded".
+  // The live consequence was concrete: 6 of 13 rows sat at 0% and the page announced this deployment's
+  // own AI as degraded on numbers no evaluator had produced.
   const partial = buildQualityPerformance([run('new', 120, 2), run('old', Number.NaN, 1)]);
-  assert.equal(partial.latestScore, 0);
-  assert.equal(partial.currentMean, 0);
+  assert.equal(partial.latestScore, null);
+  assert.equal(partial.currentMean, null);
   assert.equal(partial.baselineMean, null);
-  assert.deepEqual(
-    partial.trend.map((point) => point.runId),
-    ['old', 'new'],
-  );
+  // And the trend line carries neither — a chart point at 0 is the same false claim in a different shape.
+  assert.deepEqual(partial.trend, []);
 });
 
 test('performance view compares equal recent and baseline windows', () => {

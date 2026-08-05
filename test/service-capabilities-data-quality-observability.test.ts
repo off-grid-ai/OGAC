@@ -234,10 +234,15 @@ test('enterprise sources preserve exact fixture versions and connector reality',
       ?.gates.adapter.status,
     'no',
   );
+  // CONTRACT CHANGED 2026-08-05 on live evidence, not on an assertion being inconvenient. Governed
+  // object read AND write are now proven end to end on the deployment — a registered app read claim
+  // intimations with per-object etag+sha256 provenance and wrote an assessment back under a separate
+  // approved scope, with the pipeline data ceiling refusing the write when the output domain was
+  // revoked. See docs/evidence/2026-08-05-governed-object-io.md.
   assert.equal(
     audit('enterprise-source-minio').items.find((item) => item.id === 'object-read-write')?.gates
       .workflow.status,
-    'no',
+    'yes',
   );
 });
 
