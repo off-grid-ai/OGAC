@@ -322,6 +322,20 @@ stores confirms a limit, 1 keeps data forever, 1 relies on a default nobody set.
 console's own vaulted bearer credential — asking an operator for an OpenSearch login would itself be the
 defect. Authoring a policy is still absent, so the row stays `partial`.
 
+**2026-08-05 — `marquez/namespaces-tags-ownership`: the last genuinely open row, now built.**
+Namespace ownership and tag definition CRUD, proven live end to end. **The reading was the finding
+again:** every namespace reported `ownerName: "anonymous"` — not an owner, the absence of one wearing a
+plausible word — so 2 of 3 data areas had nobody accountable. Setting a placeholder is REFUSED, because
+accepting "anonymous" is exactly how the current state came about. A tag now requires a written meaning,
+since an undefined tag gets applied inconsistently and reports that rely on it inherit that.
+
+Writes are narrow on purpose: no namespace or dataset deletion, because lineage is an append-only record
+and a console that can erase it can erase evidence. `ui` stays `partial` — applying a tag to a specific
+dataset is API-only.
+
+Found while proving it: the catalogue's delete is a SOFT HIDE, so a deleted namespace kept counting as
+unowned and made the number easy to dismiss. Hidden namespaces are excluded now.
+
 ### Next up — the rest of clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
