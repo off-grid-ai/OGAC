@@ -48,6 +48,37 @@ export function inferenceTimeoutMs(env: Readonly<Record<string, string | undefin
   return Math.min(Math.max(Math.floor(parsed), MIN_INFERENCE_TIMEOUT_MS), MAX_INFERENCE_TIMEOUT_MS);
 }
 
+// ─── shouldRetryUpstream — tell a REJECTION apart from a genuinely slow answer ─────────────────────
+//
+// LIVE FINDING (same box, same session). The on-prem nodes serve one request at a time and the
+// aggregator runs with `capabilities.perRequestFallbackChain: false`, so it forwards a node's refusal
+// straight through with no second attempt. Measured on the node these demo apps use (g5): three
+// identical small prompts fired back to back gave `HTTP 502 in 1.63s`, then `200 in 2.47s`, then
+// `200 in 2.23s` — the FIRST call failed and the rest succeeded. The 502 body carried an empty
+// message (`gateway g5 (offgrid-g5.local) error: `), which is what a busy or still-loading slot looks
+// like from the aggregator. Meanwhile a real answer on the same node takes 262s.
+//
+// Those two are opposite problems and must not share a policy. A failure that came back FAST did no
+// work and is worth one more attempt; a failure that came back after the full budget means the node
+// is genuinely saturated, and retrying would double an already four-minute step and add load to the
+// thing that is already overloaded. So the rule is on ELAPSED TIME, not on the status code alone.
+//
+// One retry, not a loop: this exists to absorb a cold slot, not to paper over a down node.
+
+/** Beyond this, a failure is real work that ran out of time rather than an immediate rejection. */
+export const FAST_FAILURE_MS = 10_000;
+
+/**
+ * Whether a failed upstream attempt is worth exactly one more try.
+ *
+ * `attempt` is 1-based. Only the first attempt may retry, and only when it failed fast enough to have
+ * been a rejection rather than a timeout.
+ */
+export function shouldRetryUpstream(attempt: number, elapsedMs: number): boolean {
+  if (attempt !== 1) return false;
+  return elapsedMs >= 0 && elapsedMs < FAST_FAILURE_MS;
+}
+
 // ─── InferenceUnavailableError — a failed model call is a FAILURE, never an answer ─────────────────
 //
 // The second half of the same live finding, and the more damaging half. When the model call returned

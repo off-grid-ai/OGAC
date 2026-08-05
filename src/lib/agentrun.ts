@@ -73,7 +73,11 @@ import { getEgressPolicy } from '@/lib/egress-policy-store';
 // Safety checks run on every request; the LLM-as-judge score runs out-of-band (see scoreRun) so it
 // never adds latency to the response.
 import type { EgressDecision } from '@/lib/tool-primitives';
-import { InferenceUnavailableError, inferenceTimeoutMs } from '@/lib/inference-timeout';
+import {
+  InferenceUnavailableError,
+  inferenceTimeoutMs,
+  shouldRetryUpstream,
+} from '@/lib/inference-timeout';
 const ANSWER_MODEL = process.env.OFFGRID_GROUNDING_MODEL ?? 'gemma-local';
 
 export interface RunStep {
@@ -233,36 +237,45 @@ async function gatewayAnswer(
   // governed app prompt that read a real source on on-prem hardware — see inference-timeout.ts for
   // the measurement (a real claim-assessment prompt needs 262s on this node) and the rationale for
   // defaulting to the aggregator's own 300s upstream allowance instead.
-  try {
-    const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
-      method: 'POST',
-      // Attribution: the invoking user AND the tenant org, so this run's gateway spend lands
-      // ATTRIBUTED on the observability doc. Without the org the doc is invisible to the org-scoped
-      // FinOps/Insights surfaces, i.e. agent traffic reads as zero cost (G-GATEWAY-INDEX-ORG).
-      headers: gatewayHeaders({
-        'content-type': 'application/json',
-        ...gatewayAttribution({ userId: caller, orgId }),
-      }),
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(inferenceTimeoutMs(process.env)),
-    });
-    // A non-2xx is the UPSTREAM's failure, and it used to be flattened into the same `null` as "the
-    // model answered with nothing" — so the caller could not tell an outage from an empty reply and
-    // substituted a fabricated answer for both. Throwing keeps the two apart.
-    if (!res.ok) {
-      throw new InferenceUnavailableError(`gateway returned HTTP ${res.status}`);
+  //
+  // ONE retry when the first attempt failed FAST. The on-prem nodes serve one request at a time and
+  // the aggregator has no fallback chain, so a cold or busy slot comes straight back as an instant
+  // 502 — measured, the first of three identical calls failed in 1.6s and the next two succeeded.
+  // shouldRetryUpstream() owns that rule; a failure that consumed the whole budget is NOT retried,
+  // because that node is saturated and a second four-minute attempt would only make it worse.
+  const timeoutMs = inferenceTimeoutMs(process.env);
+  let lastReason = 'no attempt was made';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const startedAt = Date.now();
+    try {
+      const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+        method: 'POST',
+        // Attribution: the invoking user AND the tenant org, so this run's gateway spend lands
+        // ATTRIBUTED on the observability doc. Without the org the doc is invisible to the org-scoped
+        // FinOps/Insights surfaces, i.e. agent traffic reads as zero cost (G-GATEWAY-INDEX-ORG).
+        headers: gatewayHeaders({
+          'content-type': 'application/json',
+          ...gatewayAttribution({ userId: caller, orgId }),
+        }),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      // A non-2xx is the UPSTREAM's failure, and it used to be flattened into the same `null` as "the
+      // model answered with nothing" — so the caller could not tell an outage from an empty reply and
+      // substituted a fabricated answer for both. Keeping them apart is the whole point.
+      if (!res.ok) throw new Error(`gateway returned HTTP ${res.status}`);
+      const payload = await res.json();
+      const usage = extractUsage(payload);
+      if (usage) onUsage?.(usage);
+      return extractText(payload);
+    } catch (err) {
+      // Named explicitly, because "timed out after 300s" and "connection refused" send an operator to
+      // completely different places, and the app run surfaces this message verbatim on the failed step.
+      lastReason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      if (!shouldRetryUpstream(attempt, Date.now() - startedAt)) break;
     }
-    const payload = await res.json();
-    const usage = extractUsage(payload);
-    if (usage) onUsage?.(usage);
-    return extractText(payload);
-  } catch (err) {
-    if (err instanceof InferenceUnavailableError) throw err;
-    // A transport error or the abort above. Named explicitly, because "timed out after 300s" and
-    // "connection refused" send an operator to completely different places.
-    const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    throw new InferenceUnavailableError(reason);
   }
+  throw new InferenceUnavailableError(lastReason);
 }
 
 const DEFAULT_SYSTEM = 'Answer only from the provided sources, concisely.';

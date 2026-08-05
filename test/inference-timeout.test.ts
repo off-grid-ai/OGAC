@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   DEFAULT_INFERENCE_TIMEOUT_MS,
+  FAST_FAILURE_MS,
   InferenceUnavailableError,
   MAX_INFERENCE_TIMEOUT_MS,
   MIN_INFERENCE_TIMEOUT_MS,
   inferenceTimeoutMs,
+  shouldRetryUpstream,
 } from '../src/lib/inference-timeout.ts';
 
 // The regression these tests exist for: the agent path aborted every governed model call at 20 000 ms
@@ -50,6 +52,27 @@ test('clamps to a usable range at both ends', () => {
     inferenceTimeoutMs({ OFFGRID_INFERENCE_TIMEOUT_MS: String(MAX_INFERENCE_TIMEOUT_MS) }),
     MAX_INFERENCE_TIMEOUT_MS,
   );
+});
+
+// The retry rule exists for a measured signature: on a single-slot on-prem node the FIRST of three
+// identical calls came back 502 in 1.63s and the next two succeeded. A fast failure did no work; a
+// failure that burned the whole budget means the node is saturated and must not be hit again.
+test('retries a fast rejection exactly once', () => {
+  assert.equal(shouldRetryUpstream(1, 1_630), true, 'the measured 1.63s 502 must retry');
+  assert.equal(shouldRetryUpstream(1, 0), true, 'an instant connection refusal must retry');
+  // Only ONE extra attempt — this absorbs a cold slot, it does not paper over a down node.
+  assert.equal(shouldRetryUpstream(2, 1_630), false);
+  assert.equal(shouldRetryUpstream(3, 10), false);
+});
+
+test('never retries a failure that consumed real time', () => {
+  // 262s is the measured duration of a REAL answer on this node, so a failure near that is a
+  // saturated node. Retrying would double an already four-minute step and add load to the cause.
+  assert.equal(shouldRetryUpstream(1, 262_000), false);
+  assert.equal(shouldRetryUpstream(1, FAST_FAILURE_MS), false, 'the boundary is exclusive');
+  assert.equal(shouldRetryUpstream(1, FAST_FAILURE_MS - 1), true);
+  // A nonsense clock reading must not be treated as "fast".
+  assert.equal(shouldRetryUpstream(1, -1), false);
 });
 
 // The error type is what keeps "the model was not reached" distinguishable from "the model answered
