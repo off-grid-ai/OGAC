@@ -8,6 +8,14 @@ import {
   type BankCrossSellContextSources,
 } from '@/lib/adapters/bank-cross-sell-context';
 import type { DataDomain } from '@/lib/data-domains';
+// @ts-expect-error shared JS reachability helper
+import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+
+// queryDomain -> execConnectorRead -> resolveConnectorTarget resolves a per-connector secret via
+// Postgres before touching this test's local HTTP server (see crm-writeback.test.ts for the full
+// trace). The second test injects its own `sources.query` stub directly and never reaches
+// queryDomain, so it is unaffected either way.
+const dbUp = await dbReachable();
 
 const DOMAINS: DataDomain[] = [
   {
@@ -28,7 +36,10 @@ const DOMAINS: DataDomain[] = [
   },
 ];
 
-test('reads both tenant bindings through the real connector-query adapter', async (t) => {
+test(
+  'reads both tenant bindings through the real connector-query adapter',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   const server = createServer((req, res) => {
     res.setHeader('content-type', 'application/json');
     if (req.url === '/accounts') return res.end(JSON.stringify([{ id: 1, name: 'Alpha Ltd' }]));
@@ -75,7 +86,8 @@ test('reads both tenant bindings through the real connector-query adapter', asyn
   assert.equal(snapshot.customerRows[0].name, 'Alpha Ltd');
   assert.equal(snapshot.eligibilityRows[0].scheme_type, 'Group Term');
   assert.equal(snapshot.readAt, '2026-07-23T01:00:00.000Z');
-});
+  },
+);
 
 test('fails closed when either required live source is empty', async () => {
   const sources: BankCrossSellContextSources = {
