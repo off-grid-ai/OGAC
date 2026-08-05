@@ -158,12 +158,24 @@ DOMAIN rather than a bucket, because a connector's keypair usually reaches the w
 out of it — a run whose output domain had been revoked still wrote the object. Fixed through the same
 `enforceDataAccess` the read uses, re-proven in both directions. **84 of 196 fully leveraged.**
 
-### Next up — the rest of cluster 2 (3 items)
+**2026-08-05 — `enterprise-source-minio/bucket-discovery`: CLOSED, all four gates.**
+The S3 data-rule form lists a source's real buckets and folders instead of asking someone to type
+them. Verified live (real buckets and folders in the picker, screenshot confirmed) plus four negatives:
+`missing-credential`, `not-object-store`, `unknown-source` for a foreign tenant, `unreachable` for a
+down store — never an empty list. Discovery never accepts an endpoint from the caller and never returns
+object content. **85 of 196 fully leveraged.**
 
-`enterprise-source-minio/bucket-discovery`, `…/versioning-retention-events`, and
-`seaweedfs/topology-repair`. Also still open: `seaweedfs/lifecycle-versioning` **workflow** — nothing
-binds a retention policy to the buckets the console itself writes to, and now that apps can write to
-the lake that matters more, not less.
+### Next up — the rest of cluster 2 (2 items) then clusters 3–6
+
+- `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
+  not exist. The gap says keep privileged lifecycle deployment-owned until tenant-safe rollback and
+  audit boundaries exist; **read the entry before building**, it may be deliberate.
+- `seaweedfs/topology-repair` — volume topology and repair. Operator surface, lowest product value.
+- `seaweedfs/lifecycle-versioning` **workflow** is still open and now matters MORE: apps can write to
+  the lake, so nothing bounds what those writes accumulate. The binding is a retention policy applied
+  to the buckets the console itself writes to, not another screen.
+
+Then clusters 3 (data quality, 6), 4 (gateway routing, 3), 5 (retention/alerting, ~10), 6 (CDC, 2).
 
 **Verify before building — it has now paid off four times in two clusters.** Every row picked up so
 far had at least one gate claiming something absent that was already there. Reproduce the gap live
