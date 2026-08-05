@@ -239,6 +239,22 @@ there is nothing to fail over to. That is a second inference host, so it belongs
 between the pipeline spine and the proxy would leave two places to configure, two to audit, and no single
 answer to "what governed this run". **89 of 196 fully leveraged.**
 
+**2026-08-05 — cluster 6 groundwork: credential rotation PROVEN on the MySQL fixture.**
+Evidence: [`docs/evidence/2026-08-05-credential-rotation.md`](evidence/2026-08-05-credential-rotation.md).
+Vaulted the inline password, rotated it, and **observed the stale vault entry being REFUSED** before
+updating it — a rotation never seen failing has not been shown to do anything. Restored and re-verified.
+
+**G-211:** every seeded fixture connector keeps its password inline in the endpoint URL, `secret_ref:
+null`. The vaulted shape works (`con_f5c959` uses it); the seeds do not.
+
+**The drill broke the fixture on its first run**, and the lesson is in the evidence: the restore was in
+`catch`, not `finally`, so an abort between changing the database password and updating the vault left
+the shared MySQL user unusable — and the restore that did run put back the console row while leaving the
+database changed. A restore must be unconditional and must restore the FAR side.
+
+Only the MySQL row moved. Postgres, MSSQL and REST share the mechanism but were not drilled, so they
+stay `partial` rather than borrowing the evidence.
+
 ### Next up — the rest of clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
