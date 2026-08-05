@@ -143,11 +143,11 @@ const DATA_AUDITS: readonly ServiceCapabilityAudit[] = [
         'partial', 'Run and node views expose core run metadata and timing, but not a complete custom-facet renderer.',
         'yes', 'Verified live on the fleet 2026-07-21: a governed agent run recorded COMPLETED state, startedAt/endedAt, durationMs=105171, and a nominalTime facet in Marquez run history.',
       ]),
-      capability('namespaces-tags-ownership', 'Namespaces, tags, and ownership', 'Organize lineage entities and maintain searchable governance metadata.', '/data/lineage/graph', 'Inspect lineage metadata', 'The console does not provide full namespace, tag, or ownership CRUD. Add a governed metadata owner and reconcile changes with Marquez.', [
-        'yes', 'Marquez supports namespaces, tags, and dataset/job metadata.',
-        'partial', 'Metadata is read, while lifecycle mutations are not fully integrated.',
-        'partial', 'Metadata is visible but not a complete CRUD management surface.',
-        'no', 'No verified production workflow maintains ownership or tags through the console.',
+      capability('namespaces-tags-ownership', 'Namespaces, tags, and ownership', 'Organize lineage entities and maintain searchable governance metadata.', '/data/lineage/graph', 'Inspect lineage metadata', 'Dataset-level tag application exists in the adapter but has no UI yet, so applying PII to a specific dataset is an API call. Namespace ownership and tag definition are done.', [
+        'yes', 'Marquez exposes namespace ownership and tag lifecycle over its REST API.',
+        'yes', 'marquez-metadata.ts reads ownership and writes owners and tag definitions, with the judgement kept pure in data-ownership-policy.ts. Writes are deliberately narrow — no namespace or dataset deletion, because lineage is an append-only record and a console that can erase it can erase evidence. HIDDEN namespaces are excluded from the ownership count: the catalogue\'s delete is a soft hide, so a deleted area kept counting as unowned and made the number easy to dismiss.',
+        'partial', 'Ownership is reported per data area with the consequence stated, and a tag with no written meaning is flagged. A failed read is a 502, never an empty catalogue. Applying a tag to a SPECIFIC dataset has no UI yet — that path is API-only, which is why this gate is partial rather than yes.',
+        'yes', 'PROVEN LIVE 2026-08-05 end to end, and the READING is the finding: every namespace reported ownerName \"anonymous\", which is not an owner but the absence of one wearing a plausible word — 2 of 3 data areas had nobody accountable. Set an owner and read it back from the catalogue rather than echoing the request; defined RETAIN_7Y with a meaning. Both refusals verified: owner \"anonymous\" is REJECTED (that placeholder is exactly how the current state happened), and a tag with no description is rejected because an undefined tag gets applied inconsistently and reports that rely on it inherit the inconsistency.',
       ]),
     ],
   },
