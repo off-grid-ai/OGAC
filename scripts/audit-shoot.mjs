@@ -8,6 +8,15 @@
 //   node scripts/audit-shoot.mjs --out=/tmp/audit/governance \
 //     --routes=/governance/posture,/governance/policies,/governance/evidence/retention
 //
+// SHOOT THE TENANT THE DEMO ACTUALLY USES. The org is resolved from the HOST — a
+// `<slug>-onprem-console.*` hostname sets x-offgrid-tenant-slug in middleware, which binds the org.
+// A loopback or bare-localhost base therefore has NO tenant and falls back to `default`, the scratch
+// org with draft apps, stale cases and empty catalogue tables. An audit run that way reports "walls of
+// zeros" that a demo viewer would never see. This mistake invalidated a whole pass:
+//
+//   node scripts/audit-shoot.mjs --demo=insurer --out=/tmp/audit/insurer --routes=/overview,/work
+//   node scripts/audit-shoot.mjs --demo=bank    --out=/tmp/audit/bank    --routes=/overview,/work
+//
 //   node scripts/audit-shoot.mjs --out=/tmp/audit/data --routes-file=/tmp/data-routes.txt
 //
 // Options:
@@ -34,11 +43,31 @@ const arg = (k, d) => {
 };
 const flag = (k) => process.argv.includes(`--${k}`);
 
-const BASE = arg('base', 'http://127.0.0.1:3005').replace(/\/$/, '');
+// The two accounts the conference demo is handed out on, each on its own tenant host. `--demo=` picks
+// one and supplies the matching base URL, so a reviewer cannot accidentally shoot `default`.
+const DEMO = {
+  insurer: {
+    base: 'https://suraksha-onprem-console.getoffgridai.co',
+    email: 'demo-insurer@getoffgridai.co',
+    password: 'OffGridDemo2026!',
+  },
+  bank: {
+    base: 'https://bharatunion-onprem-console.getoffgridai.co',
+    email: 'demo-bank@getoffgridai.co',
+    password: 'OffGridDemo2026!',
+  },
+};
+const demo = DEMO[arg('demo', '')] ?? null;
+const BASE = arg('base', demo?.base ?? 'http://127.0.0.1:3005').replace(/\/$/, '');
 const OUT = arg('out', '/tmp/audit/shots');
 const WIDTH = Number(arg('width', '1600'));
 const WAIT = Number(arg('wait', '3500'));
-const EMAIL = arg('email', 'dev@offgrid.local');
+const EMAIL = arg('email', demo?.email ?? 'dev@offgrid.local');
+const PASSWORD = arg('password', demo?.password ?? 'dev');
+// The real accounts authenticate through the `password` (ROPC) provider, whose credential field is
+// `username`, not `email`. The dev-credentials provider is `dev`. Getting this wrong yields a 302 and
+// a null session, which looks like a wrong password rather than a wrong provider.
+const PROVIDER = arg('provider', demo ? 'password' : 'dev');
 
 const routesFile = arg('routes-file', '');
 const routes = (routesFile ? readFileSync(routesFile, 'utf8').split('\n') : arg('routes', '/').split(','))
@@ -57,8 +86,11 @@ const ctx = await browser.newContext({ viewport: { width: WIDTH, height: 1000 } 
 //  • The landing page's CSP blocks a same-origin fetch from the document, so page.evaluate fails.
 //  • maxRedirects:0 — the session cookie rides on the 302 and following it can drop it.
 const csrf = (await (await ctx.request.get(`${BASE}/api/auth/csrf`)).json()).csrfToken;
-const login = await ctx.request.post(`${BASE}/api/auth/callback/dev`, {
-  form: { csrfToken: csrf, email: EMAIL, password: 'dev', callbackUrl: '/' },
+const login = await ctx.request.post(`${BASE}/api/auth/callback/${PROVIDER}`, {
+  form:
+    PROVIDER === 'password'
+      ? { csrfToken: csrf, username: EMAIL, password: PASSWORD, callbackUrl: '/' }
+      : { csrfToken: csrf, email: EMAIL, password: PASSWORD, callbackUrl: '/' },
   maxRedirects: 0,
 });
 const session = await (await ctx.request.get(`${BASE}/api/auth/session`)).json();
@@ -69,7 +101,17 @@ if (!session?.user) {
   );
   process.exit(1);
 }
-console.log(`signed in as ${session.user.email} (${session.user.role ?? 'role?'})`);
+console.log(
+  `signed in as ${session.user.email} (role ${session.user.role ?? '?'}, org ${session.user.org ?? '?'}) at ${BASE}`,
+);
+// Loud, because auditing the wrong tenant is the single most expensive mistake available here: it
+// produces empty screens that look like product defects and are not.
+if (!demo && !arg('base', '')) {
+  console.warn(
+    'WARNING: no --demo and no --base — this is the DEFAULT scratch org, not a demo tenant. Empty\n' +
+      '         screens seen here are probably absent seed data, not defects. Use --demo=insurer|bank.',
+  );
+}
 
 const page = await ctx.newPage();
 // Collect what the page itself complains about — a console error is a finding even when the pixels look fine.
