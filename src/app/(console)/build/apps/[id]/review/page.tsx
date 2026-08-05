@@ -3,8 +3,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { progress } from '@/lib/app-runs-view';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
+import { caseLabel, runSubject } from '@/lib/app-work-queue';
 import { getApp } from '@/lib/apps-store';
 import { requireModuleForUser } from '@/lib/module-access';
+import { recommendationFrom } from '@/lib/review-inbox';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -50,24 +52,36 @@ export default async function AppReviewTab({ params }: Readonly<{ params: Promis
           {awaiting.map((r) => {
             const p = progress(r.steps);
             const pending = r.steps.find((s) => s.status === 'awaiting_human');
+            // WHAT the decision is about, not which row it is. This card led with the raw run id
+            // (`apprun_54419080`) in mono type, so a reviewer facing a queue of them could not tell
+            // which claim was theirs, spot the urgent one, or refer to one in a conversation — the
+            // exact failure runSubject() was written for on the work queue. Reused here rather than
+            // re-derived, so the two surfaces name the same case the same way.
+            const subject = caseLabel(runSubject(r.input), r.id);
+            // …and the app's own recommendation, which is the thing being approved. The card used
+            // `pending.outcome`, but a HUMAN step has no outcome until it is decided, so every card
+            // showed only its step label and no reviewer could see what they were approving.
+            // recommendationFrom() already distils it from the upstream agent step for the review
+            // detail; the queue card now agrees with the page it opens.
+            const recommendation = recommendationFrom(r);
             return (
               <Link
                 key={r.id}
                 href={`/solutions/apps/${id}/runs/${encodeURIComponent(r.id)}`}
                 className="group flex flex-col gap-2 rounded-md border border-amber-500/40 bg-amber-500/[0.05] p-4 hover:border-amber-500/70"
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-foreground">{r.id}</span>
-                  <span className="text-[11px] text-muted-foreground">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground">{subject}</span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
                     {p.done}/{p.total} steps
                   </span>
                 </div>
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-xs text-muted-foreground">
                   {pending?.label ?? 'Awaiting decision'}
                 </p>
-                {pending?.outcome ? (
-                  <p className="line-clamp-2 text-xs text-muted-foreground">{pending.outcome}</p>
-                ) : null}
+                <p className="line-clamp-3 whitespace-pre-line text-xs text-foreground/80">
+                  {recommendation}
+                </p>
                 <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-600 group-hover:underline dark:text-amber-500">
                   Review now <ArrowRight className="size-3" />
                 </span>

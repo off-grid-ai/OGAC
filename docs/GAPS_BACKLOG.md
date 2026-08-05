@@ -2373,3 +2373,75 @@ deployment-wide summary refuses to make any retention claim while it stands.
 sector requires. The console can now READ policies; authoring them is guarded CRUD that does not exist
 yet (`opensearch/index-lifecycle`, still `partial`). Applying one policy by hand on the deployment is
 the faster path and belongs to the fleet repo.
+
+---
+
+## G-DEMO-APPS-1 — the on-prem model node cannot serve a governed app prompt (BLOCKS the flagship demo app)
+
+**Found 2026-08-05, measured live on the demo box.** Death-Claim Assessment (`app_14940314`) produces no
+assessment. The chain, each link measured, not inferred:
+
+| what | evidence |
+|---|---|
+| a real app prompt on the node these apps use (g5, `gemma-4-e4b`) | one attempt returned `HTTP 200 in 262.205s`; later attempts returned `HTTP 000` after 280s, i.e. the node never answered |
+| the same node on a trivial prompt | `HTTP 200 in 3.79s` |
+| the discriminator | prompt SIZE. `bhapp_reimb` works because its source context is ~2 small rows; `app_14940314` folds a claim document plus up to 6 premium rows into the prompt and the node's prefill collapses |
+| what the client did about it | aborted at a hardcoded 20 000 ms and returned the FIRST SOURCE VERBATIM as the answer |
+
+The last row is fixed (see `src/lib/inference-timeout.ts` — configurable budget defaulting to the
+aggregator's own `chatUpstreamMs: 300000`, and `InferenceUnavailableError` so a failed call can no longer
+masquerade as output). With that in place the app now fails HONESTLY: the step reads
+`the model could not be reached: Error: gateway returned HTTP 502`, and the app surface says
+"Could not finish".
+
+**So the app is honest but still cannot finish, and that is now visible.** Its overview reads
+"Could not finish 4" with no completed run and no waiting case. **Do not put `app_14940314` in front of
+an investor until this is closed.**
+
+**Two candidate fixes, both real:**
+1. **Bound the source context a governed agent step feeds the model.** A step that dumps whole result
+   sets into the prompt is a cost and reliability problem independently of this box. This is the
+   product-level fix and it would make the app work on the hardware we actually ship on.
+2. **Capacity on the node** (a larger/faster model host, or serving more than one slot). Fleet work.
+
+Related, same investigation:
+- **`perRequestFallbackChain: false`** on the aggregator with single-slot nodes means a cold or busy slot
+  is a straight 502. Partly absorbed by `shouldRetryUpstream` (one retry when the failure came back
+  fast), but the aggregator has no fallback of its own.
+- **`g1` is `health: down` yet still `enabled: true` in the pool.** `POST /api/v1/gateway/nodes/g1
+  {action:"disable"}` answered `{"ok":true,"note":"pool refreshed from SSOT"}` and the pool still lists
+  it `enabled: true` — **a write that reports success and changes nothing.** Verify-the-real-path defect.
+
+## G-DEMO-APPS-2 — an app's agent prompt silently diverges from the app spec
+
+`materializeAppAgent` (`src/lib/apps-store.ts`) creates the runtime agent on FIRST run and caches its id
+onto the step. It never re-syncs. So editing a step's `inlineAgent.systemPrompt` afterwards has **no
+effect on what runs**, forever, with nothing reporting the divergence.
+
+Found because the currency sweep passed on the app specs and failed on the live agents: five agents were
+still instructing the model "Amounts in USD ($)" / "Amounts in $" after the specs had been corrected to
+rupees — including `agent_0f43eba9`, the agent Renewal & Persistency Nudge actually runs. The five
+library agents were corrected through `PUT /api/v1/admin/agents/:id`; `agent_0f43eba9` returned **409
+"This runtime agent is owned by an app and must be managed through that app"** and **there is no path
+through the app either**, so it is the one still carrying the wrong currency.
+
+**Fix:** re-sync the owned agent's prompt from the spec on app save (or on run, when it differs), and
+make the 409 point at a route that actually exists.
+
+## G-DEMO-APPS-3 — the app overview headline contradicts its own stat tiles
+
+On `/solutions/apps/app_14940314` the headline reads **"Nothing is waiting. 4 cases have been handled."**
+directly above tiles reading **HANDLED 0**, WAITING ON A PERSON 0, **COULD NOT FINISH 4**. The headline
+counts every terminal run; the tile counts only successful ones. Both derivations are defensible alone,
+but on one screen one of them is lying. Screenshot evidence in this session.
+
+## G-DEMO-APPS-4 — `app_c38d2c5e` has nine runs and not one produced a decision
+
+Policy Underwriting Assist's whole history is the empty `ar_*` seed family. `prune-broken-demo-runs.mts`
+deliberately SKIPPED it, because deleting them would leave the app with no runs at all — worse for a
+reader and it would hide this. Its case subjects are now correct insurer fiction read from
+`surdom_policies` (verified by screenshot: "Life proposal — Aadhya Gill, ₹50,00,000 sum assured
+(Endowment)"), but opening any run shows no outcome. Blocked behind G-DEMO-APPS-1.
+
+Also noted: the case picker labels every `surdom_policies` row "Record 1..20" instead of the
+policyholder's name, even though `holder_name` is present on each record.
