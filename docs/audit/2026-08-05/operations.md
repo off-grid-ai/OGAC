@@ -26,8 +26,14 @@ judged as a projected 16:9 from row 10).
 - [x] capability-gate data counted from source (49 audits, 784 gates, 49 workflow ratios)
 - [x] probe/health libs read (now scored POST-DEMO unless visible)
 - [x] live health measured (`/api/v1/status`: `degraded`, 42/43, 1 down, 20-37s latency)
-- [ ] `/operations/clusters`, `/operations/api-docs`, `/operations/services/agent-worker` — shots still
-      in flight; judged from code, treated as avoid-on-stage rather than fix-before-stage
+- [x] `/operations/clusters` — screenshot judged (near-blank page, one card)
+- [x] `/operations/services/agent-worker` — screenshot judged (three `Unknown` gates)
+- [x] `report.json` console/HTTP errors reviewed for both runs
+- [ ] `/operations/api-docs` — never rendered within the shooter's 90s network-idle wait; judged from
+      code only. `/operations/config` and `/operations/messaging` are pure legacy redirects (verified in
+      code) and need no separate judgement.
+
+**Status: complete for the demo lens.** 12 blockers + 5 risks below, all screen-anchored.
 
 ---
 
@@ -422,7 +428,31 @@ From `/tmp/audit/ops/report.json`:
   a white flash and a multi-second wait on the path to his strongest screen. Navigate to Backups from
   a different route, or from a fresh URL.
 - Four Operations routes (`/edge`, `/config`, `/messaging`, `/api-docs`) never reach network-idle
-  within 90s, which corroborates R2's slow first paint.
+  within 90s, which corroborates R2's slow first paint. `/operations/api-docs` produced no screenshot
+  at all within 90s — R3's copy claim is code-verified, not screenshot-verified.
+
+## R5 — Two Operations screens disagree about the same worker, in the same demo
+`/tmp/audit/ops2/operations_services_agent-worker.png` vs `/tmp/audit/ops/operations_runs.png`
+
+On **`/operations/runs`** the worker-readiness panel is green and specific: *"3/3 queues ready"*,
+`offgrid-agents · Ready · 1 poller · 10184@offgrid-s1 · 11:17:57 AM`. It is the best proof-of-life in
+the section and step 2 of the recommended demo.
+
+Open **`/operations/services/agent-worker`** — one click from the same nav — and the gate band reads
+**DEPLOYED `Unknown` · REACHABLE `Unknown` · FUNCTIONAL `Unknown`**, three times over, with the
+evidence *"Optional dependency — not asserted by the liveness probe."* Plus, again, a green
+**CONSOLE-USED `Pass`** claiming a verified production workflow (the D12 pattern).
+
+So the console proves the agent worker is running on one screen and says it knows nothing about it on
+the next. If a prospect follows up on the green 3/3 panel by clicking through to the worker, that is
+the screen they land on. (Cause: the three workers are registered as `indirect://` + `probe:
+'optional'` so the liveness probe never touches them — see Out of scope. The live evidence
+`readWorkerReadiness()` already exists and is not wired into the gates.)
+
+Subtitle jargon on the same screen: *"**Temporal** worker that executes durable agent runs."*
+
+**Cheapest fix:** none that is copy-only. Treat as avoid-on-stage — do not click from the readiness
+panel into a worker's service page.
 
 ---
 
@@ -483,6 +513,8 @@ Total: 3 routes, all deep-linkable, none of which currently show a red state.
 - **`/operations/clusters`** — one small card in the corner of a blank page (D2). Never open this.
 - **Do not reach Backups by clicking it from Admin** — the RSC prefetch fails and it hard-reloads
   (R4). Deep-link or arrive from Runs.
+- **Do not click from the green worker-readiness panel into a worker's service page** — that page says
+  Unknown/Unknown/Unknown about the worker the panel just proved is running (R5).
 - **`/operations/edge`** — slow bare "Loading edge status…" card, and no freshness indicator (R2).
 - **`/operations/admin`** — empty textarea with `e.g. …` placeholder (D4). Trivially fixed by seeding
   one row.

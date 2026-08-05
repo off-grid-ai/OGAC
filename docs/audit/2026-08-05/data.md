@@ -458,3 +458,43 @@ bucket/folder") a business audience cannot act on.
 **Fix (cheap):** add one data domain bound to an S3 connector with a resource like `claims-documents/2026`, so
 the button opens a populated folder browser — which is a genuinely good screen. Otherwise hide the button when
 no scope exists.
+
+### [DEMO-BLOCKER] "Who owns this data?" answers `anonymous`, next to two namespaces named `…-probe` and `…-ownership-proof`
+
+**Persona:** DPO / CISO follow-up question — the most likely one in the room
+**Where:** `/data/lineage/runs?view=governance` → `src/components/lineage/LineageGovernance.tsx:38-119`
+(`ns.ownerName ?? 'unassigned'`); the UI never filters `isHidden`
+(`src/lib/marquez-lineage.ts:365` parses the flag but no component uses it)
+**What:** Read live from the lineage store on the box, the four namespaces are:
+`default` → **anonymous**, `offgrid-console` → **anonymous**, `offgrid-lineage-probe` → `data-governance`
+(description: *"probe from marquez-lineage agent"*), `offgrid-ownership-proof` → `claims-ops` (description:
+*"Proof namespace for ownership CRUD"*, created 2026-08-05 05:19, and marked `isHidden: true` in the store —
+but the console shows hidden namespaces anyway). The panel's own subtitle is *"Assign an accountable owner to
+each lineage namespace. Provenance answers 'who owns this?'"*
+**Why it matters:** The screen that exists to answer "who is accountable for this data" answers **anonymous**
+for the two real namespaces, and the other two rows are visibly test scaffolding (`probe`, `proof`). It also
+means the impressive "4 namespace(s)" count on `/data/lineage` is half harness data.
+**Fix (cheap):** set real owners on `default` and `offgrid-console` (the CRUD to do it is right there in the
+panel), and delete or hide the `-probe` / `-ownership-proof` namespaces — at minimum make the UI respect
+`isHidden`.
+
+### [DEMO-BLOCKER] `/data/lineage/datasets` shows "DATASETS (100)" — ~60 are run ids, three are named `seedds_*`, and several belong to another tenant
+
+**Persona:** business audience; and a prospect who reads a customer name that isn't theirs
+**Where:** `/data/lineage/datasets` → `src/components/lineage/LineageCurate.tsx` (`LineageDatasetCatalog`),
+fed by `src/lib/marquez-lineage.ts`
+**What:** The catalogue renders ~100 small pills. Roughly sixty are `run_0122e3da`, `run_053ad5cd`, … and
+`chatrun_061f9f34`, plus a dozen `doc:08085aa5-7d21-4b57-a7b6-bc11342e6e8c`-style uuids — execution artifacts
+listed as *datasets*, which is what inflates the headline "100 datasets" quoted on `/data/lineage`. Three are
+named **`dataset:seedds_claims`**, **`dataset:seedds_gl`**, **`dataset:seedds_kyc`** and one **`S1 ingest
+verify`** — visible seed/test naming. And **`bhcon_corebank:claims`**, **`bhcon_crm:accounts`**,
+**`bhcon_erp:invoices`** are the *bharatunion* tenant's connector namespaces, on screen while signed into the
+demo org. The panel also states *"Dataset deletion is unavailable because the lineage graph is append-only."*
+**Why it matters:** Three separate credibility hits in one frame: hash soup where business names should be,
+`seedds_`/`verify` test artifacts, and another organisation's identifiers visible inside this one's console —
+which is precisely the thing an enterprise buyer is scanning for. The 100-dataset claim also does not survive
+inspection.
+**Fix (cheap):** filter `run_*` / `chatrun_*` / `doc:*` out of the dataset catalogue (they are runs, not
+datasets) and recount; rename the `seedds_*` datasets and drop `S1 ingest verify`; scope the catalogue to the
+signed-in org's namespaces so `bhcon_*` cannot appear. Until then, do not open this tab.
+**Screenshot:** `data_lineage_datasets.png`.

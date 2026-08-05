@@ -402,3 +402,147 @@ Three things to fix on it:
 - the back link says **`← Studio`**, a name the product retired, while the sidebar highlights **Apps**
   (`solutions-build.md` R4).
 
+### N14 — DEMO-BLOCKER — One case, three currencies, across three screens on the demo path
+
+This is the cross-section inconsistency an audience is most likely to catch, and it is on the case he
+will actually open. Following the SAME reimbursement case (₹/$63,000, `Client-Entertainment`):
+
+| screen | what the amount reads |
+| --- | --- |
+| `/work/tasks` (`work/work_tasks.png`) | `Amount: ₹63,000 · Category: Client-Entertainment` |
+| `/solutions/reviews` (`work2/reviews.png`) | `$63,000` — in the largest, amber, card headline |
+| `/solutions/reviews/…` detail (`work2/review_detail.png`) | `Approve $63,000 …` + `$63,000` + `Over quota by $23,000` |
+| the run's steps (`work2/…runs_seedrun_reimb_04.png`) | `Quota $40,000 — exceeded` · and `This decision covers 63,000.` **with no symbol** |
+
+The same is true of the loan case: `₹12,00,000` on `/work/tasks`, **`$1,200,000`** on
+`/solutions/reviews`. ₹12 lakh and $1.2M differ by roughly 85×. A banker in the room reads that
+immediately, and it undermines every other number in the demo.
+
+`docs/APP_AS_PRODUCT.md` records this as fixed (*"Demo currency copy corrected — 8 apps said 'Amounts in
+USD ($)'… `scripts/fix-demo-currency-copy.mts`"*). **It is not fixed on the review surfaces or in the
+step outputs** — that script corrected app `summary` copy, not the run payloads the review cards format.
+This is the cheapest high-impact fix in the audit.
+
+### N15 — DEMO-BLOCKER — At the climax of the demo, the "Trust checks" panel says nothing was checked
+
+`/tmp/audit/work2/review_detail.png` is the approval moment — the single screen the whole narrative
+builds to. Its right rail leads with:
+
+> **Trust checks** · `Faithful to sources` — **Not scored**
+> *"Not scored — grounding was not measured for this run, so treat the answer as unchecked rather than
+> as verified."*
+> *"No guardrail findings recorded for this draft."*
+
+So on the screen where a human takes responsibility for an AI decision, the platform states that
+grounding was not measured and no guardrail ran. The landing page sells *"Citations — check claims
+against their sources"* and *"Guardrails — stop unsafe behavior before it becomes an action"* — both
+answered "not scored / none" here. It is honest (and the honesty is good engineering) but it is the
+worst possible sentence to project at that moment.
+
+**The single highest-value fix in this whole audit: produce ONE reimbursement run that has a real
+grounding score and at least one recorded guardrail finding, and demo that run.** Everything else on
+this screen already works and reads well:
+- `Approve $63,000 — Reimbursement Approval?` · `Paused at Manager review`
+- `What the app recommends: Over quota by $23,000`
+- `The request` — `Amount / Category / Employee: Anjali Nair`
+- `WHY THIS NEEDS YOU — This step is configured to require a person to sign off before the run continues.`
+- a required reason field, `Edit what this will do before approving`, `Escalate to`, and
+  `Reject · Escalate · Approve`.
+
+Two further defects on that screen: the word **"draft"** appears again (*"for this draft"*), and **the
+left 60% of the frame is empty** — one small card holding a single line of text, then ~600 px of blank
+space, with the entire substance in the right rail. On a projector the climax screen looks half-built.
+
+### N16 — DEMO-RISK — `/solutions/reviews` is a strong screen with two hollow cards and a tautological title
+
+Same screenshot (`work2/reviews.png`). The copy is excellent — *"Decisions waiting on you. Each one is
+a run an app has paused for a person to approve or reject. Open one to see what you're approving, why,
+and the amount at stake."* — and `AWAITING YOU 5 · YOU CAN APPROVE 5 · ABOVE YOUR LIMIT 0 · APPS
+INVOLVED 4` is a clean band. But:
+
+- **Two of the five cards are visibly hollow** — "Approve Motor Claim FNOL Triage?" and "Approve
+  Reimbursement Approval?" carry no amount and no requester, leaving a large blank middle beside three
+  cards that have both.
+- **"Approve Reimbursement Approval?"** is a tautology, and it appears twice in the grid (once with
+  `$63,000`, once bare), reading as a duplicate row.
+- The sidebar still shows `Work 9` next to `AWAITING YOU 5`.
+
+### N17 — DEMO-RISK — `/work` (the section landing) is a `9` beside three zeros; skip it and deep-link `/work/tasks`
+
+`/tmp/audit/demo-path/work.png`: `WAITING ON YOU 9` (red-tinted tile — the wrong number again) then
+`PROJECTS 0 · CONVERSATIONS 0 · ARTIFACTS 0`. Three consecutive zeros. The `Inside work` 6-card grid
+below is clean and the h1 (*"Your work"*) and its subtitle are good, but the stat band says the
+workspace is unused. There is nothing on this page that `/work/tasks` does not do better.
+
+(Seeding one project, one conversation and one saved artifact would fix the band — and would also give
+him somewhere to go if a prospect asks about chat or documents.)
+
+### N18 — The "9 vs 5" contradiction is on FIVE surfaces, not one
+
+Worth stating as its own line because it is the most-repeated wrong number in the console and the
+cheapest thing on this list to fix (delete two orphaned apps' runs, or scope the sum to visible apps):
+
+| shows **9** | shows **5** |
+| --- | --- |
+| the sidebar badge `My tasks 9` (on every screen) | `/overview` — *"5 cases are waiting for you to decide"* |
+| `/work` — `WAITING ON YOU 9` | `/work/tasks` — *"5 cases are waiting for you to decide"* |
+| `/solutions/apps` — `WAITING FOR A PERSON 9` | `/solutions/reviews` — `AWAITING YOU 5` |
+
+The badge is rendered in the sidebar of **every** screenshot above, so the contradiction is present in
+the same frame as the correct number on three different pages.
+
+### N19 — The proof section HAS two real numbers, and they are hidden behind two zeros and 65% empty screen
+
+`/tmp/audit/demo-path/governance_evidence.png` — four cards in one row and nothing else:
+
+| card | value |
+| --- | --- |
+| Audit log | **422** events recorded |
+| Security events | **94** refusals recorded — *"Blocked, denied, and suspicious activity."* |
+| Provenance | **0** signed answers — *"No signed answers yet — runs are signed as they complete."* |
+| Evidence export | **0** destinations configured |
+
+**The good news is the most important finding in this section: `94 refusals recorded` is the "show me
+it blocking something" evidence I said did not exist in N3.** It does exist — it is just not on the
+home page (which says "Nothing was blocked in the last 24 hours") and not on the guardrails overview.
+`/governance/evidence/security` should be in the demo.
+
+Two problems:
+
+1. **`Provenance 0 signed answers` contradicts its own detail page.** `governance.md` B3 measured the
+   live tables: `default` holds **78 signed / 118 runs**. The card reads `app_runs` via
+   `evidence-posture-reader.ts` and the ledger reads a different table via `provenance-view.ts`, so the
+   overview says **0** and the page one click down renders **78 records**. On the surface that exists to
+   prove provenance — which the landing page sells as *"See where every answer and action came from"* —
+   the headline is zero. **This is a wrong number, not an empty system.**
+2. **The bottom ~65% of the frame is blank.** Four cards, one row, then nothing, at 1600×1000. This is
+   the emptiest non-error screen on the demo path and a direct hit on the repo's own
+   "no wasted real estate" rule.
+
+### N20 — `/data/catalog` is the emptiest screen on the demo path, and it is one click from `/data`
+
+`/tmp/audit/data/data_catalog.png`, confirming `data.md`'s BLOCKER visually:
+`DATASETS 0 · HOLDING PII 0 · FRESHNESS ALERTS 0 · TOTAL ROWS 0`, then a single wide card reading
+*"No datasets catalogued yet. Use **Seed from connectors** to register the datasets your declared
+connectors and data-domains already point at, or add one manually."* — and **~75% of the screen blank**.
+
+Four zeros and an empty state, arrived at by clicking the `DATASETS 4 · 3,60,759 cataloged rows` tile
+on `/data`. If he clicks that tile on stage the demo stops.
+
+### N21 — `/runtime/models` is a good "many models, your hardware" screen with two cheap blemishes
+
+`/tmp/audit/runtime/runtime_models.png`. Strong: a green **`connected`** badge on the gateway, a
+Modalities grid with **five `ready`** chips (text · vision understanding · embeddings · transcription ·
+speech), and a `Model catalog · 4 live · 25 total` list with real `live` badges, context windows and a
+right-hand spec panel. This is a credible "Route" beat.
+
+- **`http://offgrid-s1.local:8800/v1` is printed under the heading** — an internal host and port,
+  projected. Same class as the `/operations/services` leak.
+- **`image generation · not_installed` and `image edit · not_installed`** — two grey chips carrying a
+  raw snake_case token. A business audience reads "two capabilities are missing" and an engineer's
+  identifier at the same time.
+- The **default-selected model is the least informative one**: `Qwen 9B (fleet)` shows
+  `ctx unknown · Context window unknown · License unknown · On fleet no`. Four "unknown"s and a "no" in
+  the detail panel. Pre-select `Qwythos 9B · 1M (cluster)` (512K ctx, `live`) instead — a one-line
+  change to what the page opens on.
+

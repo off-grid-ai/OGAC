@@ -77,7 +77,11 @@ export async function probeEntry(entry: ServiceEntry): Promise<ServiceHealth> {
   if (!needsNetworkProbe(entry) || !isHttpProbeable(entry.url)) {
     return resolveHealth(entry);
   }
-  const raw = await probeService(entry.url, entry.healthPath);
+  // expectStatus MUST be threaded: without it the per-entry declaration is dead config, which is
+  // exactly what happened when it was added — the otel-collector's `expectStatus: [405, 200]` existed
+  // in the entry and never reached the probe. Caught by review, not by the typechecker, because an
+  // unused optional parameter compiles perfectly.
+  const raw = await probeService(entry.url, entry.healthPath, undefined, entry.expectStatus);
   return resolveHealth(entry, raw);
 }
 

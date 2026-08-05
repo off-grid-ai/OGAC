@@ -55,7 +55,7 @@ async function probeHomeServices() {
   const entries = getServices().filter((s) => HOME_SERVICE_IDS.has(s.id));
   return Promise.all(
     entries.map(async (s) => {
-      const h: RawProbe = await safe(() => probeService(s.url, s.healthPath, 3000), {
+      const h: RawProbe = await safe(() => probeService(s.url, s.healthPath, 3000, s.expectStatus), {
         status: 'down' as const,
         httpStatus: null,
         ms: null,
