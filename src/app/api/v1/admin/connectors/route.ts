@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
-import { hostPolicyFromEnv } from '@/lib/connector-policy';
+import { hostPolicyFromEnv, redactEndpointCredential } from '@/lib/connector-policy';
 import {
   validateConnectorCreate,
   persistConnectorSecret,
@@ -13,7 +13,21 @@ import { currentOrgId } from '@/lib/tenancy';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ object: 'list', data: await listConnectors(await currentOrgId()) });
+  const rows = await listConnectors(await currentOrgId());
+  // REDACT ON READ, for every caller, not just the UI.
+  //
+  // New connectors are stored credential-free (POST below splits the password into the vault), but
+  // SEEDED fixtures predate that and keep it inline: `postgres://coreins:coreins@…`. This endpoint
+  // returned it verbatim, so on the PUBLIC read-only demo anyone could curl the API and read the
+  // database passwords. Redacting in the page component was not enough — the exposure was the API.
+  //
+  // Unconditional rather than viewer-only: a stored credential has no business in an API response at
+  // all. The real one is resolved from the vault at query time by connector-exec, so nothing that
+  // actually connects is affected.
+  return NextResponse.json({
+    object: 'list',
+    data: rows.map((c) => ({ ...c, endpoint: redactEndpointCredential(c.endpoint) })),
+  });
 }
 
 // Create a connector from the self-serve form. The typed cred fields (SQL host/port/db/user/password
