@@ -37,12 +37,15 @@ const FETCH_WINDOW = 2000;
 
 // Read one page of audit rows for the given filters. Never throws — a search outage surfaces as
 // { configured, error } and an empty page.
-export async function readAuditPage(f: AuditFilters, orgId?: string): Promise<AuditPage> {
+export async function readAuditPage(f: AuditFilters, orgId: string): Promise<AuditPage> {
   const page = f.page && f.page >= 1 ? f.page : 1;
   const size = Math.min(f.size ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const hideAutotest = isDemoTenantOrg(orgId);
   // Only pass filters searchAudit is known to support today; the rest are applied by filterAuditRows.
+  // `org` is NOT one of those optional filters — it is the tenant boundary and searchAudit requires it.
+  // It was optional on both sides of this seam, which is how the audit view served every org's rows.
   const result = await searchAudit({
+    org: orgId,
     q: f.q,
     outcome: f.outcome,
     size: FETCH_WINDOW,
@@ -69,13 +72,19 @@ export async function readAuditPage(f: AuditFilters, orgId?: string): Promise<Au
 // Read the WHOLE filtered set (up to the fetch window) for export — no pagination slice.
 export async function readAuditForExport(
   f: AuditFilters,
-  orgId?: string,
+  orgId: string,
 ): Promise<{
   rows: AuditRow[];
   configured: boolean;
   error?: string;
 }> {
-  const result = await searchAudit({ q: f.q, outcome: f.outcome, size: FETCH_WINDOW, offset: 0 });
+  const result = await searchAudit({
+    org: orgId,
+    q: f.q,
+    outcome: f.outcome,
+    size: FETCH_WINDOW,
+    offset: 0,
+  });
   const view = normalizeAudit(result);
   const withHide: AuditFilters = { ...f, hideAutotest: isDemoTenantOrg(orgId) };
   return { rows: filterAuditRows(view.rows, withHide), configured: view.configured, error: view.error };

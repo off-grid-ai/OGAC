@@ -38,12 +38,13 @@ function fmt(ts: string): string {
 // resource/project names this pipeline. Honest: an unconfigured/empty index → an empty table + note.
 export default async function PipelineAuditPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
-  const p = await getPipeline(id, await currentOrgId());
+  const orgId = await currentOrgId();
+  const p = await getPipeline(id, orgId);
   if (!p) notFound();
 
   // Over-fetch a recent window and narrow purely (searchAudit's free-text `q` doesn't cover
   // resource/project reliably; the pure filter is the exact, unit-tested gate).
-  const result = await searchAudit({ size: 200 });
+  const result = await searchAudit({ org: orgId, size: 200 });
   const view = normalizeAudit(result);
   const rows = filterAuditForPipeline(view.rows, id);
 

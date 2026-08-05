@@ -31,7 +31,12 @@ const RECENT_AUDIT = 200;
 const realReaders: CopilotReaders = {
   audit: async () => {
     try {
-      const page = await readAuditPage({ size: RECENT_AUDIT, page: 1 });
+      // Scoped to the caller's org. This read feeds the copilot's PROMPT, so an unscoped one would
+      // have let the assistant summarise another tenant's audit trail back to this tenant in prose —
+      // the same leak as the audit view, minus the screenshot that would have revealed it. Found by
+      // the typechecker once `org` became required rather than by looking, which is the argument for
+      // making a tenant boundary a required parameter instead of a convention.
+      const page = await readAuditPage({ size: RECENT_AUDIT, page: 1 }, await currentOrgId());
       return { rows: page.rows, configured: page.configured };
     } catch {
       return { rows: [], configured: false };

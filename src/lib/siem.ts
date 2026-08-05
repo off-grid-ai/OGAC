@@ -144,6 +144,13 @@ export function siemConfigured(): boolean {
 // The read-back filter contract the Audit-log VIEW consumes (Phase 4.11): free text + exact-match
 // facets on actor / action / project / outcome + a [from,to] time window + paging. All optional.
 export interface AuditSearchParams {
+  // REQUIRED, and deliberately not optional. Every other field here is a filter the caller MAY apply;
+  // this one is the tenant boundary, and it was optional until 2026-08-05 — so all five call sites
+  // omitted it and every tenant's audit view served the whole index. The insurer's console and the
+  // bank's rendered byte-identical screens over 1015 rows spanning four orgs, on links being handed to
+  // outsiders. Making it required means the typechecker refuses a call that forgets the boundary,
+  // which is the only version of this rule that stays true as call sites are added.
+  org: string;
   q?: string; // free text (matched against model / outcome / deviceId / keyId / actorId / action)
   outcome?: string; // exact-match filter (ok | blocked | redacted | error)
   actor?: string; // exact-match on actorId (user email or machine client-id)
@@ -174,11 +181,21 @@ interface OsHit {
 }
 
 // Build the OpenSearch query DSL: a bool query with a full-text `multi_match` (when `q` is given)
-// plus term filters. Empty query → match_all, newest first.
+// plus term filters, newest first. The org term is always present — see below.
+//
+// EXPORTED so the tenant boundary is directly assertable. The query DSL is the terminal artefact this
+// function produces: whether a tenant's rows leak is decided entirely by what is in this object, so a
+// test that reads it is testing the real thing, not a stand-in for it. It stayed private while the
+// boundary was missing and nothing could see the omission.
 // eslint-disable-next-line complexity
-function buildQuery(p: AuditSearchParams): Record<string, unknown> {
+export function buildQuery(p: AuditSearchParams): Record<string, unknown> {
   const must: Record<string, unknown>[] = [];
-  const filter: Record<string, unknown>[] = [];
+  // The tenant boundary goes in FIRST and unconditionally. Note what this excludes: the 122 legacy
+  // device/gateway docs shipped before attribution existed carry no `org` field at all, so they match
+  // no tenant and are now invisible to every tenant. That is the correct reading — a record we cannot
+  // attribute to an org cannot be shown to an org — and it is deliberately not softened with a
+  // "missing org" fallback, because that fallback is precisely how one tenant would see another's rows.
+  const filter: Record<string, unknown>[] = [{ term: { 'org.keyword': p.org } }];
   if (p.q?.trim()) {
     must.push({
       multi_match: {
@@ -200,7 +217,9 @@ function buildQuery(p: AuditSearchParams): Record<string, unknown> {
     if (p.to) range.lte = p.to;
     filter.push({ range: { ts: range } });
   }
-  const bool = must.length || filter.length ? { bool: { must, filter } } : { match_all: {} };
+  // `filter` always holds at least the org term, so there is no match_all path any more — an audit
+  // search with no filters at all is exactly the query that caused the leak.
+  const bool = { bool: { must, filter } };
   return {
     query: bool,
     sort: [{ ts: { order: 'desc', unmapped_type: 'date' } }],

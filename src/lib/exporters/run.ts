@@ -71,7 +71,9 @@ export async function runExport(id: string, orgId: string): Promise<ExportResult
 
   let result: ExportResult;
   if (resolved.kind === 'audit') {
-    const search = await searchAudit({ size: AUDIT_BATCH, offset: 0 });
+    // Scoped to the org that owns the export target: an export is a copy of audit evidence leaving the
+    // platform, so shipping another tenant's rows into this tenant's SIEM would be the leak made durable.
+    const search = await searchAudit({ org: orgId, size: AUDIT_BATCH, offset: 0 });
     if (!search.configured) {
       result = { ok: false, count: 0, detail: 'Audit search backend not configured — nothing to export.' };
     } else {
