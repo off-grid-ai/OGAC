@@ -2279,3 +2279,28 @@ compliance gap someone can act on; early deletion is irreversible.
 deployment choice — the S3 lifecycle spec has no such limit), or add a console-side sweep for windows
 over 255 days, which means a second clock that only holds while our process runs. Prefer the former.
 Owner: `off-grid-ai/onprem-fleet-orchestration`.
+
+## G-210 — failover works, but nothing is configured to fail over to
+
+Found 2026-08-05 while running the gateway failure drill
+(`docs/evidence/2026-08-05-gateway-failover-drill.md`). The proxy DOES fail over correctly: with a dead
+second deployment in the pool, requests were retried onto the healthy one and succeeded
+(`attempted-retries` 1–2, served by the healthy deployment id).
+
+But the production config has **exactly one deployment per model name**:
+
+```
+onprem/qwen3-vl-8b -> 1    onprem/gemma-4-e4b -> 1    onprem/qwythos-9b -> 1
+```
+
+So the routing policy has no redundancy to use. Any single inference host going down takes its model
+with it, and the "load balancing / failover" capability is real in the proxy and inert in practice.
+
+**Not console work:** closing it means a second inference host serving the same model, added as a
+second deployment under the same `model_name`. Owner: `off-grid-ai/onprem-fleet-orchestration`.
+
+**Second finding, worth its own line:** response caching is enabled on this proxy, so the first
+version of this drill — six identical prompts — was served from Redis and returned a 200 while
+*naming the dead deployment as the server*. Any future load-balancing or latency drill on this proxy
+MUST send unique prompts or `cache: {"no-cache": true}`, or it measures the cache instead of the thing
+under test. A green drill that proves nothing is worse than no drill.
