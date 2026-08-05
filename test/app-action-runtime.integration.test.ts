@@ -6,6 +6,15 @@ import { test } from 'node:test';
 import { CRM_TASK_API_VERSION } from '@/lib/adapters/crm-task-writeback';
 import type { ActionStep, AppSpec } from '@/lib/app-model';
 import { defaultDeps, executeStep, type StepResult } from '@/lib/app-run';
+// @ts-expect-error shared JS reachability helper
+import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+
+// Only the LIVE-mode test below actually reaches the CRM adapter's execRestConnectorRequest ->
+// resolveConnectorTarget, which resolves a per-connector secret via Postgres before ever reaching
+// this test's local HTTP server (see crm-writeback.test.ts for the full trace). The shadow-mode
+// and pre-approval tests never touch Postgres — they return before any write I/O — so only the
+// live test needs the guard.
+const dbUp = await dbReachable();
 
 const ACTION: ActionStep = {
   id: 'create-follow-up',
@@ -137,7 +146,10 @@ test('live action cannot execute before its exact approved human step', async (t
   assert.equal(requests, 0);
 });
 
-test('live App action executes the real tenant-scoped adapter and returns its receipt', async (t) => {
+test(
+  'live App action executes the real tenant-scoped adapter and returns its receipt',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   const ledger = new Map<string, { hash: string; task: Record<string, unknown> }>();
   const keys: string[] = [];
   const server = createServer(async (req, res) => {
@@ -200,4 +212,5 @@ test('live App action executes the real tenant-scoped adapter and returns its re
   assert.equal(ledger.size, 2);
   assert.equal(keys[0], keys[1]);
   assert.notEqual(keys[1], keys[2]);
-});
+  },
+);
