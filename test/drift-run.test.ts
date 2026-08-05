@@ -52,3 +52,30 @@ test('describeDriftAttribution: null/garbage → null (legacy rows never throw)'
   assert.equal(v?.engineLabel, 'Off Grid PSI');
   assert.equal(v?.driftPct, null);
 });
+
+test('A SIDECAR THAT FELL BACK IS NOT A PROVEN EVIDENTLY RUN', () => {
+  // The sidecar returns the same response shape whether Evidently ran or whether it fell back to a
+  // first-party PSI approximation. Before it reported which, a rough approximation was indistinguishable
+  // from a real Evidently verdict — and the console printed `Evidently ran "<selection>"` regardless,
+  // a claim about work that may never have happened.
+  const fellBack = summarizeDrift({
+    ...base,
+    engine: 'native',
+    fallbackReason: 'Evidently did not run (each window needs at least 2 points)',
+  });
+  assert.equal(fellBack.engineProven, false);
+  // And the version must NOT survive onto a run the engine did not produce.
+  assert.equal(fellBack.evidentlyVersion, null);
+  // The reason has to survive onto the view a person reads, or the run just looks native for no
+  // stated cause.
+  assert.match(describeDriftAttribution(fellBack)?.fallbackReason ?? '', /2 points/);
+});
+
+test('the method recorded is the one APPLIED, not the one requested', () => {
+  // The two differ when the installed build has no such preset — data_summary does not exist in 0.4.40
+  // and runs as data_quality. Recording the request would make the attribution agree with what we hoped
+  // for rather than what happened.
+  const a = summarizeDrift({ ...base, engine: 'evidently', method: 'data_quality', fallbackReason: null });
+  assert.equal(a.method, 'data_quality');
+  assert.equal(a.engineProven, true);
+});

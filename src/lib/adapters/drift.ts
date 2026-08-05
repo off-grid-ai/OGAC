@@ -196,6 +196,18 @@ export const nativeDrift: DriftPort = {
 interface EvidentlyResponse {
   drift_detected?: boolean;
   share_drifted?: number;
+  /**
+   * WHICH ENGINE ACTUALLY RAN. The sidecar falls back to a first-party PSI approximation when
+   * Evidently cannot run, and used to return the same shape either way — so a rough approximation was
+   * indistinguishable from a real Evidently verdict. Absent means an older sidecar that cannot say.
+   */
+  engine?: 'evidently' | 'first-party-psi';
+  /** The preset REALLY executed, which is not always the one requested. */
+  preset_applied?: string | null;
+  methods_applied?: Record<string, string>;
+  columns?: Array<{ column: string; drifted: boolean; score: number | null; method: string }>;
+  evidently_version?: string | null;
+  note?: string | null;
 }
 
 export const evidentlyDrift: DriftPort = {
@@ -244,18 +256,55 @@ export const evidentlyDrift: DriftPort = {
       const selected = options?.preset ?? options?.method;
       const baseline = scores.slice(n, n * 2).length;
       const current = scores.slice(0, n).length;
-      const note = selected ? `Evidently ran "${selected}".` : 'Evidently drift run.';
+      // A SIDECAR THAT FELL BACK IS NOT AN EVIDENTLY RUN. The sidecar reports the engine it actually
+      // used; if that is the first-party approximation, this is recorded as a native run with the
+      // reason, exactly as an unreachable collector already is. Claiming `Evidently ran "<selection>"`
+      // off the back of the request was a statement about work that may never have happened.
+      if (data.engine === 'first-party-psi') {
+        return analyzeFirstParty(scores, options, data.note ?? 'the drift service fell back to its own approximation');
+      }
+      // Report what the sidecar says it DID, not what we asked for — they differ when the installed
+      // build has no such preset, and the difference is the operator's to see.
+      const applied = data.preset_applied ?? null;
+      const appliedMethods = Object.entries(data.methods_applied ?? {});
+      const note = [
+        applied
+          ? `Evidently ran "${applied}"${selected && applied !== selected ? ` (asked for "${selected}")` : ''}.`
+          : selected
+            ? `Evidently ran, but did not report which preset — "${selected}" is not confirmed.`
+            : 'Evidently drift run.',
+        appliedMethods.length
+          ? `Tests applied: ${appliedMethods.map(([c, m]) => `${c}=${m}`).join(', ')}.`
+          : '',
+        data.note ? `Note: ${data.note}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
       return {
         engine: 'evidently',
         status,
-        metrics: [{ name: 'share_drifted', value: Number(share.toFixed(3)), status }],
+        // Per-column evidence when the sidecar reports it: a single dataset-wide share cannot tell an
+        // operator WHICH signal moved, and "something drifted" is not actionable. Evidently labels each
+        // entry with the test it actually ran, so the row is evidence rather than intent.
+        metrics: [
+          { name: 'share_drifted', value: Number(share.toFixed(3)), status },
+          ...(data.columns ?? []).map((c) => ({
+            name: `${c.column} (${c.method})`,
+            value: c.score ?? 0,
+            status: (c.drifted ? 'drift' : 'stable') as DriftStatus,
+          })),
+        ],
         baseline,
         current,
         note,
         attribution: summarizeDrift({
           engine: 'evidently',
-          evidentlyVersion: EVIDENTLY_VERSION,
-          method: selected ?? 'DataDriftPreset',
+          // The version the SIDECAR reports, not a constant compiled in here: a constant claims a
+          // version that may not be what is deployed.
+          evidentlyVersion: data.evidently_version ?? EVIDENTLY_VERSION,
+          // The method really applied wins over the request. Recording the request would make the
+          // attribution agree with what we hoped for rather than what happened.
+          method: applied ?? selected ?? 'DataDriftPreset',
           driftShare: Number(share.toFixed(3)),
           status,
           baseline,
