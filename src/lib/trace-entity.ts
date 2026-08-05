@@ -17,7 +17,8 @@ export async function resolveEntityMatch(
   entity: string,
 ): Promise<EntityMatch | null> {
   if (kind !== 'pipeline') return null;
-  const p = await getPipeline(entity, await currentOrgId()).catch(() => null);
+  const orgId = await currentOrgId();
+  const p = await getPipeline(entity, orgId).catch(() => null);
   if (!p) return null;
-  return pipelineTraceMatch(entity);
+  return pipelineTraceMatch(entity, orgId);
 }

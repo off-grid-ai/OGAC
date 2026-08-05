@@ -10,6 +10,7 @@ import {
   safeLangfuseRegistry,
   safeListTraces,
 } from '@/lib/langfuse';
+import { ownedRunIdsForOrg } from '@/lib/langfuse-session-scope';
 import { requireModuleForUser } from '@/lib/module-access';
 import { scoringConfigured } from '@/lib/qa/scoring';
 import { currentOrgId } from '@/lib/tenancy';
@@ -26,10 +27,13 @@ export default async function InsightsAiOverviewPage({
   const params = await searchParams;
   const rawRange = Array.isArray(params.lfRange) ? params.lfRange[0] : params.lfRange;
   const { range, fromIso, toIso } = resolveRange(rawRange);
+  // Sessions carry no owner marker of their own, so their ownership is resolved from our own run tables
+  // before the registry read. Everything else scopes on orgId.
+  const ownedRuns = await ownedRunIdsForOrg(orgId);
   const [traces, insights, registry, agentRuns] = await Promise.all([
-    safeListTraces(100),
+    safeListTraces(orgId, 100),
     safeLangfuseInsights(fromIso, toIso),
-    safeLangfuseRegistry(100),
+    safeLangfuseRegistry(orgId, ownedRuns, 100),
     listAgentRuns(100, orgId).catch(() => []),
   ]);
   const registryRecords =

@@ -51,8 +51,16 @@ export interface EntityWindowData {
 export interface EntityTraceSource {
   /** Sync "is trace read-back configured on this deployment?" (env-derived). */
   configured(): boolean;
-  /** Recent traces + windowed scores — the raw firehose the pure layer narrows. Never throws. */
-  fetchWindow(fromIso: string, toIso: string): Promise<EntityWindowData>;
+  /**
+   * Recent traces + windowed scores for ONE TENANT — the firehose the pure layer narrows further.
+   * Never throws.
+   *
+   * `orgId` is required and leading. This port had no tenant parameter while the whole observability
+   * read layer had none, and it is the seam a per-entity OBSERVE tab would be wired through — so
+   * requiring it here means the boundary exists before the first consumer does, rather than being
+   * discovered later the way the sibling leaks were.
+   */
+  fetchWindow(orgId: string, fromIso: string, toIso: string): Promise<EntityWindowData>;
   /** One trace's spans/generations. Never throws (empty on failure). */
   fetchObservations(traceId: string): Promise<LangfuseObservation[]>;
 }
@@ -60,10 +68,10 @@ export interface EntityTraceSource {
 // ─── live implementation over langfuse.ts ─────────────────────────────────────────────────────────
 export const langfuseEntitySource: EntityTraceSource = {
   configured: () => langfuseReadConfigured(),
-  async fetchWindow(fromIso, toIso) {
+  async fetchWindow(orgId, fromIso, toIso) {
     if (!langfuseReadConfigured()) return { configured: false, traces: [], scores: [] };
     const [traces, scores] = await Promise.allSettled([
-      listTraces(RECENT_LIMIT),
+      listTraces(orgId, RECENT_LIMIT),
       fetchScores(fromIso, toIso, RECENT_LIMIT),
     ]);
     const errors: string[] = [];
@@ -106,7 +114,7 @@ export async function getEntityObservability(
   if (!source.configured()) {
     return { configured: false, range: win.range, view: emptyEntityObservability(match.id) };
   }
-  const data = await source.fetchWindow(win.fromIso, win.toIso);
+  const data = await source.fetchWindow(match.orgId, win.fromIso, win.toIso);
   const windowed = filterTracesByWindow(data.traces, win.fromIso, win.toIso);
   const view = rollupEntityObservability(windowed, data.scores, match);
   return { configured: true, range: win.range, view, error: data.error };
@@ -134,7 +142,7 @@ export async function getEntityTraceDetail(
   const win = resolveRange(range, now);
   if (!source.configured()) return { configured: false, belongs: false, detail: null };
 
-  const data = await source.fetchWindow(win.fromIso, win.toIso);
+  const data = await source.fetchWindow(match.orgId, win.fromIso, win.toIso);
   const matched = filterTracesForEntity(data.traces, match);
   const traceMeta = matched.find((t) => t.id === traceId) ?? null;
   // The trace id must be one of the entity's matched traces (or explicitly in its trace-id set) —

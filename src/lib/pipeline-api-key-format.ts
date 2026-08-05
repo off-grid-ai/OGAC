@@ -158,11 +158,18 @@ export function pipelineTag(pipelineId: string): string {
 // surfaces (fetch route + OBSERVE tab) derive their `EntityMatch`, so tag/id attribution can't drift
 // between them (DRY). Matches traces naming the canonical `pipeline:<id>` tag OR the bare id (the
 // latter preserves the pre-existing best-effort match). Pure — returns a plain descriptor, no I/O.
-export function pipelineTraceMatch(pipelineId: string): {
+export function pipelineTraceMatch(
+  pipelineId: string,
+  orgId: string,
+): {
   id: string;
+  orgId: string;
   tags: string[];
 } {
-  return { id: pipelineId, tags: [pipelineTag(pipelineId), pipelineId] };
+  // orgId is carried through because the tags below are an ENTITY selector, not a tenant boundary:
+  // they narrow "which pipeline", and nothing in them establishes whose pipeline. The trace read this
+  // feeds was org-wide, so the tenant has to be stated explicitly here.
+  return { id: pipelineId, orgId, tags: [pipelineTag(pipelineId), pipelineId] };
 }
 
 // PA-12 — the ONE canonical tag-derivation used at every telemetry SOURCE (traces, eval_runs, cost,

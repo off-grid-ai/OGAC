@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/authz';
 import { langfuseDatasets as port } from '@/lib/adapters/langfuse-datasets';
 import { buildCreateItemBody, type CreateItemInput } from '@/lib/langfuse-datasets';
 import { LangfuseHttpError } from '@/lib/langfuse-http';
+import { datasetBelongsToOrg } from '@/lib/langfuse-ownership';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,10 @@ export async function PATCH(
   const body = (await req.json().catch(() => null)) as Omit<CreateItemInput, 'datasetName' | 'id'> | null;
   if (!body) return NextResponse.json({ error: 'body required' }, { status: 400 });
   const decoded = decodeURIComponent(name);
+  // An item edit or delete is a write to its dataset, so the boundary is the dataset's owner.
+  if (!(await datasetBelongsToOrg(decoded, await currentOrgId()))) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
   const itemId = decodeURIComponent(id);
   const shaped = buildCreateItemBody({ ...body, datasetName: decoded, id: itemId });
   if (!shaped.ok) return NextResponse.json({ error: shaped.error }, { status: 400 });
@@ -47,6 +52,10 @@ export async function DELETE(
   const { name, id } = await params;
   if (!port.configured()) return NextResponse.json({ error: 'Langfuse not configured' }, { status: 503 });
   const decoded = decodeURIComponent(name);
+  // An item edit or delete is a write to its dataset, so the boundary is the dataset's owner.
+  if (!(await datasetBelongsToOrg(decoded, await currentOrgId()))) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
   const itemId = decodeURIComponent(id);
   try {
     await port.removeItem(itemId);

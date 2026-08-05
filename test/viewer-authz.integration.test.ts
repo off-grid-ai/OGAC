@@ -55,13 +55,24 @@ test('requireAdmin WIRES decideAdminGate: allow → session, viewer-write → re
 
 test('the edge middleware WIRES isViewerWriteAttempt to a catch-all 403 for every /api mutating request', () => {
   // The load-bearing control: covers all routes regardless of per-handler gate.
-  assert.match(middleware, /isViewerWriteAttempt\(role,\s*req\.method\)/, 'checks the pure viewer-write attempt on the request method');
+  // The PATHNAME must be passed, not just the method. This assertion used to pin the two-argument
+  // form and broke when the third argument was added — but the third argument is the point: without it
+  // a POST that is semantically a READ (READ_ONLY_QUERY_PATHS) is refused as a write, which is a live
+  // defect that already happened once (the viewer could not search memory). So the assertion is
+  // tightened to require the pathname rather than relaxed to tolerate it.
+  assert.match(
+    middleware,
+    /isViewerWriteAttempt\(role,\s*req\.method,\s*pathname\)/,
+    'consults the pure viewer-write decision with BOTH the method and the pathname',
+  );
   assert.match(middleware, /pathname\.startsWith\('\/api\/'\)\s*&&\s*isViewerWriteAttempt/, 'scoped to /api/* mutating requests');
   assert.match(middleware, /VIEWER_FORBIDDEN_BODY[\s\S]*status:\s*403/, 'returns the read-only 403 body');
   // The pure predicate it relies on: viewer+mutating true, viewer+GET false, admin+POST false.
   assert.equal(isViewerWriteAttempt('viewer', 'POST'), true);
   assert.equal(isViewerWriteAttempt('viewer', 'GET'), false);
   assert.equal(isViewerWriteAttempt('admin', 'POST'), false);
+  // And the reason the pathname is threaded: a read that travels as a POST is not a write attempt.
+  assert.equal(isViewerWriteAttempt('viewer', 'POST', '/api/v1/organizational-brain/search'), false);
 });
 
 test('config/reveal REDACTS the secret value for a viewer, returns raw for an admin', () => {

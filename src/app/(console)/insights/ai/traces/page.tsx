@@ -28,7 +28,7 @@ export default async function InsightsAiTracesPage() {
   await requireModuleForUser('observability');
   const orgId = await currentOrgId();
   const [traceReadback, runs] = await Promise.all([
-    safeListTraces(100),
+    safeListTraces(orgId, 100),
     listAgentRuns(100, orgId).catch(() => []),
   ]);
 

@@ -53,7 +53,7 @@ export default async function PipelineObservabilityPage({
   const pipeline = await getPipeline(id, orgId);
   if (!pipeline) notFound();
 
-  const match = pipelineTraceMatch(id);
+  const match = pipelineTraceMatch(id, orgId);
   const { configured, view, error } = await getEntityObservability(match, range);
   const detail = trace ? (await getEntityTraceDetail(match, trace, range)).detail : null;
 

@@ -25,6 +25,17 @@ import { buildWaterfall, type ScoreTrendSeries, shapeScoreTrends, type Waterfall
 export interface EntityMatch {
   /** The entity id (pipeline/app/agent) — for display + as an implicit substring selector. */
   id: string;
+  /**
+   * The org that owns the entity. REQUIRED, and carried on the match rather than passed alongside it,
+   * because a pipeline/app/agent is only ever observed in the context of its tenant — keeping the two
+   * together means a caller cannot hold a match without having decided whose it is.
+   *
+   * It exists because the trace read this feeds was tenant-blind: every entity's OBSERVE surface read
+   * from an org-wide firehose, and the entity selectors below (tags, trace ids) are NOT a tenant
+   * boundary — two tenants' pipelines can share a tag shape, and a matched trace was never checked
+   * against the caller's org.
+   */
+  orgId: string;
   /** Substrings to look for in a trace's name/userId (e.g. `pipeline:pl_abc`). */
   tags?: string[];
   /** Exact Langfuse trace ids belonging to the entity (normalized run ids). */

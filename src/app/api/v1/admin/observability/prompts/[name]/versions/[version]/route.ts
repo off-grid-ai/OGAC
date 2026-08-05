@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/authz';
 import { langfusePrompts as port } from '@/lib/adapters/langfuse-prompts';
 import { LangfuseHttpError } from '@/lib/langfuse-http';
 import { buildLabelUpdateBody } from '@/lib/langfuse-prompts';
+import { promptBelongsToOrg } from '@/lib/langfuse-ownership';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,11 @@ export async function PATCH(
   const shaped = buildLabelUpdateBody(body?.newLabels);
   if (!shaped.ok) return NextResponse.json({ error: shaped.error }, { status: 400 });
   const decoded = decodeURIComponent(name);
+  // Promoting a label is a WRITE to a prompt's deployment state. Unguarded, a writer in one tenant could
+  // move another tenant's `production` label — quietly changing which prompt that tenant's AI runs on.
+  if (!(await promptBelongsToOrg(decoded, await currentOrgId()))) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
   try {
     const updated = await port.setVersionLabels(decoded, versionNum, shaped.value.newLabels);
     auditFromSession(gate, await currentOrgId(), {

@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { safeLangfuseRegistry } from '@/lib/langfuse';
 import { resolveRegistryTab } from '@/lib/langfuse-registry';
+import { ownedRunIdsForOrg } from '@/lib/langfuse-session-scope';
 import { requireModuleForUser } from '@/lib/module-access';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +18,12 @@ export default async function PromptRegistryPage({
   await requireModuleForUser('observability');
   const params = await searchParams;
   const rawTab = Array.isArray(params.lfReg) ? params.lfReg[0] : params.lfReg;
+  // This page displayed another tenant's system prompt to the insurer's read-only demo account. The org
+  // now comes from the request's own tenant binding and scopes every list on it.
+  const orgId = await currentOrgId();
+  const ownedRuns = await ownedRunIdsForOrg(orgId);
   const [registry, tab] = await Promise.all([
-    safeLangfuseRegistry(100),
+    safeLangfuseRegistry(orgId, ownedRuns, 100),
     Promise.resolve(resolveRegistryTab(rawTab)),
   ]);
 

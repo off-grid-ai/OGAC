@@ -157,7 +157,7 @@ test('shapeTraceDetail with a null row still renders from observations (honest p
 // ─── getEntityObservability (orchestration) ────────────────────────────────────
 test('getEntityObservability: unconfigured source → honest empty view', async () => {
   const src = fakeSource({ configured: false, traces: [], scores: [] }, {}, false);
-  const r = await getEntityObservability({ id: 'pl_1', tags: ['pipeline:pl_1'] }, '7d', src, NOW);
+  const r = await getEntityObservability({ id: 'pl_1', orgId: 'org_test', tags: ['pipeline:pl_1'] }, '7d', src, NOW);
   assert.equal(r.configured, false);
   assert.equal(r.range, '7d');
   assert.equal(r.view.traceCount, 0);
@@ -174,7 +174,7 @@ test('getEntityObservability: narrows to entity AND window, then rolls up', asyn
     scores: [score({ id: 's1', traceId: 'runA', value: 0.9 })],
   };
   const src = fakeSource(data);
-  const r = await getEntityObservability({ id: 'pl_1', tags: ['pipeline:pl_1'] }, '7d', src, NOW);
+  const r = await getEntityObservability({ id: 'pl_1', orgId: 'org_test', tags: ['pipeline:pl_1'] }, '7d', src, NOW);
   assert.equal(r.configured, true);
   // runOld is out of the 7d window; other belongs to a different entity → only runA remains
   assert.equal(r.view.traceCount, 1);
@@ -185,7 +185,7 @@ test('getEntityObservability: narrows to entity AND window, then rolls up', asyn
 
 test('getEntityObservability: propagates a partial-fetch error string', async () => {
   const src = fakeSource({ configured: true, traces: [], scores: [], error: 'Langfuse 500' });
-  const r = await getEntityObservability({ id: 'pl_1', tags: ['pipeline:pl_1'] }, undefined, src, NOW);
+  const r = await getEntityObservability({ id: 'pl_1', orgId: 'org_test', tags: ['pipeline:pl_1'] }, undefined, src, NOW);
   assert.equal(r.error, 'Langfuse 500');
   assert.equal(r.range, '7d'); // default range
 });
@@ -193,7 +193,7 @@ test('getEntityObservability: propagates a partial-fetch error string', async ()
 // ─── getEntityTraceDetail (orchestration) ──────────────────────────────────────
 test('getEntityTraceDetail: unconfigured → not configured, no detail', async () => {
   const src = fakeSource({ configured: false, traces: [], scores: [] }, {}, false);
-  const r = await getEntityTraceDetail({ id: 'pl_1', tags: ['pipeline:pl_1'] }, 'runA', '7d', src, NOW);
+  const r = await getEntityTraceDetail({ id: 'pl_1', orgId: 'org_test', tags: ['pipeline:pl_1'] }, 'runA', '7d', src, NOW);
   assert.equal(r.configured, false);
   assert.equal(r.belongs, false);
   assert.equal(r.detail, null);
@@ -206,7 +206,7 @@ test('getEntityTraceDetail: refuses a trace that does not belong to the entity',
     scores: [],
   };
   const src = fakeSource(data);
-  const r = await getEntityTraceDetail({ id: 'pl_1', tags: ['pipeline:pl_1'] }, 'foreign', '7d', src, NOW);
+  const r = await getEntityTraceDetail({ id: 'pl_1', orgId: 'org_test', tags: ['pipeline:pl_1'] }, 'foreign', '7d', src, NOW);
   assert.equal(r.belongs, false);
   assert.equal(r.detail, null);
 });
@@ -223,7 +223,7 @@ test('getEntityTraceDetail: shapes the detail for a trace that belongs', async (
     ],
   };
   const src = fakeSource(data, observations);
-  const r = await getEntityTraceDetail({ id: 'pl_1', tags: ['pipeline:pl_1'] }, 'runA', '7d', src, NOW);
+  const r = await getEntityTraceDetail({ id: 'pl_1', orgId: 'org_test', tags: ['pipeline:pl_1'] }, 'runA', '7d', src, NOW);
   assert.equal(r.belongs, true);
   assert.equal(r.detail?.id, 'runA');
   assert.equal(r.detail?.latency, 300);
@@ -235,7 +235,7 @@ test('getEntityTraceDetail: shapes the detail for a trace that belongs', async (
 test('getEntityTraceDetail: trace-id-set membership renders even without list metadata', async () => {
   const data: EntityWindowData = { configured: true, traces: [], scores: [] };
   const src = fakeSource(data, { runX: [obs({ id: 'z', traceId: 'runX', type: 'GENERATION' })] });
-  const r = await getEntityTraceDetail({ id: 'ag_1', traceIds: ['runX'] }, 'runX', '7d', src, NOW);
+  const r = await getEntityTraceDetail({ id: 'ag_1', orgId: 'org_test', traceIds: ['runX'] }, 'runX', '7d', src, NOW);
   assert.equal(r.belongs, true);
   assert.equal(r.detail?.name, 'runX'); // no row metadata → falls back to id
   assert.equal(r.detail?.generationCount, 1);

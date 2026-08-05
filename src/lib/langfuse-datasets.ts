@@ -1,4 +1,8 @@
-// PURE dataset-management logic for the Langfuse-native datasets surface — ZERO imports, ZERO I/O.
+// PURE dataset-management logic for the Langfuse-native datasets surface — ZERO I/O.
+//
+// It imports exactly one thing: the pure ownership rule in langfuse-tenancy.ts (itself zero-import).
+// Re-deriving "which org owns this dataset" here would duplicate a security rule in two places, and a
+// duplicated security rule is one that eventually disagrees with itself.
 //
 // The brain behind the Langfuse datasets adapter: validates dataset/item input, shapes request bodies
 // for the public API (`POST /api/public/v2/datasets`, `POST /api/public/dataset-items`), and
@@ -9,6 +13,8 @@
 // + metadata, ACTIVE or ARCHIVED). Items are UPSERTED by id (so "edit" = re-POST with the same id).
 // A dataset RUN is one experiment execution over the items (created by the SDK during evals); the
 // console reads runs back but doesn't launch them here.
+
+import { datasetOrg } from '@/lib/langfuse-tenancy';
 
 // ── Types (public contract) ────────────────────────────────────────────────────────────────────
 export type DatasetItemStatus = 'ACTIVE' | 'ARCHIVED';
@@ -60,6 +66,14 @@ export interface DatasetRow {
   description: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The org that owns this dataset, from its `metadata.org`; null when unmarked.
+   *
+   * The raw record always carried this and the shaper DROPPED it, so no caller could tell whose dataset
+   * it was — which is how the dataset list and detail ended up served to every tenant identically. A
+   * shape that discards the owner makes the boundary unrepresentable.
+   */
+  org: string | null;
 }
 
 export interface DatasetItemView {
@@ -248,6 +262,7 @@ export function shapeDatasets(rows: RawDataset[]): DatasetRow[] {
       description: (r.description ?? '').trim(),
       createdAt: (r.createdAt ?? '').trim(),
       updatedAt: (r.updatedAt ?? '').trim(),
+      org: datasetOrg(r),
     }))
     .sort((a, b) => {
       if (a.createdAt < b.createdAt) return 1;
@@ -265,6 +280,7 @@ export function shapeDataset(row: RawDataset | null | undefined): DatasetRow | n
     description: (row.description ?? '').trim(),
     createdAt: (row.createdAt ?? '').trim(),
     updatedAt: (row.updatedAt ?? '').trim(),
+    org: datasetOrg(row),
   };
 }
 

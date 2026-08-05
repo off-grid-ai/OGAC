@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/authz';
 import { langfuseDatasets as port } from '@/lib/adapters/langfuse-datasets';
 import { buildCreateItemBody, type CreateItemInput } from '@/lib/langfuse-datasets';
 import { LangfuseHttpError } from '@/lib/langfuse-http';
+import { datasetBelongsToOrg } from '@/lib/langfuse-ownership';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ name: s
   const body = (await req.json().catch(() => null)) as Omit<CreateItemInput, 'datasetName'> | null;
   if (!body) return NextResponse.json({ error: 'body required' }, { status: 400 });
   const decoded = decodeURIComponent(name);
+  // Adding an item to a dataset is a write to that dataset; unguarded, one tenant could inject golden
+  // cases into another tenant's evaluation set and silently change what its AI is measured against.
+  if (!(await datasetBelongsToOrg(decoded, await currentOrgId()))) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
   const shaped = buildCreateItemBody({ ...body, datasetName: decoded });
   if (!shaped.ok) return NextResponse.json({ error: shaped.error }, { status: 400 });
   try {

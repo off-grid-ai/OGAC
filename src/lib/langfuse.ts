@@ -16,8 +16,22 @@
 // has the keypair provisioned it's preferred; until then the broker returns `kind:'none'` and we fall
 // back to the current env keys UNCHANGED — byte-identical to today.
 import { langfuseAuthHeader, langfuseEnvAuthConfigured } from '@/lib/langfuse-auth';
+import {
+  filterDatasetsForOrg,
+  filterPromptsForOrg,
+  filterSessionsForOrg,
+  filterTracesForOrg,
+  orgTag,
+} from '@/lib/langfuse-tenancy';
 
 const BASE = process.env.OFFGRID_LANGFUSE_URL;
+
+// The store holds every tenant's records and only the prompt endpoint can filter by our owner marker
+// server-side, so traces/datasets/sessions must over-read and narrow locally. Without this multiplier a
+// request for 30 rows returns 30 rows ACROSS ALL TENANTS and one tenant's page renders near-empty — the
+// scoping fix would have read as "no data" rather than as correct. The upstream cap is 100, which every
+// call site clamps to.
+const TENANT_OVERREAD = 4;
 
 
 
@@ -62,6 +76,13 @@ export interface LangfuseTrace {
   latency?: number | null;
   totalCost?: number | null;
   observations?: number;
+  /**
+   * Free-form emitter metadata. Load-bearing for TENANCY: our own emitter stamps
+   * `metadata.attributes.org`, which is the only reliable owner marker a trace carries — `tags` is `[]`
+   * and `userId` is null on the real records. It was missing from this interface while the read path had
+   * no tenant filter at all, so nothing could even express the boundary. See langfuse-tenancy.ts.
+   */
+  metadata?: unknown;
 }
 
 export interface LangfuseObservation {
@@ -80,12 +101,17 @@ interface Paged<T> {
   data: T[];
 }
 
-// GET /api/public/traces — recent traces, newest first.
-export async function listTraces(limit = 30): Promise<LangfuseTrace[]> {
+// GET /api/public/traces — recent traces, newest first, NARROWED TO ONE TENANT.
+//
+// `orgId` is REQUIRED and comes first, deliberately. It used to take only a `limit`, so every caller
+// received every tenant's traces; making the boundary a required leading parameter means the typechecker
+// refuses a call that forgets it. The upstream API has no org filter, so the narrowing is applied here
+// after the fetch — which means the fetch must OVER-READ to still fill a page for one tenant.
+export async function listTraces(orgId: string, limit = 30): Promise<LangfuseTrace[]> {
   const json = await lfGet<Paged<LangfuseTrace>>(
-    `/api/public/traces?limit=${Math.min(limit, 100)}&orderBy=timestamp.desc`,
+    `/api/public/traces?limit=${Math.min(Math.max(limit, 1) * TENANT_OVERREAD, 100)}&orderBy=timestamp.desc`,
   );
-  return json.data ?? [];
+  return filterTracesForOrg(json.data ?? [], orgId).slice(0, limit);
 }
 
 // GET /api/public/observations?traceId=... — the spans of one trace (for the waterfall).
@@ -102,11 +128,11 @@ export interface TraceListResult {
   error?: string;
 }
 
-// Best-effort wrapper for the page — never throws.
-export async function safeListTraces(limit = 30): Promise<TraceListResult> {
+// Best-effort wrapper for the page — never throws. `orgId` required, for the reason on listTraces.
+export async function safeListTraces(orgId: string, limit = 30): Promise<TraceListResult> {
   if (!langfuseReadConfigured()) return { configured: false, traces: [] };
   try {
-    return { configured: true, traces: await listTraces(limit) };
+    return { configured: true, traces: await listTraces(orgId, limit) };
   } catch (e) {
     return { configured: true, traces: [], error: (e as Error).message };
   }
@@ -451,26 +477,38 @@ export function shapeSessions(rows: LangfuseSession[]): SessionRow[] {
     });
 }
 
-// Thin fetchers.
-export async function fetchPrompts(limit = 50): Promise<LangfusePromptMeta[]> {
+// Thin fetchers. Each takes a REQUIRED orgId and returns only that tenant's records — the store holds
+// every tenant's, and these are the paths that served all of them to all of them.
+//
+// The prompt list is narrowed BY THE SERVER (`?tag=`), because the upstream API filters on tags natively
+// and pushing the boundary down is strictly better: the other tenants' rows never cross the wire. The
+// pure filter is applied again afterwards anyway — belt and braces, since a server-side filter is a
+// remote promise and this one is the guarantee.
+export async function fetchPrompts(orgId: string, limit = 50): Promise<LangfusePromptMeta[]> {
   const json = await lfGet<Paged<LangfusePromptMeta>>(
-    `/api/public/v2/prompts?limit=${Math.min(limit, 100)}`,
+    `/api/public/v2/prompts?limit=${Math.min(limit, 100)}&tag=${encodeURIComponent(orgTag(orgId))}`,
   );
-  return json.data ?? [];
+  return filterPromptsForOrg(json.data ?? [], orgId);
 }
 
-export async function fetchDatasets(limit = 50): Promise<LangfuseDataset[]> {
+// Datasets and sessions have no server-side filter for their marker, so they over-read and narrow here.
+export async function fetchDatasets(orgId: string, limit = 50): Promise<LangfuseDataset[]> {
   const json = await lfGet<Paged<LangfuseDataset>>(
-    `/api/public/datasets?limit=${Math.min(limit, 100)}`,
+    `/api/public/datasets?limit=${Math.min(Math.max(limit, 1) * TENANT_OVERREAD, 100)}`,
   );
-  return json.data ?? [];
+  return filterDatasetsForOrg(json.data ?? [], orgId).slice(0, limit);
 }
 
-export async function fetchSessions(limit = 50): Promise<LangfuseSession[]> {
+// Sessions carry no marker at all — the caller resolves which run ids the org owns (our own DB knows)
+// and passes them in. See filterSessionsForOrg.
+export async function fetchSessions(
+  ownedRunIds: ReadonlySet<string>,
+  limit = 50,
+): Promise<LangfuseSession[]> {
   const json = await lfGet<Paged<LangfuseSession>>(
-    `/api/public/sessions?limit=${Math.min(limit, 100)}`,
+    `/api/public/sessions?limit=${Math.min(Math.max(limit, 1) * TENANT_OVERREAD, 100)}`,
   );
-  return json.data ?? [];
+  return filterSessionsForOrg(json.data ?? [], ownedRunIds).slice(0, limit);
 }
 
 // Best-effort combined read-back for the page — never throws. Real empties when unconfigured/unreachable.
@@ -484,13 +522,20 @@ export interface LangfuseRegistry {
   error?: string;
 }
 
-export async function safeLangfuseRegistry(limit = 50): Promise<LangfuseRegistry> {
+// `orgId` scopes prompts and datasets; `ownedRunIds` scopes sessions (they carry no marker of their own).
+// Both are required — this function fanned out to three unscoped reads and was the single widest source
+// of the leak, feeding both the registry page and the AI overview.
+export async function safeLangfuseRegistry(
+  orgId: string,
+  ownedRunIds: ReadonlySet<string>,
+  limit = 50,
+): Promise<LangfuseRegistry> {
   if (!langfuseReadConfigured())
     return { configured: false, prompts: [], datasets: [], sessions: [] };
   const [p, d, s] = await Promise.allSettled([
-    fetchPrompts(limit),
-    fetchDatasets(limit),
-    fetchSessions(limit),
+    fetchPrompts(orgId, limit),
+    fetchDatasets(orgId, limit),
+    fetchSessions(ownedRunIds, limit),
   ]);
   const errors: string[] = [];
   for (const r of [p, d, s]) if (r.status === 'rejected') errors.push((r.reason as Error).message);
