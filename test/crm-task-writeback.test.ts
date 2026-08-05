@@ -6,6 +6,16 @@ import { test } from 'node:test';
 import { writeCrmTask, CRM_TASK_API_VERSION } from '@/lib/adapters/crm-task-writeback';
 import { getSigning } from '@/lib/adapters/registry';
 import { buildCrmTaskSourceRequest, validateCrmTaskCommand } from '@/lib/crm-task-writeback';
+// @ts-expect-error shared JS reachability helper
+import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+
+// writeCrmTask's connector is passed in literally below (no store lookup), but
+// execRestConnectorRequest -> resolveConnectorTarget still resolves a per-connector secret via
+// connector-secrets.ts -> drizzle -> Postgres for every call, even connectors with no stored
+// secret (a missing row is a clean null; an UNREACHABLE db throws and surfaces as "connector is
+// not a reachable REST source" — see crm-writeback.test.ts for the full trace). CI's gate job
+// starts no Postgres, so both real-HTTP tests below always failed there for this hidden reason.
+const dbUp = await dbReachable();
 
 const CREATE_COMMAND = {
   operation: 'create-task',
@@ -74,7 +84,10 @@ function json(res: ServerResponse, status: number, body: unknown, replayed = fal
   res.end(JSON.stringify(body));
 }
 
-test('CRM task adapter creates, updates, replays, scopes, and signs through real HTTP', async (t) => {
+test(
+  'CRM task adapter creates, updates, replays, scopes, and signs through real HTTP',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   const tasks = new Map<string, Record<string, unknown>>();
   const ledger = new Map<string, { hash: string; task: Record<string, unknown> }>();
   const seenOrgs: string[] = [];
@@ -138,9 +151,13 @@ test('CRM task adapter creates, updates, replays, scopes, and signs through real
   const conflict = await writeCrmTask(connector, { ...CREATE_COMMAND, subject: 'Different action' }, 'org_bharat', clock);
   assert.equal(conflict.ok, false);
   if (!conflict.ok) assert.equal(conflict.code, 'idempotency-conflict');
-});
+  },
+);
 
-test('CRM task adapter fails closed on an unversioned upstream response', async (t) => {
+test(
+  'CRM task adapter fails closed on an unversioned upstream response',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   const server = createServer(async (req, res) => {
     await readJson(req);
     res.writeHead(201, { 'content-type': 'application/json' });
@@ -156,4 +173,5 @@ test('CRM task adapter fails closed on an unversioned upstream response', async 
     'org_bharat',
   );
   assert.deepEqual(result, { ok: false, code: 'upstream-error', message: 'CRM task API returned an unsupported contract' });
-});
+  },
+);
