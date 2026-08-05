@@ -254,3 +254,28 @@ based on the shared harness's screenshot has only seen the top ~1000px of it** �
 on pages taller than one viewport before trusting a clean bill of health. Recommend fixing
 `audit-shoot.mjs` to size `[data-og-shell="page"]` to its `scrollHeight` before capturing, or
 screenshot that element directly instead of the page.
+
+---
+
+## Correction (main session, verified live)
+
+**`/work/artifacts` is NOT a cross-tenant leak.** The Operations+Work report listed it as one on the
+strength of pixel-identical screenshots on both tenants. Reproduced and traced to the source:
+
+- `GET /api/v1/chat/artifacts` passes `currentOrgId()`, and `listArtifacts(userId, orgId)` filters on
+  **both** `chat_artifacts.user_id` AND `chat_artifacts.org_id`. The read path is correct.
+- The rows were identical because the SEED wrote every artifact for every user into every org —
+  including cross-tenant combinations (`arjun.menon@surakshalife.example` owned rows under
+  `org_bharat`). 40 such rows existed and are deleted.
+- Separately, 5 of the 7 artifacts the insurer's demo account showed were lending/collections content
+  (90-DPD buckets, dunning notices, exposure by bucket) on a **life insurer**. Replaced with life
+  equivalents (lapse risk, persistency, premium reminder, IRDAI grievance timelines, sum assured by
+  product), created through the product's own `saveArtifact` path.
+
+`/work/prompts` was also cleared: the two tenants return different counts (95 vs 103), and the shared
+titles are genuinely org-visible seeded prompts, not another tenant's.
+
+**Lesson for the "identical data on both tenants" heuristic.** It found two real leaks today, so it
+earns its place — but it is a *suspicion*, not a finding. Identical rows can equally mean duplicated
+seed data or two empty lists. Confirm against the read path and the database before calling it a leak;
+reporting one that isn't costs as much credibility as missing one that is.
