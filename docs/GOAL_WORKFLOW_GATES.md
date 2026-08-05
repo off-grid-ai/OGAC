@@ -255,6 +255,22 @@ database changed. A restore must be unconditional and must restore the FAR side.
 Only the MySQL row moved. Postgres, MSSQL and REST share the mechanism but were not drilled, so they
 stay `partial` rather than borrowing the evidence.
 
+**2026-08-05 — cluster 5, the retention half: metric and log store windows now STATED.**
+Most of cluster 5's rows say in their own gap text to keep privileged administration deployment-owned —
+backup, restore, cluster topology, snapshots. That is a boundary, not a backlog. The part that WAS
+missing is that the console could not say how long these stores keep data, which is the compliance claim
+the roadmap says cannot stay open.
+
+`/governance/evidence/retention` now reports it per store beside the database sweep, and keeps three
+answers apart that a dashboard would flatten into one number: **confirmed** by the store, **assumed**
+from a built-in default nobody chose, and **unknown**. A failed read is none of them and certainly not
+"no limit". One unconfirmed store blocks the deployment-wide claim, because a retention statement is
+about all the data.
+
+**The reading is the finding:** metrics report `-retentionPeriod="3"` → 3 months, confirmed. The LOG
+store — the one holding the audit trail — sets **no retention flag at all**, so it runs on the built-in
+7-day default. Reported as ASSUMED, saying nobody chose it. Screenshot verified.
+
 ### Next up — the rest of clusters 3–6
 
 - `enterprise-source-minio/versioning-retention-events` — versioning and bucket events genuinely do
