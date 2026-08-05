@@ -6,6 +6,16 @@ export const KAFKA_SOURCE_MAX_OFFSET_SPAN = 500;
 export const KAFKA_SOURCE_MAX_PARTITION_WINDOWS = 32;
 export const KAFKA_SOURCE_TIMEOUT_MS = 10_000;
 
+/**
+ * The ONLY read parameters a caller may name on a Kafka source read: the bounded offset window and a
+ * correlation id. Everything else (broker, topic, schema, credentials, actor identity) is resolved
+ * server-side from the canonical stores and can never be supplied by a step or an HTTP body.
+ *
+ * Exported because the App runtime has to know which of a connector-query step's params are BOUNDED-READ
+ * declarations rather than case filters (see connector-filter.sourceReadParams) — one list, two readers.
+ */
+export const KAFKA_SOURCE_READ_PARAM_KEYS = ['partitionWindows', 'correlationId'] as const;
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_KAFKA_NAME = /^[A-Za-z0-9._-]{1,249}$/;
 const SAFE_FIELD = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
@@ -235,7 +245,7 @@ export function parseKafkaSourceReadRequest(value: unknown): KafkaSourceReadRequ
   if (!plainObject(params)) {
     throw new KafkaSourceContractError('invalid-request', 'params must be an object');
   }
-  exactKeys(params, ['partitionWindows', 'correlationId'], 'params');
+  exactKeys(params, [...KAFKA_SOURCE_READ_PARAM_KEYS], 'params');
   const correlationId =
     params.correlationId === undefined
       ? undefined

@@ -68,7 +68,12 @@ import {
   connectorFailureMessage,
   connectorReadSentence,
 } from '@/lib/connector-failure';
-import { caseRecordFrom, resolveStepParams, unresolvedFilterMessage } from '@/lib/connector-filter';
+import {
+  caseRecordFrom,
+  resolveStepParams,
+  sourceReadParams,
+  unresolvedFilterMessage,
+} from '@/lib/connector-filter';
 import { type CaseScope, columnsOfRow, couldScope, inferCaseScope, scopeDetail } from '@/lib/case-scope';
 import { effectivePiiMasking, maskOrBlock } from '@/lib/pii-escalation';
 import { auditEnforcement } from '@/lib/pipeline-contract';
@@ -958,9 +963,12 @@ async function executeConnectorStep(
     // which will report the failure or the emptiness on its own terms.
     inferred = inferCaseScope(columnsOfRow(probe.result?.rows?.[0]), caseRecord);
   }
+  // A streaming source's bounded-read WINDOW travels with the read, alongside the case filters: it is
+  // a governed read declaration, not an equality filter, and resolveStepParams drops it (see
+  // connector-filter.sourceReadParams for the read that silently widened to the tail of the topic).
   const { result, detail, failure } = await deps.queryDomain(resolved, connector, {
     op: step.op ?? 'read',
-    params: { ...params.filters, ...inferred.filters },
+    params: { ...params.filters, ...inferred.filters, ...sourceReadParams(step.params) },
     orgId: ctx.orgId,
     actorId: trustedActor,
   });

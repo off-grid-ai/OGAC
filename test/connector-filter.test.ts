@@ -6,8 +6,10 @@ import {
   filterRows,
   resolveStepParams,
   runInputWithCase,
+  sourceReadParams,
   unresolvedFilterMessage,
 } from '../src/lib/connector-filter.ts';
+import { KAFKA_SOURCE_READ_PARAM_KEYS } from '../src/lib/kafka-enterprise-source.ts';
 
 // ── Scoping a data read to ONE case ────────────────────────────────────────────────────────────────
 //
@@ -235,5 +237,63 @@ describe('run-input boundary — a picked record must survive into a bindable fi
       const r = resolveStepParams({ [k]: `{{case.${k}}}` }, runInput);
       assert.deepEqual(r.filters, { [k]: v }, `${k} must survive the boundary`);
     }
+  });
+});
+
+// ── A BOUNDED-READ declaration is not a case filter ────────────────────────────────────────────────
+//
+// A Kafka step declares the offset window it is governed to read. resolveStepParams classified that
+// array as REJECTED and dropped it, so the source derived its own window from the tail of the topic
+// and the app read records nobody asked for. Found the moment the connector-query integration suite
+// ran against a real Postgres in CI instead of skipping: the requested `fromOffset:'42'` reached the
+// broker seam as `'40'`.
+describe('sourceReadParams', () => {
+  const WINDOW = [{ partition: 0, fromOffset: '42', toOffset: '42' }];
+
+  test('carries the offset window resolveStepParams throws away', () => {
+    const params = { partitionWindows: WINDOW };
+    assert.deepEqual(resolveStepParams(params, {}).filters, {}, 'a filter it is not');
+    assert.deepEqual(sourceReadParams(params), { partitionWindows: WINDOW });
+  });
+
+  test('carries a declared correlation id', () => {
+    assert.deepEqual(sourceReadParams({ correlationId: 'case-4711-read' }), {
+      correlationId: 'case-4711-read',
+    });
+  });
+
+  test('a forged actor identity or broker override is NOT forwarded', () => {
+    assert.deepEqual(
+      sourceReadParams({
+        partitionWindows: WINDOW,
+        actorId: 'caller-forged',
+        brokers: 'attacker:9092',
+        orgId: 'other-tenant',
+      }),
+      { partitionWindows: WINDOW },
+      "only the source contract's own read parameters cross the boundary",
+    );
+  });
+
+  test('case filters and the read window coexist on one step', () => {
+    const params = { employee_id: '{{case.employee_id}}', partitionWindows: WINDOW };
+    const runInput = runInputWithCase({ input: {}, case: { employee_id: 2 } });
+    assert.deepEqual(resolveStepParams(params, runInput).filters, { employee_id: 2 });
+    assert.deepEqual(sourceReadParams(params), { partitionWindows: WINDOW });
+  });
+
+  test('no params, or none of them source-read, yields an empty object', () => {
+    assert.deepEqual(sourceReadParams(undefined), {});
+    assert.deepEqual(sourceReadParams({}), {});
+    assert.deepEqual(sourceReadParams({ employee_id: 2 }), {});
+  });
+
+  test('an explicit undefined is absent, not a forwarded undefined', () => {
+    assert.deepEqual(sourceReadParams({ partitionWindows: undefined }), {});
+  });
+
+  test('the whitelist IS the source contract key list — one definition, no drift', () => {
+    const everyKey = Object.fromEntries(KAFKA_SOURCE_READ_PARAM_KEYS.map((k) => [k, `v:${k}`]));
+    assert.deepEqual(sourceReadParams(everyKey), everyKey);
   });
 });

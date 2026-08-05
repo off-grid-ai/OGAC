@@ -1,3 +1,5 @@
+import { KAFKA_SOURCE_READ_PARAM_KEYS } from '@/lib/kafka-enterprise-source';
+
 // ─── Scope a read to the case being worked on — pure ─────────────────────────────────────────────────
 //
 // A per-case app read its whole table: "Read the invoice" returned twenty unrelated invoices and "Check the
@@ -216,6 +218,35 @@ export function filterRows(
       return String(actual) === String(value);
     }),
   );
+}
+
+// ─── sourceReadParams — a BOUNDED-READ declaration is not a case filter ──────────────────────────
+// A streaming source read is bounded by an explicit offset window, e.g.
+//   { kind: 'connector-query', domain: 'risk signals', params: { partitionWindows: [{ partition: 0,
+//     fromOffset: '42', toOffset: '42' }] } }
+// That is not an equality filter on a column — it is the window the step author governed the read to.
+// resolveStepParams only understands scalar filters, so it classified `partitionWindows` (an array)
+// as REJECTED and dropped it; the Kafka source then fell back to deriving a window from the tail of
+// the topic and the app read records its author never asked for. Live finding (2026-08-04): this
+// surfaced the moment CI ran the connector-query integration suite against a real Postgres instead of
+// skipping it — the requested window `fromOffset:'42'` arrived at the broker seam as `'40'`.
+//
+// The whitelist is the source contract's OWN key list, so the two cannot drift.
+const SOURCE_READ_PARAM_KEYS: readonly string[] = KAFKA_SOURCE_READ_PARAM_KEYS;
+
+/**
+ * Split out the step params that are bounded-read declarations for the SOURCE rather than case
+ * filters. Returns only keys the source contract accepts, so an unknown or forged param (an actor
+ * identity, a broker override) is never forwarded — the source still validates what it receives.
+ */
+export function sourceReadParams(
+  params: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const picked: Record<string, unknown> = {};
+  for (const key of SOURCE_READ_PARAM_KEYS) {
+    if (params && params[key] !== undefined) picked[key] = params[key];
+  }
+  return picked;
 }
 
 /** The sentence a step shows when the case cannot satisfy a filter the app declared. */

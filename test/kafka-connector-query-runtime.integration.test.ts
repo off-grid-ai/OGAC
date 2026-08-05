@@ -225,7 +225,7 @@ test(
       { orgId: ORG, actor: 'signed-in-operator', runId: 'run_kafka_runtime' },
       dependencies,
     );
-    assert.equal(result.status, 'done');
+    assert.equal(result.status, 'done', result.detail ?? '(no detail)');
     // Provenance lives on the step's refs + the audit ledger; the reader-facing detail must not name
     // the engine (an OSS product name on a customer's screen — the hero script's governing rule).
     assert.doesNotMatch(result.detail ?? '', /via kafka/, 'the engine name must not be on screen');
