@@ -475,11 +475,11 @@ const OBSERVABILITY_AUDITS: readonly ServiceCapabilityAudit[] = [
         'yes', 'SIEM exposes searches, filters, details, and aggregate views.',
         'yes', 'Security-event investigation uses the deployed OpenSearch boundary.',
       ]),
-      capability('index-lifecycle', 'Indexes, mappings, aliases, and retention', 'Manage mappings, templates, aliases, rollover, and retention policy.', '/insights/siem', 'Inspect SIEM storage', 'Application indexes are provisioned, but there is no guarded template, alias, or ISM policy lifecycle. Add read-back and versioned policy changes.', [
-        'yes', 'OpenSearch 2.18 includes mappings, templates, aliases, and Index State Management.',
-        'partial', 'Adapters create/use expected indexes but do not expose complete lifecycle management.',
-        'partial', 'SIEM shows data and health, not index-policy CRUD.',
-        'partial', 'Operational data uses indexes; console-managed rollover and retention are not verified.',
+      capability('index-lifecycle', 'Indexes, mappings, aliases, and retention', 'Manage mappings, templates, aliases, rollover, and retention policy.', '/insights/siem', 'Inspect SIEM storage', 'AUTHORING a lifecycle policy is still absent, and it matters more than it did: reading them found ZERO policies on the deployed index, so the audit log accumulates forever (G-212). Reading and reporting is closed; guarded template/alias/policy CRUD is not, and applying the first policy by hand on the deployment is the faster path.', [
+        'yes', 'OpenSearch exposes index templates, aliases and ISM policies.',
+        'partial', 'Lifecycle policies are now READ through the console\'s own bearer credential (no operator login — see IDENTITY_ONE_DOOR.md); template, alias and policy WRITES are not integrated.',
+        'yes', 'The retention evidence page reports what bounds the search index, and says nothing does when nothing does.',
+        'partial', 'PROVEN LIVE 2026-08-05, and the reading is the finding: /_plugins/_ism/policies returned total_policies 0, so the security-auditlog-* indices are UNBOUNDED — the audit trail is the one store a compliance reader asks about first. Surfaced as unbounded on /governance/evidence/retention, and the deployment-wide retention claim is blocked while it stands. Managing policies from the console is still absent (G-212).',
       ]),
       capability('security-alerting', 'Security analytics and alerting', 'Run detectors, monitors, rules, findings, and notification actions.', '/insights/siem', 'Inspect detections', 'The console implements its own SIEM rules and incidents; OpenSearch detector/monitor lifecycle is not integrated or attributed.', [
         'yes', 'OpenSearch 2.18 includes Alerting and Security Analytics features when corresponding plugins are enabled.',

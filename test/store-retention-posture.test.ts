@@ -106,3 +106,39 @@ test('the reasons are counted separately, because they need different actions', 
   assert.match(s.sentence, /1 could not be read/);
   assert.match(s.sentence, /1 relies on a built-in default/);
 });
+
+test('A READ THAT FINDS NOTHING BOUNDING THE STORE IS STRONGER THAN A MISSING SETTING', () => {
+  // A search index with zero lifecycle policies is not "we could not find the setting" — it is "we
+  // looked, and nothing expires". Worse, and more certain. Measured live 2026-08-05: the audit log
+  // index reported total_policies: 0, so security-auditlog-* accumulates forever.
+  const p = readPosture({
+    storeId: 'opensearch',
+    holds: 'audit and security logs',
+    flagValue: null,
+    explicitUnbounded: true,
+  });
+  assert.equal(p.confidence, 'unbounded');
+  assert.match(p.sentence, /Nothing removes audit and security logs on a schedule/);
+  assert.match(p.sentence, /confirmed by reading the store, not inferred from a missing setting/);
+});
+
+test('explicitly unbounded beats every other signal, including a stale flag', () => {
+  // If the store says nothing expires, a flag value lying around must not override that.
+  const p = readPosture({
+    storeId: 'x',
+    holds: 'logs',
+    flagValue: '30d',
+    documentedDefault: '7d',
+    explicitUnbounded: true,
+  });
+  assert.equal(p.confidence, 'unbounded');
+});
+
+test('an unbounded audit store blocks the claim and is counted as keeping data forever', () => {
+  const s = summarisePosture([
+    readPosture({ storeId: 'a', holds: 'metrics', flagValue: '3' }),
+    readPosture({ storeId: 'b', holds: 'audit logs', flagValue: null, explicitUnbounded: true }),
+  ]);
+  assert.equal(s.claimable, false);
+  assert.match(s.sentence, /1 keeps data forever/);
+});

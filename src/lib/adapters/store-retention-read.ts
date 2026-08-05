@@ -83,11 +83,45 @@ async function probeOne(p: StoreProbe, timeoutMs: number): Promise<StoreReading>
   }
 }
 
+/**
+ * The search index is a different shape: retention there is an index-lifecycle POLICY, not a flag. Zero
+ * policies is not a missing setting — it is a read that succeeded and found that nothing expires. On an
+ * index holding audit logs that is the "unbounded audit store" the roadmap calls a promise we cannot
+ * keep, so it is worth reading rather than assuming.
+ */
+async function probeSearchIndex(timeoutMs: number): Promise<StoreReading> {
+  const base = { storeId: 'opensearch', holds: 'audit and security logs' };
+  try {
+    const url = (process.env.OPENSEARCH_URL || 'http://127.0.0.1:9200').replace(/\/$/, '');
+    const { getServiceCredential } = await import('@/lib/service-credentials');
+    const cred = (await getServiceCredential('opensearch')) as { kind: string; token?: string };
+    const headers: Record<string, string> =
+      cred.kind === 'bearer' && cred.token ? { authorization: `Bearer ${cred.token}` } : {};
+    const res = await fetch(`${url}/_plugins/_ism/policies`, {
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+      cache: 'no-store',
+    });
+    if (!res.ok) return { ...base, flagValue: null, readFailed: true };
+    const body = (await res.json()) as { total_policies?: number };
+    const total = Number(body.total_policies ?? 0);
+    if (total === 0) return { ...base, flagValue: null, explicitUnbounded: true };
+    // Policies exist. We do not parse their per-state ages here — saying "N policies are in force"
+    // without reading what they DO would be the overstatement this module exists to avoid.
+    return { ...base, flagValue: null, readFailed: true };
+  } catch {
+    return { ...base, flagValue: null, readFailed: true };
+  }
+}
+
 /** Ask every store, in parallel, and summarise whether the deployment can make its retention claim. */
 export async function readRetentionPosture(
   env: NodeJS.ProcessEnv = process.env,
   timeoutMs = 4_000,
 ): Promise<PostureSummary> {
-  const readings = await Promise.all(probes(env).map((p) => probeOne(p, timeoutMs)));
-  return summarisePosture(readings.map(readPosture));
+  const [flagged, search] = await Promise.all([
+    Promise.all(probes(env).map((p) => probeOne(p, timeoutMs))),
+    probeSearchIndex(timeoutMs),
+  ]);
+  return summarisePosture([...flagged, search].map(readPosture));
 }

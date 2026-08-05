@@ -34,6 +34,12 @@ export interface StoreReading {
   documentedDefault?: string | null;
   /** True when the read itself failed (unreachable, refused, timed out). */
   readFailed?: boolean;
+  /**
+   * Set when the read SUCCEEDED and the answer is that nothing bounds this store — for example a
+   * search index with zero lifecycle policies. Distinct from a missing flag: we did not fail to find
+   * the setting, we found that there is none, and that is a stronger and worse statement.
+   */
+  explicitUnbounded?: boolean;
 }
 
 export interface RetentionPosture {
@@ -93,6 +99,15 @@ export function readPosture(reading: StoreReading): RetentionPosture {
       confidence: 'unknown',
       window: null,
       sentence: `How long ${reading.holds} are kept could not be read from this store. That is UNKNOWN, not confirmed and not unlimited.`,
+    };
+  }
+
+  if (reading.explicitUnbounded) {
+    return {
+      ...base,
+      confidence: 'unbounded',
+      window: null,
+      sentence: `Nothing removes ${reading.holds} on a schedule. They accumulate until someone deletes them or the disk fills — confirmed by reading the store, not inferred from a missing setting.`,
     };
   }
 

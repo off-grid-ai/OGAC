@@ -2346,3 +2346,30 @@ cannot be rotated without an endpoint rewrite.
 
 **Fix:** seed fixtures with a credential-free endpoint and `persistConnectorSecret`, the way
 `con_f5c959` already is. Owner: whoever owns the seed scripts (`scripts/seed-*.mts`).
+
+## G-212 — the audit log index has NO retention policy at all
+
+Found 2026-08-05 while extending the retention posture to the search index. Reading
+`/_plugins/_ism/policies` on the deployed OpenSearch returns:
+
+```json
+{"policies":[],"total_policies":0}
+```
+
+Zero index-lifecycle policies. The `security-auditlog-*` daily indices therefore **accumulate forever**
+— nothing rolls them over and nothing expires them. This is precisely the case the roadmap names: *"an
+unbounded audit store is a promise we cannot keep."*
+
+It is worse than the log-store finding beside it (G-209's neighbour, where VictoriaLogs runs on an
+unrecorded 7-day default). There, something does eventually delete. Here, nothing does — and the data is
+the audit trail, which is the one store a compliance reader will ask about first.
+
+**Surfaced, not hidden:** `/governance/evidence/retention` now reports it as `unbounded` with the
+sentence "Nothing removes audit and security logs on a schedule. They accumulate until someone deletes
+them or the disk fills — confirmed by reading the store, not inferred from a missing setting." The
+deployment-wide summary refuses to make any retention claim while it stands.
+
+**Fix:** an ISM policy on `security-auditlog-*` with a rollover and a delete state at the window the
+sector requires. The console can now READ policies; authoring them is guarded CRUD that does not exist
+yet (`opensearch/index-lifecycle`, still `partial`). Applying one policy by hand on the deployment is
+the faster path and belongs to the fleet repo.
