@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { airbyteEtl } from '@/lib/adapters/airbyte';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireWriter } from '@/lib/authz';
+import { isEtlConnectionVisible } from '@/lib/etl-scope';
 import { currentOrgId } from '@/lib/tenancy';
 import {
   buildScheduleUpdate,
@@ -30,6 +31,14 @@ export async function PATCH(
   }
 
   const org = await currentOrgId();
+  // Same boundary as the detail route — a writer in one org must not reschedule another org's
+  // connection by guessing its id.
+  if (!(await isEtlConnectionVisible(id))) {
+    return NextResponse.json(
+      { error: 'connection not found or Airbyte unreachable' },
+      { status: 404 },
+    );
+  }
   const raw = await airbyteEtl.getConnectionRaw(id);
   if (!raw) {
     return NextResponse.json(

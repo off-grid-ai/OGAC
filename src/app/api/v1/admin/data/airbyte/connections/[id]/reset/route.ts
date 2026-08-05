@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { airbyteEtl } from '@/lib/adapters/airbyte';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireWriter } from '@/lib/authz';
+import { isEtlConnectionVisible } from '@/lib/etl-scope';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,14 @@ export async function POST(
 
   const { id } = await params;
   const org = await currentOrgId();
+  // Same boundary as the detail route — a writer in one org must not reset another org's
+  // connection's replication state by guessing its id.
+  if (!(await isEtlConnectionVisible(id))) {
+    return NextResponse.json(
+      { error: 'reset failed or Airbyte unreachable' },
+      { status: 404 },
+    );
+  }
   const job = await airbyteEtl.resetConnection(id);
   auditFromSession(gate, org, {
     action: 'data.airbyte.reset',

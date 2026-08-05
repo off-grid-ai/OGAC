@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { airbyteEtl } from '@/lib/adapters/airbyte';
 import { formatRows } from '@/lib/dataplane-ui';
+import { currentEtlConnections } from '@/lib/etl-scope';
 import type { EtlJobStatus } from '@/lib/etl-model';
 import { requireModuleForUser } from '@/lib/module-access';
 import { PageFrame } from '@/components/PageFrame';
@@ -52,10 +53,9 @@ export async function PipelinesContent({
 }: Readonly<{ embedded?: boolean; showHeading?: boolean }> = {}) {
   await requireModuleForUser('data');
 
-  const [healthy, connections] = await Promise.all([
-    airbyteEtl.health(),
-    airbyteEtl.listConnections(),
-  ]);
+  // currentEtlConnections() (not the raw airbyteEtl.listConnections()) — same cross-tenant leak as
+  // the Replication page (see src/lib/etl-tenancy.ts); this hub embeds the identical connection list.
+  const [healthy, connections] = await Promise.all([airbyteEtl.health(), currentEtlConnections()]);
 
   // Pull recent jobs per connection (best-effort; each degrades to []).
   const jobsByConn = new Map(

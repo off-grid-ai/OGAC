@@ -3,15 +3,19 @@ import Link from 'next/link';
 import { PipelinesContent } from '@/app/(console)/data/pipelines/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { airbyteEtl } from '@/lib/adapters/airbyte';
+import { currentEtlConnections } from '@/lib/etl-scope';
 
 export const dynamic = 'force-dynamic';
 
 // Replication surface: the live pipeline runner (sync now / job history — PipelinesContent) PLUS a
 // schedule-management list where each connection is a way IN to its detail view (schedule, per-stream
 // sync modes, state reset). List→detail, URL-driven: cards link to /data/flows/replication/[id].
+//
+// currentEtlConnections() (not the raw airbyteEtl.listConnections()) — LIVE LEAK found 2026-08-05:
+// this page rendered a connection named "CoreBank to Off Grid Warehouse" on the INSURER's own
+// screen, byte-identical to the bank's. See src/lib/etl-tenancy.ts for the ownership rule.
 export default async function ReplicationPage() {
-  const connections = await airbyteEtl.listConnections();
+  const connections = await currentEtlConnections();
 
   return (
     <div className="w-full space-y-8">

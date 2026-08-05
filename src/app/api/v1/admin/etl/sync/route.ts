@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server';
 import { airbyteEtl } from '@/lib/adapters/airbyte';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
+import { isEtlConnectionVisible } from '@/lib/etl-scope';
 import { currentOrgId } from '@/lib/tenancy';
 
 // Trigger an ETL sync for an Airbyte connection. POST { connectionId } → the job that was started.
-// Audited like the connectors sync route. 404 when Airbyte is unreachable / rejected the trigger.
+// Audited like the connectors sync route. 404 when Airbyte is unreachable / rejected the trigger, OR
+// the connectionId isn't attributable to the caller's org (isEtlConnectionVisible) — a writer in one
+// org must not trigger a sync on another org's connection by guessing its id.
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
@@ -14,6 +17,12 @@ export async function POST(req: Request) {
   const connectionId = typeof body.connectionId === 'string' ? body.connectionId.trim() : '';
   if (!connectionId) {
     return NextResponse.json({ error: 'connectionId required' }, { status: 400 });
+  }
+  if (!(await isEtlConnectionVisible(connectionId))) {
+    return NextResponse.json(
+      { error: 'sync could not be started (connection unknown or Airbyte unreachable)' },
+      { status: 404 },
+    );
   }
 
   const job = await airbyteEtl.triggerSync(connectionId);
