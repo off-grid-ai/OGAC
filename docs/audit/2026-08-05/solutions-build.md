@@ -31,6 +31,13 @@ finished screens look broken. The section overview shows `Blueprints ready 0 of 
 and the demo tenant has **zero templates**, so *"Start from a template"* (the second button on the front
 door) is a dead end. Budget an hour of seeding, not a sprint of engineering.
 
+**Do this before acting on anything else (D0):** the console on `:3005` is **serving a stale compiled copy
+of at least one module whose source on the same box contains the fix** — proven by diffing the box's own
+`src/lib/review-inbox.ts` (INR fix present) against what the review queue renders (`$1,200,000`, the exact
+pre-fix string its comment quotes). **Production-build + restart the box, then re-walk every screen.** Some
+blockers below will evaporate; the survivors are the real list. It also means any "FIXED" line in
+`docs/APP_AS_PRODUCT.md` is unverified until seen on screen.
+
 **The two assets worth building the talk around:** (1) the compile of the built-in example — five clean
 governed steps in 20s; (2) the **"WHAT HAPPENS WHEN YOU RUN THIS"** panel on the Run screen, which tells a
 reader in plain language exactly what the app will do *before* it runs, including *"You'll be asked to
@@ -51,7 +58,9 @@ because it read the local DB. Query the box (`node -e` + `pg`, read-only) for an
 - [x] **`/solutions` overview** — pixel-confirmed (D12) and its four tiles reconciled against the box DB
 - [x] **`/solutions/apps/[id]/input`** (Start a case / Run) — pixel-confirmed (D14)
 - [x] Box DB: templates per org, blueprints per org, `solution_deployments` (empty everywhere)
-- [ ] **NOT COVERED — pick up here.** `/solutions/templates`, `/solutions/library` + blueprint detail, `/solutions/deployed`, `/solutions/reviews`, and the app's `Reports` / `Quality` / `Access` / `Schedule` / `History` tabs. The **shared dev server on :3005 kept failing** (`report.json` for these shows 90s `networkidle` timeouts, HTTP 408 on `layout.css`, `ERR_EMPTY_RESPONSE`, `ERR_CONNECTION_REFUSED`). Two routes painted anyway and are judged above; `/solutions/templates` and `/solutions/library` produced no usable pixels and `/…/reports` returned an empty response. **Those server errors are harness/contention artifacts — do NOT report them as product defects.** Highest value to re-shoot: **`/solutions/templates`** (D13 says it is empty on the demo tenant; what it *says* when empty is unverified), then `/solutions/library` + a blueprint detail (D12 says all 3 are non-adoptable — the "See what is missing" click).
+- [x] **`/solutions/reviews`** — pixel-confirmed (D0), and the box's `review-inbox.ts` diffed against the repo's
+- [x] **`/solutions/templates`** — pixel-confirmed empty (D13); **`/solutions/deployed`** — pixel-confirmed empty (D12)
+- [ ] **NOT COVERED — pick up here.** `/solutions/library` + blueprint detail (its shot rendered blank at 7KB with HTTP 408 on `layout.css` — a harness artifact, re-shoot), the app's `Reports` / `Quality` / `Access` / `History` tabs, and `/solutions/apps/[id]/review`. **All of it needs re-walking after the D0 restart anyway.** The **shared dev server on :3005 kept failing** (`report.json` for these shows 90s `networkidle` timeouts, HTTP 408 on `layout.css`, `ERR_EMPTY_RESPONSE`, `ERR_CONNECTION_REFUSED`). Two routes painted anyway and are judged above; `/solutions/templates` and `/solutions/library` produced no usable pixels and `/…/reports` returned an empty response. **Those server errors are harness/contention artifacts — do NOT report them as product defects.** Highest value to re-shoot: **`/solutions/templates`** (D13 says it is empty on the demo tenant; what it *says* when empty is unverified), then `/solutions/library` + a blueprint detail (D12 says all 3 are non-adoptable — the "See what is missing" click).
 
 **Reusable harness for whoever resumes:** `scratchpad/probe-compile2.mjs` compiles all three built-in
 examples against the box and prints the step list as the refine screen would label it — that is the fastest
@@ -63,6 +72,56 @@ artifact, **not** a product defect, and must not be reported as one).
 ---
 
 ## DEMO-BLOCKERS
+
+### D0 — **THE RUNNING SERVER IS NOT EXECUTING THE CODE ON DISK.** Every approval amount reads in DOLLARS on the review queue, and the fix for it is already in the file — on the box
+Screen: **`/solutions/reviews`** — the human-approval inbox, the emotional peak of the demo.
+Screenshot: `/tmp/audit/build3/solutions_reviews.png`.
+
+The screen is otherwise the **best-looking surface in the section** — "Your review queue", five approval
+cards, "You can approve" badges, "Review now →". And the money on it, rendered large and in emerald as the
+most prominent element on each card, reads:
+
+> **`$1,200,000`** — *"Approve $1,200,000 — Personal Loan Underwriting Assist for **Arjun Pillai**?"*
+> **`$63,000`** — *"Approve $63,000 — Reimbursement Approval?"*
+
+Dollars, with US thousands grouping, on an Indian BFSI demo with Indian names and Indian products. A
+₹12,00,000 personal loan is plausible; a **$1.2 million** one is not. The CFO/CISO in the room reads that
+number before anything else on the screen.
+
+**Now the important part.** `src/lib/review-inbox.ts:168-179` already fixes this, and its comment quotes
+the defect *verbatim, including the same name*:
+> *"This used to be a hardcoded Intl 'en-US' + 'USD' formatter, so every approval question on an Indian
+> BFSI deployment read **"Approve $1,200,000 — Personal Loan Underwriting for Arjun Pillai?"**. The money
+> module already existed and already had the right default; this call site simply predated it."*
+
+`formatAmount` → `formatMoney` → `DEFAULT_CURRENCY = 'INR'` (`src/lib/money.ts:14`) with lakh/crore
+grouping. **And I diffed the box's own copy — it is byte-identical to the repo's, fix included:**
+```
+ssh offgrid-tunnel 'sed -n 165,182p /Users/admin/offgrid/console/src/lib/review-inbox.ts'
+  → identical to local, formatAmount() → formatMoney(n)
+```
+Every one of the four call sites routes through it (`:232, :244, :407-408, :428`). There is no code path
+in that module that can emit `$`.
+
+**So the console serving `:3005` is running a stale compiled copy of a module whose source on the same
+machine contains the fix.** (Most likely: `next dev` was started at 11:01 and an rsync that preserved
+mtimes never tripped HMR for this module.) I cannot prove the exact mechanism from a read-only session,
+and I am not claiming one.
+
+**Why this is D0 rather than a copy bug — it invalidates the premise of every other check:**
+1. It explains **D3** ("Amounts in USD", `$100,000`) surviving a fix the progress log records as done.
+2. It means **any item in `docs/APP_AS_PRODUCT.md` marked FIXED may still be broken on screen**, and
+   conversely some defects in this report may already be fixed in source and only *look* broken.
+3. **Action, before anything else in this report:** do a real production build + restart on the box, then
+   **re-walk every screen**. Several blockers below may evaporate; the ones that survive are the real list.
+   Do not spend a minute on copy fixes until the box is provably running current code.
+
+Secondary defects visible on this same screen, all still worth fixing after the restart:
+- **"ABOVE YOUR LIMIT 0"** — a zero tile, and "your limit" is never explained.
+- **"AWAITING YOU 5"** and **"YOU CAN APPROVE 5"** are the same number in two adjacent tiles.
+- **"Approve Reimbursement Approval?"** — a doubled word, same template flaw as D1's "could not read Read".
+- Two of five cards carry **no amount at all**, leaving a ragged hole in the Motor Claim card.
+- Timestamps render **US `7/6/2026, 5:58:41 PM`** with seconds, on an Indian demo.
 
 ### D1 — The app he'd open to show a finished product projects a red error banner, an amber banner, and a false "Draft" badge
 Screen: **`/solutions/apps/app_e8b19b50`** (Motor Claim FNOL Triage — the insurance story).
@@ -556,7 +615,10 @@ with no explanation of what it does.
   example case reading *"In one line, what does this app do for the bank?"*. The panel to its **right** is
   excellent; show that one.
 
-### Cheapest wins, ranked — all data or copy, no refactors
+### Cheapest wins, ranked
+0. **Production-build + restart the box, then re-walk every screen (D0).** Nothing else on this list is
+   trustworthy until the running server provably executes the source on disk. This is also the single
+   highest-value action: it may fix the dollar amounts on the review queue and the USD copy for free.
 1. **Re-date the seeded runs forward** so they fall inside the dashboard window (D4). One UPDATE. Turns
    `HANDLED 0 · USUALLY TAKES Not measured · NEEDED A PERSON 50%` into a stat band that agrees with the
    list beside it. Biggest visible improvement per minute of work in this section.
@@ -575,10 +637,23 @@ with no explanation of what it does.
    *"No pipeline (unbound)"* → *"Use my organisation's default"*; purge `USD`/`$100,000` from the FNOL
    app's summary and agent prompt (D3); rename `[autotest] Claim event feed` (R3); relabel the back link
    *Studio* → *Apps* (R6).
-6. **Raise the `/solutions` hub timeouts from 1.5s to ~8s** (D11), one line. Cheap insurance against the
-   section landing page showing `0 of 0` on a system with 11 apps.
+6. **Seed `solution_deployments`** — re-run `scripts/seed-solution-deployment.mts` (D12). The table is empty
+   on all three tenants, which is why the Solutions overview's chain dead-ends in `0` with a warning printed
+   twice. The progress log already claims this was done; it is not true on this box.
+7. **Publish 2–3 of the demo tenant's apps as templates** (D13) via the existing `publish-as-template`
+   route, so `Reusable templates` is not `0` and "Start from a template" is not a dead end. Alternatively
+   demo from `org_bharat`, which has 3 — but that tenant has the `email`-trigger problem (D5), so fix that
+   first if you go that way.
+8. **Delete the junk probe run** whose input is *"In one line, what does this app do for the bank?"* (D14).
+   One DELETE. It currently supplies the example case on the Run screen AND the top row of "Recently
+   handled" on the Work screen.
+9. **Raise the `/solutions` timeouts from 1.5s to ~8s** (D11), one line. Insurance only — the live page
+   showed the correct numbers.
 
 ### Rehearsal checklist (do these on the box the morning of)
+- **FIRST: production-build + restart, then confirm `/solutions/reviews` shows `₹12,00,000`, not
+  `$1,200,000`** (D0). If it still shows dollars, the box is not running current code and nothing else on
+  this list should be trusted.
 - Load **`/solutions`** twice cold; confirm `Published apps` is not `0 of 0` (D11).
 - Load **`/solutions/apps`**; confirm the "Waiting for a person" number equals the sum of the card badges (D8).
 - Open the app you plan to demo; confirm **no red banner, no amber banner, no "Draft" pill**, and that

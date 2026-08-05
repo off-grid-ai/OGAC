@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, Database, FolderOpen } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { redactEndpointCredential } from '@/lib/connector-policy';
 import { ConnectorActions } from '@/components/data/ConnectorActions';
 import { KafkaSourceManager } from '@/components/integrations/KafkaSourceManager';
 import { Badge } from '@/components/ui/badge';
@@ -132,7 +133,10 @@ export default async function ConnectorDetailPage({
                 <div className="sm:col-span-2">
                   <Field label="Endpoint">
                     <code className="break-all font-mono text-xs text-muted-foreground">
-                      {c.endpoint || '—'}
+                      {/* Redacted for display: a seeded SQL fixture stores its password in the URL, and
+                          this page put it on screen. The edit form deliberately does NOT redact — it
+                          round-trips the value on save. */}
+                      {redactEndpointCredential(c.endpoint) || '—'}
                     </code>
                   </Field>
                 </div>

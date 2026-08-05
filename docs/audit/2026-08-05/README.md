@@ -27,7 +27,7 @@ to open the PNG and judge it as a projected 16:9 image seen from row 10.
 
 | File | Scope | Lens | Status |
 | --- | --- | --- | --- |
-| `demo-narrative.md` | **The end-to-end 10-minute demo** — flow, dead ends, empty surfaces, recommended route order | demo | in progress |
+| `demo-narrative.md` | **The end-to-end 10-minute demo** — flow, dead ends, empty surfaces, recommended route order | demo | **complete** |
 | `demo-governance-insights.md` | Governance + Insights, re-scored for the stage | demo | in progress |
 | `demo-gateway-operations.md` | Gateway / services / devices + observability, re-scored | demo | in progress |
 | `data.md` | Data + Storage (41p) | demo | in progress |

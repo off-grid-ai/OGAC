@@ -1,5 +1,6 @@
 'use client';
 
+import { redactEndpointCredential } from '@/lib/connector-policy';
 import {
   ArrowLeft,
   DownloadSimple,
@@ -309,7 +310,8 @@ export function SourceObjectBrowser({
           ))}
           <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
             <div className="font-medium text-foreground">Source endpoint</div>
-            <code className="mt-1 block break-all">{source.endpoint}</code>
+            {/* Redacted: this is a read-only display of a stored endpoint, which may carry a password. */}
+            <code className="mt-1 block break-all">{redactEndpointCredential(source.endpoint)}</code>
           </div>
         </CardContent>
       </Card>

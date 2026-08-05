@@ -327,17 +327,32 @@ What holds up: the *"Inside governance"* 8-card grid (Posture / Policies / Acces
 Secrets / Evidence / Trust & regulatory) is clean, legible and a good "here is the shape of governance"
 frame. The h1 — *"Set controls once and inherit them everywhere"* — is the right sentence.
 
-### N11 — DEMO-BLOCKER — The narrative's closing section opens on three red `Unavailable` tiles
+### N11 — DEMO-BLOCKER — `/operations` is non-deterministic, and BOTH of its states are bad on stage
 
-Screenshot: `/tmp/audit/ops/operations.png`. `operations.md` OPS-10 proved this is arithmetic, not a
-flake: the page gives `computeStatus()` a **1500 ms** budget and it measured **20.1 s / 37.3 s**. So
-`/operations` will ALWAYS render:
+**I shot this page independently and got a different result from the sibling team — so this finding
+supersedes `operations.md` OPS-10's "guaranteed".** Two shots, same box, same account, ~40 minutes apart:
 
-> `SERVICE HEALTH` **Unavailable** *"Service probes did not complete."* ·
-> `RUNS IN PROGRESS` **Unavailable** ·  `RUNS NEEDING ATTENTION` **Unavailable** *"Run records did not respond."*
+| shot | `SERVICE HEALTH` | `RUNS IN PROGRESS` | `RUNS NEEDING ATTENTION` |
+| --- | --- | --- | --- |
+| `/tmp/audit/ops/operations.png` (cold) | **Unavailable** — *"Service probes did not complete."* (red) | **Unavailable** (red) | **Unavailable** — *"Run records did not respond."* (red) |
+| `/tmp/audit/demo-path/operations.png` (warm, 5 s wait) | `43 / 43` — *"Overall platform state: operational."* | `2` | **`56`** — *"Failed executions in the current read window."* (red) |
 
-Three red-bordered tiles, side by side, as the image for *"and it all runs on infrastructure you own."*
-Also on this screen: the sidebar renders **`Managed devices  SOON`** — a coming-soon badge in the nav.
+OPS-10's mechanism is right (a **1500 ms** budget on a probe measured at **20–37 s**), but the outcome is
+a **race**, not arithmetic — on a warm cache the tiles populate. The demo consequence is worse than
+either state alone: **he cannot predict which screen he will get**, so he cannot rehearse it.
+
+And the "good" state is not good:
+- **`RUNS NEEDING ATTENTION 56`, red-bordered.** Fifty-six failed executions, on the screen that says
+  *"and it all runs on infrastructure you own."* (`/operations/runs` corroborates: `Total 173 · Failed 56`.)
+- **`SERVICE HEALTH 43 / 43` contradicts `/overview`'s `Services (7/7 up)`** — two denominators for one
+  concept, two clicks apart, and per `operations.md` OPS-2/OPS-4 the `43/43` numerator counts `optional`
+  and absent services as healthy while the operator-home tile uses the opposite rule. Three surfaces,
+  three answers.
+- **`Recent activity` is six rows of the platform talking to itself:** `AI Quality Judge` ×4 plus raw
+  `agent_30e80f87` and `agent_c6b8d40d`, all dated 2026-07-26/27 — internal agent ids, ten days stale, on
+  the operations front page. (Same defect as `/insights`, N23, and `/governance`, N10 — the "Recent
+  activity" feed leaks raw agent/model identifiers on **three** section hubs.)
+- The sidebar renders **`Managed devices  SOON`** — a coming-soon badge in the nav.
 
 `/operations/services` is not the alternative (`/tmp/audit/demo-ops/operations_services.png`):
 - **every readiness chip is truncated to gibberish** — `DEPLOY…` `REACHA…` `FUNCTI…` `SEEDED` `CONSOL…`,
@@ -432,9 +447,15 @@ The same is true of the loan case: `₹12,00,000` on `/work/tasks`, **`$1,200,00
 immediately, and it undermines every other number in the demo.
 
 `docs/APP_AS_PRODUCT.md` records this as fixed (*"Demo currency copy corrected — 8 apps said 'Amounts in
-USD ($)'… `scripts/fix-demo-currency-copy.mts`"*). **It is not fixed on the review surfaces or in the
-step outputs** — that script corrected app `summary` copy, not the run payloads the review cards format.
-This is the cheapest high-impact fix in the audit.
+USD ($)'… `scripts/fix-demo-currency-copy.mts`"*). That script corrected app `summary` copy, not the run
+payloads the review cards format — hence the recurrence.
+
+**UPDATE, same day:** commit **`4e784105`** landed the real fix while this audit was running —
+`formatAmount` hardcoded an `en-US`/USD `Intl` formatter and `src/lib/money.ts` (INR, lakh/crore) already
+existed; the review call site simply predated it. `review-risk`'s `group()` got the Indian grouping too.
+The commit message notes *"two audit teams hit it separately on different screens"*. **Re-shoot
+`/solutions/reviews` to confirm, and check the run's step outputs separately** — `Quota $40,000` lives in
+the seeded run data, not in `formatAmount`.
 
 ### N15 — DEMO-BLOCKER — At the climax of the demo, the "Trust checks" panel says nothing was checked
 
@@ -621,6 +642,18 @@ things that would appear on a projected screen deeper in:
 the **`Trust checks` panel of the review screen** (N15), per-run and per-check, not from this section's
 aggregates. That is also what `quality-plain.ts` already does correctly.
 
+### N24 — DEMO-RISK — A React hydration mismatch on the LANDING PAGE, and `/build` confirmed as an HTTP 404
+
+From my shoot's `report.json` (`/tmp/audit/demo-path/report.json`), two objective signals:
+
+- **`/` (the landing page) logs `A tree hydrated but some attributes of the server rendered HTML didn't
+  match the client properties. This won't be patched up.`** The landing page force-sets its own theme
+  (`LandingThemeDefault`, `src/app/page.tsx:103`), which is the classic source of this error — so the
+  likely visible symptom is a **theme/colour flash on first paint of the very first thing the audience
+  sees.** Thirty seconds to check: load `/` cold, twice, and watch the first 300 ms on the projector.
+  (`/build` logs the same error.)
+- **`HTTP 404 /build`** — confirms N7 at the status-code level, not just by screenshot.
+
 ---
 
 ## Demo readiness
@@ -706,7 +739,7 @@ whole product and all three screens hold up.
 | Route / click | Why |
 | --- | --- |
 | `/insights` (and anything under it) | `RECENT RUNS 50 · COMPLETED 29 · ERRORED 0` — 21 runs unaccounted for; and a `Recent activity` feed of raw agent ids plus the literal string `CONTEXT FROM PRIOR STEPS: — [agent] No question was provided`. |
-| `/operations` | Three red **`Unavailable`** tiles, every time — the 1500 ms budget cannot beat a 20–37 s probe. |
+| `/operations` | Non-deterministic: **either** three red `Unavailable` tiles **or** `43/43 operational` beside a red **`RUNS NEEDING ATTENTION 56`**. He cannot rehearse which. Plus a `Recent activity` feed of raw `agent_30e80f87`-style ids. |
 | `/operations/services` | Every card spins on `checking` forever; every readiness chip truncates to `DEPLOY… REACHA… FUNCTI…`; internal hosts and ports (`offgrid-s1.local:4000/:8800/:8010`) on screen. |
 | `/governance` **and** `/governance/posture` (the same screen) | `CLOUD EGRESS Allowed` contradicting the home page's `0% — nothing left`; red `SOURCES WITHOUT A LAWFUL BASIS 5`; red `ACCESS CERTIFIED Never`; `TEAMS 0`; activity rows reading `qwen3-vl-8b`. |
 | `/governance/trust/regulatory` + the **Download** on it | Headline **`OVERALL POSTURE 63%`**; `PII masking (A9)` as a red gap chip that is a **false negative**; framework count says 4 (landing) / 5 (cards) / 3 (copy). The downloadable pack carries another tenant's audit events. |
@@ -744,11 +777,21 @@ The climax screen currently says `Faithful to sources — Not scored` and `No gu
 verdict, and demo **that** run. Payoff: the review screen stops disclaiming itself, and it becomes the
 answer to "how do you know the AI is any good?" — which lets him skip the entire Insights section.
 
-### 3. Fix the currency, everywhere it renders — **30–60 minutes**
-`₹63,000` on `/work/tasks` → `$63,000` on `/solutions/reviews` → `$40,000 / $23,000 / 63,000` in the run
-steps, for **one case** (N14); `₹12,00,000` → `$1,200,000` for the loan. Format from one money helper
-(`money.ts` exists) and correct the seeded step outputs. A banker catches this instantly and it discredits
-every other number.
+### 3. ~~Fix the currency, everywhere it renders~~ — **LANDED DURING THIS AUDIT (verify, then re-shoot)**
+Commit **`4e784105`** *"fix(review): approval amounts in INR, not USD — two audit teams found this
+independently"* routed `formatAmount` and `review-risk`'s `group()` through the existing `money.ts`
+(INR, lakh/crore grouping). **Two independent teams found this on different screens, which is why it went
+first.**
+
+What still needs a two-minute check before the talk, because the commit only touched the review path:
+- re-shoot `/solutions/reviews` and its detail and confirm `₹63,000` / `₹12,00,000`;
+- the **run's own step outputs** still read `Quota $40,000 — exceeded` and `Over quota by $23,000` — those
+  strings are in the seeded run data, not in `formatAmount`, so they are probably still dollars;
+- the queue case `Invoice: INV-1 $200` is likewise seeded text (folded into fix #1).
+
+**Replacement for this slot if the above checks out: rewrite the `/data` hub's dead `Manage sources`
+CTA** to point at the connectors list (`data.md` MAJOR) — 15 minutes, and it makes `/data` openable if a
+prospect insists on seeing where the data comes from.
 
 ### 4. Six copy / default changes, one sitting — **60–90 minutes total**
 Each is a single line, each removes a specific projected embarrassment:

@@ -440,3 +440,40 @@ export function spliceCredential(type: string, endpoint: string, secret: string)
     return endpoint;
   }
 }
+
+/**
+ * The inverse of `spliceCredential`, for anything a PERSON will read.
+ *
+ * A connector endpoint is stored as the operator typed it, and for a seeded SQL fixture that means the
+ * password is in the URL: `mssql://sa:Offgrid!Erp2026@127.0.0.1:1433/erp`. The connector detail page
+ * rendered `c.endpoint` verbatim, so a plaintext password went on screen — and on a projector, to a
+ * room. That is the one defect in this audit that is actively damaging rather than merely embarrassing.
+ *
+ * The username is KEPT: it is useful context ("which account are we connecting as") and is not a
+ * secret. Only the password is replaced, and it is replaced with a fixed-width marker rather than
+ * removed, so the reader can see that a credential IS configured — an endpoint with the password
+ * silently stripped looks like one with no credential at all, which is a different and misleading fact.
+ *
+ * Pure. Falls back to returning the input unchanged only when there is no password to hide.
+ */
+export function redactEndpointCredential(endpoint: string): string {
+  const raw = (endpoint ?? '').trim();
+  if (!raw) return raw;
+  try {
+    const u = new URL(raw);
+    if (!u.password) return raw;
+    u.password = '';
+    // Rebuilt by hand: setting `password = ''` leaves URL.toString() emitting `user@host` with the
+    // colon dropped, which reads as "no credential configured".
+    const auth = u.username ? `${u.username}:••••••@` : '••••••@';
+    const port = u.port ? `:${u.port}` : '';
+    return `${u.protocol}//${auth}${u.hostname}${port}${u.pathname}${u.search}${u.hash}`;
+  } catch {
+    // Not a parseable URL. Fall back to a targeted substitution rather than showing it: a malformed
+    // endpoint containing a credential is exactly as damaging as a well-formed one, and a URL that
+    // fails to parse is MORE likely to be hand-edited and wrong. Matches `user:secret@` wherever it
+    // appears, not just directly after `://`, because the malformed cases are exactly the ones where
+    // it does not sit where the scheme rule says it should.
+    return raw.replace(/([A-Za-z0-9._~%+-]+):([^@\s]+)@/g, '$1:••••••@');
+  }
+}
