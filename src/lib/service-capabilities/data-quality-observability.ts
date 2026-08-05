@@ -850,7 +850,7 @@ const ENTERPRISE_SOURCE_AUDITS: readonly ServiceCapabilityAudit[] = [
     summary:
       'The pinned MinIO fixture is healthy and seeded, but the Data Sources connector catalog marks S3 as coming soon. No governed object workflow is proven.',
     items: [
-      capability('object-read-write', 'Governed object read and write', 'Read and write objects under a tenant-approved bucket and prefix.', '/data/connectors', 'Open data sources', '', [
+      capability('object-read-write', 'Governed object read and write', 'Read and write objects under a tenant-approved bucket and prefix.', '/data/sources', 'Open data sources', '', [
         'yes', 'The pinned S3-compatible release exposes object APIs.',
         'yes', 'connector-policy marks s3 READY and connector-exec dispatches an s3 dialect to queryGovernedObjectSource; writeGovernedObject is the write half. Neither accepts a bucket from the caller — the data domain owns bucket+prefix, the connector owns the vaulted keypair, the tenant owns both, and scopedObjectKey refuses a key that leaves the prefix.',
         'yes', 'Data → Connectors creates an S3 source (endpoint + keypair, keypair vaulted); a data domain binds it to bucket/prefix; the builder binds a read step to the domain and an output step with sink: lake.',

@@ -168,8 +168,12 @@ test('deep links distinguish a pending capability audit from an unknown service 
 });
 
 test('inventory filtering is URL-backed and preserves selection plus every facet', () => {
+  // 'telemetry' used to be unique to otel-collector's description ("OpenTelemetry collector"), but a
+  // live finding on victoriametrics' next action ("the collector's own self-telemetry reaches the
+  // store...") now also contains the substring — see the identical note in service-inventory.test.ts.
+  // 'OTLP', the ingest protocol name, still selects otel-collector alone.
   const html = renderExplorer('otel-collector', {
-    query: 'telemetry',
+    query: 'OTLP',
     family: 'observability',
     owner: 'operations-services',
     audit: 'current',
@@ -188,7 +192,7 @@ test('inventory filtering is URL-backed and preserves selection plus every facet
   assert.match(html, /1\/49 services shown/);
   assert.match(
     html,
-    /href="\/operations\/services\/capability-map\?q=telemetry&amp;family=runtime&amp;owner=operations-services&amp;audit=current&amp;readiness=unverified"/,
+    /href="\/operations\/services\/capability-map\?q=OTLP&amp;family=runtime&amp;owner=operations-services&amp;audit=current&amp;readiness=unverified"/,
   );
 });
 
