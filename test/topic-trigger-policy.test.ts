@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  advanceCursor,
   deliveryKey,
   describeTopicTrigger,
   dispositionFor,
   mayCommitOffset,
   parseTopicTriggerConfig,
+  planTopicConsume,
   type StreamRecord,
 } from '../src/lib/topic-trigger-policy.ts';
 
@@ -117,4 +119,95 @@ test('the copy says nothing is listening when no broker is configured', () => {
   for (const s of [off, describeTopicTrigger(config, true)]) {
     assert.doesNotMatch(s, /Kafka|Redpanda|offset|partition|consumer group/i);
   }
+});
+
+// ─── the cursor plan ────────────────────────────────────────────────────────────────────────────
+
+const part = (partition: number, lowOffset: string, highOffset: string) => ({
+  partition,
+  lowOffset,
+  highOffset,
+});
+
+test('A NEVER-SEEN PARTITION STARTS AT THE LIVE EDGE — turning a trigger on is not a backfill', () => {
+  // 40k historical records must NOT become 40k governed runs the moment someone saves the trigger.
+  const plan = planTopicConsume([part(0, '0', '40000')], []);
+  assert.deepEqual(plan.windows, []);
+  assert.deepEqual(plan.initialised, [{ partition: 0, nextOffset: '40000' }]);
+});
+
+test('an initialised partition then reads only what arrives after it', () => {
+  const plan = planTopicConsume([part(0, '0', '40003')], [{ partition: 0, nextOffset: '40000' }]);
+  assert.deepEqual(plan.windows, [{ partition: 0, fromOffset: '40000', toOffset: '40002' }]);
+});
+
+test('caught up means no window at all, not an empty read', () => {
+  assert.deepEqual(
+    planTopicConsume([part(0, '0', '12')], [{ partition: 0, nextOffset: '12' }]).windows,
+    [],
+  );
+});
+
+test('records deleted by retention before we read them are REPORTED, never silently skipped', () => {
+  // The cursor is behind the earliest surviving record: work was lost. Saying nothing would present
+  // data loss as a normal quiet cycle.
+  const plan = planTopicConsume([part(0, '900', '1000')], [{ partition: 0, nextOffset: '500' }]);
+  assert.deepEqual(plan.lost, [{ partition: 0, from: '500', to: '900', missed: '400' }]);
+  // And it resumes from the earliest record that still exists rather than stalling forever.
+  assert.deepEqual(plan.windows, [{ partition: 0, fromOffset: '900', toOffset: '999' }]);
+});
+
+test('A BUSY PARTITION CANNOT STARVE THE OTHERS — every partition progresses every cycle', () => {
+  // Spending the budget in partition order would mean a permanently busy partition 0 consumes it all,
+  // and a record on partition 2 waits forever. Each gets an equal share instead.
+  const plan = planTopicConsume(
+    [part(0, '0', '100000'), part(1, '0', '100000'), part(2, '0', '100000')],
+    [0, 1, 2].map((partition) => ({ partition, nextOffset: '0' })),
+    9,
+  );
+  assert.deepEqual(plan.windows, [
+    { partition: 0, fromOffset: '0', toOffset: '2' },
+    { partition: 1, fromOffset: '0', toOffset: '2' },
+    { partition: 2, fromOffset: '0', toOffset: '2' },
+  ]);
+});
+
+test('a quiet partition hands its unused share to one with a backlog', () => {
+  // Fairness must not become waste: partition 1 has a single record, so the other 9 slots go to 0.
+  const plan = planTopicConsume(
+    [part(0, '0', '100000'), part(1, '0', '1')],
+    [
+      { partition: 0, nextOffset: '0' },
+      { partition: 1, nextOffset: '0' },
+    ],
+    10,
+  );
+  assert.deepEqual(plan.windows, [
+    { partition: 0, fromOffset: '0', toOffset: '8' },
+    { partition: 1, fromOffset: '0', toOffset: '0' },
+  ]);
+});
+
+test('an unread remainder is left for the next cycle, never dropped', () => {
+  const first = planTopicConsume([part(0, '0', '100')], [{ partition: 0, nextOffset: '0' }], 10);
+  assert.deepEqual(first.windows, [{ partition: 0, fromOffset: '0', toOffset: '9' }]);
+  const second = planTopicConsume([part(0, '0', '100')], [{ partition: 0, nextOffset: '10' }], 10);
+  assert.deepEqual(second.windows, [{ partition: 0, fromOffset: '10', toOffset: '19' }]);
+});
+
+test('offsets past 2^53 are planned exactly', () => {
+  const plan = planTopicConsume(
+    [part(0, '0', '9007199254740995')],
+    [{ partition: 0, nextOffset: '9007199254740993' }],
+  );
+  assert.deepEqual(plan.windows, [
+    { partition: 0, fromOffset: '9007199254740993', toOffset: '9007199254740994' },
+  ]);
+});
+
+test('the cursor never rewinds, so a late acknowledgement cannot re-run finished work', () => {
+  assert.equal(advanceCursor(undefined, '7'), '8');
+  assert.equal(advanceCursor('8', '9'), '10');
+  assert.equal(advanceCursor('10', '3'), '10'); // out-of-order ack is ignored
+  assert.equal(advanceCursor('9007199254740993', '9007199254740993'), '9007199254740994');
 });

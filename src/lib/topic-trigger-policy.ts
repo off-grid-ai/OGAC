@@ -156,6 +156,145 @@ export function mayCommitOffset(d: Disposition, runPersisted: boolean): boolean 
   return true;
 }
 
+// ─── Where to read from: the cursor plan ────────────────────────────────────────────────────────
+//
+// The consumer does NOT let the broker track its own progress. Broker-side auto-commit acknowledges a
+// record when it is *delivered*, which is precisely the commit-before-durable failure this module
+// exists to prevent. So the cursor is ours, stored beside the runs it accounts for, and this function
+// decides what to read next from it.
+
+/** What the broker reports for one partition. `highOffset` is the log end — one PAST the last record. */
+export interface PartitionState {
+  partition: number;
+  lowOffset: string;
+  highOffset: string;
+}
+
+/** Our own progress: the first offset NOT yet processed. Absent means this partition is unseen. */
+export interface PartitionCursor {
+  partition: number;
+  nextOffset: string;
+}
+
+export interface ReadWindow {
+  partition: number;
+  fromOffset: string;
+  toOffset: string;
+}
+
+export interface ConsumePlan {
+  windows: ReadWindow[];
+  /**
+   * Partitions started at the live edge because this trigger had never consumed them.
+   * Surfaced, not silent: an operator who expected history to replay must be told it did not.
+   */
+  initialised: Array<{ partition: number; nextOffset: string }>;
+  /** Partitions whose cursor fell behind retention — records were deleted before we read them. */
+  lost: Array<{ partition: number; from: string; to: string; missed: string }>;
+}
+
+export const MAX_RECORDS_PER_CYCLE = 200;
+
+/**
+ * Plan the next read.
+ *
+ * THE DEFAULT THAT MATTERS: a partition we have never consumed starts at the LIVE EDGE, not at the
+ * beginning. "This app starts when a record arrives" must not mean "and it will now process the last
+ * six months of them" — turning on a trigger would fire thousands of governed runs, which on a topic
+ * carrying customer instructions is an incident, not a backfill.
+ *
+ * All offset arithmetic is BigInt: broker offsets pass 2^53 and Number would silently round.
+ */
+export function planTopicConsume(
+  partitions: readonly PartitionState[],
+  cursors: readonly PartitionCursor[],
+  maxRecords = MAX_RECORDS_PER_CYCLE,
+): ConsumePlan {
+  const at = new Map(cursors.map((c) => [c.partition, c.nextOffset]));
+  const plan: ConsumePlan = { windows: [], initialised: [], lost: [] };
+  const budget = BigInt(Math.max(0, maxRecords));
+
+  // Pass 1 — establish where each partition stands. No budget is spent yet, because spending it in
+  // partition order would let a busy partition 0 consume the whole cycle forever and STARVE the rest:
+  // a record on partition 3 would then wait indefinitely for one that never goes quiet.
+  const ready: Array<{ partition: number; next: bigint; available: bigint }> = [];
+  for (const p of [...partitions].sort((a, b) => a.partition - b.partition)) {
+    const low = BigInt(p.lowOffset);
+    const high = BigInt(p.highOffset);
+    const known = at.get(p.partition);
+
+    if (known === undefined) {
+      plan.initialised.push({ partition: p.partition, nextOffset: p.highOffset });
+      continue;
+    }
+
+    let next = BigInt(known);
+    if (next < low) {
+      // Retention deleted records we had not read. We cannot invent them; we CAN refuse to hide it.
+      plan.lost.push({
+        partition: p.partition,
+        from: known,
+        to: p.lowOffset,
+        missed: (low - next).toString(),
+      });
+      next = low;
+    }
+    if (next >= high) continue; // caught up
+    ready.push({ partition: p.partition, next, available: high - next });
+  }
+  if (ready.length === 0 || budget <= 0n) return plan;
+
+  // Pass 2 — an equal share each, so every partition makes progress every cycle.
+  const share = budget / BigInt(ready.length);
+  let spare = budget % BigInt(ready.length);
+  const take = new Map<number, bigint>();
+  let unused = 0n;
+  for (const r of ready) {
+    let allot = share;
+    if (spare > 0n) {
+      allot += 1n;
+      spare -= 1n;
+    }
+    const t = r.available < allot ? r.available : allot;
+    unused += allot - t;
+    take.set(r.partition, t);
+  }
+  // Pass 3 — hand back what quiet partitions did not need, so a small budget is never left on the
+  // table while a busy partition has a backlog.
+  for (const r of ready) {
+    if (unused <= 0n) break;
+    const room = r.available - take.get(r.partition)!;
+    if (room <= 0n) continue;
+    const extra = room < unused ? room : unused;
+    take.set(r.partition, take.get(r.partition)! + extra);
+    unused -= extra;
+  }
+
+  for (const r of ready) {
+    const t = take.get(r.partition)!;
+    if (t <= 0n) continue;
+    plan.windows.push({
+      partition: r.partition,
+      fromOffset: r.next.toString(),
+      toOffset: (r.next + t - 1n).toString(),
+    });
+  }
+  return plan;
+}
+
+/**
+ * Move a cursor past a record that is finished with.
+ *
+ * Monotonic on purpose: a late or out-of-order acknowledgement must never rewind the cursor, because
+ * rewinding re-runs governed work that already ran.
+ */
+export function advanceCursor(current: string | undefined, offset: string): string {
+  const after = BigInt(offset) + 1n;
+  if (current === undefined) return after.toString();
+  const now = BigInt(current);
+  return (after > now ? after : now).toString();
+}
+
 /** One line for the trigger's surface, in the reader's language rather than the broker's. */
 export function describeTopicTrigger(config: TopicTriggerConfig, brokerConfigured: boolean): string {
   if (!brokerConfigured) {
