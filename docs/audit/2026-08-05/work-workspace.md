@@ -17,6 +17,54 @@ Status: IN PROGRESS — findings appended as confirmed.
 
 ## Findings
 
+### W6 — BLOCKER (live evidence) — The nav badge says 9, the queue page says 5, and the 4 missing cases are real work nobody can reach.
+Persona: **non-technical officer** (which number do I trust?), **technical operator** (abandoned work is invisible), **QA**.
+
+Measured on the shared dev server as `dev@offgrid.local` (2026-08-05):
+
+| source | value |
+|---|---|
+| `GET /api/v1/admin/my-work/count` | `{"available":true,"waiting":9,"oldestDays":30}` |
+| `/work/tasks` heading (screenshot `/tmp/audit/work/work_tasks.png`) | *"5 cases are waiting for you to decide."* |
+| sidebar badge in the same screenshot | `My tasks  9` |
+
+Enumerating the runs (`GET /api/v1/admin/app-runs?limit=200`, filtered to `awaiting_human`) shows exactly
+why: 4 of the 9 belong to app ids that `listApps` does not return —
+`eyat_reimbursement_553aa949`, `…_91689e1f` (app `app_d9f008e3`), `…_8cb6f3a9`, `…_c3f9f616`
+(app `app_4108cf57`), all waiting since 2026-07-09.
+
+- `src/lib/my-work-reader.ts:44-46` deliberately drops them: *"A run whose app has been deleted cannot be
+  acted on … and **it is counted nowhere else either**."* That justification is **false today** —
+  `src/app/api/v1/admin/my-work/count/route.ts:34` counts every `awaiting_human` run with no app filter,
+  and that count is what the nav badge renders next to the very link that hides them.
+- Consequence for the officer: the badge that exists to tell them work arrived over-reports by 80%, so it
+  trains them to distrust it — the exact failure the badge was built to fix.
+- Consequence for the operator: **four cases have been paused for 27 days with no surface anywhere that
+  lists them.** They are not "deleted work", they are orphaned work; there is no reassign, no re-home,
+  no cancel path for them in this section.
+
+### W7 — HIGH — Approve is a one-click, no-confirmation, no-undo action in a list row, and what it will DO is only stated after it is done.
+Persona: **non-technical officer** ("what happens if I approve?" / "can I undo?"), **UX/QA** (consequence before the press).
+
+`src/components/build/CaseDecision.tsx` renders `Approve` / `Reject` inline on the queue row
+(`:146-159`) and posts straight to the review route — **no confirm step, no summary of the effect**.
+The consequences only appear afterwards, in a toast that fades: *"Approved — the case continues."*
+(`:57-62`). Approving resumes the workflow's remaining steps, which is where side-effecting action and
+sink steps live (create/update a record in a connected system, send the email/WhatsApp) — so a
+mis-click is an external, irreversible write. There is **no undo**: the only reversal in the store is
+`markAppRunCancelled`, restricted to `running|awaiting_human|queued` (`src/lib/app-run-store.ts:152`),
+i.e. it cannot touch a run you have just approved to completion.
+
+The material for a proper pre-press statement already exists and is unused here:
+`planActionImpact` (`src/lib/action-contract.ts:184-212`) returns exactly the plain-language sentence
+needed — *"Update record for X. Nothing has been changed."* plus `sideEffects` and an egress
+classification. The **bulk** bar does the right thing (`describeBatch(...)`,
+`src/components/build/BulkDecideBar.tsx:76`, "includes the age of the oldest, so a batch cannot quietly
+sweep up something long-forgotten") — so the single-case path is the weaker of the two, which is
+backwards: single-case approval is the one an officer does fifty times a day on autopilot.
+Also `Reject` with no reason is one click and permanent (`:145-152`) while `This was wrong` demands a
+reason — the destructive-and-silent path is the easiest one.
+
 ### W1 — BLOCKER — The queue page throws away the "did the read succeed?" flag, so an outage renders as a green "Nothing is waiting for a decision right now."
 Persona: **non-technical officer** (also QA/QC — failure-as-emptiness), **technical operator**.
 

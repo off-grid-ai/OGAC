@@ -111,3 +111,89 @@ infra coordinates out of the public tree.
 Label nodes "Storage node 1/2/3" and keep addresses to an admin-only detail.
 **Screenshot:** `data_lake.png` shows the bucket list (`media`, `provit`) with no per-row actions, and the
 node row rendering a raw private IP and port.
+
+### [BLOCKER] Two parallel "dataset" registries: the hub counts 4, the catalogue that governs them says 0
+
+**Persona:** DPO, Data Engineer
+**Where:** `src/app/(console)/data/page.tsx:53,71-75` (`listDatasets` → `datasets` table, stat href
+`/data/catalog`) vs `src/app/(console)/data/catalog/page.tsx:35-36` and
+`src/app/(console)/data/governance/page.tsx:61-66` (`listAssets` → `data_assets` table);
+`src/lib/store.ts:1067` vs `src/lib/data-catalog-store.ts:129`;
+bridge that does not bridge: `src/app/api/v1/admin/data-assets/seed/route.ts:19-28`
+**What:** The console keeps two unrelated dataset registries. The Data hub's "Datasets 4 · 3,60,759 cataloged
+rows" card reads `datasets`; the Catalog and Data-governance surfaces read `data_assets`. Clicking that hub
+card lands on a page that says *"No datasets catalogued yet."* Confirmed live on the box:
+`datasets` = 4 rows (all `org_id='default'`), `data_assets` = 12 (`org_bharat`) + 4 (`org_suraksha`) and
+**zero** for the org the console signs into. "Seed from connectors" derives proposals from connectors +
+data-domains only — it can never pull the `datasets` rows across, so the two registries never converge.
+**Why it matters:** Every DPO control — classification, PII posture, freshness SLA, retention window,
+right-to-be-forgotten scope — hangs off `data_assets`. Anything registered as a `dataset` is therefore
+un-classified, un-retained and outside the erasure sweep, while the console's front page asserts those
+datasets exist and are "cataloged". The governance screen answers "do we hold PII?" with **0** for an org that
+holds 360,759 rows. That is a false claim on the surface a regulator would be shown.
+**Fix:** One registry. Either fold `datasets` into `data_assets` (migrate + make the hub read `listAssets`) or
+make the hub stat read the catalogue and drop the legacy table. Until then the hub must not label the legacy
+count "Datasets" and must not link it to the catalogue.
+**Screenshot:** `data_sources.png` (hub) shows "DATASETS 4 / 3,60,759 cataloged rows"; `data_catalog.png` and
+`data_catalog_governance.png` show DATASETS 0, HOLDING PII 0, TOTAL ROWS 0 with "No datasets catalogued yet."
+
+### [MINOR] Seven Data routes still have page files that are permanently redirected away
+
+**Persona:** Technical operator (deep links), maintainer
+**Where:** `src/modules/route-migrations.mjs:78-84` and `:8` vs the still-present
+`src/app/(console)/data/{etl,governance,query,pipelines,retrieval,integrations,tool-catalog}/page.tsx`,
+`src/app/(console)/storage/page.tsx`
+**What:** All eight paths 308 elsewhere (verified live: `/data/etl` → `/data/flows/orchestration`,
+`/storage` → `/work/files`, etc.). Two of the page modules are still legitimately used as *content*
+components (`EtlJobsContent`, `DataGovernanceContent`); the rest, including the whole `/storage` page, are
+unreachable. Assigned page counts for this section are therefore inflated.
+**Why it matters:** Dead surfaces get audited, screenshotted and "verified" without any user reaching them —
+exactly the drift the ledger rules warn about. `/storage` in particular reads as a live storage console.
+**Fix:** Delete the unreachable pages; move `EtlJobsContent` / `DataGovernanceContent` into
+`src/components/**` so a content module is not disguised as a route.
+
+### [MAJOR] The knowledge index reports "Total vectors 0" for a live, non-empty index — the sibling page shows "—" for the same field
+
+**Persona:** Data Engineer, Technical operator
+**Where:** `src/lib/retrieval-view.ts:70-72` (`asCount` coerces `null`/absent → `0`), `:115`, `:122`
+(`totalVectors` = sum of those zeros); rendered `src/components/retrieval/RetrievalManager.tsx:228,293`
+**What:** Qdrant returns `vectors_count: null` on current versions; `asCount` turns that into `0`. The Indexes
+page therefore prints **TOTAL VECTORS 0** and **Vectors 0** on a collection that simultaneously reports
+**Points 3** and status `green`. The Vector-collections page reads the same field and honestly prints **"—"**,
+so the codebase contains both the right and the wrong rendering of one value. Meanwhile the Data hub labels the
+*points* count "3 vectors" — three surfaces, three answers (0, —, 3) for one number.
+**Why it matters:** "0 vectors" on a retrieval index is the signal an engineer acts on: it reads as "nothing is
+indexed, retrieval is broken", and the next move is a needless reindex. Unknown must not be rendered as zero.
+**Fix:** Make `asCount` return `number | null` and render `null` as "—" (or fall back to `points_count` with a
+label that says so). Then use one shared formatter across hub / indexes / collections so the three agree.
+**Screenshot:** `data_knowledge_indexes.png` shows "TOTAL VECTORS 0" and a row "offgrid-brain · Vectors 0 ·
+Points 3 · green"; `data_knowledge_indexes_collections.png` shows the same collection as "3 points · VECTORS —".
+
+### [MAJOR] The retrieval surface prints the engine name three times, the internal host:port, and an internal codename
+
+**Persona:** Principal UX / brand
+**Where:** `src/components/retrieval/RetrievalManager.tsx:183,216,242` (`view.adapterId` → `qdrant`),
+`:219-221` with `src/lib/retrieval-view.ts:163-171` (`retrievalEndpointLabel` returns the raw host)
+**What:** `/data/knowledge/indexes` renders a `qdrant` pill, an "ADAPTER · qdrant" field, `(qdrant)` in the
+body copy, and "ENDPOINT · http://offgrid-s1.local:6333/" — the vector engine's name three times plus an
+internal hostname and its well-known port. The collection is displayed as `offgrid-brain`, the internal
+codename the project already decided to stop showing users (`src/app/(console)/data/page.tsx:263-264` documents
+removing exactly this leak from the neighbouring page).
+**Why it matters:** Explicit rule violation on the surface a buyer is most likely to be walked through, and the
+host:port is an infrastructure coordinate this repo deliberately keeps out of public view.
+**Fix:** Show a product label ("Meaning-based search index") and a state (reachable / unreachable) instead of
+the adapter id; keep the endpoint behind an admin-only diagnostics disclosure; render a display name for the
+default collection.
+
+### [MINOR] The Indexes list has a detail page nothing links to; its rows only offer Delete
+
+**Persona:** Principal UX / IA, Technical operator
+**Where:** `src/components/retrieval/RetrievalManager.tsx:286-310` (collection name is plain text, only action
+is Delete) vs the existing route `src/app/(console)/data/knowledge/indexes/collections/[name]/page.tsx`
+**What:** Each collection HAS a real detail route (snapshots / backup / restore), reachable only via the
+header's "Snapshots & backup" button → the collections grid → the card. From the Indexes table — the place a
+row lives — the name is not a link and the only per-row affordance is a destructive one.
+**Why it matters:** Breaks the list→detail rule with the detail page already built, and leaves Delete as the
+single thing you can do to a row, which is the most dangerous default possible.
+**Fix:** Link the collection name in the Indexes table to `…/collections/{name}`; move Delete behind the
+detail page or a row menu.
