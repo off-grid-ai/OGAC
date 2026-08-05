@@ -11,6 +11,7 @@
 // there for the `schedule` kind so cron correctness has one source of truth, not two.
 
 import type { TriggerKind, TriggerSpec } from '@/lib/app-model';
+import { parseTopicTriggerConfig } from '@/lib/topic-trigger-policy';
 import { isValidCron } from '@/lib/temporal-schedules';
 
 export type { TriggerKind, TriggerSpec } from '@/lib/app-model';
@@ -20,10 +21,15 @@ export type { TriggerKind, TriggerSpec } from '@/lib/app-model';
 // schedule = app-schedules.ts here). email + whatsapp REQUIRE on-prem gateway config to be enabled —
 // they are "coming soon" until that config is present, and are NEVER auto-enabled (air-gap safety).
 export const CONFIGURED_TRIGGER_KINDS: readonly TriggerKind[] = ['on-demand', 'webhook', 'schedule'];
-export const COMING_SOON_TRIGGER_KINDS: readonly TriggerKind[] = ['email', 'whatsapp'];
+// `topic` is GATED ON PURPOSE. Its config policy and delivery semantics exist and are tested
+// (topic-trigger-policy.ts), but no consumer is subscribed yet — so an app could select it and nothing
+// would ever arrive. Offering it as configured would be a promise the deployment cannot keep. Move it to
+// CONFIGURED_TRIGGER_KINDS in the same change that lands the consumer, not before.
+export const COMING_SOON_TRIGGER_KINDS: readonly TriggerKind[] = ['topic', 'email', 'whatsapp'];
 const ALL_TRIGGER_KINDS: readonly TriggerKind[] = [
   'on-demand',
   'webhook',
+  'topic',
   'email',
   'whatsapp',
   'schedule',
@@ -74,6 +80,13 @@ export function validateTrigger(spec: TriggerSpec | undefined): TriggerValidatio
       }
       break;
     }
+    case 'topic': {
+      // Shape-checked by the same pure policy the consumer will use, so a trigger cannot be saved in a
+      // state the consumer would then refuse — the validation lives in ONE place, not two.
+      const parsed = parseTopicTriggerConfig(cfg);
+      if (!parsed.ok) errors.push(`stream trigger: ${parsed.sentence}`);
+      break;
+    }
     case 'email':
       // On-prem IMAP poller config (host/mailbox). Validity is shape-only here; the poller adapter
       // (Phase 4C) verifies reachability. Kind is valid but gated → comingSoon.
@@ -104,6 +117,14 @@ export function normalizeTrigger(raw: unknown): TriggerSpec {
       const cron = typeof rawCfg.cron === 'string' ? rawCfg.cron.trim() : '';
       if (!isValidCron(cron)) throw new Error('schedule trigger: valid config.cron required');
       config = { cron };
+      break;
+    }
+    case 'topic': {
+      // Keep ONLY the two keys the consumer uses, so a persisted trigger cannot carry stale extras that
+      // silently change behaviour later. Throws on invalid, matching every other kind here.
+      const parsed = parseTopicTriggerConfig(rawCfg);
+      if (!parsed.ok) throw new Error(`stream trigger: ${parsed.sentence}`);
+      config = { topic: parsed.config.topic, groupId: parsed.config.groupId };
       break;
     }
     case 'email':

@@ -14,8 +14,8 @@ import {
 // Pure-logic unit tests for the trigger substrate — validation, normalization, webhook-path
 // derivation, and the configured-vs-coming-soon gating. No I/O.
 
-test('isTriggerKind: only the five known kinds', () => {
-  for (const k of ['on-demand', 'webhook', 'email', 'whatsapp', 'schedule']) {
+test('isTriggerKind: only the six known kinds', () => {
+  for (const k of ['on-demand', 'webhook', 'topic', 'email', 'whatsapp', 'schedule']) {
     assert.equal(isTriggerKind(k), true);
   }
   assert.equal(isTriggerKind('cron'), false);
@@ -23,11 +23,29 @@ test('isTriggerKind: only the five known kinds', () => {
   assert.equal(isTriggerKind(null), false);
 });
 
-test('isConfiguredKind: on-demand/webhook/schedule wired; email/whatsapp gated', () => {
+test('isConfiguredKind: on-demand/webhook/schedule wired; topic/email/whatsapp gated', () => {
   assert.deepEqual([...CONFIGURED_TRIGGER_KINDS], ['on-demand', 'webhook', 'schedule']);
-  assert.deepEqual([...COMING_SOON_TRIGGER_KINDS], ['email', 'whatsapp']);
+  assert.deepEqual([...COMING_SOON_TRIGGER_KINDS], ['topic', 'email', 'whatsapp']);
   assert.equal(isConfiguredKind('webhook'), true);
   assert.equal(isConfiguredKind('email'), false);
+  // `topic` has a tested policy but NO consumer subscribed yet. It must stay gated until one lands,
+  // or an app selects a trigger that can never fire. This assertion is the guard on that promise.
+  assert.equal(isConfiguredKind('topic'), false);
+});
+
+test('a stream trigger is refused unless it names both a topic and a consumer group', () => {
+  // The same pure policy the consumer will use, so a trigger cannot be saved in a state the consumer
+  // would then refuse. One rule, one place.
+  assert.equal(validateTrigger({ kind: 'topic', config: { topic: 'a.b' } }).ok, false);
+  const good = validateTrigger({ kind: 'topic', config: { topic: 'a.b', groupId: 'g' } });
+  assert.equal(good.ok, true);
+  assert.equal(good.comingSoon, true);
+  // normalizeTrigger keeps only the two keys the consumer reads.
+  assert.deepEqual(
+    normalizeTrigger({ kind: 'topic', config: { topic: ' a.b ', groupId: 'g', stale: 'x' } }).config,
+    { topic: 'a.b', groupId: 'g' },
+  );
+  assert.throws(() => normalizeTrigger({ kind: 'topic', config: { topic: 'bad name', groupId: 'g' } }));
 });
 
 test('validateTrigger: on-demand needs no config', () => {

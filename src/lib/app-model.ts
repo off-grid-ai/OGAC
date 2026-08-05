@@ -22,7 +22,7 @@ export interface FormField {
 }
 
 // ─── TriggerSpec — how an app is invoked ──────────────────────────────────────
-export type TriggerKind = 'on-demand' | 'webhook' | 'email' | 'whatsapp' | 'schedule';
+export type TriggerKind = 'on-demand' | 'webhook' | 'topic' | 'email' | 'whatsapp' | 'schedule';
 export interface TriggerSpec {
   kind: TriggerKind;
   config?: Record<string, unknown>;
@@ -141,7 +141,7 @@ export interface ValidationResult {
   errors: string[];
 }
 
-const TRIGGER_KINDS: TriggerKind[] = ['on-demand', 'webhook', 'email', 'whatsapp', 'schedule'];
+const TRIGGER_KINDS: TriggerKind[] = ['on-demand', 'webhook', 'topic', 'email', 'whatsapp', 'schedule'];
 const STEP_KINDS = new Set<AppStepKind>([
   'agent',
   'connector-query',
