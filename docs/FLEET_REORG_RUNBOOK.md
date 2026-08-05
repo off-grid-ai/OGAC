@@ -1,6 +1,28 @@
 # Fleet reorganisation runbook — 4 service nodes, s1 as control plane only
 
-**Written 2026-08-05, measured live. Not yet executed.** Downtime is acceptable (founder's call);
+> **EXECUTED 2026-08-05.** Sixteen containers moved off S1; its memory headroom went from
+> effectively none to **71% free**. The four service nodes are **g1, g3, g5, g6**. The authoritative
+> record now lives in the private fleet repo — `deploy/onprem/SERVER_STATE.md` (measurements, the
+> Rosetta trap, the SeaweedFS finding), `DEPLOYMENT_TOPOLOGY.md` (placement) and the two new stacks
+> `services-node-g1.yml` / `services-node-g3.yml`. This file is kept for the reasoning; **read the
+> fleet repo for current state.**
+>
+> **Four things below turned out to be wrong, and are corrected in the fleet repo:**
+> 1. **g5 was never free.** It runs 5 containers (LiteLLM + observability) under **Colima**. Its
+>    docker CLI defaults to an empty `orbstack` context, so `docker ps` answers about the wrong
+>    daemon and exits 0. That is why I recorded it as idle.
+> 2. **g1 was never free either** — it held an 8.54 GB orphan `llama-server`. Killing it reclaimed
+>    9 GB. So the plan's "g1/g3/g5 are idle" premise was wrong on two of three nodes.
+> 3. **OpenBao and OPA were NOT moved.** Together ~32 MiB, so there was nothing to gain, while
+>    OpenBao holds every vaulted connector credential. Hazard #1 below was avoided by not creating it.
+> 4. **Nothing needed repointing.** The plan assumed connector endpoints and console env would have
+>    to change. Binding each forward to the *same port number* the container used on S1 made the move
+>    invisible above the transport instead.
+>
+> Not done: **g6 still holds 28 containers.** Rebalancing its Airbyte/Kestra stack is the fleet's
+> most fragile integration and is deliberately left as its own slice.
+
+**Written 2026-08-05, measured live.** Downtime is acceptable (founder's call);
 **data loss is not** — several volumes hold demo data curated the same day.
 
 ## Why
