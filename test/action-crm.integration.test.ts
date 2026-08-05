@@ -7,6 +7,17 @@ import { executeCrmAction, type ActionExecutionContext } from '@/lib/adapters/ac
 import { CRM_TASK_API_VERSION } from '@/lib/adapters/crm-task-writeback';
 import { getSigning } from '@/lib/adapters/registry';
 import type { ActionStepShape } from '@/lib/action-contract';
+// @ts-expect-error shared JS reachability helper
+import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+
+// executeCrmAction's connector is passed in literally below (no store lookup), but for any test
+// that reaches the CRM adapter's execRestConnectorRequest, resolveConnectorTarget still resolves
+// a per-connector secret via connector-secrets.ts -> drizzle -> Postgres, even for a connector
+// with no stored secret (a missing row is a clean null; an UNREACHABLE db surfaces as "connector
+// is not a reachable REST source" — see crm-writeback.test.ts for the full trace). Only the three
+// tests below that actually reach the boundary need the guard; the maker-checker/validation tests
+// return before any I/O and never touch Postgres.
+const dbUp = await dbReachable();
 
 const CONTEXT: ActionExecutionContext = {
   orgId: 'org_bharat',
@@ -98,7 +109,10 @@ test('maker-checker blocks the CRM boundary before any side effect', async () =>
   }
 });
 
-test('generic action creates and replays a tenant-scoped CRM task through real HTTP', async (t) => {
+test(
+  'generic action creates and replays a tenant-scoped CRM task through real HTTP',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   const ledger = new Map<string, { hash: string; task: Record<string, unknown> }>();
   const seenOrgs: string[] = [];
   const seenPaths: string[] = [];
@@ -179,9 +193,13 @@ test('generic action creates and replays a tenant-scoped CRM task through real H
     ['/v1/tasks', '/v1/tasks', '/v1/tasks', '/v1/tasks'],
     'the legacy /db read suffix is removed without changing the CRM origin',
   );
-});
+  },
+);
 
-test('generic action updates a CRM opportunity through its existing signed adapter', async (t) => {
+test(
+  'generic action updates a CRM opportunity through its existing signed adapter',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   let record: Record<string, unknown> = { id: 'opp_202', stage: 'qualification' };
   const seenMethods: string[] = [];
   const server = createServer(async (req, res) => {
@@ -219,7 +237,8 @@ test('generic action updates a CRM opportunity through its existing signed adapt
     assert.equal(result.receipt.target, 'opp_202');
   }
   assert.deepEqual(seenMethods, ['GET', 'PATCH']);
-});
+  },
+);
 
 test('action errors remain bounded and unsupported catalogue entries do not fabricate impact', async () => {
   const connector = { id: 'crm', type: 'rest', endpoint: 'http://127.0.0.1:1' };
@@ -263,7 +282,10 @@ test('public or ambiguous CRM endpoints are blocked before any action I/O', asyn
   }
 });
 
-test('the real HTTP action boundary times out with a bounded useful failure', async (t) => {
+test(
+  'the real HTTP action boundary times out with a bounded useful failure',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   const server = createServer(() => {
     // Deliberately never respond: execRestConnectorRequest owns the five-second abort boundary.
   });
@@ -294,4 +316,5 @@ test('the real HTTP action boundary times out with a bounded useful failure', as
   // failure eventually gets waved through. A generous ceiling still distinguishes bounded from hung.
   assert.ok(elapsed >= 4_500, `abort fired too early at ${elapsed}ms — the boundary was not exercised`);
   assert.ok(elapsed < 60_000, `not bounded — took ${elapsed}ms, which is a hang rather than a timeout`);
-});
+  },
+);
