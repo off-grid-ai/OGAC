@@ -309,11 +309,22 @@ export const GUIDE_QUESTIONS: readonly GuideQuestion[] = [
         href: '/solutions/apps',
         what: 'Each one does a piece of real work and was described in plain language, not coded. Your rules about data, safety and who approves what are already applied to all of them.',
       },
+      // The app's own home is the strongest single screen in the product for a non-technical reader:
+      // what is waiting, what the AI recommended for each case, what a person already decided, and the
+      // plain-language chain on each finished one ("read 2 sources · passed a safety check · AI assessed
+      // it · a person decided · signed and tamper-evident"). Verified populated on both tenants today —
+      // bank: 11 waiting with real ₹ amounts; insurer: 3 waiting plus a handled history.
       {
-        label: 'See a case that a person signed off',
-        href: '/solutions/apps/bhapp_reimb/review',
-        what: 'A reimbursement decision the AI recommended and a person approved — with the report that carries the decision out.',
+        label: 'Open one and see it working',
+        href: '/solutions/apps/bhapp_reimb',
+        what: 'Eleven reimbursement cases waiting for a person, each with the amount, what the AI found and what it recommends — plus the ones already decided.',
         tenants: [BANK],
+      },
+      {
+        label: 'Open one and see it working',
+        href: '/solutions/apps/app_14940314',
+        what: 'Death-claim cases waiting for a person, each with what the AI found — plus the ones already decided, and what each decision was checked against.',
+        tenants: [INSURER],
       },
     ],
   },

@@ -276,9 +276,11 @@ test('both live demo tenants get every question, with their own entity anchored 
     for (const q of questions) assert.ok(q.destinations.length > 0, `${slug}/${q.id}`);
   }
   const bank = guideQuestionsForTenant('bharatunion').find((q) => q.id === 'what-apps-do');
-  assert.ok(bank?.destinations.some((d) => d.href === '/solutions/apps/bhapp_reimb/review'));
+  assert.ok(bank?.destinations.some((d) => d.href === '/solutions/apps/bhapp_reimb'));
   const insurer = guideQuestionsForTenant('suraksha').find((q) => q.id === 'what-apps-do');
+  assert.ok(insurer?.destinations.some((d) => d.href === '/solutions/apps/app_14940314'));
   assert.ok(!insurer?.destinations.some((d) => d.href.includes('bhapp_reimb')));
+  assert.ok(!bank?.destinations.some((d) => d.href.includes('app_14940314')));
 });
 
 // ─── Table hygiene ─────────────────────────────────────────────────────────────────────────────
