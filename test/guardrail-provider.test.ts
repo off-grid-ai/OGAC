@@ -204,7 +204,12 @@ test('output scan uses /analyze/output with prompt context and preserves aggrega
 
   const out = await llmGuardPii.scanOutput?.('Tell me about Raj', 'Raj PAN is ABCDE1234F', 'default');
   assert.equal(seen?.url, 'http://127.0.0.1:8000/analyze/output');
-  assert.deepEqual(seen?.body, { prompt: 'Tell me about Raj', output: 'Raj PAN is ABCDE1234F' });
+  // G-F2 (6bb7a161) put the domestic-PII floor in front of the engine on BOTH phases: PAN/Aadhaar/
+  // IFSC/UPI are masked on the ORIGINAL text before it is ever sent to LLM Guard, so "Mask PAN in
+  // every output" is true even if the engine itself never sees — and can never leak — the real PAN.
+  // This assertion went stale when that commit landed without updating this pre-existing test: it
+  // used to assert the raw PAN reached the wire, which the current (correct) code no longer does.
+  assert.deepEqual(seen?.body, { prompt: 'Tell me about Raj', output: 'Raj PAN is [PAN]' });
   assert.equal(out?.redacted, '[REDACTED]');
   assert.deepEqual(out?.answeredBy, ['pii', 'classifiers']);
   assert.deepEqual(out?.degraded, ['secondary']);

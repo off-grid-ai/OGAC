@@ -112,15 +112,22 @@ function withLlmGuard<T>(sanitized: (prompt: string) => string, fn: () => Promis
 
 test('runInboundGuardrails — PII (email) is REDACTED before the model when the contract requires masking (LLM Guard)', async () => {
   const msg = 'please email the report to arjun.mehta@corebank.in today';
+  // getPii().scan() runs the G-F2 domestic-PII floor (lib/pii-floor.ts) BEFORE the engine ever sees
+  // the text — `regexScan` already redacts EMAIL to `[EMAIL]` on the original message. So the string
+  // LLM Guard's mocked /analyze/prompt receives as `prompt` already has the raw address gone; this
+  // mock's replace() is a no-op by the time it runs (nothing to find) and that IS the assertion: the
+  // floor, not the engine, is what actually stopped the raw email reaching the model. Previously this
+  // test's stub redacted the raw address itself and asserted its OWN placeholder came back — that
+  // stopped proving anything the moment the floor started running first (went stale with 6bb7a161,
+  // never updated here).
   const r = await withLlmGuard(
     (p) => p.replace('arjun.mehta@corebank.in', '[REDACTED_EMAIL]'),
     () => runInboundGuardrails(msg, 'gemma-local', { requireMasking: true }),
   );
   assert.equal(r.blocked, false);
   assert.equal(r.redacted, true);
-  // The email is gone from the model-facing text; LLM Guard's Anonymize sanitized it in place.
   assert.ok(!r.text.includes('arjun.mehta@corebank.in'), 'email must be redacted from model input');
-  assert.ok(r.text.includes('[REDACTED_EMAIL]'));
+  assert.ok(r.text.includes('[EMAIL]'), 'the domestic-PII floor redaction reaches the model-facing text');
   // The PII verdict is recorded regardless (audit trail shows PII was present).
   const pii = r.checks.find((c) => c.name === 'pii');
   assert.equal(pii?.verdict, 'redacted');

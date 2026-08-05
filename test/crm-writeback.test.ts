@@ -10,6 +10,17 @@ import {
   isCrmWritebackReplay,
   validateCrmOpportunityWriteback,
 } from '@/lib/crm-writeback';
+// @ts-expect-error shared JS reachability helper
+import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+
+// writeCrmOpportunityFollowUp's connector target is passed in literally below — no store lookup —
+// but execRestConnectorRequest -> resolveConnectorTarget still resolves a per-connector secret via
+// connector-secrets.ts -> drizzle -> Postgres for EVERY connector id, even ones with no stored
+// secret. A missing row is a clean `null` (proceeds unauthenticated); an UNREACHABLE db throws,
+// which resolveConnectorTarget's catch turns into `credentialError`, which execRestConnectorRequest
+// then reports as "connector is not a reachable REST source" — indistinguishable from a real REST
+// failure unless you already know to suspect the DB. Real HTTP boundary; hidden Postgres dependency.
+const dbUp = await dbReachable();
 
 const VALID_COMMAND = {
   opportunityId: 1,
@@ -90,7 +101,10 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-test('CRM adapter performs one real HTTP PATCH, replays idempotently, and signs receipts', async (t) => {
+test(
+  'CRM adapter performs one real HTTP PATCH, replays idempotently, and signs receipts',
+  { skip: dbUp ? false : SKIP_MESSAGE },
+  async (t) => {
   let record: Record<string, unknown> = {
     id: 1,
     account_id: 1,
@@ -144,7 +158,8 @@ test('CRM adapter performs one real HTTP PATCH, replays idempotently, and signs 
   assert.equal(conflict.ok, false);
   if (!conflict.ok) assert.equal(conflict.code, 'idempotency-conflict');
   assert.equal(patches, 1, 'reusing a key for a different command is rejected');
-});
+  },
+);
 
 test('CRM adapter reports invalid, missing, and unsupported requests without fabrication', async () => {
   const invalid = await writeCrmOpportunityFollowUp(
