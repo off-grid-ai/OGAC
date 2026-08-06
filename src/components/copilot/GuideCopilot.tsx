@@ -416,11 +416,14 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     // scraping can, but it says nothing about what is on the page today — and that is the difference
     // between describing what an Apps page is and describing the apps this reader has.
     const screen = readScreen();
-    setActions(screen?.actions ?? []);
     const request = identity
       ? { ...identity, content: screen?.content }
       : (screen ?? { title: pathname });
+    // AFTER submit, not before. submit clears the actions so a row cannot outlive the screen it came
+    // from, and setting them first meant that clear wiped them again in the same handler — the CTAs
+    // never appeared once.
     submit(pageExplanationQuestion(request), pageExplanationLabel(request));
+    setActions(screen?.actions ?? []);
   }, [identity, pathname, submit]);
 
   // Switching INTO page mode asks immediately — the mode is the request, so making the reader press a
