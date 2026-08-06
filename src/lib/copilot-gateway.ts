@@ -10,6 +10,7 @@
 // The pure request-shaping (`buildChatBody`) is exported + unit-testable without a live gateway.
 
 import { completionBudget, readCompletion } from './chat-completion';
+import { isPageExplanation } from '@/lib/guide-events';
 import { buildCopilotPrompt, type CopilotContext, type CopilotPrompt, type Citation } from './copilot-context';
 import { gatewayFetch } from './gateway';
 import { inferenceTimeoutMs } from './inference-timeout';
@@ -135,7 +136,10 @@ export async function answerCopilot(
   timeoutMs = inferenceTimeoutMs(process.env),
 ): Promise<CopilotAnswer> {
   const prompt = buildCopilotPrompt(ctx);
-  const kind: CopilotAnswer['kind'] = prompt.hasData ? 'platform' : 'page';
+  // Follows what was ASKED, not whether records turned up. Deriving it from hasData mislabelled a
+  // platform question that found nothing as a "page" answer, and captioned a page answer "over live
+  // records" whenever the selection happened to match something.
+  const kind: CopilotAnswer['kind'] = isPageExplanation(ctx.question) ? 'page' : 'platform';
 
   // Gated on `answerable`, not `hasData`. A page explanation has no records by nature and is still
   // perfectly answerable from the screen's own description; gating on hasData meant the model was

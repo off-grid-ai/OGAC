@@ -111,3 +111,25 @@ test('stemming makes a word family match one affinity entry', () => {
   assert.ok(scoreFact('what runs here?', run) > 0);
   assert.ok(scoreFact('has anything actually run?', run) > 0);
 });
+
+test('a page explanation is given NO records, even when some would match', async () => {
+  // Correctness, not performance. With records in the prompt the model describes the SCREEN in terms
+  // of them: asked about Work — "what needs a decision from you, and the apps that do your work" — it
+  // answered "the /work page displays your current pipeline status and recent audit logs", because
+  // audit rows were the only concrete thing in front of it.
+  const { buildCopilotPrompt } = await import('@/lib/copilot-context');
+  const { pageExplanationQuestion } = await import('@/lib/guide-events');
+  const question = pageExplanationQuestion({
+    title: 'Your work',
+    eyebrow: 'Work',
+    description: 'What needs a decision from you, and the apps that do your work.',
+  });
+  // The same context that would happily yield audit records for a free-text question.
+  const prompt = buildCopilotPrompt({
+    question,
+    audit: { configured: true, rows: [] },
+  });
+  assert.deepEqual(prompt.citations, [], 'no records may compete with the page description');
+  assert.equal(prompt.answerable, true);
+  assert.match(prompt.user, /apps that do your work/, 'the description IS the material');
+});

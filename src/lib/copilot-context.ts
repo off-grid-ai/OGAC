@@ -212,11 +212,16 @@ export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
   // Selecting NOTHING is a real outcome, not a failure: the no-data path below already says so
   // honestly and then answers from what the console does. Padding the prompt with a weak match so
   // there is something to cite is exactly how an off-topic record reaches a buyer labelled evidence.
-  const citations = selectRelevantFacts(ctx.question, buildCitations(ctx));
-  const hasData = citations.length > 0;
-  // "Explain this page" is a different KIND of question and needs the opposite handling — see the
-  // branch at the bottom, and isPageExplanation for why.
+  // "Explain this page" is a different KIND of question and gets NO records at all.
+  //
+  // Not a performance choice — a correctness one. With records in the prompt the model describes the
+  // screen in terms of them: asked about Work ("what needs a decision from you, and the apps that do
+  // your work"), it answered "the /work page displays your current pipeline status and recent audit
+  // logs", because audit rows were the only concrete thing in front of it. The page's own description
+  // is the material for this question; anything else in the prompt competes with it.
   const explainingAPage = isPageExplanation(ctx.question);
+  const citations = explainingAPage ? [] : selectRelevantFacts(ctx.question, buildCitations(ctx));
+  const hasData = citations.length > 0;
 
   const factBlock = hasData
     ? citations.map((c) => `[${c.n}] (${c.source}) ${c.text}`).join('\n')
