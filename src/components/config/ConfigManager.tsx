@@ -357,7 +357,7 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
                       onReveal={toggleReveal}
                     />
                     <p className="line-clamp-2 text-[11px] text-muted-foreground">
-                      {entry.description}
+                      {isViewer ? publicLabel(entry.description) : entry.description}
                     </p>
                   </div>
                 ))}

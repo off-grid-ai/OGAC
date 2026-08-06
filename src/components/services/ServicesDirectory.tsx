@@ -30,6 +30,9 @@ const KIND_GROUPS: { kind: ServiceTopologyDirectoryEntry['kind']; label: string 
 ];
 
 function HealthDot({ h }: Readonly<{ h: ServiceHealth | undefined }>) {
+  // Probe strings name the service they talked to ("verified through the LiteLLM service",
+  // "reported by Temporal task-queue state"), so they leak engine names into a viewer-visible page.
+  const viewer = useIsViewer();
   if (!h) {
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -45,13 +48,13 @@ function HealthDot({ h }: Readonly<{ h: ServiceHealth | undefined }>) {
       <span className={ui.text}>{ui.label}</span>
       {h.ms != null && <span className="text-muted-foreground">{h.ms}ms</span>}
       {h.detail && (
-        <span className="truncate text-muted-foreground" title={h.detail}>
-          {h.detail}
+        <span className="truncate text-muted-foreground" title={viewer ? publicLabel(h.detail) : h.detail}>
+          {viewer ? publicLabel(h.detail) : h.detail}
         </span>
       )}
       {down && h.error && (
-        <span className="truncate text-muted-foreground" title={h.error}>
-          {h.error}
+        <span className="truncate text-muted-foreground" title={viewer ? publicLabel(h.error) : h.error}>
+          {viewer ? publicLabel(h.error) : h.error}
         </span>
       )}
     </span>
