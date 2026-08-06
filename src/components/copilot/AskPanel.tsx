@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CopilotAnswerSkeleton } from '@/components/copilot/CopilotAnswerSkeleton';
 import { CopilotAnswerView } from '@/components/copilot/CopilotAnswerView';
 import { MIN_QUESTION_LENGTH, useCopilotAnswer } from '@/components/copilot/useCopilotAnswer';
 import { Button } from '@/components/ui/button';
@@ -68,6 +69,17 @@ export function AskPanel() {
       {error ? (
         <Card className="border-destructive/40 shadow-sm">
           <CardContent className="py-4 text-sm text-destructive">{error}</CardContent>
+        </Card>
+      ) : null}
+
+      {/* Same loader as the guide, from one component — the two copilot surfaces answer through the
+          same pipeline and waited the same ~15-20s, so they must not drift into two different ideas
+          of what "working" looks like. */}
+      {loading ? (
+        <Card className="shadow-sm">
+          <CardContent className="py-4">
+            <CopilotAnswerSkeleton label="Reading the live records…" />
+          </CardContent>
         </Card>
       ) : null}
 

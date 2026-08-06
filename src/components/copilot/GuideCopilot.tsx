@@ -3,6 +3,7 @@
 import { ArrowRight, Compass, X } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CopilotAnswerSkeleton } from '@/components/copilot/CopilotAnswerSkeleton';
 import { CopilotAnswerView } from '@/components/copilot/CopilotAnswerView';
 import { MIN_QUESTION_LENGTH, useCopilotAnswer } from '@/components/copilot/useCopilotAnswer';
 import { useIsViewer } from '@/components/ViewerModeProvider';
@@ -335,9 +336,9 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                 {resolution ? <Destinations resolution={resolution} onGo={goTo} /> : null}
 
                 {loading ? (
-                  <p className="border-t border-border pt-3 text-xs text-muted-foreground">
-                    Reading the live records…
-                  </p>
+                  <div className="border-t border-border pt-3">
+                    <CopilotAnswerSkeleton label="Reading the live records…" />
+                  </div>
                 ) : null}
                 {error ? (
                   <p className="border-t border-border pt-3 text-xs text-destructive">{error}</p>
@@ -418,7 +419,11 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
           className="fixed bottom-4 right-4 z-40 hidden items-center gap-2 rounded-full border border-primary bg-primary px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest text-primary-foreground shadow-lg transition-opacity hover:opacity-90 md:flex"
         >
           <Compass className="size-4" />
-          Show me around
+          {/* NOT "Show me around" any more: that is now one of the two MODES inside the panel, so
+              using it for the launcher too promised the tour and could open the page explainer. This
+              names what the surface is for rather than one thing it does, and it matches the
+              composer's own placeholder, so the invitation and the input agree. */}
+          Ask anything
         </button>
       )}
     </>
