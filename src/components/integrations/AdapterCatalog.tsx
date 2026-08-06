@@ -1,5 +1,8 @@
 'use client';
 
+import { useIsViewer } from '@/components/ViewerModeProvider';
+import { publicLabel } from '@/lib/lineage-labels';
+
 import { Plugs, PlugsConnected } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -38,6 +41,7 @@ const RENDER: Record<string, string> = {
 // the default (no ?cat=) is "All". Every card keeps its swap-via config, live health, and the
 // register action — this is organization, not removal.
 export function AdapterCatalog({ bindings }: Readonly<{ bindings: CapabilityBinding[] }>) {
+  const isViewer = useIsViewer();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const active = normalizeCategory(searchParams.get('cat'));
@@ -114,12 +118,25 @@ export function AdapterCatalog({ bindings }: Readonly<{ bindings: CapabilityBind
                     <Icon className="size-5 text-primary" />
                     <CardTitle className="text-sm capitalize">{b.capability}</CardTitle>
                   </div>
-                  <StateBadge state={state} subject={b.active.vendor ?? b.capability} />
+                  <StateBadge
+                    state={state}
+                    subject={
+                      isViewer
+                        ? publicLabel(b.active.vendor ?? b.capability)
+                        : (b.active.vendor ?? b.capability)
+                    }
+                  />
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-sm font-medium text-foreground">{b.active.vendor}</span>
+                  {/* Sanitised. This card names the OSS project serving each capability, and the page
+                      is reachable by the read-only demo accounts handed out on public links — the
+                      2026-08-05 audit called it the densest engine-name exposure in the console.
+                      An operator still sees the real names below; a visitor sees what the thing DOES. */}
+                  <span className="text-sm font-medium text-foreground">
+                    {isViewer ? publicLabel(b.active.vendor) : b.active.vendor}
+                  </span>
                   <Badge variant="secondary" className="text-muted-foreground">
                     {b.active.license}
                   </Badge>
@@ -127,8 +144,16 @@ export function AdapterCatalog({ bindings }: Readonly<{ bindings: CapabilityBind
                     {b.active.render}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">{b.active.description}</p>
+                <p className="text-xs text-muted-foreground">
+                  {isViewer ? publicLabel(b.active.description) : b.active.description}
+                </p>
 
+                {/* The swap instruction and the alternative implementations are OPERATOR material:
+                    a raw environment variable and a list of OSS project ids. A read-only visitor
+                    cannot act on either — they have no shell and no write access — so for them this
+                    block is pure internal detail with no upside. Hidden rather than sanitised,
+                    because "swap via <redacted>=<redacted>" is noise, not information. */}
+                {isViewer ? null : (
                 <div className="space-y-1.5 border-t border-border pt-3">
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
                     Swap via
@@ -151,6 +176,7 @@ export function AdapterCatalog({ bindings }: Readonly<{ bindings: CapabilityBind
                     <span className="text-xs text-muted-foreground">No alternatives.</span>
                   )}
                 </div>
+                )}
               </CardContent>
             </Card>
           );

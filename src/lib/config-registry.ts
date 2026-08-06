@@ -193,14 +193,26 @@ export const CONFIG_REGISTRY: ConfigKeyDef[] = [
     type: 'boolean',
     secret: false,
     restartRequired: true,
-    description: 'Enable the dev credentials login. MUST be false in production.',
+    // The description states the SECOND condition because this page shows the raw env value and the
+    // code applies a further guard: `devLoginEnabled = AUTH_DEV_LOGIN === 'true' && NODE_ENV !==
+    // 'production'`. On the live box the variable IS true while the console runs under `next start`,
+    // so the provider is genuinely absent — verified in the auth log: `Provider with id "dev" not
+    // found. Available providers: [password]`. Reading "Dev login: on" here and concluding the door
+    // is open is the wrong conclusion, and the reverse (trusting it when NODE_ENV changes) would be
+    // worse, so the effective state is spelled out rather than implied.
+    description:
+      'Enable the dev credentials login. MUST be false in production. Also force-disabled whenever NODE_ENV=production, so a `true` here has no effect on a production build — check the sign-in page for the real answer.',
   },
   {
     key: 'OFFGRID_ADMIN_EMAILS',
     group: 'Auth',
     label: 'Admin emails',
     type: 'string',
-    secret: false,
+    // SECRET because the value is real people's addresses. Marked `false`, this rendered the
+    // operator's own personal email in plaintext to anyone who opened the config page — including
+    // every read-only demo account handed out on a public link. It is not a credential, but it is
+    // personal data and it names who to phish to get admin, which is the same reason we mask keys.
+    secret: true,
     restartRequired: true,
     description: 'Comma-separated emails always granted admin, regardless of Keycloak role.',
   },
