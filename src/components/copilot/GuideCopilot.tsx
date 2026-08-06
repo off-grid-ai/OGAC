@@ -1,11 +1,11 @@
 'use client';
 
-import { ArrowRight, Compass, X } from '@phosphor-icons/react/dist/ssr';
+import { ArrowLeft, ArrowRight, Compass, X } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CopilotAnswerSkeleton } from '@/components/copilot/CopilotAnswerSkeleton';
 import { CopilotAnswerView } from '@/components/copilot/CopilotAnswerView';
-import { MIN_QUESTION_LENGTH, useCopilotAnswer } from '@/components/copilot/useCopilotAnswer';
+import { MIN_QUESTION_LENGTH, useCopilotAnswer, type CopilotAnswer } from '@/components/copilot/useCopilotAnswer';
 import { useIsViewer } from '@/components/ViewerModeProvider';
 import {
   GUIDE_THEMES,
@@ -57,6 +57,13 @@ import { routeIdentityForPath } from '@/modules/route-identity';
 // a panel width is not one. Open/closed is local for the same reason.
 /** The guide answers two different questions; see the mode switch in the header. */
 type GuideMode = 'tour' | 'page';
+
+/** One answered question, kept so the reader can step back to it without paying for it again. */
+interface GuideSnapshot {
+  asked: string;
+  resolution: GuideResolution | null;
+  result: CopilotAnswer | null;
+}
 
 const PANEL_STORAGE_KEY = 'offgrid.guide.width';
 const PANEL_MIN_PX = 380;
@@ -148,10 +155,34 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   const pathname = usePathname();
   const identity = routeIdentityForPath(pathname);
 
+  // ─── Back through previous answers ────────────────────────────────────────────────────────────
+  //
+  // Each answer costs real seconds on on-prem hardware, so asking a second question used to DESTROY
+  // the first one with no way back — a reader who followed a "go and see it" link, then asked about
+  // where they landed, could not return to what sent them there. Snapshots are kept in memory and
+  // restored without re-asking, because re-running the model to see something already computed is
+  // the expensive way to answer a question nobody asked again.
+  const [past, setPast] = useState<GuideSnapshot[]>([]);
+  const [restored, setRestored] = useState<GuideSnapshot | null>(null);
+
+  const goBack = useCallback(() => {
+    setPast((stack) => {
+      if (stack.length === 0) return stack;
+      setRestored(stack[stack.length - 1]);
+      return stack.slice(0, -1);
+    });
+  }, []);
+
   const submit = useCallback(
     (q: string) => {
       const text = q.trim();
       if (text.length < MIN_QUESTION_LENGTH) return;
+      // Keep whatever is on screen before replacing it. Snapshotting the RESTORED entry when one is
+      // showing keeps the stack honest — otherwise stepping back and asking again would silently
+      // drop the entry you were looking at.
+      const current = restored ?? (asked ? { asked, resolution, result } : null);
+      if (current?.asked) setPast((stack) => [...stack, current]);
+      setRestored(null);
       // Clear the composer once the question is accepted. It used to keep the text, so after asking
       // you were left staring at your own question in the input while the answer rendered above it —
       // and typing the next one meant selecting and deleting the last one first. The question is not
@@ -163,8 +194,16 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       setResolution(resolveGuideDestinations(text, { tenantSlug, sanitize: publicLabel }));
       void ask(text);
     },
-    [ask, tenantSlug],
+    [ask, asked, resolution, restored, result, tenantSlug],
   );
+
+  // A restored snapshot wins over live state, so stepping back shows that answer rather than the
+  // newest one. Loading is suppressed while viewing history — a spinner over an answer you already
+  // have reads as though it is being recomputed.
+  const shownAsked = restored ? restored.asked : asked;
+  const shownResolution = restored ? restored.resolution : resolution;
+  const shownResult = restored ? restored.result : result;
+  const shownLoading = restored ? false : loading;
 
   const goTo = useCallback(
     (destination: GuideDestination) => {
@@ -184,13 +223,30 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       // doing it here too fired TWO overlapping requests for one click. The hook now refuses to let a
       // superseded response land, but the right fix is not to make the second request at all.
       if (mode !== 'page') {
-        submit(`What am I looking at on ${destination.label}, and what should I check here?`);
+        // A destination can point at the page you are ALREADY on — the egress card links to the
+        // egress page — and `router.push` to the current route is a no-op, so the reader clicks
+        // "take me there", nothing moves, and the panel starts thinking. Ask about the PAGE in that
+        // case, which is both a better question and the one whose answer explains why nothing moved.
+        const samePlace = destination.href.split('?')[0] === pathname;
+        submit(
+          samePlace
+            ? pageExplanationQuestion(
+                identity
+                  ? { title: identity.title, eyebrow: identity.eyebrow, description: identity.description }
+                  : { title: destination.label },
+              )
+            : `What am I looking at on ${destination.label}, and what should I check here?`,
+        );
       }
     },
-    [mode, router, submit],
+    [identity, mode, pathname, router, submit],
   );
 
   const startOver = useCallback(() => {
+    // 'new' means a clean slate, so the back stack goes with it — leaving history behind a fresh
+    // question would let Back jump to an answer from a conversation the reader has ended.
+    setPast([]);
+    setRestored(null);
     setAsked(null);
     setResolution(null);
     setQuestion('');
@@ -326,22 +382,36 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
               </p>
             ) : null}
 
-            {asked ? (
+            {shownAsked ? (
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-[13px] font-medium leading-snug text-foreground">{asked}</p>
-                  <button
-                    type="button"
-                    onClick={startOver}
-                    className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    new
-                  </button>
+                  <p className="text-[13px] font-medium leading-snug text-foreground">{shownAsked}</p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {/* Only shown when there is somewhere to go back TO — a permanently-disabled
+                        control is just clutter on a panel this narrow. */}
+                    {past.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={goBack}
+                        className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <ArrowLeft className="size-3" />
+                        back
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={startOver}
+                      className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      new
+                    </button>
+                  </div>
                 </div>
 
-                {resolution ? <Destinations resolution={resolution} onGo={goTo} /> : null}
+                {shownResolution ? <Destinations resolution={shownResolution} onGo={goTo} /> : null}
 
-                {loading ? (
+                {shownLoading ? (
                   <div className="border-t border-border pt-3">
                     <CopilotAnswerSkeleton label="Reading the live records…" />
                   </div>
@@ -349,13 +419,13 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                 {error ? (
                   <p className="border-t border-border pt-3 text-xs text-destructive">{error}</p>
                 ) : null}
-                {result ? (
+                {shownResult ? (
                   <div className="og-fade-in border-t border-border pt-3">
-                    <CopilotAnswerView result={result} />
+                    <CopilotAnswerView result={shownResult} />
                   </div>
                 ) : null}
 
-                {resolution?.match === 'none' && !loading ? (
+                {shownResolution?.match === 'none' && !shownLoading ? (
                   <Starters questions={questions} onPick={submit} heading="Try one of these instead" />
                 ) : null}
               </div>

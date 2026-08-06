@@ -50,7 +50,11 @@ test('no data → hasData false and an honest no-data prompt', () => {
   const prompt = buildCopilotPrompt({ question: 'why is cost up?' });
   assert.equal(prompt.hasData, false);
   assert.equal(prompt.citations.length, 0);
-  assert.match(prompt.user, /no facts available/i);
+  // Asserts the PROPERTY — the prompt tells the model there is nothing to answer from — rather than
+  // one phrasing. The wording moved from "facts" to "records" when the prompt stopped calling
+  // generically-gathered activity "facts about the question"; the honesty rule is unchanged.
+  assert.match(prompt.user, /no records available|no facts available/i);
+  assert.match(prompt.user, /no data/i);
 });
 
 test('citations are numbered 1..n and only from present sources', () => {

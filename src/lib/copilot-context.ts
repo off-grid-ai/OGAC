@@ -199,12 +199,27 @@ export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
   const user = [
     `Operator question: ${ctx.question}`,
     '',
-    'Facts from the platform spine:',
+    // The facts are gathered the SAME way for every question — recent anomalies, drift, evals, cost,
+    // audit — so for a question they do not cover they are not evidence, they are just what happened
+    // to be lying around. Asked "what can and cannot leave" on the egress page, the model answered
+    // with cost spikes and feature drift and called them "Evidence", because the prompt said answer
+    // from these facts and never said what to do when they do not fit.
+    //
+    // Naming them "recent platform activity" rather than "facts about the question", and requiring an
+    // explicit relevance check first, is what stops an off-topic dump being presented as an answer.
+    'Recent platform activity (gathered generically — it may or may not relate to the question):',
     factBlock,
     '',
     hasData
-      ? 'Answer the question using ONLY these facts, citing them as [n].'
-      : 'There are no facts available. Tell the operator you have no data to answer this and suggest what to check or enable.',
+      ? [
+          'FIRST decide whether the records above actually bear on the question.',
+          '- If they do: answer using ONLY them, citing as [n].',
+          '- If they do NOT: say so in one sentence ("I don\'t have records about X"), then answer the',
+          '  question from what the console itself does — plainly and without citations — and stop.',
+          '  Do NOT list unrelated records under a heading like "Evidence"; an off-topic record',
+          '  presented as evidence is worse than admitting the gap.',
+        ].join('\n')
+      : 'There are no records available. Tell the operator you have no data to answer this and suggest what to check or enable.',
   ].join('\n');
 
   return { system: SYSTEM_PROMPT, user, citations, hasData };
