@@ -1,5 +1,7 @@
 'use client';
 
+import { ReadOnlyGuard } from '@/components/ReadOnlyGuard';
+
 import { Plus } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
@@ -25,10 +27,12 @@ export function AddAssetButton() {
 
   return (
     <>
-      <Button size="sm" onClick={() => setPanel('new-asset')}>
-        <Plus className="size-4" />
-        Add dataset
-      </Button>
+      <ReadOnlyGuard>
+        <Button size="sm" onClick={() => setPanel('new-asset')}>
+          <Plus className="size-4" />
+          Add dataset
+        </Button>
+      </ReadOnlyGuard>
       <AssetFormSheet
         open={open}
         onOpenChange={(o) => !o && setPanel(null)}

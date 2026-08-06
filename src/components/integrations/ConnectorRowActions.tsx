@@ -1,5 +1,7 @@
 'use client';
 
+import { ReadOnlyGuard } from '@/components/ReadOnlyGuard';
+
 import {
   ArrowsClockwise,
   DotsThree,
@@ -159,12 +161,17 @@ export function ConnectorRowActions({ connector }: Readonly<{ connector: Connect
 
   return (
     <>
+      {/* Every item behind this trigger is a write — sync, edit, delete — so guarding the trigger
+          disarms all three at once, and a viewer is told why instead of opening a menu where each
+          item fails on click. */}
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-8" aria-label="Connector actions">
-            <DotsThree className="size-4" weight="bold" />
-          </Button>
-        </DropdownMenuTrigger>
+        <ReadOnlyGuard>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-8" aria-label="Connector actions">
+              <DotsThree className="size-4" weight="bold" />
+            </Button>
+          </DropdownMenuTrigger>
+        </ReadOnlyGuard>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={sync} disabled={busy}>
             <ArrowsClockwise className="size-4" />

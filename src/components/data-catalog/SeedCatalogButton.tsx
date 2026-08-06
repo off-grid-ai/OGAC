@@ -1,5 +1,7 @@
 'use client';
 
+import { ReadOnlyGuard } from '@/components/ReadOnlyGuard';
+
 import { Sparkle } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -30,9 +32,11 @@ export function SeedCatalogButton() {
   }
 
   return (
-    <Button size="sm" variant="outline" onClick={seed} disabled={busy}>
-      <Sparkle className="size-4" />
-      {busy ? 'Seeding…' : 'Seed from connectors'}
-    </Button>
+    <ReadOnlyGuard>
+      <Button size="sm" variant="outline" onClick={seed} disabled={busy}>
+        <Sparkle className="size-4" />
+        {busy ? 'Seeding…' : 'Seed from connectors'}
+      </Button>
+    </ReadOnlyGuard>
   );
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { ReadOnlyGuard } from '@/components/ReadOnlyGuard';
+
 import { Database, Lightning, MagnifyingGlass, Plus } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -199,15 +201,17 @@ export function ConnectorCatalog() {
                     </CardHeader>
                     <CardContent className="flex flex-1 flex-col justify-between gap-3">
                       <p className="text-xs text-muted-foreground">{t.description}</p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => setOpen(t.id)}
-                      >
-                        <Plus className="size-4" />
-                        Add
-                      </Button>
+                      <ReadOnlyGuard className="w-full">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setOpen(t.id)}
+                        >
+                          <Plus className="size-4" />
+                          Add
+                        </Button>
+                      </ReadOnlyGuard>
                     </CardContent>
                   </Card>
                 ))}
