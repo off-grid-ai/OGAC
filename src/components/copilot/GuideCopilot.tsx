@@ -12,6 +12,7 @@ import {
   GUIDE_THEMES,
   guideQuestionsForTenant,
   resolveGuideDestinations,
+  withoutCurrentPage,
   type GuideDestination,
   type GuideResolution,
 } from '@/lib/guide-copilot';
@@ -234,7 +235,14 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   // newest one. Loading is suppressed while viewing history — a spinner over an answer you already
   // have reads as though it is being recomputed.
   const shownAsked = restored ? restored.asked : asked;
-  const shownResolution = restored ? restored.resolution : resolution;
+  const rawResolution = restored ? restored.resolution : resolution;
+  // Filtered against the CURRENT path, not the path at the time the question was asked. The reader
+  // clicks "take me there", lands, and the list must stop offering the screen they are now on — a
+  // filter applied once at submit time would leave exactly that dead link behind.
+  const shownResolution = useMemo(
+    () => (rawResolution ? withoutCurrentPage(rawResolution, pathname) : null),
+    [pathname, rawResolution],
+  );
   const shownResult = restored ? restored.result : result;
   const shownLoading = restored ? false : loading;
 
@@ -255,21 +263,11 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       // NOT in page mode, though: there the pathname effect already asks about wherever you land, so
       // doing it here too fired TWO overlapping requests for one click. The hook now refuses to let a
       // superseded response land, but the right fix is not to make the second request at all.
+      // No same-page branch any more. A destination pointing at the current screen used to be
+      // handled here — asked about instead of navigated to — but handling a dead link gracefully is
+      // not the same as not offering it. `withoutCurrentPage` removes it before the reader can click.
       if (mode !== 'page') {
-        // A destination can point at the page you are ALREADY on — the egress card links to the
-        // egress page — and `router.push` to the current route is a no-op, so the reader clicks
-        // "take me there", nothing moves, and the panel starts thinking. Ask about the PAGE in that
-        // case, which is both a better question and the one whose answer explains why nothing moved.
-        const samePlace = destination.href.split('?')[0] === pathname;
-        submit(
-          samePlace
-            ? pageExplanationQuestion(
-                identity
-                  ? { title: identity.title, eyebrow: identity.eyebrow, description: identity.description }
-                  : { title: destination.label },
-              )
-            : `What am I looking at on ${destination.label}, and what should I check here?`,
-        );
+        submit(`What am I looking at on ${destination.label}, and what should I check here?`);
       }
     },
     [identity, mode, pathname, router, submit],
@@ -433,7 +431,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
             ) : null}
 
             {mode === 'proof' ? (
-              <GuideProof onGo={goToProof} />
+              <GuideProof onGo={goToProof} pathname={pathname} />
             ) : shownAsked ? (
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">

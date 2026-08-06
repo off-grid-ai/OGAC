@@ -660,6 +660,38 @@ const MIN_TOPIC_SCORE = 2;
  *  4. `none`     — honestly nothing. The widget then says so and shows the starter questions;
  *                  it does NOT guess a page.
  */
+/**
+ * Is this destination the screen the reader is already on?
+ *
+ * Compares the PATH only — a destination may carry a query string, and `/insights/cost?tab=models`
+ * from `/insights/cost` is still a real move. Trailing slashes are normalised because a route can be
+ * written either way and a false negative here puts a dead link back on screen.
+ */
+export function isCurrentPath(href: string, pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  const strip = (v: string) => (v.split('?')[0].replace(/\/+$/, '') || '/');
+  return strip(href) === strip(pathname);
+}
+
+/**
+ * Drop destinations that point at the current screen.
+ *
+ * A "go and see it" link to the page you are already reading does nothing when you click it. There is
+ * no way to distinguish that from a broken product: the reader clicks, the screen does not change,
+ * and they stop trusting every other link on the surface. Handling the click gracefully is not
+ * enough — the link should never have been offered.
+ */
+export function withoutCurrentPage(
+  resolution: GuideResolution,
+  pathname: string | null | undefined,
+): GuideResolution {
+  const destinations = resolution.destinations.filter((d) => !isCurrentPath(d.href, pathname));
+  if (destinations.length === resolution.destinations.length) return resolution;
+  // Everything it had to offer was this page. That is 'none' — there is nowhere to send the reader,
+  // and saying so is honest, where an empty list under a "Go and see it" heading just looks broken.
+  return { ...resolution, destinations, match: destinations.length ? resolution.match : 'none' };
+}
+
 export function resolveGuideDestinations(
   question: string,
   options: { tenantSlug?: string | null; sanitize?: (label: string) => string } = {},

@@ -3,6 +3,7 @@
 import { ArrowRight, Warning } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useState } from 'react';
 import { CopilotAnswerSkeleton } from '@/components/copilot/CopilotAnswerSkeleton';
+import { isCurrentPath } from '@/lib/guide-copilot';
 import { PROOF_UNAVAILABLE, type ProofPoint } from '@/lib/guide-proof';
 
 // ─── "Prove it" — the claims, with live numbers, that a buyer needs settled ────────────────────────
@@ -14,7 +15,10 @@ import { PROOF_UNAVAILABLE, type ProofPoint } from '@/lib/guide-proof';
 // Each card is a claim, its number, and a link. The link is the point: a proof a reader cannot go and
 // check for themselves is a slogan.
 
-export function GuideProof({ onGo }: Readonly<{ onGo: (href: string) => void }>) {
+export function GuideProof({
+  onGo,
+  pathname,
+}: Readonly<{ onGo: (href: string) => void; pathname: string | null }>) {
   const [points, setPoints] = useState<ProofPoint[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -72,14 +76,25 @@ export function GuideProof({ onGo }: Readonly<{ onGo: (href: string) => void }>)
           <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
             {p.value !== null ? p.detail : PROOF_UNAVAILABLE}
           </p>
-          <button
-            type="button"
-            onClick={() => onGo(p.href)}
-            className="group mt-2 flex items-center gap-1 text-[11px] font-medium text-foreground transition-colors hover:text-primary"
-          >
-            {p.linkLabel}
-            <ArrowRight className="size-3 text-primary transition-transform group-hover:translate-x-0.5" />
-          </button>
+          {/* The action is a bordered pill, not a line of text with an arrow after it. The previous
+              version read as a caption — nothing about 11px foreground text says "press me", and on a
+              panel where going somewhere IS the point, the one control per card has to look like one.
+              Suppressed entirely when it would point at the screen already open: a link that cannot
+              move you is indistinguishable from a broken one. */}
+          {isCurrentPath(p.href, pathname) ? (
+            <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              you are on this screen
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onGo(p.href)}
+              className="group mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors duration-150 hover:border-primary hover:bg-primary hover:text-primary-foreground"
+            >
+              {p.linkLabel}
+              <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          )}
         </div>
       ))}
     </div>

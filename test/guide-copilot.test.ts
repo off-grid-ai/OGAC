@@ -7,8 +7,10 @@ import {
   GUIDE_QUESTIONS,
   GUIDE_THEMES,
   guideQuestionsForTenant,
+  isCurrentPath,
   isReadOnlySafeHref,
   resolveGuideDestinations,
+  withoutCurrentPage,
 } from '../src/lib/guide-copilot.ts';
 import { leaksInternalName, publicLabel } from '../src/lib/lineage-labels.ts';
 
@@ -318,4 +320,48 @@ test('duplicate destinations within one answer are collapsed', () => {
   const { destinations } = resolveGuideDestinations('What is waiting for a person to decide right now?');
   const hrefs = destinations.map((d) => d.href);
   assert.equal(new Set(hrefs).size, hrefs.length);
+});
+
+// ── Never offer the screen the reader is already on ───────────────────────────────────────────────
+// The founder's report was "many times I click on a link and it doesn't change the route". Every one
+// of those was a destination pointing at the current page: router.push to the current route is a
+// no-op, so the click did nothing, and there is no way for a reader to distinguish that from a
+// broken product. Handling the click gracefully is not the fix; not offering the link is.
+
+test('a destination for the current page is removed', () => {
+  const res = {
+    match: 'exact' as const,
+    destinations: [
+      { href: '/governance/egress', label: 'Egress', what: 'what can leave' },
+      { href: '/operations/runs', label: 'Runs', what: 'every run' },
+    ],
+  };
+  const out = withoutCurrentPage(res, '/governance/egress');
+  assert.deepEqual(out.destinations.map((d) => d.href), ['/operations/runs']);
+});
+
+test('when every destination was the current page, that is "none", not an empty list', () => {
+  // An empty list under a "Go and see it" heading reads as broken. 'none' renders the honest line.
+  const res = {
+    match: 'exact' as const,
+    destinations: [{ href: '/insights/outcomes', label: 'ROI', what: 'the return' }],
+  };
+  const out = withoutCurrentPage(res, '/insights/outcomes');
+  assert.equal(out.destinations.length, 0);
+  assert.equal(out.match, 'none');
+});
+
+test('a query string is still a real move; a trailing slash is not', () => {
+  assert.equal(isCurrentPath('/insights/cost?tab=models', '/insights/cost'), true);
+  assert.equal(isCurrentPath('/insights/cost/', '/insights/cost'), true);
+  assert.equal(isCurrentPath('/insights/cost/models', '/insights/cost'), false);
+  assert.equal(isCurrentPath('/insights/cost', null), false, 'unknown path filters nothing');
+});
+
+test('nothing is dropped when the reader is somewhere else entirely', () => {
+  const res = {
+    match: 'exact' as const,
+    destinations: [{ href: '/operations/runs', label: 'Runs', what: 'every run' }],
+  };
+  assert.equal(withoutCurrentPage(res, '/overview'), res, 'same object — no needless re-render');
 });
