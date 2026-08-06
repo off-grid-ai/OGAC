@@ -14,6 +14,15 @@ export interface PageExplanationRequest {
   eyebrow?: string;
   /** The route's one-line description, when it has one. */
   description?: string;
+  /**
+   * What is actually ON the screen right now — the figures, rows and names the reader can see.
+   *
+   * Without it the answer is a definition. Asked about Apps, the guide replied that the page "displays
+   * pre-built business use cases and AI agents designed for the full lifecycle of your organization":
+   * true of every tenant, and therefore worth nothing to the one reading it. The useful answer names
+   * what is in front of them — how many apps, which are live, what is waiting.
+   */
+  content?: string;
 }
 
 /**
@@ -28,7 +37,12 @@ export interface PageExplanationRequest {
 export function pageExplanationQuestion(request: PageExplanationRequest): string {
   const where = [request.eyebrow, request.title].filter(Boolean).join(' → ');
   const detail = request.description ? ` The page describes itself as: ${request.description}.` : '';
-  return `Explain the "${where}" page to me.${detail} What is it for, what am I looking at, and what should I check first?`;
+  // The screen's contents go in as a labelled block rather than woven into the sentence: it is data,
+  // not part of the question, and the model needs to be able to tell those apart.
+  const onScreen = request.content
+    ? `\n\nWhat is on the screen right now:\n${request.content}`
+    : '';
+  return `Explain the "${where}" page to me.${detail} What is it for, what am I looking at, and what should I check first?${onScreen}`;
 }
 
 /**

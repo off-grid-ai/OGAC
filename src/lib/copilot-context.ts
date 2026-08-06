@@ -272,16 +272,19 @@ export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
           // unanswerable nonsense to someone who only wanted to know what they were looking at.
           [
             'Explain this screen: what it is for, and what the reader should look at first.',
-            // The invention rule is the load-bearing one. Given only a path, the model described Work
-            // as "your current active AI model and system status" with a "System Health section" —
-            // none of which exists. It is answering about a screen it cannot see, so anything it was
-            // not told is a guess, and a confident guess about the product is worse than a short
-            // answer.
-            'Use ONLY the page name and description in the question. Do NOT name any section, tab,',
-            'metric, button or feature you were not told about — if you were not told, leave it out',
-            'and keep the answer short.',
+            // The point of handing over the screen's contents. Without this the answer is a
+            // definition — "Apps displays pre-built business use cases for the full lifecycle of your
+            // organization" — which is true of every tenant and therefore worth nothing to the one
+            // reading it. Name what is actually there.
+            'Where the screen contents are given, be SPECIFIC about them: how many of a thing there',
+            'are, what state they are in, and anything that looks like it needs attention. Prefer a',
+            'real number or name from the screen over a general description of the page.',
+            // Still the load-bearing rule. Given only a path, the model described Work as "your
+            // current active AI model and system status" with a "System Health section" — none of
+            // which exists. It is answering about a screen it cannot see beyond what it was told.
+            'Do NOT mention anything that is not in the page name, description or contents above.',
             'Do not mention records, data availability, or modules being configured: none of that was',
-            'asked and none of it applies. No citations. Three sentences at most.',
+            'asked and none of it applies. No citations. Four sentences at most.',
           ].join('\n')
         : 'There are no records available. Tell the operator you have no data to answer this and suggest what to check or enable.',
   ].join('\n');

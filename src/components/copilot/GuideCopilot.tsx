@@ -386,7 +386,17 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     //
     // The page itself is the material. Its heading and standfirst are on screen in front of the
     // reader, which makes them both always available and exactly what the answer should be about.
-    submit(pageExplanationQuestion(identity ?? readScreen() ?? { title: pathname }));
+    // The screen is read EITHER way. A registered identity gives a better title and description than
+    // scraping can, but it says nothing about what is on the page today — and that is the difference
+    // between describing what an Apps page is and describing the apps this reader has.
+    const screen = readScreen();
+    submit(
+      pageExplanationQuestion(
+        identity
+          ? { ...identity, content: screen?.content }
+          : (screen ?? { title: pathname }),
+      ),
+    );
   }, [identity, pathname, submit]);
 
   // Switching INTO page mode asks immediately — the mode is the request, so making the reader press a
@@ -898,12 +908,33 @@ function readScreen(): PageExplanationRequest | null {
   const main = document.querySelector('[data-og-shell="page"]') ?? document.querySelector('main');
   const heading = main?.querySelector('h1, h2');
   const title = heading?.textContent?.trim();
-  if (!heading || !title) return null;
+  if (!main || !heading || !title) return null;
   // The standfirst: the first paragraph after the heading, within the same header block. Capped —
   // a whole page of prose in the prompt is the crowding problem this was meant to avoid.
   const description = heading.parentElement?.querySelector('p')?.textContent?.trim().slice(0, 280);
   // A short all-caps label above the heading is the section eyebrow ("WORK OVERVIEW").
   const prev = heading.parentElement?.previousElementSibling?.textContent?.trim();
   const eyebrow = prev && prev.length <= 40 && prev === prev.toUpperCase() ? prev : undefined;
-  return { title, description: description || undefined, eyebrow };
+  return { title, description: description || undefined, eyebrow, content: readScreenContent(main) };
+}
+
+/** How much of the screen goes into the prompt. Enough to be specific, short enough for a 2B. */
+const SCREEN_CONTENT_LIMIT = 1200;
+
+/**
+ * The text the reader can currently see, flattened for the prompt.
+ *
+ * This is what turns a definition into an observation. Given only a title, the guide answered that
+ * Apps "displays pre-built business use cases and AI agents designed for the full lifecycle of your
+ * organization" — true of every tenant, and therefore worth nothing to the one reading it. Given the
+ * screen, it can say how many apps there are, which are live, and what is waiting.
+ *
+ * Read from the page shell, which does NOT contain the guide panel — the panel is a fixed sibling.
+ * That matters: including it would feed the model its own previous answer and the question it is
+ * currently being asked.
+ */
+function readScreenContent(main: Element): string | undefined {
+  const text = (main as HTMLElement).innerText?.replace(/\s*\n\s*/g, ' · ').replace(/\s{2,}/g, ' ').trim();
+  if (!text) return undefined;
+  return text.length > SCREEN_CONTENT_LIMIT ? `${text.slice(0, SCREEN_CONTENT_LIMIT)}…` : text;
 }

@@ -182,3 +182,32 @@ test('run ids map to their plane by prefix, and an unknown one to nothing', asyn
   assert.equal(runHref('run_0d632888'), '/operations/runs/agent%3Arun_0d632888');
   assert.equal(runHref('wat_x'), null);
 });
+
+test('the screen contents reach the prompt, and the prompt asks for specifics', async () => {
+  // Given only a title, the guide answered that Apps "displays pre-built business use cases and AI
+  // agents designed for the full lifecycle of your organization" — true of every tenant, and
+  // therefore worth nothing to the one reading it.
+  const { buildCopilotPrompt } = await import('@/lib/copilot-context');
+  const { pageExplanationQuestion } = await import('@/lib/guide-events');
+  const prompt = buildCopilotPrompt({
+    question: pageExplanationQuestion({
+      title: 'Apps',
+      eyebrow: 'Solutions',
+      description: 'Business use cases and agents across their full lifecycle.',
+      content: 'Claims triage · Live · 12 runs · Renewal nudge · Draft · 2 cases waiting',
+    }),
+  });
+  assert.match(prompt.user, /Claims triage/, 'what is on screen must reach the model');
+  assert.match(prompt.user, /2 cases waiting/);
+  assert.match(prompt.user, /be SPECIFIC/i, 'and it must be asked to use it');
+  assert.equal(prompt.citations.length, 0, 'still no platform records competing with it');
+});
+
+test('a screen with no contents still explains the page', async () => {
+  // The scrape can come back empty (an empty state, a page still loading). That must degrade to the
+  // old behaviour, not to a prompt with a dangling empty section.
+  const { pageExplanationQuestion } = await import('@/lib/guide-events');
+  const q = pageExplanationQuestion({ title: 'Apps', eyebrow: 'Solutions' });
+  assert.doesNotMatch(q, /What is on the screen right now/);
+  assert.match(q, /Explain the "Solutions → Apps" page/);
+});
