@@ -86,6 +86,27 @@ export function lineageLabel(raw: string | null | undefined): string {
  */
 export const publicLabel = lineageLabel;
 
+/**
+ * A source label safe to show a customer, e.g. a catalogue card's "Object store (SeaweedFS)".
+ *
+ * These labels are `Purpose (Engine)`, and the two halves need opposite treatment. Substituting
+ * inside the parenthesis gives "Object store (object store)", so the parenthetical is DROPPED when it
+ * names something internal — the purpose already says everything a reader needs.
+ *
+ * It is kept when it names something the CUSTOMER owns: "Core Insurance (Postgres)" is their
+ * database and the engine is useful, load-bearing information. The test is `leaksInternalName`, so
+ * this stays in step with the one list rather than growing a second opinion about what is internal.
+ */
+export function publicSourceLabel(raw: string | null | undefined): string {
+  const s = (raw ?? '').trim();
+  if (!s) return '';
+  const m = s.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  if (m && leaksInternalName(m[2])) return m[1].trim();
+  // No parenthetical, or a customer-owned one — fall back to the normal word-level rule so a bare
+  // internal name ("SeaweedFS") is still replaced rather than passed through.
+  return lineageLabel(s);
+}
+
 /** True when a label still names something internal — used by tests to guard the list. */
 export function leaksInternalName(raw: string | null | undefined): boolean {
   const s = (raw ?? '').toLowerCase();

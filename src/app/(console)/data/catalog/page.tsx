@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { publicSourceLabel } from '@/lib/lineage-labels';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listAssets, listAllClassifications } from '@/lib/data-catalog-store';
@@ -112,7 +113,7 @@ export default async function DataCatalogPage() {
                   <div className="min-w-0">
                     <CardTitle className="truncate text-sm">{asset.name}</CardTitle>
                     <p className="mt-1 truncate text-xs text-muted-foreground">
-                      {asset.source || '—'} · {asset.kind}
+                      {publicSourceLabel(asset.source) || '—'} · {asset.kind}
                     </p>
                   </div>
                   <Badge className={LEVEL_TONE[posture.effectiveLevel]}>

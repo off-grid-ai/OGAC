@@ -1,5 +1,8 @@
 'use client';
 
+import { useIsViewer } from '@/components/ViewerModeProvider';
+import { publicLabel } from '@/lib/lineage-labels';
+
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -59,6 +62,7 @@ function ServiceCard({
   s,
   h,
 }: Readonly<{ s: ServiceTopologyDirectoryEntry; h: ServiceHealth | undefined }>) {
+  const isViewer = useIsViewer();
   const audit = summarizeServiceCapabilityAudit(s.id);
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/40">
@@ -67,13 +71,15 @@ function ServiceCard({
           href={`/operations/services/${s.id}`}
           className="text-sm font-medium text-foreground hover:text-primary"
         >
-          {s.label}
+          {isViewer ? publicLabel(s.label) : s.label}
         </Link>
         <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px] uppercase">
           {AUTH_LABEL[s.auth]}
         </Badge>
       </div>
-      <p className="flex-1 text-xs text-muted-foreground">{s.description}</p>
+      <p className="flex-1 text-xs text-muted-foreground">
+        {isViewer ? publicLabel(s.description) : s.description}
+      </p>
       <div className="flex items-center gap-3 font-mono text-[10px] text-muted-foreground">
         <span>
           {s.componentCount} component{s.componentCount === 1 ? '' : 's'}
