@@ -44,7 +44,10 @@ export function UserMenu({ user }: Readonly<{ user?: SessionUser }>) {
           ) : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/signin' })}>
+        {/* `signin=manual` is what makes sign-out possible on a demo host. Those links sign themselves
+            in on arrival, so landing a signed-out visitor on a bare /signin would log them straight
+            back in and there would be no way out of the demo at all. Ordinary hosts ignore the param. */}
+        <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/signin?signin=manual' })}>
           <LogOut className="size-4" />
           Sign out
         </DropdownMenuItem>
