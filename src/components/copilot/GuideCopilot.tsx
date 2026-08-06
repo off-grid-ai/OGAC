@@ -21,7 +21,7 @@ import {
   type GuideDestination,
   type GuideResolution,
 } from '@/lib/guide-copilot';
-import { pageExplanationQuestion } from '@/lib/guide-events';
+import { pageExplanationQuestion, type PageExplanationRequest } from '@/lib/guide-events';
 import { publicLabel } from '@/lib/lineage-labels';
 import { routeIdentityForPath } from '@/modules/route-identity';
 
@@ -346,16 +346,15 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   }, [reset]);
 
   const explainThisPage = useCallback(() => {
-    // A route with no registered identity still deserves an answer, so fall back to the path itself
-    // rather than silently doing nothing — an "Explain this page" tab that does nothing on some pages
-    // is worse than one that gives a thinner answer.
-    submit(
-      pageExplanationQuestion(
-        identity
-          ? { title: identity.title, eyebrow: identity.eyebrow, description: identity.description }
-          : { title: pathname },
-      ),
-    );
+    // GIVE IT REAL MATERIAL. Only some routes are in the identity registry — /work and
+    // /governance/egress are not — and for those the model received nothing but `Explain the "/work"
+    // page` and invented the rest: it described Work as "your current active AI model and system
+    // status" with a "System Health section", none of which exists. A 2B asked to describe a screen
+    // it cannot see will make one up, so the fix is material, not a sterner instruction.
+    //
+    // The page itself is the material. Its heading and standfirst are on screen in front of the
+    // reader, which makes them both always available and exactly what the answer should be about.
+    submit(pageExplanationQuestion(identity ?? readScreen() ?? { title: pathname }));
   }, [identity, pathname, submit]);
 
   // Switching INTO page mode asks immediately — the mode is the request, so making the reader press a
@@ -543,7 +542,9 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                     this product cannot answer, dead-ending them on their second click.
                     On a 'none' match there is nothing to continue from, so it falls back to the full
                     list, which is exactly what that reader needs. */}
-                {!shownLoading && shownResolution?.match === 'none' ? (
+                {/* Not in page mode: "Try one of these instead" under an explanation of the screen
+                    reads as an apology for an answer that was fine. */}
+                {!shownLoading && mode !== 'page' && shownResolution?.match === 'none' ? (
                   <Starters
                     questions={questions}
                     onPick={submit}
@@ -838,4 +839,29 @@ function FollowUps({
       </div>
     </div>
   );
+}
+
+/**
+ * The page's own heading and standfirst, read from the screen.
+ *
+ * The fallback when a route is not in the identity registry. Reading the DOM is the right move here
+ * and not a hack: this panel's job is to describe the screen the reader is looking at, and the
+ * heading they can see IS that screen's description — it cannot go stale, and it exists for every
+ * page whether or not someone remembered to register it.
+ *
+ * Returns null rather than guessing when there is no heading; the caller then falls back to the path,
+ * and the prompt forbids inventing anything beyond what it was given.
+ */
+function readScreen(): PageExplanationRequest | null {
+  const main = document.querySelector('[data-og-shell="page"]') ?? document.querySelector('main');
+  const heading = main?.querySelector('h1, h2');
+  const title = heading?.textContent?.trim();
+  if (!heading || !title) return null;
+  // The standfirst: the first paragraph after the heading, within the same header block. Capped —
+  // a whole page of prose in the prompt is the crowding problem this was meant to avoid.
+  const description = heading.parentElement?.querySelector('p')?.textContent?.trim().slice(0, 280);
+  // A short all-caps label above the heading is the section eyebrow ("WORK OVERVIEW").
+  const prev = heading.parentElement?.previousElementSibling?.textContent?.trim();
+  const eyebrow = prev && prev.length <= 40 && prev === prev.toUpperCase() ? prev : undefined;
+  return { title, description: description || undefined, eyebrow };
 }

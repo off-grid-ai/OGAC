@@ -258,10 +258,17 @@ export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
           // this question yet. Check that the relevant module is configured" — untrue, and
           // unanswerable nonsense to someone who only wanted to know what they were looking at.
           [
-            'Explain this screen to the reader: what it is for, what they are looking at, and what to',
-            'check first. Answer from the page description above and from what this console does.',
-            'Do not mention records, data availability, or modules being configured — none of that',
-            'was asked, and this question does not depend on any of it. No citations.',
+            'Explain this screen: what it is for, and what the reader should look at first.',
+            // The invention rule is the load-bearing one. Given only a path, the model described Work
+            // as "your current active AI model and system status" with a "System Health section" —
+            // none of which exists. It is answering about a screen it cannot see, so anything it was
+            // not told is a guess, and a confident guess about the product is worse than a short
+            // answer.
+            'Use ONLY the page name and description in the question. Do NOT name any section, tab,',
+            'metric, button or feature you were not told about — if you were not told, leave it out',
+            'and keep the answer short.',
+            'Do not mention records, data availability, or modules being configured: none of that was',
+            'asked and none of it applies. No citations. Three sentences at most.',
           ].join('\n')
         : 'There are no records available. Tell the operator you have no data to answer this and suggest what to check or enable.',
   ].join('\n');
