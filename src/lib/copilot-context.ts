@@ -18,6 +18,7 @@ import { modelLabel } from './model-catalog';
 import { selectRelevantFacts } from './copilot-relevance';
 import { isPageExplanation } from './guide-events';
 import { plainAction, plainOrg, plainRefs } from './plain-identifiers';
+import { runHref } from './runs-monitor';
 import type { DriftView } from './drift-view';
 import type { EvalsView } from './evals-view';
 import type { FinOps } from './finops';
@@ -167,7 +168,11 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
         // and unusable. The run id stays: that is the reader's own evidence and the thing they go
         // and look up.
         `${r.ts.slice(0, 19)} — ${plainAction(r.action)} by ${r.actor} in ${plainOrg(r.project)}${r.model ? ` (${modelLabel(r.model)})` : ''}: ${r.outcome}${r.runId ? ` [run ${r.runId}]` : ''}.`,
-        r.runId ? '/solutions/apps' : '/governance/evidence/audit',
+        // Link to THE run named in the text, not to the list it lives in. The row quoted
+        // "[run apprun_eee51b30]" and then sent the reader to the apps directory to go and find it.
+        // Falls back to the audit log when the id is not one we can place — a wrong link is worse
+        // than a general one.
+        (r.runId ? runHref(r.runId) : null) ?? '/governance/evidence/audit',
       );
     }
   }

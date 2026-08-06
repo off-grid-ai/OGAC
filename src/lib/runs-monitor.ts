@@ -75,6 +75,35 @@ export function runKey(kind: RunKind, sourceId: string): string {
   return `${kind}:${sourceId}`;
 }
 
+/**
+ * Which plane a bare run id belongs to, from its prefix.
+ *
+ * The ids are self-describing — `apprun_…`, `chatrun_…`, `run_…` — and other surfaces already rely
+ * on that (see lineageRef). Returns null for anything unrecognised rather than guessing, because a
+ * wrong kind produces a link to a run that does not exist, which is worse than no link.
+ */
+export function runKindFromId(runId: string | null | undefined): RunKind | null {
+  const id = String(runId ?? '').trim().toLowerCase();
+  if (id.startsWith('apprun_')) return 'app';
+  if (id.startsWith('chatrun_')) return 'chat';
+  if (id.startsWith('run_')) return 'agent';
+  return null;
+}
+
+/**
+ * A link to THE run a record refers to, or null when the id is not one we can place.
+ *
+ * The audit citations quoted a run id in their text — "[run apprun_eee51b30]" — and then linked to
+ * the apps LIST. The reader is looking at the id of the exact record that answers their question and
+ * being sent to a directory to find it themselves. The generic run route resolves `kind:id` for every
+ * plane (and redirects app runs on to their own page), so one link covers all three.
+ */
+export function runHref(runId: string | null | undefined): string | null {
+  const kind = runKindFromId(runId);
+  if (!kind) return null;
+  return `/operations/runs/${encodeURIComponent(runKey(kind, String(runId).trim()))}`;
+}
+
 // ─── Status normalization — each plane's vocabulary → the one product vocabulary ─────────────────
 // App runs:   queued|running|awaiting_human|done|error|cancelled
 // Agent runs: done|error|blocked|running (mostly 'done' today)

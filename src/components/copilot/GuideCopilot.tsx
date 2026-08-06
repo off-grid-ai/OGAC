@@ -13,6 +13,7 @@ import {
   guideQuestionsForTenant,
   guideRoleFromParam,
   guideRoleSpec,
+  isCurrentPath,
   themesForRole,
   type GuideQuestion,
   type GuideRole,
@@ -266,6 +267,12 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     });
   }, []);
 
+  /** One resolver, so submit and askAndGo can never disagree about where a question leads. */
+  const resolveFor = useCallback(
+    (text: string) => resolveGuideDestinations(text, { tenantSlug, sanitize: publicLabel }),
+    [tenantSlug],
+  );
+
   const submit = useCallback(
     (q: string) => {
       const text = q.trim();
@@ -285,11 +292,36 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       setHistory((h) => (h.includes(text) ? h : [...h, text]));
       // Destinations resolve instantly and locally — the visitor gets somewhere to go before the model
       // has finished thinking, which matters because a governed answer takes real seconds.
-      setResolution(resolveGuideDestinations(text, { tenantSlug, sanitize: publicLabel }));
+      setResolution(resolveFor(text));
       void ask(text);
     },
     [ask, asked, resolution, restored, result, tenantSlug],
   );
+
+  /**
+   * A tapped question TAKES YOU THERE, then answers from where you land.
+   *
+   * The guide's whole promise is "every answer comes with a screen you can go and check it on", and
+   * until now that meant reading the answer, then finding the destination card, then clicking it —
+   * three steps to do the one thing the reader asked for. Tapping a question is an unambiguous
+   * signal; there is nothing to be gained by making them confirm it.
+   *
+   * Only for TAPPED questions, not typed ones. A pill is a curated question with a known-good
+   * destination; a typed question can match weakly, and yanking someone to a page on a maybe is
+   * worse than offering it.
+   *
+   * The navigation goes FIRST and the answer follows, so the screen responds instantly while the
+   * model takes its seconds.
+   */
+  const askAndGo = useCallback(
+    (question: string) => {
+      const target = resolveFor(question).destinations.find((d) => !isCurrentPath(d.href, pathname));
+      if (target) router.push(target.href);
+      submit(question);
+    },
+    [pathname, resolveFor, router, submit],
+  );
+
 
   // A restored snapshot wins over live state, so stepping back shows that answer rather than the
   // newest one. Loading is suppressed while viewing history — a spinner over an answer you already
@@ -547,7 +579,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                 {!shownLoading && mode !== 'page' && shownResolution?.match === 'none' ? (
                   <Starters
                     questions={questions}
-                    onPick={submit}
+                    onPick={askAndGo}
                     heading="Try one of these instead"
                     role={role}
                   />
@@ -555,14 +587,14 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                 {!shownLoading && shownResult && shownResolution?.match !== 'none' ? (
                   <FollowUps
                     questions={followUpQuestions(questions, shownResolution, history)}
-                    onPick={submit}
+                    onPick={askAndGo}
                   />
                 ) : null}
               </div>
             ) : (
               <>
                 <RoleRow role={role} onChoose={chooseRole} />
-                <Starters questions={questions} onPick={submit} heading={null} role={role} />
+                <Starters questions={questions} onPick={askAndGo} heading={null} role={role} />
               </>
             )}
           </div>
@@ -708,6 +740,16 @@ function Destinations({
   );
 }
 
+/**
+ * The one pill style, used by both question lists.
+ *
+ * PRESS FEEDBACK MATTERS HERE more than on an ordinary button. Tapping a question navigates AND
+ * starts a model call that takes seconds, so without an immediate state change the reader gets a
+ * moment of nothing and presses again. `active:` fires on pointer-down, before any of that.
+ */
+const PILL_CLASS =
+  'og-rise rounded-full border border-border bg-background px-3 py-1.5 text-left text-[12.5px] leading-snug text-foreground transition-all duration-150 hover:border-primary hover:bg-primary/5 hover:text-primary active:scale-[0.97] active:bg-primary active:text-primary-foreground disabled:opacity-40';
+
 /** Starter questions, grouped so a visitor can find their theme rather than face an empty box. */
 function Starters({
   questions,
@@ -756,7 +798,7 @@ function Starters({
                   type="button"
                   onClick={() => onPick(q.question)}
                   style={{ animationDelay: `${Math.min(i, 6) * 25}ms` }}
-                  className="og-rise rounded-full border border-border bg-background px-3 py-1.5 text-left text-[12.5px] leading-snug text-foreground transition-colors duration-150 hover:border-primary hover:bg-primary/5 hover:text-primary"
+                  className={PILL_CLASS}
                 >
                   {q.question}
                 </button>
@@ -831,7 +873,7 @@ function FollowUps({
             type="button"
             onClick={() => onPick(q.question)}
             style={{ animationDelay: `${Math.min(i, 6) * 25}ms` }}
-            className="og-rise rounded-full border border-border bg-background px-3 py-1.5 text-left text-[12.5px] leading-snug text-foreground transition-colors duration-150 hover:border-primary hover:bg-primary/5 hover:text-primary"
+            className={PILL_CLASS}
           >
             {q.question}
           </button>
