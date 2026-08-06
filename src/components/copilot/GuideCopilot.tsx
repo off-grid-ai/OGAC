@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CopilotAnswerSkeleton } from '@/components/copilot/CopilotAnswerSkeleton';
 import { CopilotAnswerView } from '@/components/copilot/CopilotAnswerView';
+import { GuideProof } from '@/components/copilot/GuideProof';
 import { MIN_QUESTION_LENGTH, useCopilotAnswer, type CopilotAnswer } from '@/components/copilot/useCopilotAnswer';
 import { useIsViewer } from '@/components/ViewerModeProvider';
 import {
@@ -55,8 +56,15 @@ import { routeIdentityForPath } from '@/modules/route-identity';
 // Width is a PREFERENCE, not a navigational position, so it lives in localStorage rather than the URL
 // — the repo rule about putting position in the URL is about places you can navigate Back out of, and
 // a panel width is not one. Open/closed is local for the same reason.
-/** The guide answers two different questions; see the mode switch in the header. */
-type GuideMode = 'tour' | 'page';
+/**
+ * The guide answers three different questions; see the mode switch in the header.
+ *
+ * `proof` is not a chat mode at all — it is a computed list of claims with live figures. It exists
+ * because the reader this demo is actually sent to (an investor, an enterprise buyer) does not arrive
+ * with a question to type; they arrive with five doubts, and the most important of them — "is any of
+ * this real" — cannot honestly be settled by a model writing a sentence about itself.
+ */
+type GuideMode = 'tour' | 'page' | 'proof';
 
 /** One answered question, kept so the reader can step back to it without paying for it again. */
 interface GuideSnapshot {
@@ -66,6 +74,8 @@ interface GuideSnapshot {
 }
 
 const PANEL_STORAGE_KEY = 'offgrid.guide.width';
+/** Marks that the guide has introduced itself once, so it opens on arrival but not on every page. */
+const GUIDE_SEEN_KEY = 'offgrid.guide.seen';
 const PANEL_MIN_PX = 380;
 /** Never wider than 80% of the viewport: the point of this surface is pointing AT the console. */
 const panelMaxPx = (viewport: number) => Math.max(PANEL_MIN_PX, Math.round(viewport * 0.8));
@@ -77,6 +87,9 @@ export function clampPanelWidth(px: number, viewport: number): number {
 }
 
 export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | null }>) {
+  // Starts CLOSED and opens on mount for a demo visitor (see the effect below), rather than starting
+  // open — the server renders this too, and a panel that exists in the server HTML but not in the
+  // client's first paint is a hydration mismatch.
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [question, setQuestion] = useState('');
@@ -98,6 +111,26 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     const stored = Number(window.localStorage.getItem(PANEL_STORAGE_KEY));
     if (stored) setWidth(clampPanelWidth(stored, window.innerWidth));
   }, []);
+
+  // OPEN ON ARRIVAL for a demo visitor. A stranger who lands on an operator console alone has to
+  // guess what to click — the whole reason this surface exists — and a closed panel behind a launcher
+  // in the corner is a guess they have to make first. Operators are left alone: they know the product
+  // and the panel would just take room from the screen they came to use.
+  //
+  // Once per browser, not once per page load: it opens on the first visit and then respects whatever
+  // the reader did with it, so someone who closed it does not have to close it again on every
+  // navigation. `dismissed` (hide for this visit) is checked too — an explicit dismissal outranks
+  // this entirely.
+  useEffect(() => {
+    if (!isViewer || dismissed) return;
+    if (window.localStorage.getItem(GUIDE_SEEN_KEY)) return;
+    window.localStorage.setItem(GUIDE_SEEN_KEY, '1');
+    setOpen(true);
+    // ...on "Prove it", not the tour. This is the one moment we know the reader is brand new, and the
+    // proof list is the only mode that has something on screen the instant it opens — the other two
+    // would greet them with either a loader or a list of questions to read.
+    setMode('proof');
+  }, [dismissed, isViewer]);
 
   // Tell the app shell how much room to leave, so the panel SHARES the screen instead of covering it
   // (globals.css turns these two into padding on [data-og-app-shell]). Driven from state rather than
@@ -269,6 +302,8 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   // Switching INTO page mode asks immediately — the mode is the request, so making the reader press a
   // second button to get what the tab already promised would be a dead step. Switching back to the
   // tour clears the answer so they land on the questions rather than on a stale page explanation.
+  // `proof` clears like the tour does — its content is computed, not asked, so leaving a previous
+  // answer underneath a list of live figures would attribute the model's prose to them.
   const chooseMode = useCallback(
     (next: GuideMode) => {
       setMode(next);
@@ -276,6 +311,16 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       else startOver();
     },
     [explainThisPage, startOver],
+  );
+
+  /** A proof card's "go and check it" link. Same rule as every other destination: a real push. */
+  const goToProof = useCallback(
+    (href: string) => {
+      router.push(href);
+      // No follow-up question. The reader was told to go and look at something specific; opening a
+      // model answer over the page they were just sent to would talk over the evidence.
+    },
+    [router],
   );
 
   // In page mode, follow the reader as they navigate: arriving somewhere new IS a new question. Keyed
@@ -333,7 +378,9 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[11px] uppercase tracking-widest text-foreground">Guide</p>
               <p className="mt-0.5 text-[13px] leading-snug text-foreground/80">
-                Ask what you want to know. Every answer comes with a screen you can go and check it on.
+                {mode === 'proof'
+                  ? 'Every figure below is read from this system as you look at it. Nothing here is written by an AI.'
+                  : 'Ask what you want to know. Every answer comes with a screen you can go and check it on.'}
               </p>
             </div>
             {/* X collapses back to the launcher — the affordance a panel is expected to have. Dismissing
@@ -354,6 +401,9 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
           <div className="flex gap-1 border-b border-border px-5 py-2">
             {(
               [
+                // "Prove it" leads, because it is the first thing a stranger wants and the only mode
+                // that answers instantly — the other two cost a model call each.
+                ['proof', 'Prove it'],
                 ['tour', 'Show me around'],
                 ['page', 'Explain this page'],
               ] as const
@@ -382,7 +432,9 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
               </p>
             ) : null}
 
-            {shownAsked ? (
+            {mode === 'proof' ? (
+              <GuideProof onGo={goToProof} />
+            ) : shownAsked ? (
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-[13px] font-medium leading-snug text-foreground">{shownAsked}</p>

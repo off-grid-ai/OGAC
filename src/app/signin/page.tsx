@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { readSigninDemoBanner } from '@/lib/demo-hellobar';
 import { signinDemoTenants } from '@/lib/demo-tenants';
 import { tenantSlugFromHost } from '@/lib/route-access';
+import { SigninDemoAutoStart } from './SigninDemoAutoStart';
 import { SigninDemoBanner } from './SigninDemoBanner';
 import { SigninHeader } from './SigninHeader';
 import { SigninTenantLinks } from './SigninTenantLinks';
@@ -127,8 +128,23 @@ export default async function SignInPage({
       <SigninHeader />
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
         {demoBanner.show ? (
-          <div className="w-full max-w-sm">
+          <div className="flex w-full max-w-sm flex-col gap-3">
             <SigninDemoBanner model={demoBanner} />
+            {/* A demo link signs itself in. The credentials are printed in the banner directly above,
+                so this discloses nothing new — it just removes a step that can only lose a visitor who
+                has never seen the product. Only rendered when THIS host resolves demo creds, so the
+                operator console is unaffected. */}
+            {demoBanner.email && demoBanner.password ? (
+              <SigninDemoAutoStart
+                email={demoBanner.email}
+                password={demoBanner.password}
+                callbackUrl={callbackUrl ?? '/overview'}
+                action={withPassword}
+                // Never auto-retry into a rejected login: that redirects back here with ?error=1 and
+                // would loop, which reads as a hung page rather than a failed sign-in.
+                disabled={Boolean(error)}
+              />
+            ) : null}
           </div>
         ) : null}
         <Card className="w-full max-w-sm shadow-sm">
