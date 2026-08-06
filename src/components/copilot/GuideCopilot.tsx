@@ -112,6 +112,8 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   const [role, setRole] = useState<GuideRole | null>(null);
   /** Every question asked this session, so a follow-up is never one they have already had. */
   const [history, setHistory] = useState<string[]>([]);
+  /** Actions read off the screen at the moment it was explained. */
+  const [actions, setActions] = useState<ScreenAction[]>([]);
   const [question, setQuestion] = useState('');
   const [resolution, setResolution] = useState<GuideResolution | null>(null);
   const [asked, setAsked] = useState<string | null>(null);
@@ -300,6 +302,9 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       // and typing the next one meant selecting and deleting the last one first. The question is not
       // lost: it is shown above the answer as the thing that was asked.
       setQuestion('');
+      // Cleared for every question; explainThisPage sets them again straight after. A CTA row left
+      // over from the last page would point at a screen this answer is not about.
+      setActions([]);
       const shown = (label ?? text).trim();
       setAsked(shown);
       setHistory((h) => (h.includes(shown) ? h : [...h, shown]));
@@ -378,6 +383,14 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     [identity, mode, pathname, router, submit],
   );
 
+  /** Go to a route the SCREEN offered. Same rule as every destination: a real push, nothing else. */
+  const goToHref = useCallback(
+    (href: string) => {
+      router.push(href);
+    },
+    [router],
+  );
+
   const startOver = useCallback(() => {
     // 'new' means a clean slate, so the back stack goes with it — leaving history behind a fresh
     // question would let Back jump to an answer from a conversation the reader has ended.
@@ -403,6 +416,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     // scraping can, but it says nothing about what is on the page today — and that is the difference
     // between describing what an Apps page is and describing the apps this reader has.
     const screen = readScreen();
+    setActions(screen?.actions ?? []);
     const request = identity
       ? { ...identity, content: screen?.content }
       : (screen ?? { title: pathname });
@@ -603,6 +617,9 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                     heading="Try one of these instead"
                     role={role}
                   />
+                ) : null}
+                {!shownLoading && shownResult && !restored ? (
+                  <ScreenActions actions={actions} onGo={goToHref} />
                 ) : null}
                 {!shownLoading && shownResult && shownResolution?.match !== 'none' ? (
                   <FollowUps
@@ -914,7 +931,9 @@ function FollowUps({
  * Returns null rather than guessing when there is no heading; the caller then falls back to the path,
  * and the prompt forbids inventing anything beyond what it was given.
  */
-function readScreen(): PageExplanationRequest | null {
+type ScreenRead = PageExplanationRequest & { actions: ScreenAction[] };
+
+function readScreen(): ScreenRead | null {
   const main = document.querySelector('[data-og-shell="page"]') ?? document.querySelector('main');
   const heading = main?.querySelector('h1, h2');
   const title = heading?.textContent?.trim();
@@ -925,7 +944,13 @@ function readScreen(): PageExplanationRequest | null {
   // A short all-caps label above the heading is the section eyebrow ("WORK OVERVIEW").
   const prev = heading.parentElement?.previousElementSibling?.textContent?.trim();
   const eyebrow = prev && prev.length <= 40 && prev === prev.toUpperCase() ? prev : undefined;
-  return { title, description: description || undefined, eyebrow, content: readScreenContent(main) };
+  return {
+    title,
+    description: description || undefined,
+    eyebrow,
+    content: readScreenContent(main),
+    actions: readScreenActions(main),
+  };
 }
 
 /** How much of the screen goes into the prompt. Enough to be specific, short enough for a 2B. */
@@ -947,4 +972,77 @@ function readScreenContent(main: Element): string | undefined {
   const text = (main as HTMLElement).innerText?.replace(/\s*\n\s*/g, ' · ').replace(/\s{2,}/g, ' ').trim();
   if (!text) return undefined;
   return text.length > SCREEN_CONTENT_LIMIT ? `${text.slice(0, SCREEN_CONTENT_LIMIT)}…` : text;
+}
+
+/** One thing the reader can actually do from the screen they are on. */
+interface ScreenAction {
+  label: string;
+  href: string;
+}
+
+/** How many actions to offer. More than a handful stops being a call to action and becomes a menu. */
+const MAX_SCREEN_ACTIONS = 4;
+
+/** Link text that says nothing on its own — every card on a list page has one. */
+const GENERIC_LABEL = /^(open|view|details|see|go|more|link|shared link|edit)$/i;
+
+/**
+ * The real actions available on this screen, read from the page's own links.
+ *
+ * WHY READ THEM RATHER THAN ASK THE MODEL. The answer ends with "Next Action: review the Underwriter
+ * decision step to approve or reject the case" and then leaves the reader to go and find it. The
+ * obvious fix — have the model emit a link — is the wrong one: it would be inventing routes, and a
+ * confident CTA to a page that does not exist is worse than no CTA. The page already contains its own
+ * actions as real anchors, so taking them is both accurate by construction and impossible to fake.
+ *
+ * A bare "Open" is meaningless once it is out of its card, so a generic label borrows the nearest
+ * heading — "Open · Policy Underwriting Assist".
+ */
+function readScreenActions(main: Element): ScreenAction[] {
+  const seen = new Set<string>();
+  const actions: ScreenAction[] = [];
+  for (const a of Array.from(main.querySelectorAll('a[href]'))) {
+    const href = a.getAttribute('href') ?? '';
+    // Internal routes only. An external link is not something this guide should be steering into.
+    if (!href.startsWith('/') || href.startsWith('//')) continue;
+    const text = a.textContent?.trim().replace(/\s+/g, ' ') ?? '';
+    if (!text || text.length > 48) continue;
+    const context = a.closest('[class*="card"], li, article')?.querySelector('h2, h3, h4')?.textContent?.trim();
+    const label = GENERIC_LABEL.test(text) && context ? `${text} · ${context}` : text;
+    const key = `${href}|${label}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    actions.push({ label: label.slice(0, 60), href });
+    if (actions.length >= MAX_SCREEN_ACTIONS) break;
+  }
+  return actions;
+}
+
+/** The CTA row: what the reader can do, right now, without going to look for it. */
+function ScreenActions({
+  actions,
+  onGo,
+}: Readonly<{ actions: readonly ScreenAction[]; onGo: (href: string) => void }>) {
+  if (actions.length === 0) return null;
+  return (
+    <div className="space-y-1.5 border-t border-border pt-3">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        Do it from here
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {actions.map((a, i) => (
+          <button
+            key={`${a.href}-${a.label}`}
+            type="button"
+            onClick={() => onGo(a.href)}
+            style={{ animationDelay: `${Math.min(i, 6) * 25}ms` }}
+            className="og-rise inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary px-3 py-1.5 text-left text-[12.5px] leading-snug text-primary-foreground transition-all duration-150 hover:opacity-90 active:scale-[0.97]"
+          >
+            {a.label}
+            <ArrowRight className="size-3" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }

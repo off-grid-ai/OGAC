@@ -279,6 +279,12 @@ export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
             'Where the screen contents are given, be SPECIFIC about them: how many of a thing there',
             'are, what state they are in, and anything that looks like it needs attention. Prefer a',
             'real number or name from the screen over a general description of the page.',
+            // A screen reading ₹2,23,184.52 came back as "a $2.23M policy": the model read the Indian
+            // lakh grouping as millions and swapped the symbol. Two errors in one figure, on a
+            // surface whose whole job is to be believed — and both avoidable, because the correctly
+            // formatted number was right there.
+            'Copy every figure EXACTLY as it appears on the screen — same digits, same grouping, same',
+            'currency symbol. Never convert a currency, rescale a number, or reformat it.',
             // Still the load-bearing rule. Given only a path, the model described Work as "your
             // current active AI model and system status" with a "System Health section" — none of
             // which exists. It is answering about a screen it cannot see beyond what it was told.

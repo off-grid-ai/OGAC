@@ -230,3 +230,17 @@ test('what the reader sees they asked is short — the scrape stays in the promp
   // ...and none of it is lost — the model still gets everything.
   assert.match(pageExplanationQuestion(request), /Policy Underwriting Assist/);
 });
+
+test('the prompt forbids reformatting a figure from the screen', async () => {
+  // A screen reading ₹2,23,184.52 came back as "a $2.23M policy": the Indian lakh grouping read as
+  // millions AND the symbol swapped. Two errors in one figure, on a surface whose job is to be
+  // believed, and both avoidable — the correctly formatted number was right there.
+  const { buildCopilotPrompt } = await import('@/lib/copilot-context');
+  const { pageExplanationQuestion } = await import('@/lib/guide-events');
+  const prompt = buildCopilotPrompt({
+    question: pageExplanationQuestion({ title: 'Apps', content: 'This decision covers ₹2,23,184.52' }),
+  });
+  assert.match(prompt.user, /₹2,23,184\.52/, 'the figure reaches the model as written');
+  assert.match(prompt.user, /Copy every figure EXACTLY/i);
+  assert.match(prompt.user, /Never convert a currency/i);
+});
