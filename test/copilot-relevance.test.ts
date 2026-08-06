@@ -211,3 +211,22 @@ test('a screen with no contents still explains the page', async () => {
   assert.doesNotMatch(q, /What is on the screen right now/);
   assert.match(q, /Explain the "Solutions → Apps" page/);
 });
+
+test('what the reader sees they asked is short — the scrape stays in the prompt', async () => {
+  // The full payload carries the page description and up to 1200 characters of screen contents.
+  // Rendering that above the answer filled the panel with scraped text before the reader reached a
+  // word of the reply.
+  const { pageExplanationLabel, pageExplanationQuestion } = await import('@/lib/guide-events');
+  const request = {
+    title: 'Apps',
+    eyebrow: 'Solutions',
+    description: 'Business use cases and agents across their full lifecycle.',
+    content: 'Policy Underwriting Assist · Live · Awaiting review · Run ar_6c0d47222cb4 · 5/6 steps',
+  };
+  const label = pageExplanationLabel(request);
+  assert.equal(label, 'Explain this page: Solutions → Apps');
+  assert.ok(label.length < 60, 'it is a heading, not a payload');
+  assert.doesNotMatch(label, /Policy Underwriting|ar_6c0d47222cb4|full lifecycle/);
+  // ...and none of it is lost — the model still gets everything.
+  assert.match(pageExplanationQuestion(request), /Policy Underwriting Assist/);
+});

@@ -60,3 +60,16 @@ export function pageExplanationQuestion(request: PageExplanationRequest): string
 export function isPageExplanation(question: string | null | undefined): boolean {
   return /^Explain the "[^"]*" page to me\./.test(String(question ?? '').trim());
 }
+
+/**
+ * The short, human version of a page question — what the READER should see they asked.
+ *
+ * The question sent to the model carries the page description and up to 1200 characters of the
+ * screen's contents. That is prompt material, not a sentence anybody asked, and rendering it above
+ * the answer filled the panel with a wall of scraped text before the reader reached a word of the
+ * reply. The two have to be separate strings: one for the model, one for the human.
+ */
+export function pageExplanationLabel(request: PageExplanationRequest): string {
+  const where = [request.eyebrow, request.title].filter(Boolean).join(' → ');
+  return `Explain this page: ${where}`;
+}

@@ -22,7 +22,11 @@ import {
   type GuideDestination,
   type GuideResolution,
 } from '@/lib/guide-copilot';
-import { pageExplanationQuestion, type PageExplanationRequest } from '@/lib/guide-events';
+import {
+  pageExplanationLabel,
+  pageExplanationQuestion,
+  type PageExplanationRequest,
+} from '@/lib/guide-events';
 import { publicLabel } from '@/lib/lineage-labels';
 import { routeIdentityForPath } from '@/modules/route-identity';
 
@@ -273,8 +277,16 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     [tenantSlug],
   );
 
+  /**
+   * Ask a question.
+   *
+   * `label` is what the READER sees they asked, when that differs from what the model is sent. A page
+   * explanation carries the page description and up to 1200 characters of scraped screen contents —
+   * prompt material, not a sentence anybody asked — and rendering it above the answer buried the
+   * reply under a wall of text. Everywhere else the two are the same string.
+   */
   const submit = useCallback(
-    (q: string) => {
+    (q: string, label?: string) => {
       const text = q.trim();
       if (text.length < MIN_QUESTION_LENGTH) return;
       // Keep whatever is on screen before replacing it. Snapshotting the RESTORED entry when one is
@@ -288,14 +300,15 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       // and typing the next one meant selecting and deleting the last one first. The question is not
       // lost: it is shown above the answer as the thing that was asked.
       setQuestion('');
-      setAsked(text);
-      setHistory((h) => (h.includes(text) ? h : [...h, text]));
+      const shown = (label ?? text).trim();
+      setAsked(shown);
+      setHistory((h) => (h.includes(shown) ? h : [...h, shown]));
       // Destinations resolve instantly and locally — the visitor gets somewhere to go before the model
       // has finished thinking, which matters because a governed answer takes real seconds.
       setResolution(resolveFor(text));
       void ask(text);
     },
-    [ask, asked, resolution, restored, result, tenantSlug],
+    [ask, asked, resolveFor, resolution, restored, result],
   );
 
   /**
@@ -390,13 +403,10 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     // scraping can, but it says nothing about what is on the page today — and that is the difference
     // between describing what an Apps page is and describing the apps this reader has.
     const screen = readScreen();
-    submit(
-      pageExplanationQuestion(
-        identity
-          ? { ...identity, content: screen?.content }
-          : (screen ?? { title: pathname }),
-      ),
-    );
+    const request = identity
+      ? { ...identity, content: screen?.content }
+      : (screen ?? { title: pathname });
+    submit(pageExplanationQuestion(request), pageExplanationLabel(request));
   }, [identity, pathname, submit]);
 
   // Switching INTO page mode asks immediately — the mode is the request, so making the reader press a
