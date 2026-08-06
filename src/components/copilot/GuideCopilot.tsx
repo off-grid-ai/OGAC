@@ -142,8 +142,18 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     (destination: GuideDestination) => {
       // Navigation lives in the URL: a push, so Back steps out and the destination is shareable.
       router.push(destination.href);
+      // ...and the guide then reads the screen it just took you to.
+      //
+      // Taking someone somewhere and leaving the PREVIOUS answer sitting above the new page is the
+      // one moment this surface can't afford to look inert: the reader followed an instruction, the
+      // page changed underneath them, and nothing acknowledged it. A stranger reads that as "the
+      // thing is broken", not "the answer above still applies".
+      //
+      // Asking about the destination reuses the whole existing pipeline — the same gather, the same
+      // honesty labels, the same loading line — so there is no second answer path to keep in step.
+      submit(`What am I looking at on ${destination.label}, and what should I check here?`);
     },
-    [router],
+    [router, submit],
   );
 
   const startOver = useCallback(() => {
