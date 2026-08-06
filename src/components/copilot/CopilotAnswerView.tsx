@@ -3,7 +3,7 @@
 import { useCallback, useRef } from 'react';
 import { Markdown } from '@/components/chat/Markdown';
 import { Badge } from '@/components/ui/badge';
-import { SOURCE_LABEL, type CopilotAnswer } from '@/components/copilot/useCopilotAnswer';
+import { sourceLabel, type CopilotAnswer } from '@/components/copilot/useCopilotAnswer';
 
 // The one place an answer + its citations are rendered. Extracted from AskPanel so the guide reuses it
 // rather than growing a second answer UI that could drift from the honesty rules: the source label
@@ -44,7 +44,7 @@ export function CopilotAnswerView({ result }: Readonly<{ result: CopilotAnswer }
           Answer
         </span>
         <Badge variant="secondary" className="text-[11px] font-normal text-muted-foreground">
-          {SOURCE_LABEL[result.source]}
+          {sourceLabel(result)}
         </Badge>
       </div>
 
@@ -81,9 +81,14 @@ export function CopilotAnswerView({ result }: Readonly<{ result: CopilotAnswer }
           </ol>
         </div>
       ) : (
-        <p className="border-t border-border pt-3 text-xs text-muted-foreground">
-          No underlying records were available for this question.
-        </p>
+        // A screen explanation has no records BY NATURE, so captioning it "no underlying records were
+        // available" reads as a failed lookup for a question that never needed one. Only say it when
+        // the reader actually asked something the records were supposed to answer.
+        result.kind === 'page' ? null : (
+          <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+            No underlying records were available for this question.
+          </p>
+        )
       )}
     </div>
   );

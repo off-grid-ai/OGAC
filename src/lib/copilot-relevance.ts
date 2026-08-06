@@ -47,11 +47,35 @@ const SOURCE_TERMS: Record<Citation['source'], readonly string[]> = {
   audit: ['who', 'audit', 'log', 'logs', 'trail', 'regulator', 'regulatory', 'compliance', 'access',
     'blocked', 'block', 'stopped', 'stop', 'denied', 'deny', 'refused', 'masked', 'mask', 'redacted',
     'pii', 'pan', 'aadhaar', 'leave', 'leaves', 'left', 'egress', 'private', 'privacy', 'network',
-    'run', 'runs', 'ran', 'executed', 'evidence', 'signed', 'signature', 'record', 'records'],
+    'run', 'runs', 'ran', 'executed', 'evidence', 'signed', 'signature', 'record', 'records',
+    // "Is this really running, or a mock-up?" selected nothing and was answered "I have no records"
+    // — the worst possible reply to that particular question. The audit trail IS the evidence that
+    // work happened, so the vocabulary of doubt belongs to it.
+    'real', 'really', 'live', 'mock', 'mockup', 'fake', 'demo', 'genuine', 'working'],
 };
 
+/**
+ * Crude suffix stripping, so one affinity entry covers a word's whole family.
+ *
+ * "Is this really RUNNING" missed an affinity list containing 'run' and 'runs', and the fix is not to
+ * type out every inflection of every term forever. Naive on purpose: it only has to make two words
+ * that mean the same thing collide, and it is never shown to anyone.
+ */
+function stem(w: string): string {
+  if (w.length > 5 && w.endsWith('ing')) {
+    const base = w.slice(0, -3);
+    // "running" → "runn" → "run": undo the doubled consonant English adds before -ing.
+    return base.length > 3 && base.at(-1) === base.at(-2) ? base.slice(0, -1) : base;
+  }
+  if (w.length > 4 && w.endsWith('ed')) return w.slice(0, -2);
+  if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  return w;
+}
+
 function terms(text: string): string[] {
-  return (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((w) => w.length > 2 && !STOP.has(w));
+  return (text.toLowerCase().match(/[a-z0-9]+/g) ?? [])
+    .filter((w) => w.length > 2 && !STOP.has(w))
+    .map(stem);
 }
 
 /**
@@ -67,8 +91,9 @@ export function scoreFact(question: string, fact: Citation): number {
   const inFact = new Set(terms(fact.text));
   let score = 0;
   for (const w of asked) if (inFact.has(w)) score += 2;
+  // Stemmed on both sides, or the list's own 'runs' would never meet a stemmed 'run'.
   const affinity = SOURCE_TERMS[fact.source] ?? [];
-  if (affinity.some((w) => asked.has(w))) score += 1;
+  if (affinity.some((w) => asked.has(stem(w)))) score += 1;
   return score;
 }
 

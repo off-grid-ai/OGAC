@@ -77,3 +77,37 @@ test('an empty or meaningless question selects nothing', () => {
 test('nothing gathered stays nothing — no invention', () => {
   assert.deepEqual(selectRelevantFacts('what is this costing us?', []), []);
 });
+
+// ── "Explain this page" is a different KIND of question ───────────────────────────────────────────
+
+test('a page explanation is answerable with no records at all', async () => {
+  // Asked to explain the Work page, the copilot replied "I have no platform records to answer this
+  // question yet. Check that the relevant module is configured" — untrue, and unanswerable nonsense
+  // to someone who only wanted to know what they were looking at. The screen always exists.
+  const { buildCopilotPrompt } = await import('@/lib/copilot-context');
+  const { pageExplanationQuestion } = await import('@/lib/guide-events');
+  const prompt = buildCopilotPrompt({
+    question: pageExplanationQuestion({ title: 'Your work', eyebrow: 'Work' }),
+  });
+  assert.equal(prompt.hasData, false, 'there are genuinely no records');
+  assert.equal(prompt.answerable, true, 'and it is still perfectly answerable');
+  assert.doesNotMatch(prompt.user, /no data to answer|configured and has recorded/i);
+  assert.match(prompt.user, /Explain this screen/i);
+});
+
+test('a platform question with no records still says so', async () => {
+  // The honest-empty path must survive the page-explanation carve-out — the carve-out is for screens,
+  // not a licence to answer anything without evidence.
+  const { buildCopilotPrompt } = await import('@/lib/copilot-context');
+  const prompt = buildCopilotPrompt({ question: 'who founded the company?' });
+  assert.equal(prompt.answerable, false);
+  assert.match(prompt.user, /no records available/i);
+});
+
+test('stemming makes a word family match one affinity entry', () => {
+  // "Is this really RUNNING" missed a list containing 'run' and 'runs'.
+  const run = fact('audit', '2026-08-04 — agent run by a service account in this organisation: ok');
+  assert.ok(scoreFact('is this really running, or a mock-up?', run) > 0);
+  assert.ok(scoreFact('what runs here?', run) > 0);
+  assert.ok(scoreFact('has anything actually run?', run) > 0);
+});

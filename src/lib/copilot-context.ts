@@ -16,6 +16,7 @@ import { publicLabel } from '@/lib/lineage-labels';
 import type { AuditRow } from './audit-log-view';
 import { modelLabel } from './model-catalog';
 import { selectRelevantFacts } from './copilot-relevance';
+import { isPageExplanation } from './guide-events';
 import { plainAction, plainOrg, plainRefs } from './plain-identifiers';
 import type { DriftView } from './drift-view';
 import type { EvalsView } from './evals-view';
@@ -49,6 +50,8 @@ export interface CopilotPrompt {
   citations: Citation[];
   /** True when there is at least one real fact to reason over. */
   hasData: boolean;
+  /** Whether the model has anything to answer FROM — records, or a screen to describe. */
+  answerable: boolean;
 }
 
 const MAX_AUDIT = 25; // cap facts so the prompt stays bounded
@@ -211,10 +214,15 @@ export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
   // there is something to cite is exactly how an off-topic record reaches a buyer labelled evidence.
   const citations = selectRelevantFacts(ctx.question, buildCitations(ctx));
   const hasData = citations.length > 0;
+  // "Explain this page" is a different KIND of question and needs the opposite handling — see the
+  // branch at the bottom, and isPageExplanation for why.
+  const explainingAPage = isPageExplanation(ctx.question);
 
   const factBlock = hasData
     ? citations.map((c) => `[${c.n}] (${c.source}) ${c.text}`).join('\n')
-    : '(no platform records are available for this question)';
+    : explainingAPage
+      ? '(none needed — this question is about a screen, not about the records)'
+      : '(no platform records are available for this question)';
 
   const user = [
     `Operator question: ${ctx.question}`,
@@ -239,8 +247,24 @@ export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
           "If they do not actually answer it, say \"I don't have records about that\" in one sentence,",
           'then answer from what this console does — plainly, with no citations — and stop.',
         ].join('\n')
-      : 'There are no records available. Tell the operator you have no data to answer this and suggest what to check or enable.',
+      : explainingAPage
+        ? // A SCREEN always exists, so "I have no records" is never the answer to "what is this
+          // page". Asked to explain Work, the copilot replied "I have no platform records to answer
+          // this question yet. Check that the relevant module is configured" — untrue, and
+          // unanswerable nonsense to someone who only wanted to know what they were looking at.
+          [
+            'Explain this screen to the reader: what it is for, what they are looking at, and what to',
+            'check first. Answer from the page description above and from what this console does.',
+            'Do not mention records, data availability, or modules being configured — none of that',
+            'was asked, and this question does not depend on any of it. No citations.',
+          ].join('\n')
+        : 'There are no records available. Tell the operator you have no data to answer this and suggest what to check or enable.',
   ].join('\n');
 
-  return { system: SYSTEM_PROMPT, user, citations, hasData };
+  // `answerable` and `hasData` are NOT the same question, and conflating them is what broke
+  // "Explain this page". hasData asks whether we found records; answerable asks whether the model has
+  // anything to work with. For a screen, the page description IS the material — so a page explanation
+  // is answerable with no records at all, and short-circuiting on hasData skipped the model entirely
+  // and returned a canned "I have no platform records" to someone who just asked what a page does.
+  return { system: SYSTEM_PROMPT, user, citations, hasData, answerable: hasData || explainingAPage };
 }

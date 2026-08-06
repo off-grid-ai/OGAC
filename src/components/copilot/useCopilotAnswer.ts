@@ -22,9 +22,24 @@ export interface CopilotAnswer {
   citations: Citation[];
   source: 'gateway' | 'no-data' | 'fallback';
   hasData: boolean;
+  /** What was asked about — a screen, or the platform's records. */
+  kind?: 'page' | 'platform';
 }
 
 /** The honest provenance label for an answer. Never claims more than the source supports. */
+/**
+ * The provenance caption for an answer.
+ *
+ * A page explanation is answered by the same model but NOT "over live records" — there are none, by
+ * nature. Claiming records that do not exist is the one thing this caption exists to prevent.
+ */
+export function sourceLabel(result: Pick<CopilotAnswer, 'source' | 'kind'>): string {
+  if (result.source === 'gateway' && result.kind === 'page') {
+    return 'Answered by the AI running on this box';
+  }
+  return SOURCE_LABEL[result.source];
+}
+
 export const SOURCE_LABEL: Record<CopilotAnswer['source'], string> = {
   gateway: 'Answered by the AI running on this box, over live records',
   fallback: 'The AI is unavailable — showing the raw records instead',

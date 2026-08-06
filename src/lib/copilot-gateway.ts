@@ -25,6 +25,11 @@ export interface CopilotAnswer {
    * sends an operator to check a healthy gateway.
    */
   source: 'gateway' | 'no-data' | 'fallback' | 'truncated';
+  /**
+   * What was asked about. A screen explanation legitimately has no records behind it, so the UI must
+   * not caption it "no underlying records were available" as though something had failed.
+   */
+  kind?: 'page' | 'platform';
   hasData: boolean;
 }
 
@@ -130,9 +135,13 @@ export async function answerCopilot(
   timeoutMs = inferenceTimeoutMs(process.env),
 ): Promise<CopilotAnswer> {
   const prompt = buildCopilotPrompt(ctx);
+  const kind: CopilotAnswer['kind'] = prompt.hasData ? 'platform' : 'page';
 
-  if (!prompt.hasData) {
-    return { answer: factsFallback([]), citations: [], source: 'no-data', hasData: false };
+  // Gated on `answerable`, not `hasData`. A page explanation has no records by nature and is still
+  // perfectly answerable from the screen's own description; gating on hasData meant the model was
+  // never called and the reader got a canned "no platform records" for "what is this page?".
+  if (!prompt.answerable) {
+    return { answer: factsFallback([]), citations: [], source: 'no-data', hasData: false, kind: 'platform' };
   }
 
   try {
@@ -148,13 +157,16 @@ export async function answerCopilot(
       // identical to an unreachable gateway.
       const outcome = readCompletion(await res.json());
       if (outcome.kind === 'answer') {
-        return { answer: outcome.text, citations: prompt.citations, source: 'gateway', hasData: true };
+        // hasData reports the TRUTH about records, so a page explanation says false and the UI can
+        // caption it honestly rather than implying a failed lookup.
+        return { answer: outcome.text, citations: prompt.citations, source: 'gateway', hasData: prompt.hasData, kind };
       }
       if (outcome.kind === 'truncated-before-answer') {
         return {
           answer: truncatedAnswer(prompt.citations),
           citations: prompt.citations,
           source: 'truncated',
+          kind,
           hasData: true,
         };
       }
@@ -163,5 +175,11 @@ export async function answerCopilot(
     /* gateway unreachable — fall through to the facts-only fallback */
   }
 
-  return { answer: factsFallback(prompt.citations), citations: prompt.citations, source: 'fallback', hasData: true };
+  return {
+    answer: factsFallback(prompt.citations),
+    citations: prompt.citations,
+    source: 'fallback',
+    hasData: prompt.hasData,
+    kind,
+  };
 }

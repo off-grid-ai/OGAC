@@ -30,3 +30,19 @@ export function pageExplanationQuestion(request: PageExplanationRequest): string
   const detail = request.description ? ` The page describes itself as: ${request.description}.` : '';
   return `Explain the "${where}" page to me.${detail} What is it for, what am I looking at, and what should I check first?`;
 }
+
+/**
+ * Is this the guide asking about a screen rather than about the platform's records?
+ *
+ * It matters because the two need opposite handling. A question about the platform is answered FROM
+ * the records, and having none is a real answer ("I don't have records about that"). A question about
+ * a SCREEN is not: asked to explain the Work page, the copilot replied "I have no platform records to
+ * answer this question yet. Check that the relevant module is configured" — which is both untrue and
+ * unanswerable nonsense to someone who only wanted to know what they were looking at. The page always
+ * exists; explaining it never depended on a record.
+ *
+ * Matched on the sentence this file owns, so the two stay in step by construction.
+ */
+export function isPageExplanation(question: string | null | undefined): boolean {
+  return /^Explain the "[^"]*" page to me\./.test(String(question ?? '').trim());
+}

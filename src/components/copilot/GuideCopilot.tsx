@@ -514,7 +514,12 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                   </div>
                 </div>
 
-                {shownResolution ? <Destinations resolution={shownResolution} onGo={goTo} /> : null}
+                {/* Not in page mode. The reader asked what THIS screen is; a "there is no single
+                    screen that answers that one" notice above the explanation answers a question
+                    nobody asked and reads as a failure. */}
+                {shownResolution && mode !== 'page' ? (
+                  <Destinations resolution={shownResolution} onGo={goTo} />
+                ) : null}
 
                 {shownLoading ? (
                   <div className="border-t border-border pt-3">
