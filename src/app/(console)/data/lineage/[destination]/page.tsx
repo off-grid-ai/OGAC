@@ -151,7 +151,7 @@ export default async function LineageDestinationPage({
 
   if (destination.id === 'runs') return <RunsSurface searchParams={await searchParams} />;
 
-  const lineage = await readLineageView();
+  const lineage = await readLineageView(await currentOrgId());
   if (destination.id === 'graph') return <LineageGraph {...lineage} />;
 
   if (!lineage.configured || lineage.error) {

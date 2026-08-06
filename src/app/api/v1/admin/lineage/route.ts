@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { currentOrgId } from '@/lib/tenancy';
 import { requireAdmin } from '@/lib/authz';
 import { readLineageView } from '@/lib/marquez';
 
@@ -8,5 +9,5 @@ import { readLineageView } from '@/lib/marquez';
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json(await readLineageView());
+  return NextResponse.json(await readLineageView(await currentOrgId()));
 }
