@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+import { dbUpOnce, SKIP_MESSAGE } from './support/db-available.mjs';
 
 // SECURITY EPIC — Wave 2 tenant-isolation integration tests (real Postgres) for the RUNS surfaces:
 //   • G-ISO-2 — an app-run submitted under org X PERSISTS + reads back under X, never under 'default'.
@@ -15,11 +15,10 @@ import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
 const A = `test-w2-a-${randomUUID().slice(0, 8)}`;
 const B = `test-w2-b-${randomUUID().slice(0, 8)}`;
 
-const dbUp = await dbReachable();
-const skip = dbUp ? false : SKIP_MESSAGE;
 
 // ─── G-ISO-2 — an app-run persists under the RUN's real org, not DEFAULT_ORG ──────────────────────
-test('G-ISO-2: an app-run submitted under org A persists + reads back under A (never default)', { skip }, async (t) => {
+test('G-ISO-2: an app-run submitted under org A persists + reads back under A (never default)', async (t) => {
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
   const { runApp, defaultDeps, newAppRunId } = await import('@/lib/app-run');
   const { getAppRunView } = await import('@/lib/app-runs-view-reader');
   const { db } = await import('@/db');
@@ -70,7 +69,8 @@ test('G-ISO-2: an app-run submitted under org A persists + reads back under A (n
 });
 
 // ─── agent-run by-id lookups are org-scoped (cross-tenant IDOR blocked) ───────────────────────────
-test('agent-run by-id reads/cancel/delete are org-scoped: A cannot touch B’s run', { skip }, async (t) => {
+test('agent-run by-id reads/cancel/delete are org-scoped: A cannot touch B’s run', async (t) => {
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
   const agentrun = await import('@/lib/agentrun');
   const { db } = await import('@/db');
   const { agentRuns } = await import('@/db/schema');
@@ -122,7 +122,8 @@ test('agent-run by-id reads/cancel/delete are org-scoped: A cannot touch B’s r
 });
 
 // ─── listAgentRunsByAgent is org-scoped ───────────────────────────────────────────────────────────
-test('listAgentRunsByAgent is org-scoped: A’s listing never includes B’s runs', { skip }, async (t) => {
+test('listAgentRunsByAgent is org-scoped: A’s listing never includes B’s runs', async (t) => {
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
   const agentrun = await import('@/lib/agentrun');
   const { db } = await import('@/db');
   const { agentRuns } = await import('@/db/schema');

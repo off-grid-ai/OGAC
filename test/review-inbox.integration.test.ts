@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+import { dbUpOnce, SKIP_MESSAGE } from './support/db-available.mjs';
 
 // INTEGRATION test for the HITL REVIEW INBOX — exercises the REAL server-only reader
 // (review-inbox-reader.ts) wired to the REAL stores (apps-store, app-run-store, app-access, agentrun)
@@ -16,9 +16,10 @@ import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
 const ORG = 'test-int-review-inbox';
 const OWNER = 'owner@corp';
 
-const dbUp = await dbReachable();
 
-test('HITL review inbox against a real Postgres', { skip: dbUp ? false : SKIP_MESSAGE }, async (t) => {
+test('HITL review inbox against a real Postgres', async (t) => {
+  if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
   const { createApp, deleteApp } = await import('@/lib/apps-store');
   const { setAppAccessPolicy, deleteAppAccessPolicy, ensureAppAccessSchema } = await import('@/lib/app-access');
   const { upsertAppRunState } = await import('@/lib/app-run-store');

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+import { dbUpOnce, SKIP_MESSAGE } from './support/db-available.mjs';
 
 // Exercises the real Postgres readers that feed Operations → Runs. The audit ledger is append-only,
 // so this writes two legitimate observations for one chat execution, plus app/agent executions with
@@ -9,12 +9,11 @@ import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
 
 const ORG = 'test-int-runs-dedup';
 const SHARED_ID = 'provider-collision-42';
-const dbUp = await dbReachable();
 
 test(
   'listAllRuns deduplicates repeated chat observations and preserves cross-kind id collisions',
-  { skip: dbUp ? false : SKIP_MESSAGE },
   async (t) => {
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
     const { db } = await import('@/db');
     const { agentRuns, appRuns } = await import('@/db/schema');
     const { listAllRuns, getRunByKey } = await import('@/lib/runs-monitor-reader');

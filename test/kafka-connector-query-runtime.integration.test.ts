@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import type { AppSpec } from '@/lib/app-model';
 import type { KafkaEnterpriseSourcePort } from '@/lib/adapters/kafka-enterprise-source';
-import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+import { dbUpOnce, SKIP_MESSAGE } from './support/db-available.mjs';
 
 const ORG = 'test-kafka-connector-query-runtime';
 const FOREIGN_ORG = 'test-kafka-connector-query-runtime-foreign';
@@ -20,7 +20,6 @@ const SCHEMA = JSON.stringify({
     severity: { type: 'string', enum: ['high', 'low'] },
   },
 });
-const dbUp = await dbReachable();
 
 function encodedRecord(value: Record<string, unknown>): Buffer {
   const envelope = Buffer.alloc(5);
@@ -31,8 +30,8 @@ function encodedRecord(value: Record<string, unknown>): Buffer {
 
 test(
   'canonical App connector-query consumes a governed Kafka source with tenant, schema and actor provenance',
-  { skip: dbUp ? false : SKIP_MESSAGE },
   async (t) => {
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
     const vault = new Map<string, string>();
     const vaultGets: string[] = [];
     let schemaMode: 'exact' | 'mismatch' = 'exact';

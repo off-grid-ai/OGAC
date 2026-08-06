@@ -2,18 +2,21 @@ import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
 import { Pool } from 'pg';
 import type { ActionReceipt } from '@/lib/action-contract';
-import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+import { dbUpOnce, SKIP_MESSAGE } from './support/db-available.mjs';
 import { prepareActionOutcomeSchema } from './support/action-outcome-schema.mjs';
 
-const dbUp = await dbReachable();
 const previous = {
   databaseUrl: process.env.DATABASE_URL,
   org: process.env.OFFGRID_ORG,
   token: process.env.OFFGRID_ADMIN_TOKEN,
   authSecret: process.env.AUTH_SECRET,
 };
-const prepared = dbUp ? await prepareActionOutcomeSchema('route') : null;
-if (prepared) process.env.DATABASE_URL = prepared.databaseUrl;
+// Prepared inside the test rather than at module scope. A top-level `await` here is rejected outright
+// by the transform ("Top-level await is currently not supported with the cjs output format"), which
+// failed the WHOLE FILE to load — reported as a failing test that had asserted nothing. The env is
+// still set before the app modules are imported, because those imports are dynamic and happen inside
+// the test body after this runs.
+let prepared: Awaited<ReturnType<typeof prepareActionOutcomeSchema>> | null = null;
 process.env.OFFGRID_ORG = 'org_bharat';
 process.env.OFFGRID_ADMIN_TOKEN = 'outcome-route-store-test';
 process.env.AUTH_SECRET = 'outcome-route-store-test-secret-32';
@@ -44,8 +47,10 @@ function request(method: string, body?: Record<string, unknown>): Request {
 
 test(
   'real routes retain accepted to converted evidence, replay, correction, withdrawal and scoped reads',
-  { skip: dbUp ? false : SKIP_MESSAGE },
-  async () => {
+  async (t) => {
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
+    prepared = await prepareActionOutcomeSchema('route');
+    process.env.DATABASE_URL = prepared.databaseUrl;
     const collection =
       await import('../src/app/api/v1/admin/app-runs/[id]/actions/[stepId]/outcomes/route.ts');
     const item =

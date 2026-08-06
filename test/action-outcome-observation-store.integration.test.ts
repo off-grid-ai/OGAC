@@ -3,13 +3,18 @@ import test, { after } from 'node:test';
 import { Pool } from 'pg';
 import type { ActionReceipt } from '@/lib/action-contract';
 import type { ActionOutcomeMutationInput } from '@/lib/action-outcome-contract';
-import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
+import { dbUpOnce, SKIP_MESSAGE } from './support/db-available.mjs';
 import { prepareActionOutcomeSchema } from './support/action-outcome-schema.mjs';
 
-const dbUp = await dbReachable();
 const previousDatabaseUrl = process.env.DATABASE_URL;
-const prepared = dbUp ? await prepareActionOutcomeSchema('store') : null;
-if (prepared) process.env.DATABASE_URL = prepared.databaseUrl;
+// Prepared inside each test rather than at module scope: a top-level await is rejected by the
+// transform and failed the whole file to load. Memoised so two tests share one schema, as before.
+let prepared: Awaited<ReturnType<typeof prepareActionOutcomeSchema>> | null = null;
+async function ensureSchema() {
+  prepared ??= await prepareActionOutcomeSchema('store');
+  process.env.DATABASE_URL = prepared.databaseUrl;
+  return prepared;
+}
 after(async () => {
   await prepared?.cleanup();
   if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
@@ -18,8 +23,9 @@ after(async () => {
 
 test(
   'retains tenant-scoped receipt outcomes, retries, correction history and withdrawal history',
-  { skip: dbUp ? false : SKIP_MESSAGE },
-  async () => {
+  async (t) => {
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
+    await ensureSchema();
     const store = await import('@/lib/action-outcome-observation-store');
     const pool = new Pool({ connectionString: prepared!.databaseUrl });
     const executedAt = new Date(Date.now() - 60_000).toISOString();
@@ -200,8 +206,9 @@ test(
 
 test(
   'rejects outcome timestamps outside the canonical receipt window',
-  { skip: dbUp ? false : SKIP_MESSAGE },
-  async () => {
+  async (t) => {
+    if (!(await dbUpOnce())) return t.skip(SKIP_MESSAGE);
+    await ensureSchema();
     const store = await import('@/lib/action-outcome-observation-store');
     const base: ActionOutcomeMutationInput = {
       runId: 'run_cross_sell',
