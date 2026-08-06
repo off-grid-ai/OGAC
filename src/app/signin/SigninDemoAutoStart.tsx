@@ -2,6 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+// WHY IT CALLS THE ACTION AND DOES NOT SUBMIT THE FORM. The first version fired
+// `formRef.current.requestSubmit()` on a 50ms timer. Clicking the button worked; the automatic
+// submit hung forever on "Signing you in…". A form wired to a server action only carries its action
+// id once React has attached to it, so submitting on a timer raced hydration and lost: the browser
+// sent a bare POST to /signin, Next re-rendered the sign-in page, the effect fired again, and the
+// visitor sat in a loop that looked exactly like a hung login. Invoking the action reference
+// directly has no such window — if the effect is running, React is hydrated and the reference is
+// live. The form stays for the manual click and the no-JavaScript case.
+
 // ─── Demo links sign themselves in ────────────────────────────────────────────────────────────────
 //
 // A public demo link goes to an investor or a buyer who has never seen this product. Landing them on
@@ -38,20 +47,28 @@ export function SigninDemoAutoStart({
   action: (formData: FormData) => Promise<void>;
   disabled: boolean;
 }>) {
-  const formRef = useRef<HTMLFormElement>(null);
+  // The once-guard is a REF, not the label state. If the attempt fails we want the button to become
+  // clickable again without the effect re-firing — a guard that resets is a loop waiting to happen.
+  const fired = useRef(false);
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
-    if (disabled || started) return;
+    if (disabled || fired.current) return;
     if (new URLSearchParams(window.location.search).get('signin') === 'manual') return;
+    fired.current = true;
     setStarted(true);
-    // A tick, so the form is in the DOM and React has flushed before the submit.
-    const id = window.setTimeout(() => formRef.current?.requestSubmit(), 50);
-    return () => window.clearTimeout(id);
-  }, [disabled, started]);
+    const form = new FormData();
+    form.set('username', email);
+    form.set('password', password);
+    form.set('callbackUrl', callbackUrl);
+    // A successful action redirects, so this promise settling without navigation means it did not
+    // work. Hand the visitor back a button they can press rather than leaving them on a label that
+    // will never change — the failure mode that made the first version look hung.
+    void action(form).finally(() => setStarted(false));
+  }, [action, callbackUrl, disabled, email, password]);
 
   return (
-    <form ref={formRef} action={action} className="w-full max-w-sm">
+    <form action={action} className="w-full max-w-sm">
       <input type="hidden" name="username" value={email} readOnly />
       <input type="hidden" name="password" value={password} readOnly />
       <input type="hidden" name="callbackUrl" value={callbackUrl} readOnly />
