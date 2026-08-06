@@ -163,6 +163,14 @@ const SYSTEM_PROMPT = [
   '4. Be concise and operator-focused: the likely answer/cause first, then the supporting evidence,',
   '   then a concrete next step if one is warranted.',
   '5. Do not name internal open-source engines; speak in capability terms (e.g. "drift checks", not the tool).',
+  // LENGTH IS LATENCY, and this is an interactive surface. Measured on the live box: answers were
+  // running to ~3,000 tokens and taking 16-43 SECONDS at the model's 43 tok/s, because nothing told
+  // it how long to be — "be concise" is not a budget. A reader watching a loader for 40s reads the
+  // product as slow no matter how good the answer is, so the limit is stated in words the model can
+  // actually count against.
+  '6. LENGTH: at most ~150 words. Lead with a one-sentence answer, then at most 4 short bullets of',
+  '   evidence. Do not restate the question, do not add a summary, and stop as soon as the question is',
+  '   answered — brevity matters more than completeness here.',
 ].join('\n');
 
 /**

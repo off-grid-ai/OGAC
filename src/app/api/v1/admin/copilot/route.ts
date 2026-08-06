@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/authz';
 import { answerCopilot } from '@/lib/copilot-gateway';
 import { gatherCopilotContext } from '@/lib/copilot-gather';
+import { withGatewayScope } from '@/lib/gateway-scope';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +40,20 @@ async function answer(question: string): Promise<NextResponse> {
     return NextResponse.json({ error: 'question is required' }, { status: 400 });
   }
   const ctx = await gatherCopilotContext(question);
-  return NextResponse.json(await answerCopilot(ctx));
+
+  // ATTRIBUTE THE CALL TO THE ASKING ORG. Without this the copilot's gateway call is written with no
+  // org, so it lands in the durable call history as unattributable — and since a record we cannot
+  // attribute is shown to NOBODY (the rule that closed the tenant leaks), the tenant's own Logs page
+  // could never show a question its own user had just asked. Reported live: "Explain this page"
+  // answered correctly while Logs stayed empty on both tenants.
+  //
+  // Measured at the time: 3,180 of 3,512 records in the index had org: null, including every call made
+  // that day. Agent-runs and app-runs already wrap their gateway work this way (agentrun.ts,
+  // app-run.ts); the copilot was the one interactive path that did not.
+  const orgId = await currentOrgId();
+  return withGatewayScope({ orgId }, async () =>
+    NextResponse.json(await answerCopilot(ctx)),
+  );
 }
 
 export async function GET(req: Request) {
