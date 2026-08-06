@@ -1,3 +1,4 @@
+import { toPlainText } from '@/lib/plain-text';
 import { Markdown } from '@/components/chat/Markdown';
 import {
   ArrowLeft,
@@ -175,7 +176,14 @@ export default async function RunDetailPage({
                             </span>
                           </div>
                           {s.detail ? (
-                            <p className="mt-1 text-[11px] text-muted-foreground">{s.detail}</p>
+                            // A step's detail is a ONE-LINE preview, and for the compose step that
+                            // line is the model's answer. Rendering markdown here is wrong (a heading
+                            // and a bullet list cannot share a line) and rendering it raw is what put
+                            // `**Retention Action Recommendation:** **Rationale:**` in the timeline.
+                            // Strip the syntax, keep the words.
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              {toPlainText(s.detail)}
+                            </p>
                           ) : null}
                           {s.refs && s.refs.length > 0 ? (
                             <div className="mt-1 flex flex-wrap gap-1">
