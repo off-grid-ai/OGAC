@@ -133,3 +133,52 @@ test('a page explanation is given NO records, even when some would match', async
   assert.equal(prompt.answerable, true);
   assert.match(prompt.user, /apps that do your work/, 'the description IS the material');
 });
+
+// ── A citation may only link to a run that still exists ───────────────────────────────────────────
+
+const auditCtx = (runId: string, knownRunIds?: ReadonlySet<string>) => ({
+  question: 'what was blocked, and in which run?',
+  audit: {
+    configured: true,
+    rows: [{
+      id: 'a1', ts: '2026-08-05T03:22:35', actor: 'proof:ceiling', action: 'pipeline.data.deny',
+      outcome: 'blocked', project: 'org_suraksha', runId,
+    }],
+  },
+  knownRunIds,
+});
+
+test('a run that no longer exists is not linked', async () => {
+  // apprun_eee51b30 is in the live audit ledger and NOT in app_runs — the audit trail outlives the
+  // runs it describes. Linking it 404'd, and a dead link from a citation is worse than no link:
+  // the citation is the part the reader is being asked to trust.
+  const { buildCopilotPrompt } = await import('@/lib/copilot-context');
+  const { citations } = buildCopilotPrompt(auditCtx('apprun_eee51b30', new Set()) as never);
+  assert.ok(citations.length > 0, 'the record is still cited — only the link is withheld');
+  assert.equal(citations[0].ref, '/governance/evidence/audit');
+});
+
+test('a run that does exist is linked straight to it', async () => {
+  const { buildCopilotPrompt } = await import('@/lib/copilot-context');
+  const { citations } = buildCopilotPrompt(
+    auditCtx('apprun_cfc47905', new Set(['apprun_cfc47905'])) as never,
+  );
+  assert.equal(citations[0].ref, '/operations/runs/app%3Aapprun_cfc47905');
+});
+
+test('not having checked means not linking — never linking unverified', async () => {
+  // Absent knownRunIds is "we did not ask", and an unverified link is exactly what this prevents.
+  const { buildCopilotPrompt } = await import('@/lib/copilot-context');
+  const { citations } = buildCopilotPrompt(auditCtx('apprun_cfc47905') as never);
+  assert.equal(citations[0].ref, '/governance/evidence/audit');
+});
+
+test('run ids map to their plane by prefix, and an unknown one to nothing', async () => {
+  const { runHref, runKindFromId } = await import('@/lib/runs-monitor');
+  assert.equal(runKindFromId('apprun_x'), 'app');
+  assert.equal(runKindFromId('chatrun_x'), 'chat');
+  assert.equal(runKindFromId('run_x'), 'agent');
+  assert.equal(runKindFromId('wat_x'), null, 'a wrong kind is a link to a run that does not exist');
+  assert.equal(runHref('run_0d632888'), '/operations/runs/agent%3Arun_0d632888');
+  assert.equal(runHref('wat_x'), null);
+});

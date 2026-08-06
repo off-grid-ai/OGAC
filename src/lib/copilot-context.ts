@@ -43,6 +43,14 @@ export interface CopilotContext {
   drift?: DriftView | null;
   evals?: EvalsView | null;
   anomalies?: { metric: string; scan: AnomalyScan }[];
+  /**
+   * Run ids this org can actually open, when the caller checked.
+   *
+   * Absent means "not checked" and no run links are produced. The audit ledger outlives the runs it
+   * describes, and a citation that 404s is worse than one that points at the audit log — the
+   * citation is the part the reader is being asked to trust.
+   */
+  knownRunIds?: ReadonlySet<string>;
 }
 
 export interface CopilotPrompt {
@@ -168,11 +176,11 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
         // and unusable. The run id stays: that is the reader's own evidence and the thing they go
         // and look up.
         `${r.ts.slice(0, 19)} — ${plainAction(r.action)} by ${r.actor} in ${plainOrg(r.project)}${r.model ? ` (${modelLabel(r.model)})` : ''}: ${r.outcome}${r.runId ? ` [run ${r.runId}]` : ''}.`,
-        // Link to THE run named in the text, not to the list it lives in. The row quoted
-        // "[run apprun_eee51b30]" and then sent the reader to the apps directory to go and find it.
-        // Falls back to the audit log when the id is not one we can place — a wrong link is worse
-        // than a general one.
-        (r.runId ? runHref(r.runId) : null) ?? '/governance/evidence/audit',
+        // Link to THE run named in the text, but only when it still exists. The row quoted
+        // "[run apprun_eee51b30]" and linked to the apps directory; pointing it at the run itself
+        // then 404'd, because that id is in the audit log and not in app_runs. Verified ids only.
+        (r.runId && ctx.knownRunIds?.has(r.runId) ? runHref(r.runId) : null) ??
+          '/governance/evidence/audit',
       );
     }
   }

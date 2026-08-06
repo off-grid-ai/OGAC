@@ -23,12 +23,18 @@ export interface CopilotReaders {
   finops: () => Promise<FinOps | null>;
   drift: () => Promise<DriftView | null>;
   evals: () => Promise<EvalsView | null>;
+  /** Which of these run ids this org can open. Optional: absent means no run links are produced. */
+  knownRunIds?: (ids: readonly string[]) => Promise<ReadonlySet<string>>;
 }
 
 const RECENT_AUDIT = 200;
 
 // The real, production readers — each wrapped so a failure degrades to "absent", never throws.
 const realReaders: CopilotReaders = {
+  knownRunIds: async (ids) => {
+    const { existingRunIds } = await import('@/lib/run-existence');
+    return existingRunIds(await currentOrgId(), ids);
+  },
   audit: async () => {
     try {
       // Scoped to the caller's org. This read feeds the copilot's PROMPT, so an unscoped one would
@@ -93,12 +99,17 @@ export async function gatherWith(question: string, readers: CopilotReaders): Pro
     readers.drift(),
     readers.evals(),
   ]);
+  // Which of the cited runs can actually be opened. One query, over ids we already hold; injected
+  // like every other reader so the orchestration stays testable without a database.
+  const runIds = (audit?.rows ?? []).map((r) => r.runId).filter((id): id is string => Boolean(id));
+  const knownRunIds = readers.knownRunIds ? await readers.knownRunIds(runIds) : undefined;
   return {
     question,
     audit,
     finops,
     drift,
     evals,
+    knownRunIds,
     anomalies: deriveAnomalies(finops),
   };
 }
