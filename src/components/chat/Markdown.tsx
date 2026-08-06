@@ -44,16 +44,19 @@ function CodeBlock({ children }: Readonly<{ children: ReactNode }>) {
 // no sources the caller never wires onCiteClick so no chips render.
 function CiteChip({ n, onClick }: Readonly<{ n: number; onClick: (n: number) => void }>) {
   return (
-    <sup>
-      <button
-        type="button"
-        onClick={() => onClick(n)}
-        title={`Jump to source ${n}`}
-        className="mx-0.5 inline-flex items-center rounded border border-primary/40 bg-primary/10 px-1 font-mono text-[0.65em] font-medium leading-none text-primary transition-colors duration-150 hover:bg-primary/20"
-      >
-        {n}
-      </button>
-    </sup>
+    // NOT a <sup> at 0.65em. Superscripting an already-small body size rendered the number at about
+    // seven pixels: illegible, indistinguishable from a decorative icon, and far too small to hit.
+    // A citation is the shortest path from a claim to its evidence and one of the most valuable
+    // controls on the surface — it has to be readable and clickable at a glance.
+    <button
+      type="button"
+      onClick={() => onClick(n)}
+      title={`Open source ${n}`}
+      aria-label={`Open source ${n}`}
+      className="mx-0.5 inline-flex min-w-[1.25rem] translate-y-[-1px] items-center justify-center rounded border border-primary/40 bg-primary/10 px-1 py-px align-middle font-mono text-[0.8em] font-medium leading-none text-primary transition-colors duration-150 hover:border-primary hover:bg-primary hover:text-primary-foreground"
+    >
+      {n}
+    </button>
   );
 }
 
