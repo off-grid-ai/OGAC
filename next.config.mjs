@@ -34,6 +34,16 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // BUILD SOMEWHERE ELSE, THEN SWAP. `next build` rewrites `.next` in place, so building on the same
+  // box that is serving from it hands live visitors a manifest pointing at chunks that no longer
+  // exist — ChunkLoadError, "Something went wrong here" on every navigation. That has taken the demo
+  // down twice, both times mid-build, both times looking like an application bug.
+  //
+  // Building over a slow link is exactly when it matters: the artifact is too big to ship across the
+  // tunnel, so the build has to happen on the server, and the in-place window stretches to minutes.
+  // With `OFFGRID_DIST_DIR=.next-build` the build lands in a scratch directory the running server is
+  // not reading, and the cutover becomes one `mv` plus a restart — seconds, not minutes.
+  distDir: process.env.OFFGRID_DIST_DIR || '.next',
   eslint: { ignoreDuringBuilds: true },
   experimental: {
     // Client-side Router Cache TTL. Next 15 defaults `dynamic` to 0s, so every re-visit to a
