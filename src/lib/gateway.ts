@@ -257,11 +257,20 @@ export interface TuningGroup {
   rows: TuningRow[];
 }
 
-/** A capability the router genuinely does NOT have, surfaced so the UI never fakes a control. */
+/**
+ * A capability, from the ROUTER's point of view, surfaced so the UI never fakes a control.
+ *
+ * Three states, not two: the router has it (`present`), the router does not but another layer of the
+ * platform does (`providedBy` names it), or it genuinely does not exist (neither). Collapsing the
+ * middle case into "not present" told readers the product had no response cache and no rate limiting
+ * when both are running — just in the layer that should own them.
+ */
 export interface TuningCapability {
   key: string;
   label: string;
   present: boolean;
+  /** Set when the router does not provide this but another layer does. */
+  providedBy?: string;
   note: string;
 }
 
@@ -426,30 +435,44 @@ export function shapeGatewayTuning(cfg: AggregatorConfig | null): GatewayTuningV
     },
   ];
 
+  // THREE states, not two. This list is scoped to what the ROUTER tunes, but it was rendering a flat
+  // "not present" badge for every capability the router does not own — and three of the four ARE
+  // provided, just somewhere else. A reader sees four grey "not present" chips and concludes the
+  // product lacks response caching and rate limiting, which is the opposite of true: the Redis
+  // response cache is running, and the Caddy edge is live and enforcing.
+  //
+  // So a capability the platform provides elsewhere now says WHERE, and only a genuine absence reads
+  // as one. The honesty rule this section exists for is unchanged — nothing here claims to be tunable
+  // on this page when it is not — but "we do not do this" and "we do this in the right layer" are
+  // different facts and must not share a badge.
   const capabilities: TuningCapability[] = [
     {
       key: 'responseCache',
       label: 'Response cache',
       present: cap.responseCache === true,
-      note: 'The router does not cache responses. There is no cache TTL to tune.',
+      providedBy: cap.responseCache === true ? undefined : 'the platform cache',
+      note: 'The router itself does not cache, so there is no TTL to tune here. Caching runs as a platform service — see AI Runtime → Models → Cache for hit rate and savings.',
     },
     {
       key: 'perRequestFallbackChain',
       label: 'Per-request fallback chain',
       present: cap.perRequestFallbackChain === true,
-      note: 'No model→model fallback. Resilience comes from the multi-node pool + the hardcoded fallback pool, both above.',
+      providedBy: cap.perRequestFallbackChain === true ? undefined : 'the multi-node pool',
+      note: 'No model→model fallback by design. Resilience comes from the multi-node pool plus the fallback pool above — a failed node is routed around rather than answered by a different model.',
     },
     {
       key: 'rateLimit',
       label: 'Rate limiting / WAF',
       present: cap.rateLimit === true,
-      note: 'Enforced at the Caddy edge (gateway.getoffgridai.co) plus a 60 req/min per-IP layer in the console middleware — by design, not here.',
+      providedBy: cap.rateLimit === true ? undefined : 'the edge',
+      note: 'Enforced at the edge, plus a 60 req/min per-IP layer in the console — deliberately in front of the router rather than inside it, so a flood is stopped before it reaches a model.',
     },
     {
       key: 'liveReconfigure',
       label: 'Live reconfigure',
       present: cap.liveReconfigure === true,
-      note: 'Tuning knobs are env-set in the aggregator launchd plist on S1; restart the aggregator to apply changes.',
+      // Genuinely absent — no `providedBy`. Changing a tuning knob really does need a restart.
+      note: 'Tuning values are set in the router service configuration; the router restarts to apply them.',
     },
   ];
 

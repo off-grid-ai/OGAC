@@ -27,6 +27,8 @@ interface TuningCapability {
   key: string;
   label: string;
   present: boolean;
+  /** Set when the router does not provide this but another layer of the platform does. */
+  providedBy?: string;
   note: string;
 }
 interface TuningResponse {
@@ -144,14 +146,21 @@ export function GatewayTuning() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Capabilities</CardTitle>
           <p className="text-xs text-muted-foreground">
-            What this router does and doesn&apos;t provide — so nothing here pretends to be tunable when it isn&apos;t.
+            What this router tunes itself, and what the platform provides in another layer — so
+            nothing here pretends to be tunable on this page when it isn&apos;t.
           </p>
         </CardHeader>
         <CardContent className="space-y-2.5 pt-0">
           {tuning?.capabilities.map((c) => (
             <div key={c.key} className="flex items-start gap-2">
-              {c.present ? (
-                <CheckCircle size={14} className="mt-0.5 shrink-0 text-primary" weight="fill" />
+              {/* A capability provided by another layer gets a check, not a cross — it exists. The
+                  muted weight keeps it distinct from something this router tunes directly. */}
+              {c.present || c.providedBy ? (
+                <CheckCircle
+                  size={14}
+                  className={`mt-0.5 shrink-0 ${c.present ? 'text-primary' : 'text-muted-foreground'}`}
+                  weight={c.present ? 'fill' : 'regular'}
+                />
               ) : (
                 <XCircle size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
               )}
@@ -159,7 +168,7 @@ export function GatewayTuning() {
                 <span className="flex items-center gap-1.5 text-xs font-medium">
                   {c.label}
                   <Badge variant="secondary" className="font-mono text-[10px]">
-                    {c.present ? 'available' : 'not present'}
+                    {c.present ? 'available' : c.providedBy ? `via ${c.providedBy}` : 'not present'}
                   </Badge>
                 </span>
                 <p className="flex items-start gap-1 text-[11px] leading-snug text-muted-foreground">
