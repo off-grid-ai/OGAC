@@ -1,5 +1,7 @@
 'use client';
 
+import { Markdown } from '@/components/chat/Markdown';
+
 import { Check, PencilSimple, UserCircle, X } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -133,9 +135,9 @@ export function AppReview({
               className="w-full rounded-md border border-border bg-background p-2 text-[12px] text-foreground"
             />
           ) : (
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-border/60 bg-muted/40 p-2 text-[12px] text-foreground">
-              {pending.outcome || '(no output produced at this step)'}
-            </pre>
+            <div className="max-h-48 overflow-auto rounded-md border border-border/60 bg-muted/40 p-2 text-[12px] text-foreground">
+              <Markdown>{pending.outcome || '(no output produced at this step)'}</Markdown>
+            </div>
           )}
         </div>
 

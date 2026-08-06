@@ -1,5 +1,7 @@
 'use client';
 
+import { Markdown } from '@/components/chat/Markdown';
+
 import { Play } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -129,9 +131,10 @@ export function AgentRunner({ agentId }: Readonly<{ agentId: string }>) {
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
                       Answer
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-sm text-foreground">
-                      {result.output}
-                    </p>
+                    {/* Model-written: rendered, not printed as literal ** and backticks. */}
+                    <div className="mt-1 rounded-md bg-muted/50 p-3 text-sm text-foreground">
+                      <Markdown>{result.output}</Markdown>
+                    </div>
                   </div>
                 ) : null}
 

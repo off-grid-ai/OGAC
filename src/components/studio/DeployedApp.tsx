@@ -1,5 +1,7 @@
 'use client';
 
+import { Markdown } from '@/components/chat/Markdown';
+
 import { PaperPlaneRight } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -51,7 +53,11 @@ export function DeployedApp({ slug }: Readonly<{ slug: string }>) {
               <div className={`inline-block max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                 t.role === 'user' ? 'bg-primary text-primary-foreground' : 'border border-border bg-card text-foreground'
               }`}>
-                <p className="whitespace-pre-wrap">{t.text}</p>
+                {t.role === "assistant" ? (
+                  <Markdown>{t.text}</Markdown>
+                ) : (
+                  <p className="whitespace-pre-wrap">{t.text}</p>
+                )}
                 {t.role === 'assistant' && t.governed ? (
                   <span className="mt-1 block text-[10px] text-primary">✓ governed on-prem</span>
                 ) : null}

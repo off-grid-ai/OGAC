@@ -1,5 +1,7 @@
 'use client';
 
+import { Markdown } from '@/components/chat/Markdown';
+
 import { CheckCircle, EnvelopeSimple, Play, Warning } from '@phosphor-icons/react/dist/ssr';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -265,8 +267,8 @@ export function RunPanel({
               {/* NEVER "(no output)". A run that produced no text still did something, and saying nothing
                 makes a working app look broken. A run paused for a person is the NORMAL outcome for an app
                 with a human step — it belongs in Work now, and the reader needs telling. */}
-              <pre className="whitespace-pre-wrap text-sm text-foreground">
-                {result.outcome ||
+              <div className="text-sm text-foreground">
+              <Markdown>{result.outcome ||
                   result.output ||
                   result.error ||
                   (result.status === 'awaiting_human'
@@ -278,7 +280,8 @@ export function RunPanel({
                         // an internal token in a sentence aimed at someone who has never seen one.
                         ? `${statusLabel(result.status)} — no text was produced. See Activity for the step-by-step trail.`
                         : 'Started. See Activity for the step-by-step trail.')}
-              </pre>
+              </Markdown>
+              </div>
               {/* The provenance arrives WITH the answer, not on another screen. */}
               {result.trail ? (
                 <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{result.trail}</p>

@@ -2,7 +2,7 @@
 
 import { ArrowRight, Compass, X } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CopilotAnswerView } from '@/components/copilot/CopilotAnswerView';
 import { MIN_QUESTION_LENGTH, useCopilotAnswer } from '@/components/copilot/useCopilotAnswer';
 import { useIsViewer } from '@/components/ViewerModeProvider';
@@ -45,10 +45,23 @@ import { publicLabel } from '@/lib/lineage-labels';
 // rail gives the answer a real reading column and keeps the "go and see it" destinations visible at the
 // same time, which is the entire point of the surface.
 //
-// Width is capped in BOTH directions on purpose: wide enough for the evidence list, but `42vw` so it
-// never eats the screen it is pointing at — a visitor needs to see the console behind it to follow
-// "take me there".
-const PANEL_WIDTH = 'w-[min(34rem,42vw)]';
+// The panel is RESIZABLE by dragging its left edge. Answers here range from a one-liner to a
+// conclusion plus a ten-item evidence list, so no single width is right for all of them, and the
+// reader is the only one who knows how much of the console behind it they still need to see.
+//
+// Width is a PREFERENCE, not a navigational position, so it lives in localStorage rather than the URL
+// — the repo rule about putting position in the URL is about places you can navigate Back out of, and
+// a panel width is not one. Open/closed is local for the same reason.
+const PANEL_STORAGE_KEY = 'offgrid.guide.width';
+const PANEL_MIN_PX = 380;
+/** Never wider than 80% of the viewport: the point of this surface is pointing AT the console. */
+const panelMaxPx = (viewport: number) => Math.max(PANEL_MIN_PX, Math.round(viewport * 0.8));
+const PANEL_DEFAULT_PX = 544; // 34rem — the previous fixed width, now just the starting point.
+
+export function clampPanelWidth(px: number, viewport: number): number {
+  if (!Number.isFinite(px)) return PANEL_DEFAULT_PX;
+  return Math.min(Math.max(Math.round(px), PANEL_MIN_PX), panelMaxPx(viewport));
+}
 
 export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | null }>) {
   const [open, setOpen] = useState(false);
@@ -63,6 +76,45 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
 
   const questions = useMemo(() => guideQuestionsForTenant(tenantSlug), [tenantSlug]);
 
+  // Panel width. Starts at the default so the server and first client render agree (a value read from
+  // localStorage during render would hydrate-mismatch), then adopts the stored preference on mount.
+  const [width, setWidth] = useState(PANEL_DEFAULT_PX);
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    const stored = Number(window.localStorage.getItem(PANEL_STORAGE_KEY));
+    if (stored) setWidth(clampPanelWidth(stored, window.innerWidth));
+  }, []);
+
+  // Pointer events rather than mouse events so a trackpad, a mouse and a pen all work, and
+  // setPointerCapture keeps the drag alive when the cursor outruns the 4px handle.
+  const startResize = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    dragging.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, []);
+
+  const onResize = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return;
+    // The panel is pinned right, so its width is the distance from the pointer to the right edge.
+    setWidth(clampPanelWidth(window.innerWidth - e.clientX, window.innerWidth));
+  }, []);
+
+  const endResize = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      window.localStorage.setItem(PANEL_STORAGE_KEY, String(width));
+    },
+    [width],
+  );
+
+  const resetWidth = useCallback(() => {
+    setWidth(PANEL_DEFAULT_PX);
+    window.localStorage.setItem(PANEL_STORAGE_KEY, String(PANEL_DEFAULT_PX));
+  }, []);
+
   // Something typed, but not yet enough for `submit` to accept it. Drives the composer hint so the
   // "enter to ask" affordance never claims to work when it will not.
   const trimmed = question.trim();
@@ -72,6 +124,11 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     (q: string) => {
       const text = q.trim();
       if (text.length < MIN_QUESTION_LENGTH) return;
+      // Clear the composer once the question is accepted. It used to keep the text, so after asking
+      // you were left staring at your own question in the input while the answer rendered above it —
+      // and typing the next one meant selecting and deleting the last one first. The question is not
+      // lost: it is shown above the answer as the thing that was asked.
+      setQuestion('');
       setAsked(text);
       // Destinations resolve instantly and locally — the visitor gets somewhere to go before the model
       // has finished thinking, which matters because a governed answer takes real seconds.
@@ -108,15 +165,36 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
           // Entrance uses the shared motion layer in globals.css (`animate-in` + the slide/fade
           // utilities), not a bespoke keyframe — so it inherits the app's easing tokens and the global
           // `prefers-reduced-motion` opt-out for free.
-          className={`fixed inset-y-0 right-0 z-40 hidden flex-col border-l border-border bg-background shadow-2xl animate-in slide-in-from-right fade-in-0 md:flex ${PANEL_WIDTH}`}
+          // `bg-card`, not `bg-background`. Measured: the page is rgb(247,248,248) and `bg-card` is
+          // pure white, so a panel on `bg-background` renders the SAME grey as the page it floats over
+          // and reads as flat and dingy — with only its header (which did use bg-card) showing white.
+          // An overlay is an elevated surface; it should be the lighter one.
+          className="fixed inset-y-0 right-0 z-40 hidden flex-col border-l border-border bg-card shadow-2xl animate-in slide-in-from-right fade-in-0 md:flex"
+          style={{ width }}
         >
+          {/* Resize handle on the left edge. 6px of grab area for a 1px visual line — a hairline is
+              impossible to hit — and it only shows colour on hover so it stays invisible until wanted.
+              Double-click resets to the default width. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the guide"
+            onPointerDown={startResize}
+            onPointerMove={onResize}
+            onPointerUp={endResize}
+            onPointerCancel={endResize}
+            onDoubleClick={resetWidth}
+            className="group absolute inset-y-0 -left-1 z-10 w-1.5 cursor-col-resize"
+          >
+            <div className="mx-auto h-full w-px bg-transparent transition-colors duration-150 group-hover:bg-primary" />
+          </div>
           {/* Header */}
           {/* COLOUR DISCIPLINE. This surface previously carried emerald in four places at once — the
               icon, the title, every section heading and the button — which reads as a green box rather
               than a terminal surface with an accent. The brand rule is emerald ON black/white, one
               accent per surface. Structure is now carried by borders and `muted-foreground`; emerald is
               reserved for the icon and the single primary action. */}
-          <header className="flex items-start gap-3 border-b border-border bg-card px-5 py-4">
+          <header className="flex items-start gap-3 border-b border-border px-5 py-4">
             <Compass className="mt-0.5 size-4 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[11px] uppercase tracking-widest text-foreground">Guide</p>
@@ -323,25 +401,28 @@ function Starters({
             <p className="border-b border-border/60 pb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               {theme.label}
             </p>
-            {items.map((q, i) => (
-              // CONTRAST: these questions are the CONTENT of the panel, so they are `text-foreground`.
-              // Rendering them in `muted-foreground` (as they were) put every readable thing on the
-              // surface in light grey and the whole panel read as washed out and disabled — removing
-              // the emerald overload is only half the fix; the remaining text has to carry the
-              // hierarchy. Emerald returns on hover only, as the affordance that this is clickable.
-              //
-              // Stagger via inline animation-delay is the cheap pattern globals.css sanctions for a
-              // single hero region. Capped at 6 steps so a long list never feels like it is loading.
-              <button
-                key={q.id}
-                type="button"
-                onClick={() => onPick(q.question)}
-                style={{ animationDelay: `${Math.min(i, 6) * 25}ms` }}
-                className="og-rise block w-full rounded border border-transparent px-2 py-1.5 text-left text-[12.5px] leading-snug text-foreground transition-colors duration-150 hover:border-border hover:bg-muted/60 hover:text-primary"
-              >
-                {q.question}
-              </button>
-            ))}
+            {/* PILLS, not text rows. These were borderless lines that only revealed a border on
+                hover, so a reader who never hovered had no way to tell the list was clickable at all —
+                it read as body copy. Each is now a bordered pill that sizes to its own content, which
+                also lets short ones share a row and makes the set look like a set of choices.
+                Contrast matters as much as shape: the questions are the CONTENT of this panel, so they
+                are `text-foreground`; rendering them muted made the whole surface look disabled.
+                Emerald is reserved for hover, as the signal that a pill is selectable.
+                Stagger via inline animation-delay is the cheap pattern globals.css sanctions, capped
+                at 6 steps so a long list never feels like it is loading. */}
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {items.map((q, i) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => onPick(q.question)}
+                  style={{ animationDelay: `${Math.min(i, 6) * 25}ms` }}
+                  className="og-rise rounded-full border border-border bg-background px-3 py-1.5 text-left text-[12.5px] leading-snug text-foreground transition-colors duration-150 hover:border-primary hover:bg-primary/5 hover:text-primary"
+                >
+                  {q.question}
+                </button>
+              ))}
+            </div>
           </div>
         );
       })}

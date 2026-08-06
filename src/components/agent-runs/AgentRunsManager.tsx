@@ -1,5 +1,7 @@
 'use client';
 
+import { Markdown } from '@/components/chat/Markdown';
+
 import {
   ArrowClockwise,
   ArrowLeft,
@@ -321,7 +323,7 @@ function RunDetail({ id, onBack, onChanged }: Readonly<{ id: string; onBack: () 
           {run.answer ? (
             <div className="rounded-md border border-border p-3">
               <div className="text-xs text-muted-foreground">Answer</div>
-              <p className="whitespace-pre-wrap text-sm">{run.answer}</p>
+              <div className="text-sm"><Markdown>{run.answer}</Markdown></div>
             </div>
           ) : null}
 

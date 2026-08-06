@@ -1,5 +1,7 @@
 'use client';
 
+import { Markdown } from '@/components/chat/Markdown';
+
 import { Play, ShieldCheck, Warning } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -178,9 +180,13 @@ export function PromptPlayground({
                 <span>{result.error || 'Blocked by input guardrail.'}</span>
               </div>
             ) : (
-              <pre className="min-h-[10rem] max-h-[24rem] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-background p-3 font-mono text-xs leading-relaxed text-foreground">
-                {running ? 'Running through the gateway…' : result?.output || result?.error || '—'}
-              </pre>
+              // Rendered, not printed. This is gateway output, so it arrives formatted; showing the
+              // raw source made a tuned prompt look like it had produced a broken answer.
+              <div className="min-h-[10rem] max-h-[24rem] overflow-auto rounded-md border border-border bg-background p-3 text-xs leading-relaxed text-foreground">
+                <Markdown>
+                  {running ? 'Running through the gateway…' : result?.output || result?.error || '—'}
+                </Markdown>
+              </div>
             )}
 
             {result?.missing?.length ? (

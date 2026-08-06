@@ -1,3 +1,4 @@
+import { Markdown } from '@/components/chat/Markdown';
 import { displayCell, humanizeColumn, parseRowsOutput } from '@/lib/step-output-view';
 
 /**
@@ -19,12 +20,15 @@ import { displayCell, humanizeColumn, parseRowsOutput } from '@/lib/step-output-
 export function StepEvidence({ outcome, maxHeight = 'max-h-56' }: { outcome: string; maxHeight?: string }) {
   const view = parseRowsOutput(outcome);
   if (!view) {
+    // The non-row fallback is a MODEL-WRITTEN sentence, and the model formats it: shown in a <pre> it
+    // put `**Meera Malhotra**`, backticked table names and `**Conclusion:**` on screen as literal
+    // characters, so a correct answer read like a dumped log. Rendered here, and reusing the chat
+    // renderer rather than adding a second one — which also strips any leaked reasoning control
+    // tokens, since this text comes straight from a reasoning model.
     return (
-      <pre
-        className={`mt-1 ${maxHeight} overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px] text-foreground`}
-      >
-        {outcome}
-      </pre>
+      <div className={`mt-1 ${maxHeight} overflow-auto rounded bg-muted/40 p-2 text-foreground`}>
+        <Markdown>{outcome}</Markdown>
+      </div>
     );
   }
   return (

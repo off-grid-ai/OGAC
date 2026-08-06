@@ -1,5 +1,7 @@
 'use client';
 
+import { Markdown } from '@/components/chat/Markdown';
+
 import Link from 'next/link';
 import { stepKindChip } from '@/lib/app-run-progress';
 import {
@@ -256,7 +258,7 @@ export function AppRunStatus({ initial }: Readonly<{ initial: AppRunView }>) {
           {run.outcome ? (
             <div className="mt-3 rounded-md border border-primary/25 bg-primary/[0.04] p-3">
               <p className="text-[11px] uppercase tracking-wide text-primary/80">Outcome</p>
-              <pre className="mt-1 whitespace-pre-wrap text-sm text-foreground">{run.outcome}</pre>
+              <div className="mt-1 text-sm text-foreground"><Markdown>{run.outcome}</Markdown></div>
             </div>
           ) : null}
 
