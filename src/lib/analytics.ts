@@ -65,6 +65,10 @@ export async function gatewayEvents(pipelineTag?: string | null): Promise<AuditE
         // key and bySubject was empty, so a budget could never be consumed no matter the real spend.
         keyId: null,
         caller: String(s.caller ?? s.gateway ?? '').trim() || null,
+        // The NODE that served the request. Previously folded into deviceId behind `caller` and lost,
+        // which left "was this answered on our own hardware" with nothing to read but the model's
+        // name — and none of the models this fleet serves are named "local".
+        gateway: String(s.gateway ?? '').trim() || null,
       } satisfies AuditEvent;
     });
   } catch {

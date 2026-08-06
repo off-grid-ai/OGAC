@@ -214,6 +214,8 @@ export interface PolicyBundle {
 export interface AuditEvent {
   id: string;
   deviceId: string;
+  /** The fleet node that served the call, when the gateway recorded one. Proof of where it ran. */
+  gateway?: string | null;
   ts: string;
   model: string;
   tokens: number;

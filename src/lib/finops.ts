@@ -1,5 +1,6 @@
 import { gatewayEvents } from '@/lib/analytics';
 import { isFleetServedModel, modelLabel } from '@/lib/model-catalog';
+import { localSharePct } from '@/lib/request-locality';
 import { type ApiKey, type AuditEvent, listApiKeys } from '@/lib/store';
 
 // FinOps: metering + cost + usage analytics, computed from the audit/traffic log (the source of
@@ -188,8 +189,7 @@ function keySpend(keys: ApiKey[], events: AuditEvent[]): KeySpend[] {
 // rather than leaking a foreign subject/key into this tenant's view.
 export function assembleFinOps(events: AuditEvent[], keys: ApiKey[]): FinOps {
   const totalCost = round(events.reduce((a, e) => a + costOf(e), 0));
-  // Asks where it RAN, not what it cost. Conflating the two made a free cloud model look on-prem.
-  const localReq = events.filter((e) => isFleetServedModel(e.model)).length;
+
   const daily = group(events, (e) => e.ts.slice(0, 10))
     .map((b) => ({ day: b.label, costUsd: b.costUsd }))
     .sort((a, b) => a.day.localeCompare(b.day));
@@ -198,7 +198,9 @@ export function assembleFinOps(events: AuditEvent[], keys: ApiKey[]): FinOps {
       requests: events.length,
       tokens: events.reduce((a, e) => a + e.tokens, 0),
       costUsd: totalCost,
-      localShare: events.length ? Math.round((localReq / events.length) * 100) : 0,
+      // Reads the serving NODE the gateway recorded, falling back to the catalogue. Never the
+      // model's name, and never a confident 0 for an empty set.
+      localShare: localSharePct(events) ?? 0,
     },
     byModel: group(events, (e) => e.model).map((b) => ({ ...b, label: modelLabel(b.label) })),
     // Attribute to the key's SUBJECT when we can resolve the key, else to the caller identity the
