@@ -28,18 +28,58 @@ export interface CopilotAnswer {
   hasData: boolean;
 }
 
+/**
+ * Which model answers operator questions.
+ *
+ * WHY THIS IS NOT QWYTHOS ANY MORE. Measured on the live box 2026-08-05: a single copilot question
+ * took **235 seconds** on `qwythos-9b-1m` (the 9B RPC cluster on g7). The guide sat on "Reading the
+ * live records…" for four minutes, which is not a usable surface for someone looking around a demo.
+ * The same question on `qwen35-2b` (g3) answers in ~28s with reasoning on, and ~1.2s with it off.
+ *
+ * Overridable by env so the fleet can repoint without a deploy; the default is the fast model because
+ * an interactive question should be answered while the reader is still looking at the screen.
+ */
+export const COPILOT_MODEL = process.env.OFFGRID_COPILOT_MODEL ?? 'qwen35-2b';
+
+/** Answer tokens requested; the budget helper multiplies this for reasoning headroom. */
+const COPILOT_ANSWER_TOKENS = 1_600;
+
+/**
+ * Whether to let the model think before answering. **Defaults to OFF, and that default is a
+ * measurement, not a preference.**
+ *
+ * Qwen3.5 is a reasoning model, and on the question "what does an audit trail prove?" — about as
+ * simple as this surface gets — it behaved like this on the live box:
+ *
+ *   thinking ON,  max_tokens 2000 → 9,635 chars of reasoning,  EMPTY answer (hit the ceiling)
+ *   thinking ON,  max_tokens 4000 → 6,226 chars of reasoning,  answered, 28.5s
+ *   thinking ON,  max_tokens 6000 → 21,767 chars of reasoning, EMPTY answer (hit the ceiling)
+ *   thinking OFF, max_tokens 300  → answered in 54 tokens, ~1.2s
+ *
+ * Note the third line against the second: a LARGER budget produced a WORSE outcome on the same
+ * prompt. This is not something a bigger ceiling fixes — the model does not reliably decide to stop,
+ * so raising the budget mostly buys a longer wait before the same empty reply. With thinking off it
+ * answers in about a second, every time.
+ *
+ * Set OFFGRID_COPILOT_THINKING=true to turn it back on (worth revisiting on a larger model, where the
+ * stopping behaviour is better). Note that `/no_think` in the prompt does NOT work on this build —
+ * measured: 1,249 chars of reasoning and an empty answer. The template kwarg is the only switch that
+ * takes effect, and it requires the server to run with `--jinja`.
+ */
+const COPILOT_THINKING = process.env.OFFGRID_COPILOT_THINKING === 'true';
+
 /** Pure: shape the OpenAI-compatible chat body from a built prompt. No I/O. */
 export function buildChatBody(prompt: CopilotPrompt): Record<string, unknown> {
   return {
+    model: COPILOT_MODEL,
     messages: [
       { role: 'system', content: prompt.system },
       { role: 'user', content: prompt.user },
     ],
-    // Sized for a REASONING model. 700 was sized for the answer alone, and the fleet's only model
-    // (Qwythos) spends most of its allowance in `reasoning_content` before it writes a word of
-    // `content` — so on a real question it returned HTTP 200 with an EMPTY answer, and the copilot
-    // told the user "The AI is unavailable" while the gateway was answering in 2 seconds.
-    max_tokens: completionBudget(700),
+    max_tokens: completionBudget(COPILOT_ANSWER_TOKENS),
+    // Passed through the aggregator to llama.cpp's chat template. Harmless to a model that has no
+    // thinking mode, so this stays correct if the copilot is repointed at a non-reasoning model.
+    chat_template_kwargs: { enable_thinking: COPILOT_THINKING },
     temperature: 0.1,
     stream: false,
   };
