@@ -14,6 +14,8 @@
 import type { AnomalyScan } from './anomaly';
 import { publicLabel } from '@/lib/lineage-labels';
 import type { AuditRow } from './audit-log-view';
+import { modelLabel } from './model-catalog';
+import { plainAction, plainOrg, plainRefs } from './plain-identifiers';
 import type { DriftView } from './drift-view';
 import type { EvalsView } from './evals-view';
 import type { FinOps } from './finops';
@@ -71,8 +73,12 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
   // in the FACTS it was given, as a suite id, so repeating it was correct behaviour. An instruction
   // cannot fix data. Cleaning the input is the reliable half, and the two together are defence in
   // depth rather than duplication.
+  // Two passes, because they catch different things. `publicLabel` has a VOCABULARY of names we
+  // must never say (engines, codenames). `plainRefs` has none — it un-colons any machine reference,
+  // whatever it is called, which is what caught `proof:ceiling` sitting in an actor field where no
+  // vocabulary list would ever have looked for it.
   const push = (source: Citation['source'], text: string, ref?: string) =>
-    cites.push({ n: cites.length + 1, source, text: publicLabel(text), ref });
+    cites.push({ n: cites.length + 1, source, text: plainRefs(publicLabel(text)), ref });
 
   // Anomalies — the sharpest "something changed" signal.
   if (ctx.anomalies?.length) {
@@ -152,7 +158,11 @@ export function buildCitations(ctx: CopilotContext): Citation[] {
     for (const r of [...failing, ...rest].slice(0, MAX_AUDIT)) {
       push(
         'audit',
-        `${r.ts.slice(0, 19)} — ${r.action} by ${r.actor} on ${r.project || 'default'}${r.model ? ` (${r.model})` : ''}: ${r.outcome}${r.runId ? ` [run ${r.runId}]` : ''}.`,
+        // Plain language, because the model QUOTES these facts back. A reader who asked what
+        // stops a bad answer was told it was blocked "by proof:ceiling on org_suraksha" — true,
+        // and unusable. The run id stays: that is the reader's own evidence and the thing they go
+        // and look up.
+        `${r.ts.slice(0, 19)} — ${plainAction(r.action)} by ${r.actor} in ${plainOrg(r.project)}${r.model ? ` (${modelLabel(r.model)})` : ''}: ${r.outcome}${r.runId ? ` [run ${r.runId}]` : ''}.`,
         r.runId ? '/solutions/apps' : '/governance/evidence/audit',
       );
     }

@@ -1,0 +1,62 @@
+// The strings below are verbatim from a copilot answer shown to a demo viewer on 2026-08-06: asked
+// what stops a bad answer reaching a customer, they were told it was blocked "by proof:ceiling on
+// org_suraksha". Every word true, none of it usable.
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { plainAction, plainOrg, plainRefs } from '@/lib/plain-identifiers';
+
+test('an action code becomes a phrase', () => {
+  assert.equal(plainAction('pipeline.data.deny'), 'pipeline data refused');
+  assert.equal(plainAction('app.run.report'), 'app run report');
+  assert.equal(plainAction('access.machine.rotate'), 'access machine rotated');
+  assert.equal(plainAction('device.kill'), 'device stopped');
+  assert.equal(plainAction('data.erasure'), 'data erased');
+});
+
+test('an unlisted verb keeps its own word rather than getting an invented synonym', () => {
+  // A wrong explanation of a governance event is far worse than a plain one, so anything not in the
+  // short list is simply un-dotted.
+  assert.equal(plainAction('claim.disposition.write'), 'claim disposition written');
+  assert.equal(plainAction('some.brand.new.action'), 'some brand new action');
+});
+
+test('an empty or malformed action yields nothing, not the word "undefined"', () => {
+  for (const v of [null, undefined, '', '  ', '...']) assert.equal(plainAction(v), '');
+});
+
+test('an org identifier never reaches the reader', () => {
+  // Naming the tenant to itself adds nothing, and "on org_suraksha" invites the question of whose
+  // other orgs are in there.
+  assert.equal(plainOrg('org_suraksha'), 'this organisation');
+  assert.equal(plainOrg('org_bharat'), 'this organisation');
+  assert.equal(plainOrg('default'), 'this organisation');
+  assert.equal(plainOrg(''), '');
+});
+
+test('a real project name is left alone — it is the customer\'s own word', () => {
+  assert.equal(plainOrg('Claims Automation'), 'Claims Automation');
+  assert.equal(plainOrg('renewals'), 'renewals');
+});
+
+test('a machine reference loses its colon', () => {
+  assert.equal(plainRefs('blocked by proof:ceiling'), 'blocked by proof ceiling');
+  assert.equal(plainRefs('guardrail:pii and injection:pass'), 'guardrail pii and injection pass');
+});
+
+test('a colon that is not a machine reference survives', () => {
+  // A time, a URL and ordinary punctuation all contain colons; mangling those would trade one
+  // unreadable answer for another.
+  assert.equal(plainRefs('at 09:30 today'), 'at 09:30 today');
+  assert.equal(plainRefs('see https://example.com/x'), 'see https://example.com/x');
+  assert.equal(plainRefs('Note: this is fine'), 'Note: this is fine');
+  assert.equal(plainRefs('Rationale: the premium'), 'Rationale: the premium');
+});
+
+test('the sentence that shipped comes out readable', () => {
+  const shipped = 'pipeline.data.deny by proof:ceiling on org_suraksha';
+  const fixed = `${plainAction('pipeline.data.deny')} by ${plainRefs('proof:ceiling')} in ${plainOrg('org_suraksha')}`;
+  assert.notEqual(fixed, shipped);
+  assert.equal(fixed, 'pipeline data refused by proof ceiling in this organisation');
+  assert.ok(!/[a-z]+\.[a-z]+|org_|:[a-z]/.test(fixed), 'no machine syntax may survive');
+});
