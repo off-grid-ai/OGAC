@@ -20,16 +20,24 @@ export async function existingRunIds(
   if (wanted.length === 0) return new Set();
   try {
     const { db } = await import('@/db');
-    const { sql } = await import('drizzle-orm');
-    // One round trip across the three run planes. Org-scoped like every other tenant read — a run
-    // belonging to another tenant must not become a link, whether or not it exists.
-    const res = await db.execute(sql`
-      SELECT id FROM app_runs   WHERE org_id = ${orgId} AND id = ANY(${wanted})
-      UNION ALL
-      SELECT id FROM agent_runs WHERE org_id = ${orgId} AND id = ANY(${wanted})
-    `);
-    const rows = (res as unknown as { rows?: { id?: unknown }[] }).rows ?? [];
-    return new Set(rows.map((r) => String(r.id ?? '')).filter(Boolean));
+    const { agentRuns, appRuns } = await import('@/db/schema');
+    const { and, eq, inArray } = await import('drizzle-orm');
+    // The TYPED query, not a raw `sql` template. Written as
+    // `sql\`id = ANY(${wanted})\`` drizzle expanded the JS array into a row constructor —
+    // `ANY(($2, $3))` — which throws, was swallowed by the catch below, and returned an empty set.
+    // Indistinguishable from "none of these runs exist", so every citation quietly lost its link
+    // while the tests and the UI both looked fine.
+    const [apps, agents] = await Promise.all([
+      db
+        .select({ id: appRuns.id })
+        .from(appRuns)
+        .where(and(eq(appRuns.orgId, orgId), inArray(appRuns.id, wanted))),
+      db
+        .select({ id: agentRuns.id })
+        .from(agentRuns)
+        .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, wanted))),
+    ]);
+    return new Set([...apps, ...agents].map((r) => r.id));
   } catch {
     return new Set();
   }
