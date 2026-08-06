@@ -1,3 +1,4 @@
+import { Markdown } from '@/components/chat/Markdown';
 import {
   ArrowLeft,
   CheckCircle,
@@ -212,7 +213,15 @@ export default async function RunDetailPage({
 
               {agent.answer ? (
                 <Section title="Answer">
-                  <pre className="whitespace-pre-wrap text-sm text-foreground">{agent.answer}</pre>
+                  {/* MODEL OUTPUT, so it renders as markdown. In a <pre> the answer arrived as
+                      literal `**Retention Action Recommendation**` and `-` bullets — the model writes
+                      markdown, and showing its source is the difference between a considered
+                      recommendation and something that looks broken. The QUERY blocks above stay
+                      literal on purpose: those are what a person submitted, and an operator reading a
+                      run needs the exact text, not a prettified version of it. */}
+                  <div className="text-sm text-foreground">
+                    <Markdown>{agent.answer}</Markdown>
+                  </div>
                 </Section>
               ) : null}
 

@@ -1,3 +1,4 @@
+import { Markdown } from '@/components/chat/Markdown';
 import { ArrowLeft, SealCheck } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
@@ -223,7 +224,10 @@ export default async function RunTracePage({
             <CardHeader>
               <CardTitle className="text-sm">Answer</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-foreground">{run.answer || '—'}</CardContent>
+            {/* Markdown, for the same reason as the operator run view: this is model output. */}
+            <CardContent className="text-sm text-foreground">
+              {run.answer ? <Markdown>{run.answer}</Markdown> : '—'}
+            </CardContent>
           </Card>
         </div>
 
