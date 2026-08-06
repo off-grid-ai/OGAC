@@ -41,8 +41,16 @@ export interface CopilotAnswer {
  */
 export const COPILOT_MODEL = process.env.OFFGRID_COPILOT_MODEL ?? 'qwen35-2b';
 
-/** Answer tokens requested; the budget helper multiplies this for reasoning headroom. */
-const COPILOT_ANSWER_TOKENS = 1_600;
+/**
+ * Answer tokens requested; the budget helper multiplies this for reasoning headroom, giving a 16,000
+ * token ceiling.
+ *
+ * Sized generously on purpose. `max_tokens` is a CEILING, not an allocation — with thinking off the
+ * model stops on its own after a few hundred tokens (measured: a full answer in 54), so unused budget
+ * costs nothing, while an exhausted budget costs the entire answer and returns empty content. The
+ * model serves its full native 262,144-token context on g3, so there is no reason to be mean here.
+ */
+const COPILOT_ANSWER_TOKENS = 4_000;
 
 /**
  * Whether to let the model think before answering. **Defaults to OFF, and that default is a
