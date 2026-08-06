@@ -1,4 +1,5 @@
 import { Coins, CurrencyDollar, FolderSimple, Users } from '@phosphor-icons/react/dist/ssr';
+import { convertUsd, DEFAULT_CURRENCY, formatMoney } from '@/lib/money';
 import Link from 'next/link';
 import type { ComponentType } from 'react';
 import {
@@ -41,7 +42,12 @@ const RANGES: readonly { key: RangePreset; label: string }[] = [
   { key: 'all', label: 'All time' },
 ];
 
-const usd = (value: number) => `$${value.toFixed(2)}`;
+// Rendered in the ORG's currency, not the gateway's. Model usage is priced in USD upstream, but this
+// console showed $0.05 on a tenant whose every other money figure — claim amounts, ROI, staff cost —
+// is in rupees, so the same page mixed two currencies with no way to tell which was which.
+// Converted at an explicit rate (money.ts) rather than relabelled: printing a USD number with a ₹
+// sign is the bug this pairs with, found on the ROI page.
+const usd = (value: number) => formatMoney(convertUsd(value), DEFAULT_CURRENCY);
 const num = (value: number) => value.toLocaleString();
 
 function FilterBar({
@@ -179,7 +185,7 @@ function ModelsTable({ rows }: Readonly<{ rows: ModelSpend[] }>) {
     <Card className="shadow-sm">
       <CardHeader>
         <CardTitle className="text-sm">Spend by model</CardTitle>
-        <p className="mt-1 text-xs text-muted-foreground">Local models report $0 spend.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Local models report zero spend — they run on your own hardware.</p>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

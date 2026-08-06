@@ -12,6 +12,7 @@
 // and passes it in; this module owns the shape + the prompt.
 
 import type { AnomalyScan } from './anomaly';
+import { publicLabel } from '@/lib/lineage-labels';
 import type { AuditRow } from './audit-log-view';
 import type { DriftView } from './drift-view';
 import type { EvalsView } from './evals-view';
@@ -61,8 +62,17 @@ function fmtUsd(n: number): string {
  */
 export function buildCitations(ctx: CopilotContext): Citation[] {
   const cites: Citation[] = [];
+  // SANITISED AT THE ONE SEAM every citation passes through, so no fact type can be added later
+  // without it. Observed live 2026-08-06: the copilot answered `Review the "ragas" and "golden"
+  // evaluation suites` and listed `Suite "ragas": 89% pass` — an internal engine name, on a surface
+  // built for demo visitors.
+  //
+  // The system prompt already tells the model not to name engines, and it was obeying: the name was
+  // in the FACTS it was given, as a suite id, so repeating it was correct behaviour. An instruction
+  // cannot fix data. Cleaning the input is the reliable half, and the two together are defence in
+  // depth rather than duplication.
   const push = (source: Citation['source'], text: string, ref?: string) =>
-    cites.push({ n: cites.length + 1, source, text, ref });
+    cites.push({ n: cites.length + 1, source, text: publicLabel(text), ref });
 
   // Anomalies — the sharpest "something changed" signal.
   if (ctx.anomalies?.length) {

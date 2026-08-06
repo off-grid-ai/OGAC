@@ -9,10 +9,14 @@
 //     uses, resolved via teams.ts) so ROI rolls up the way the org-chart does;
 //   • the two ESTIMATES  ← resolveRoiSettings(app override → org default → hard default).
 //
-// AI cost from the run trace is priced in USD (the gateway's native unit) and ROI is stated in USD,
-// so the cost passes straight through — no currency conversion. The pure calc stays currency-agnostic.
+// AI cost from the run trace is priced in USD (the gateway's native unit); the org states value in ITS
+// currency. Those two used to meet with no conversion, so a USD cost was rendered as ₹ and subtracted
+// from a rupee value — invisible only because the demo's spend rounds to zero. It is converted HERE, at
+// the boundary where the USD number enters, so the pure calc downstream stays single-currency exactly
+// as it assumes. See convertUsd in money.ts for why the rate is explicit rather than fetched.
 
 import { computeReportMetrics } from '@/lib/app-reports';
+import { convertUsd } from '@/lib/money';
 import { listAppRunsView } from '@/lib/app-runs-view-reader';
 import { listApps } from '@/lib/apps-store';
 import {
@@ -88,7 +92,7 @@ export async function computeAppRoiRow(
     appTitle: app.title,
     department,
     runsCompleted: facts.runsCompleted,
-    actualAiCost: facts.actualAiCostUsd,
+    actualAiCost: convertUsd(facts.actualAiCostUsd),
     settings,
   });
 }
@@ -119,7 +123,7 @@ export async function computeOrgRoiRollup(orgId: string = DEFAULT_ORG): Promise<
         appTitle: app.title,
         department,
         runsCompleted: facts.runsCompleted,
-        actualAiCost: facts.actualAiCostUsd,
+        actualAiCost: convertUsd(facts.actualAiCostUsd),
         settings,
       }),
     );

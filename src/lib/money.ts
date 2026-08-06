@@ -94,3 +94,43 @@ export function formatCostOrUnmeasured(
 export function formatRate(amount: number, currency: CurrencyCode = DEFAULT_CURRENCY): string {
   return `${formatMoney(amount, currency)}/hr`;
 }
+
+// ─── Converting the gateway's USD costs into the org's currency ───────────────────────────────────
+//
+// The gateway prices model usage in USD — that is how model pricing is quoted, and local inference is
+// $0 — while an org states value in its own currency. Those two met without conversion: roi-reader.ts
+// notes the AI cost "passes straight through — no currency conversion", and the ROI page then renders
+// it with formatAmount, which uses the org currency. So a USD figure was labelled ₹ and SUBTRACTED
+// from a rupee value to produce "net value".
+//
+// It has been invisible because the demo's AI cost rounds to zero (~$0.05 → ₹0), but it is a
+// correctness bug, not a formatting one: at any real spend the net value is wrong by the FX rate.
+//
+// The rate is explicit and overridable rather than hard-coded to a number someone has to trust. It is
+// deliberately NOT fetched live: a finance figure that changes silently between two page loads is
+// worse than one that is stated, and an offline-first product must not depend on an FX API.
+export const DEFAULT_USD_RATES: Readonly<Record<CurrencyCode, number>> = {
+  USD: 1,
+  INR: 88,
+  EUR: 0.92,
+  GBP: 0.78,
+  AED: 3.67,
+  SGD: 1.35,
+};
+
+/**
+ * Convert an amount in USD into `currency`.
+ *
+ * `rates` can override the defaults (an org setting, a test). An unknown or non-finite rate falls back
+ * to 1 — leaving the number unconverted and visibly in the wrong currency — rather than silently
+ * zeroing a cost, because a cost that vanishes reads as "free" and that is the dangerous failure here.
+ */
+export function convertUsd(
+  usd: number,
+  currency: CurrencyCode = DEFAULT_CURRENCY,
+  rates: Readonly<Record<string, number>> = DEFAULT_USD_RATES,
+): number {
+  if (!Number.isFinite(usd)) return 0;
+  const rate = rates[currency];
+  return usd * (Number.isFinite(rate) && rate > 0 ? rate : 1);
+}

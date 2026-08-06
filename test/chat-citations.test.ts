@@ -192,3 +192,46 @@ test('retriever citation → chat transport → a followable source', () => {
   assert.equal(s.name, 'Reimbursement Policy 2025.pdf');
   assert.equal(s.score, 0.82);
 });
+
+// ── Ranges ────────────────────────────────────────────────────────────────────────────────────────
+// Watched live 2026-08-06: the copilot writes "[8–9]" and "[1–6]" as readily as "[1, 2]". Those
+// stayed literal text while single markers beside them became clickable chips, so a reader saw some
+// citations they could click and some they could not, with no visible rule. Note the EN DASH — the
+// model emits U+2013, which a hyphen-only pattern misses silently.
+
+test('a range expands to one chip per cited record', () => {
+  const segs = parseCitationMarkers('drift scores [8–9].', 12);
+  const cites = segs.filter((s) => s.type === 'cite');
+  assert.deepEqual(cites.map((c) => c.n), [8, 9]);
+  assert.ok(cites.every((c) => c.valid));
+});
+
+test('a hyphen range works too, not just the en dash', () => {
+  assert.deepEqual(
+    parseCitationMarkers('see [1-6]', 10).filter((s) => s.type === 'cite').map((c) => c.n),
+    [1, 2, 3, 4, 5, 6],
+  );
+});
+
+test('ranges and lists mix in one marker', () => {
+  assert.deepEqual(
+    parseCitationMarkers('[1, 3–5]', 10).filter((s) => s.type === 'cite').map((c) => c.n),
+    [1, 3, 4, 5],
+  );
+});
+
+test('an out-of-range endpoint stays literal rather than becoming a wrong chip', () => {
+  // [11–12] with only 10 sources: the second endpoint does not exist, so the marker must not claim it.
+  const cites = parseCitationMarkers('[11–12]', 10).filter((s) => s.type === 'cite');
+  assert.ok(cites.every((c) => !c.valid), 'no chip may claim a source that is not there');
+});
+
+test('an absurd range cannot generate hundreds of chips', () => {
+  const cites = parseCitationMarkers('[1–900]', 5).filter((s) => s.type === 'cite');
+  assert.ok(cites.length <= 2, `expected the marker to fall through, got ${cites.length} chips`);
+});
+
+test('a reversed range is not treated as a range', () => {
+  const cites = parseCitationMarkers('[9–8]', 12).filter((s) => s.type === 'cite');
+  assert.ok(cites.length <= 2);
+});

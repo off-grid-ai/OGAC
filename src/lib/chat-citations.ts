@@ -98,10 +98,18 @@ export type Segment =
   | { type: 'text'; text: string }
   | { type: 'cite'; n: number; valid: boolean };
 
-// Matches [1], [2, 3], [1][2] style bracketed citation markers. A marker is a bracket wrapping
-// one-or-more comma/space separated integers. Non-numeric brackets (e.g. [note], [x]) are left as
-// plain text so we never eat real prose.
-const MARKER = /\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g;
+// Matches [1], [2, 3], [1][2] and RANGES like [8-9] or [1–6]. A marker is a bracket wrapping
+// integers separated by commas or a dash. Non-numeric brackets (e.g. [note], [x]) are left as plain
+// text so we never eat real prose.
+//
+// Ranges were added 2026-08-06 after watching the live copilot: the model writes "[8–9]" and "[1–6]"
+// as naturally as "[1, 2]", and those stayed as literal bracketed text while single markers next to
+// them turned into chips. The reader sees some citations they can click and some they cannot, with no
+// rule explaining which — worse than none being clickable.
+//
+// Note the EN DASH as well as the hyphen: the model emits "–" (U+2013), which a hyphen-only pattern
+// silently misses. That is exactly how this shipped looking half-broken.
+const MARKER = /\[\s*\d+(?:\s*[,–—-]\s*\d+)*\s*\]/g;
 
 // Split answer text into ordered text/cite segments. A [1,2] group expands into two cite segments
 // (so each number is independently clickable). `valid` = the number maps to a known source, so the
@@ -118,11 +126,24 @@ export function parseCitationMarkers(text: string, sourceCount: number): Segment
   let m: RegExpExecArray | null;
   while ((m = MARKER.exec(text)) !== null) {
     pushText(text.slice(last, m.index));
-    const nums = m[0]
-      .replace(/[[\]\s]/g, '')
-      .split(',')
-      .map((x) => Number.parseInt(x, 10))
-      .filter((n) => Number.isFinite(n));
+    // Expand a range ("8–9" → 8, 9) so every cited record gets its own chip. Bounded by the source
+    // count so a malformed "[1–900]" cannot generate hundreds of chips: an invalid endpoint makes the
+    // whole marker fall through as literal text, which is the honest outcome.
+    const body = m[0].replace(/[[\]\s]/g, '');
+    const nums: number[] = [];
+    for (const part of body.split(',')) {
+      const range = part.match(/^(\d+)[–—-](\d+)$/);
+      if (range) {
+        const from = Number.parseInt(range[1], 10);
+        const to = Number.parseInt(range[2], 10);
+        if (to >= from && to - from < sourceCount) {
+          for (let n = from; n <= to; n++) nums.push(n);
+          continue;
+        }
+      }
+      const single = Number.parseInt(part, 10);
+      if (Number.isFinite(single)) nums.push(single);
+    }
     for (const n of nums) {
       segments.push({ type: 'cite', n, valid: n >= 1 && n <= sourceCount });
     }
