@@ -15,6 +15,7 @@ import type { AnomalyScan } from './anomaly';
 import { publicLabel } from '@/lib/lineage-labels';
 import type { AuditRow } from './audit-log-view';
 import { modelLabel } from './model-catalog';
+import { selectRelevantFacts } from './copilot-relevance';
 import { plainAction, plainOrg, plainRefs } from './plain-identifiers';
 import type { DriftView } from './drift-view';
 import type { EvalsView } from './evals-view';
@@ -199,7 +200,16 @@ const SYSTEM_PROMPT = [
  * honest "no data" answer WITHOUT calling the model.
  */
 export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
-  const citations = buildCitations(ctx);
+  // SELECT, then answer. Handing a 2B model forty records gathered the same way for every question
+  // is what produced "Pipeline data is successfully masked by the service account" — records stitched
+  // together because they were in the prompt, not because they related. Keeping only the ones that
+  // bear on the question makes the answer better AND faster: a shorter prompt on this hardware is
+  // the difference between a considered reply and a long one.
+  //
+  // Selecting NOTHING is a real outcome, not a failure: the no-data path below already says so
+  // honestly and then answers from what the console does. Padding the prompt with a weak match so
+  // there is something to cite is exactly how an off-topic record reaches a buyer labelled evidence.
+  const citations = selectRelevantFacts(ctx.question, buildCitations(ctx));
   const hasData = citations.length > 0;
 
   const factBlock = hasData
@@ -217,17 +227,17 @@ export function buildCopilotPrompt(ctx: CopilotContext): CopilotPrompt {
     //
     // Naming them "recent platform activity" rather than "facts about the question", and requiring an
     // explicit relevance check first, is what stops an off-topic dump being presented as an answer.
-    'Recent platform activity (gathered generically — it may or may not relate to the question):',
+    'Records from this platform, selected as the ones most likely to bear on the question:',
     factBlock,
     '',
     hasData
       ? [
-          'FIRST decide whether the records above actually bear on the question.',
-          '- If they do: answer using ONLY them, citing as [n].',
-          '- If they do NOT: say so in one sentence ("I don\'t have records about X"), then answer the',
-          '  question from what the console itself does — plainly and without citations — and stop.',
-          '  Do NOT list unrelated records under a heading like "Evidence"; an off-topic record',
-          '  presented as evidence is worse than admitting the gap.',
+          // Selection is keyword-based, so a record can still be a near-miss; the relevance check
+          // stays. It is SHORTER now because a small model follows two rules better than six, and
+          // the pile it had to reason over has already been cut down for it.
+          'Answer the question using only the records above, citing each as [n].',
+          "If they do not actually answer it, say \"I don't have records about that\" in one sentence,",
+          'then answer from what this console does — plainly, with no citations — and stop.',
         ].join('\n')
       : 'There are no records available. Tell the operator you have no data to answer this and suggest what to check or enable.',
   ].join('\n');

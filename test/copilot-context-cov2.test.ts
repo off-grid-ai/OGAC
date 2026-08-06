@@ -91,16 +91,34 @@ test('evals with zero runs contributes no citation (the runs>0 guard, false arm)
   assert.ok(!cites.some((c) => c.source === 'evals'));
 });
 
-test('buildCopilotPrompt with a fully-populated context has data and numbers every source', () => {
+test('buildCopilotPrompt selects the records that bear on the question, numbered from 1', () => {
+  // This asserted that EVERY gathered source reached the prompt, for the question "what is going
+  // on?". That was the old behaviour and it is the defect: forty unrelated records handed to a 2B
+  // model is what produced an answer stitched from records that had nothing to do with each other.
+  // The question now has to be a real one, and only the records bearing on it come through.
   const ctx: CopilotContext = {
-    question: 'what is going on?',
+    question: 'has the model drifted or started failing its quality checks?',
     drift: drift(),
     evals: evals(),
     anomalies: [{ metric: 'errors', scan }],
   };
   const prompt = buildCopilotPrompt(ctx);
   assert.equal(prompt.hasData, true);
-  assert.ok(prompt.citations.length > 4);
+  assert.ok(prompt.citations.length > 0);
+  assert.ok(prompt.citations.every((c) => c.source === 'drift' || c.source === 'evals'));
   prompt.citations.forEach((c, i) => assert.equal(c.n, i + 1));
   assert.match(prompt.user, /\[1\]/);
+});
+
+test('a question none of the records answer selects none, rather than the best of a bad set', () => {
+  // The honest outcome. The prompt already knows how to say "I don't have records about that" and
+  // answer plainly; padding it with a near-miss is how an off-topic record reaches a buyer as
+  // "Evidence".
+  const prompt = buildCopilotPrompt({
+    question: 'who founded the company and where is it registered?',
+    drift: drift(),
+    evals: evals(),
+  });
+  assert.equal(prompt.hasData, false);
+  assert.deepEqual(prompt.citations, []);
 });

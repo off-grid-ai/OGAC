@@ -95,7 +95,8 @@ test('prompt embeds numbered facts and instructs citation', () => {
 });
 
 test('buildChatBody shapes an OpenAI-compatible body with system+user', () => {
-  const prompt = buildCopilotPrompt({ question: 'q', finops });
+  // A real question: records are now selected against it, so 'q' correctly matches nothing.
+  const prompt = buildCopilotPrompt({ question: 'what are we spending on tokens?', finops });
   const body = buildChatBody(prompt) as {
     messages: { role: string; content: string }[];
     stream: boolean;
@@ -109,7 +110,8 @@ test('buildChatBody shapes an OpenAI-compatible body with system+user', () => {
 });
 
 test('factsFallback lists real facts, and says none when empty', () => {
-  const prompt = buildCopilotPrompt({ question: 'q', finops });
+  // A real question: records are selected against it now, so 'q' correctly matches nothing.
+  const prompt = buildCopilotPrompt({ question: 'what are we spending on tokens?', finops });
   const withFacts = factsFallback(prompt.citations);
   assert.match(withFacts, /\[1\]/);
   const none = factsFallback([]);
