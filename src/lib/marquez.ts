@@ -15,6 +15,16 @@ import {
 
 const BASE = process.env.OFFGRID_MARQUEZ_URL;
 
+/**
+ * How many jobs/datasets to pull from the namespace before scoping.
+ *
+ * This MUST cover the whole namespace, because the reads fetch and THEN filter by ownership. At the
+ * previous limit of 100 against 225 live datasets, a tenant silently lost any of its own nodes that
+ * happened to fall outside the first page — measured: the insurer saw none of its four
+ * `surcon_*` connector datasets, which look identical to a correctly-scoped empty result.
+ */
+const GRAPH_FETCH_LIMIT = 1000;
+
 export function marquezConfigured(): boolean {
   return Boolean(BASE);
 }
@@ -94,8 +104,8 @@ export async function fetchLineageGraph(orgId: string): Promise<LineageGraph> {
     if (!ns) return { configured: true, namespace: null, jobs: [], datasets: [], edges: [] };
     const enc = encodeURIComponent(ns);
     const [jobsRes, dsRes, owned] = await Promise.all([
-      mqGet<{ jobs?: MarquezJob[] }>(`/api/v1/namespaces/${enc}/jobs?limit=100`),
-      mqGet<{ datasets?: MarquezDataset[] }>(`/api/v1/namespaces/${enc}/datasets?limit=100`),
+      mqGet<{ jobs?: MarquezJob[] }>(`/api/v1/namespaces/${enc}/jobs?limit=${GRAPH_FETCH_LIMIT}`),
+      mqGet<{ datasets?: MarquezDataset[] }>(`/api/v1/namespaces/${enc}/datasets?limit=${GRAPH_FETCH_LIMIT}`),
       ownedLineageKeysForOrg(orgId),
     ]);
     const jobs = filterLineageNodes(jobsRes.jobs ?? [], owned);
@@ -140,8 +150,8 @@ export async function readLineageView(orgId: string): Promise<{
     if (!ns) return { configured: true, data: normalizeLineage({ namespaces }), error: null };
     const enc = encodeURIComponent(ns);
     const [jobsRes, dsRes, owned] = await Promise.all([
-      mqGet<{ jobs?: MarquezJob[] }>(`/api/v1/namespaces/${enc}/jobs?limit=100`),
-      mqGet<{ datasets?: MarquezDataset[] }>(`/api/v1/namespaces/${enc}/datasets?limit=100`),
+      mqGet<{ jobs?: MarquezJob[] }>(`/api/v1/namespaces/${enc}/jobs?limit=${GRAPH_FETCH_LIMIT}`),
+      mqGet<{ datasets?: MarquezDataset[] }>(`/api/v1/namespaces/${enc}/datasets?limit=${GRAPH_FETCH_LIMIT}`),
       ownedLineageKeysForOrg(orgId),
     ]);
     const data = normalizeLineage({
