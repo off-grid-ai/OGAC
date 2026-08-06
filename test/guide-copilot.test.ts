@@ -7,7 +7,11 @@ import {
   GUIDE_QUESTIONS,
   GUIDE_THEMES,
   guideQuestionsForTenant,
+  followUpQuestions,
+  GUIDE_ROLES,
+  guideRoleFromParam,
   isCurrentPath,
+  themesForRole,
   isReadOnlySafeHref,
   resolveGuideDestinations,
   withoutCurrentPage,
@@ -364,4 +368,73 @@ test('nothing is dropped when the reader is somewhere else entirely', () => {
     destinations: [{ href: '/operations/runs', label: 'Runs', what: 'every run' }],
   };
   assert.equal(withoutCurrentPage(res, '/overview'), res, 'same object — no needless re-render');
+});
+
+// ── Role: reorders, never hides ───────────────────────────────────────────────────────────────────
+
+test('every role sees every theme — only the order changes', () => {
+  // A tour that hides the cost story from a CISO is a pitch, not a tour. This is the invariant that
+  // keeps role-tailoring honest, so it is asserted for all of them rather than spot-checked.
+  const all = GUIDE_THEMES.map((t) => t.id).sort();
+  for (const r of GUIDE_ROLES) {
+    const seen = themesForRole(r.id).map((t) => t.id);
+    assert.equal(seen.length, GUIDE_THEMES.length, `${r.id} lost a theme`);
+    assert.deepEqual([...seen].sort(), all, `${r.id} must see every theme`);
+  }
+});
+
+test('each role leads with what that role actually opens with', () => {
+  assert.equal(themesForRole('ciso')[0].id, 'trust', 'security leads on what gets stopped');
+  assert.equal(themesForRole('dpo')[0].id, 'private', 'privacy leads on personal data');
+  assert.equal(themesForRole('cio')[0].id, 'value', 'platform leads on cost to run');
+  assert.equal(themesForRole('investor')[0].id, 'works', 'an investor leads on "is it real"');
+});
+
+test('no role means the default order, unchanged', () => {
+  assert.deepEqual(themesForRole(null).map((t) => t.id), GUIDE_THEMES.map((t) => t.id));
+  assert.deepEqual(themesForRole(undefined).map((t) => t.id), GUIDE_THEMES.map((t) => t.id));
+});
+
+test('a role is read from the link, and a junk one is ignored rather than guessed', () => {
+  assert.equal(guideRoleFromParam('ciso'), 'ciso');
+  assert.equal(guideRoleFromParam('  DPO '), 'dpo', 'case and spacing are the sender\'s business');
+  for (const junk of ['', null, undefined, 'ceo', 'admin', '../ciso']) {
+    assert.equal(guideRoleFromParam(junk), null, `${junk} must not resolve to a role`);
+  }
+});
+
+// ── Follow-ups: computed from the answer, never a repeat ──────────────────────────────────────────
+
+const ALL = [...GUIDE_QUESTIONS];
+
+test('a follow-up is never a question already asked', () => {
+  const asked = ALL.slice(0, 3).map((q) => q.question);
+  const next = followUpQuestions(ALL, { match: 'starter', destinations: [] }, asked);
+  for (const q of next) assert.ok(!asked.includes(q.question), `repeated: ${q.question}`);
+});
+
+test('the answer\'s own screens decide what comes next', () => {
+  // The first suggestion should continue the thread — a question that leads to the same screen the
+  // reader was just shown — rather than restarting the tour somewhere unrelated.
+  const seed = ALL.find((q) => q.destinations.length > 0)!;
+  const resolution = { match: 'starter' as const, destinations: [...seed.destinations] };
+  const next = followUpQuestions(ALL, resolution, [seed.question]);
+  assert.ok(next.length > 0, 'there is always somewhere to go next');
+  const seedPaths = new Set(seed.destinations.map((d) => d.href.split('?')[0]));
+  const first = next[0];
+  const shares =
+    first.destinations.some((d) => seedPaths.has(d.href.split('?')[0])) || first.theme === seed.theme;
+  assert.ok(shares, `first follow-up "${first.question}" does not continue the thread`);
+});
+
+test('with nothing to continue from, it still offers a way forward', () => {
+  // A dead end after an unmatched question is the worst moment to show an empty list.
+  assert.ok(followUpQuestions(ALL, null, []).length > 0);
+  assert.ok(followUpQuestions(ALL, { match: 'none', destinations: [] }, []).length > 0);
+});
+
+test('follow-ups are capped, and run out honestly rather than repeating', () => {
+  assert.ok(followUpQuestions(ALL, null, [], 3).length <= 3);
+  const everything = ALL.map((q) => q.question);
+  assert.deepEqual(followUpQuestions(ALL, null, everything), [], 'nothing left is an empty list');
 });

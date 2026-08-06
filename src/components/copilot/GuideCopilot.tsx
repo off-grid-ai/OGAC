@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, ArrowRight, Compass, X } from '@phosphor-icons/react/dist/ssr';
+import { ArrowLeft, ArrowRight, ArrowUp, Compass, X } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CopilotAnswerSkeleton } from '@/components/copilot/CopilotAnswerSkeleton';
@@ -8,8 +8,14 @@ import { CopilotAnswerView } from '@/components/copilot/CopilotAnswerView';
 import { MIN_QUESTION_LENGTH, useCopilotAnswer, type CopilotAnswer } from '@/components/copilot/useCopilotAnswer';
 import { useIsViewer } from '@/components/ViewerModeProvider';
 import {
-  GUIDE_THEMES,
+  followUpQuestions,
+  GUIDE_ROLES,
   guideQuestionsForTenant,
+  guideRoleFromParam,
+  guideRoleSpec,
+  themesForRole,
+  type GuideQuestion,
+  type GuideRole,
   resolveGuideDestinations,
   withoutCurrentPage,
   type GuideDestination,
@@ -79,6 +85,8 @@ const PANEL_STORAGE_KEY = 'offgrid.guide.width';
 const GUIDE_OPEN_KEY = 'offgrid.guide.open';
 /** "Hide for this visit" — sessionStorage, because a visit is a tab, not a browser installation. */
 const GUIDE_DISMISSED_KEY = 'offgrid.guide.dismissed';
+/** The reader's role, once they pick one. */
+const GUIDE_ROLE_KEY = 'offgrid.guide.role';
 const PANEL_MIN_PX = 380;
 /** Never wider than 80% of the viewport: the point of this surface is pointing AT the console. */
 const panelMaxPx = (viewport: number) => Math.max(PANEL_MIN_PX, Math.round(viewport * 0.8));
@@ -95,10 +103,15 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   // client's first paint is a hydration mismatch.
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  // Who is reading. Absent until they say so — we never guess someone's job from their behaviour.
+  const [role, setRole] = useState<GuideRole | null>(null);
+  /** Every question asked this session, so a follow-up is never one they have already had. */
+  const [history, setHistory] = useState<string[]>([]);
   const [question, setQuestion] = useState('');
   const [resolution, setResolution] = useState<GuideResolution | null>(null);
   const [asked, setAsked] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const isViewer = useIsViewer();
   const { loading, result, error, ask, reset } = useCopilotAnswer();
@@ -123,6 +136,24 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   //
   // The reader's own choice always wins. Closing it is remembered across reloads, so nobody has to
   // close it twice; only an absent preference means "open".
+  // The LINK wins over the remembered choice: whoever sent `?as=ciso` knows who they sent it to,
+  // and that is better information than a role this browser picked on some earlier visit.
+  useEffect(() => {
+    const fromLink = guideRoleFromParam(new URLSearchParams(window.location.search).get('as'));
+    if (fromLink) {
+      setRole(fromLink);
+      window.localStorage.setItem(GUIDE_ROLE_KEY, fromLink);
+      return;
+    }
+    setRole(guideRoleFromParam(window.localStorage.getItem(GUIDE_ROLE_KEY)));
+  }, []);
+
+  const chooseRole = useCallback((next: GuideRole | null) => {
+    setRole(next);
+    if (next) window.localStorage.setItem(GUIDE_ROLE_KEY, next);
+    else window.localStorage.removeItem(GUIDE_ROLE_KEY);
+  }, []);
+
   useEffect(() => {
     if (!isViewer) return;
     if (window.sessionStorage.getItem(GUIDE_DISMISSED_KEY)) {
@@ -163,6 +194,18 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     root.style.setProperty('--og-guide-width', `${width}px`);
     return () => root.removeAttribute('data-og-guide-open');
   }, [dismissed, open, width]);
+
+  /**
+   * Drop the bottom fade once there is nothing below it.
+   *
+   * Also covers the case where the content simply FITS: scrollHeight === clientHeight satisfies this,
+   * so a short list never wears a fade implying more content that does not exist.
+   */
+  const syncScrollFade = useCallback(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.toggleAttribute('data-at-end', el.scrollHeight - el.scrollTop - el.clientHeight < 8);
+  }, []);
 
   // Pointer events rather than mouse events so a trackpad, a mouse and a pen all work, and
   // setPointerCapture keeps the drag alive when the cursor outruns the 4px handle.
@@ -239,6 +282,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       // lost: it is shown above the answer as the thing that was asked.
       setQuestion('');
       setAsked(text);
+      setHistory((h) => (h.includes(text) ? h : [...h, text]));
       // Destinations resolve instantly and locally — the visitor gets somewhere to go before the model
       // has finished thinking, which matters because a governed answer takes real seconds.
       setResolution(resolveGuideDestinations(text, { tenantSlug, sanitize: publicLabel }));
@@ -293,6 +337,7 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     // 'new' means a clean slate, so the back stack goes with it — leaving history behind a fresh
     // question would let Back jump to an answer from a conversation the reader has ended.
     setPast([]);
+    setHistory([]);
     setRestored(null);
     setAsked(null);
     setResolution(null);
@@ -333,6 +378,11 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     explainThisPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, mode, open]);
+
+  // Re-measure whenever what is IN the body changes, not just on scroll — a new answer, a mode
+  // switch or a role change all alter the height, and a fade left over from the previous content is
+  // as misleading as no fade at all.
+  useEffect(syncScrollFade, [syncScrollFade, history, mode, open, role, shownAsked, shownResult, width]);
 
   if (dismissed) return null;
 
@@ -421,8 +471,16 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
             ))}
           </div>
 
-          {/* Body */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {/* Body. The fade at the bottom is the scroll affordance: at a normal window height the
+              list runs past the fold, and the cut landed right after a section heading — so the last
+              group read as an empty section rather than as more content below. A soft mask over the
+              final rows says "this continues" without adding a scrollbar to a narrow panel.
+              `pb-6` keeps the last pill clear of the fade instead of dissolving into it. */}
+          <div
+            ref={bodyRef}
+            onScroll={syncScrollFade}
+            className="og-scroll-fade min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4"
+          >
             {isViewer ? (
               <p className="mb-3 rounded border border-border bg-muted/50 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground">
                 You are signed in to look around. Nothing you click here can change anything.
@@ -472,49 +530,94 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
                   </div>
                 ) : null}
 
-                {shownResolution?.match === 'none' && !shownLoading ? (
-                  <Starters questions={questions} onPick={submit} heading="Try one of these instead" />
+                {/* WHAT TO ASK NEXT — derived from the answer just given, not the same eleven
+                    starters. The reader has been told something; the useful next question follows
+                    from that. Computed from the destinations the answer resolved to (see
+                    followUpQuestions), so it is instant and every suggestion leads somewhere real —
+                    a model-written follow-up costs another several seconds and can invent a question
+                    this product cannot answer, dead-ending them on their second click.
+                    On a 'none' match there is nothing to continue from, so it falls back to the full
+                    list, which is exactly what that reader needs. */}
+                {!shownLoading && shownResolution?.match === 'none' ? (
+                  <Starters
+                    questions={questions}
+                    onPick={submit}
+                    heading="Try one of these instead"
+                    role={role}
+                  />
+                ) : null}
+                {!shownLoading && shownResult && shownResolution?.match !== 'none' ? (
+                  <FollowUps
+                    questions={followUpQuestions(questions, shownResolution, history)}
+                    onPick={submit}
+                  />
                 ) : null}
               </div>
             ) : (
-              <Starters questions={questions} onPick={submit} heading={null} />
+              <>
+                <RoleRow role={role} onChoose={chooseRole} />
+                <Starters questions={questions} onPick={submit} heading={null} role={role} />
+              </>
             )}
           </div>
 
-          {/* Composer — the one deliberately narrow element on the surface: a single focused input. */}
+          {/* COMPOSER. It was a bare textarea with two captions under it: no border, so the one place
+              you can type did not look like a field, and the send action was a small mono button
+              sitting beside the words "enter to ask". Now it is a real bordered input that takes the
+              accent on focus, with the send control inside it.
+
+              It also GROWS with the content up to a limit, because a two-row box silently scrolls a
+              longer question out of sight while you are still writing it. */}
           <footer className="border-t border-border px-5 py-4">
-            <textarea
-              ref={inputRef}
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  submit(question);
+            <div className="rounded-lg border border-border bg-background transition-colors duration-150 focus-within:border-primary">
+              <textarea
+                ref={inputRef}
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submit(question);
+                  }
+                }}
+                rows={1}
+                // Grows to fit, capped — past the cap it scrolls, rather than eating the panel.
+                style={{ height: 'auto', maxHeight: '9rem' }}
+                onInput={(e) => {
+                  const el = e.currentTarget;
+                  el.style.height = 'auto';
+                  el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
+                }}
+                // The placeholder names THIS screen, so the invitation is about where the reader
+                // actually is rather than one fixed example they may not care about.
+                placeholder={
+                  identity
+                    ? `Ask about ${identity.title} — or anything else`
+                    : 'Ask anything — what stops a bad answer reaching a customer?'
                 }
-              }}
-              rows={2}
-              placeholder="Ask anything — e.g. what stops a bad answer reaching a customer?"
-              className="w-full resize-none bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-            <div className="mt-1 flex items-center justify-between gap-2">
-              {/* "Enter to ask" was a LIE for a short question. `submit` returns early below
-                  MIN_QUESTION_LENGTH, so typing "Hi" and pressing Enter did nothing at all and the
-                  only signal was the Ask button sitting at 40% opacity — which reads as styling, not
-                  as a rejection. Say which state we are in instead of failing silently. */}
-              <span
-                className={`font-mono text-[10px] uppercase tracking-widest ${tooShort ? 'text-foreground' : 'text-muted-foreground'}`}
-              >
-                {tooShort ? 'a few more characters' : 'enter to ask'}
-              </span>
-              <button
-                type="button"
-                onClick={() => submit(question)}
-                disabled={loading || question.trim().length < MIN_QUESTION_LENGTH}
-                className="rounded border border-primary bg-primary px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                {loading ? 'thinking' : 'ask'}
-              </button>
+                className="max-h-36 w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] leading-snug text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+              <div className="flex items-center justify-between gap-2 px-3 pb-2">
+                {/* "Enter to ask" was a LIE for a short question: submit returns early below
+                    MIN_QUESTION_LENGTH, so typing "Hi" and pressing Enter did nothing at all and the
+                    only signal was a faded button, which reads as styling rather than a rejection. */}
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {tooShort ? 'a few more characters' : 'enter to ask'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => submit(question)}
+                  disabled={loading || question.trim().length < MIN_QUESTION_LENGTH}
+                  aria-label="Ask"
+                  className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
+                >
+                  {loading ? (
+                    <span className="size-2 animate-pulse rounded-full bg-primary-foreground" />
+                  ) : (
+                    <ArrowUp className="size-4" weight="bold" />
+                  )}
+                </button>
+              </div>
             </div>
             <button
               type="button"
@@ -604,10 +707,12 @@ function Starters({
   questions,
   onPick,
   heading,
+  role,
 }: Readonly<{
   questions: ReturnType<typeof guideQuestionsForTenant>;
   onPick: (q: string) => void;
   heading: string | null;
+  role: GuideRole | null;
 }>) {
   return (
     <div className="space-y-3">
@@ -616,7 +721,10 @@ function Starters({
           {heading}
         </p>
       ) : null}
-      {GUIDE_THEMES.map((theme) => {
+      {/* Ordered for whoever is reading. themesForRole returns EVERY theme, reordered — a CISO who
+          cannot find the cost story would be a tour that hides things, which is the opposite of the
+          point. Without a role this is the default order, unchanged. */}
+      {themesForRole(role).map((theme) => {
         const items = questions.filter((q) => q.theme === theme.id);
         if (items.length === 0) return null;
         return (
@@ -651,6 +759,78 @@ function Starters({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * "Tailor this to you" — a skippable row, never a gate.
+ *
+ * A role picker in FRONT of the panel would be a form before any value, and the readers these demo
+ * links go to are exactly the ones who close the tab instead of filling one in. Someone who has seen
+ * nothing yet also has no reason to answer. So it sits above the questions with the full list
+ * underneath it either way: ignoring it costs nothing, and one tap re-orders the tour.
+ */
+function RoleRow({
+  role,
+  onChoose,
+}: Readonly<{ role: GuideRole | null; onChoose: (r: GuideRole | null) => void }>) {
+  const spec = guideRoleSpec(role);
+  return (
+    <div className="mb-3 space-y-1.5">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        {spec ? 'Showing this for' : 'Tailor this to you'}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {GUIDE_ROLES.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            // Tapping the active role clears it — the way out of a choice has to be the same control
+            // that made it, or the reader is stuck with a guess they made in one click.
+            onClick={() => onChoose(role === r.id ? null : r.id)}
+            aria-pressed={role === r.id}
+            className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors duration-150 ${
+              role === r.id
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-foreground'
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {spec ? (
+        <p className="text-[11px] leading-snug text-muted-foreground">{spec.opening}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Where to go next, computed from the answer just given. See followUpQuestions for why. */
+function FollowUps({
+  questions,
+  onPick,
+}: Readonly<{ questions: readonly GuideQuestion[]; onPick: (q: string) => void }>) {
+  if (questions.length === 0) return null;
+  return (
+    <div className="space-y-1.5 border-t border-border pt-3">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        Next, you might ask
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {questions.map((q, i) => (
+          <button
+            key={q.id}
+            type="button"
+            onClick={() => onPick(q.question)}
+            style={{ animationDelay: `${Math.min(i, 6) * 25}ms` }}
+            className="og-rise rounded-full border border-border bg-background px-3 py-1.5 text-left text-[12.5px] leading-snug text-foreground transition-colors duration-150 hover:border-primary hover:bg-primary/5 hover:text-primary"
+          >
+            {q.question}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

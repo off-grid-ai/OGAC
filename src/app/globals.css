@@ -538,3 +538,24 @@ body {
     padding-right: var(--og-guide-width, 0px);
   }
 }
+
+/* ── Scroll affordance for a panel with no visible scrollbar ────────────────────────────────────
+   A long list inside a narrow overlay clips at the fold with nothing to say it continues, and when
+   the cut lands just after a section heading the last group reads as an empty section. This masks
+   the final rows to transparent so the content visibly runs on.
+
+   `mask-image` rather than a gradient overlay: an overlay needs a solid colour to fade INTO, which
+   is wrong the moment the panel sits on a different background or the viewer flips to dark. A mask
+   fades the content itself, so it is correct on every surface and in both themes.
+
+   The mask is dropped once the reader has scrolled to the end (`data-at-end`), because a fade over
+   the genuinely-last row implies content that is not there. `prefers-reduced-motion` is irrelevant
+   here — there is no motion — but a scrollbar-visible platform keeps its scrollbar regardless. */
+.og-scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent 100%);
+}
+.og-scroll-fade[data-at-end] {
+  -webkit-mask-image: none;
+  mask-image: none;
+}

@@ -742,3 +742,130 @@ export function resolveGuideDestinations(
 
   return { destinations: [], match: 'none' };
 }
+
+// ─── Who is reading this? ────────────────────────────────────────────────────────────────────────
+//
+// The same console answers four different jobs, and they do not want the same evidence first. A CISO
+// opens with "what stops a bad thing"; a DPO only cares about personal data; a CIO is costing an
+// operational commitment; an investor wants to know it is real before anything else.
+//
+// HOW WE ASK. Not with a gate. A role picker in front of the panel is a form before any value, and
+// the people these links go to are exactly the ones who close the tab rather than fill one in — and
+// a reader who has seen nothing yet does not know why we are asking. So: the demo LINK can carry it
+// (`?as=ciso`, set by whoever sends the link, who already knows), and inside the panel it is one
+// skippable row with the full list underneath it either way.
+//
+// THE RULE THAT KEEPS THIS HONEST: a role changes which facts LEAD, never which facts exist. Every
+// question stays reachable for everyone. A tour that hides things from some readers is a pitch, and
+// this surface exists to be the opposite of that.
+export type GuideRole = 'ciso' | 'dpo' | 'cio' | 'investor';
+
+export interface GuideRoleSpec {
+  id: GuideRole;
+  /** How the reader would name themselves. */
+  label: string;
+  /** One line, in their language, shown once the role is chosen. */
+  opening: string;
+  /** Themes in the order this role cares about them. Every theme appears — only the order changes. */
+  themeOrder: readonly GuideThemeId[];
+}
+
+export const GUIDE_ROLES: readonly GuideRoleSpec[] = [
+  {
+    id: 'ciso',
+    label: 'Security',
+    opening: 'Starting with what gets stopped, who can reach what, and what leaves the network.',
+    themeOrder: ['trust', 'private', 'works', 'value'],
+  },
+  {
+    id: 'dpo',
+    label: 'Privacy',
+    opening: 'Starting with personal data — where it lives, what gets masked, and who touched it.',
+    themeOrder: ['private', 'trust', 'works', 'value'],
+  },
+  {
+    id: 'cio',
+    label: 'IT / Platform',
+    opening: 'Starting with what it costs to run, what it plugs into, and who operates it.',
+    themeOrder: ['value', 'works', 'private', 'trust'],
+  },
+  {
+    id: 'investor',
+    label: 'Investor',
+    opening: 'Starting with whether this is real software doing real work, and what it returns.',
+    themeOrder: ['works', 'value', 'trust', 'private'],
+  },
+];
+
+/** Read a role off a URL parameter. Unknown or absent → null; we never guess a reader's job. */
+export function guideRoleFromParam(raw: string | null | undefined): GuideRole | null {
+  const v = String(raw ?? '').trim().toLowerCase();
+  return GUIDE_ROLES.some((r) => r.id === v) ? (v as GuideRole) : null;
+}
+
+export function guideRoleSpec(role: GuideRole | null | undefined): GuideRoleSpec | null {
+  return GUIDE_ROLES.find((r) => r.id === role) ?? null;
+}
+
+/**
+ * Themes in the order this reader cares about them.
+ *
+ * Returns EVERY theme, reordered — never a subset. Dropping a theme for a role would mean a CISO
+ * could not find the cost story at all, which is both wrong about CISOs and dishonest about the
+ * product.
+ */
+export function themesForRole(role: GuideRole | null | undefined): GuideTheme[] {
+  const spec = guideRoleSpec(role);
+  if (!spec) return [...GUIDE_THEMES];
+  const rank = new Map(spec.themeOrder.map((id, i) => [id, i]));
+  return [...GUIDE_THEMES].sort(
+    (a, b) => (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+  );
+}
+
+// ─── What to ask next ────────────────────────────────────────────────────────────────────────────
+//
+// After an answer, a fixed list of eleven starters is the wrong thing to show: the reader has just
+// been told something, and the useful next question follows from THAT.
+//
+// COMPUTED, NOT GENERATED. Asking the model for follow-ups costs another several seconds and can
+// invent a question this product cannot answer — which dead-ends the reader on their second click,
+// the worst possible moment. The answer already tells us what it touched (the destinations it
+// resolved to), and the curated graph knows which other questions lead to the same screens. So the
+// next questions are the neighbours of where we just were, minus anything already asked.
+
+/** Route paths a resolution pointed at, normalised for comparison. */
+function destinationPaths(resolution: GuideResolution): Set<string> {
+  return new Set(resolution.destinations.map((d) => d.href.split('?')[0].replace(/\/+$/, '')));
+}
+
+/**
+ * The questions worth asking next, given where the last answer took the reader.
+ *
+ * Neighbours first (a question that shares a destination with the answer just given is a continuation
+ * of the same thread), then the rest of that theme, so the list is never empty and never repeats.
+ */
+export function followUpQuestions(
+  questions: readonly GuideQuestion[],
+  resolution: GuideResolution | null,
+  askedQuestions: readonly string[],
+  limit = 4,
+): GuideQuestion[] {
+  const asked = new Set(askedQuestions.map((q) => q.trim().toLowerCase()));
+  const fresh = questions.filter((q) => !asked.has(q.question.trim().toLowerCase()));
+  if (!resolution || resolution.destinations.length === 0) return fresh.slice(0, limit);
+
+  const paths = destinationPaths(resolution);
+  const themes = new Set(
+    questions
+      .filter((q) => q.destinations.some((d) => paths.has(d.href.split('?')[0].replace(/\/+$/, ''))))
+      .map((q) => q.theme),
+  );
+  const score = (q: GuideQuestion): number => {
+    const shares = q.destinations.some((d) => paths.has(d.href.split('?')[0].replace(/\/+$/, '')));
+    if (shares) return 0; // same screens — the direct continuation
+    if (themes.has(q.theme)) return 1; // same subject, somewhere new
+    return 2;
+  };
+  return [...fresh].sort((a, b) => score(a) - score(b)).slice(0, limit);
+}
