@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import {join, relative, dirname } from 'node:path';
 import test from 'node:test';
 import ts from 'typescript';
 
@@ -60,10 +60,19 @@ test('every rendered route owns a page frame or a deliberate canvas', async () =
 
   for (const path of routeFiles.filter((candidate) => candidate.endsWith('/page.tsx'))) {
     const route = relative(routeRoot, path);
-    const source = await readFile(path, 'utf8');
+    let source = await readFile(path, 'utf8');
+
+    // A page.tsx may only export `default` plus a fixed set of config fields, so a route whose
+    // renderer is shared with another route keeps that renderer in a co-located `content.tsx` and the
+    // page becomes a thin wrapper. The FRAME still belongs to the rendered route — it just lives one
+    // file along — so follow the delegation before deciding anything is missing. This replaces an
+    // ad-hoc `EtlJobDetailContent` name check that only covered the first page to do this.
+    if (/from '\.\/content'/.test(source)) {
+      source += await readFile(join(dirname(path), 'content.tsx'), 'utf8').catch(() => '');
+    }
+
     if (
       source.includes("from '@/components/PageFrame'") ||
-      source.includes('EtlJobDetailContent') ||
       /^export \{ default \}/m.test(source) ||
       !containsJsx(source, path) ||
       lifecycleLayoutOwners.some((owner) => route.startsWith(owner)) ||

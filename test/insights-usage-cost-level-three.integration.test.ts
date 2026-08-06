@@ -37,15 +37,21 @@ test('Usage and Cost bases redirect into explicit contextual leaves', () => {
 });
 
 test('legacy Analytics and Accounting routes redirect while retaining one live source', () => {
+  // The route and its renderer are now two files: a page.tsx may only export `default` plus config
+  // fields, so the shared source component lives in a co-located content.tsx. Both halves of the
+  // property still hold — the legacy route redirects, and exactly one live source implementation
+  // exists — they are just asserted against the file that now owns each half.
   const analytics = read('src/app/(console)/insights/analytics/page.tsx');
+  const analyticsSource = read('src/app/(console)/insights/analytics/content.tsx');
   const accounting = read('src/app/(console)/insights/accounting/page.tsx');
+  const accountingSource = read('src/app/(console)/insights/accounting/content.tsx');
 
-  assert.match(analytics, /export async function AnalyticsInsightsSource/);
-  assert.match(analytics, /computeAnalytics/);
-  assert.match(analytics, /safeSupersetDashboard/);
+  assert.match(analyticsSource, /export async function AnalyticsInsightsSource/);
+  assert.match(analyticsSource, /computeAnalytics/);
+  assert.match(analyticsSource, /safeSupersetDashboard/);
   assert.match(analytics, /redirect\(/);
-  assert.match(accounting, /export async function AccountingInsightsSource/);
-  assert.match(accounting, /computeAccounting/);
+  assert.match(accountingSource, /export async function AccountingInsightsSource/);
+  assert.match(accountingSource, /computeAccounting/);
   assert.match(accounting, /redirect\(/);
 
   for (const source of [analytics, accounting]) {

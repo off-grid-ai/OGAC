@@ -39,6 +39,10 @@ function routePageExists(pathname: string): boolean {
 }
 
 const INTENTIONAL_LEGACY_ROUTE_IMPLEMENTATIONS = new Set([
+  // The renderer moved out of page.tsx into a co-located content.tsx: a page may only export
+  // `default` plus config fields, so a route whose renderer is shared keeps it next door. Same
+  // deliberate legacy link, one file along.
+  'src/app/(console)/data/pipelines/content.tsx',
   'src/app/(console)/data/pipelines/page.tsx',
   'src/app/(console)/insights/evals/[id]/page.tsx',
   'src/app/(console)/insights/page.tsx',
