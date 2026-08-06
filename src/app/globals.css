@@ -519,3 +519,22 @@ body {
 .og-card__header > *:not(.og-card__action) {
   grid-column: 1;
 }
+
+/* ── The guide panel shares the screen instead of covering it ─────────────────────────────────────
+   The panel is a fixed rail on the right, mounted as a sibling of the app shell. Left as a pure
+   overlay it sat ON TOP of the console — you could read the answer or the page it was talking about,
+   but not both, and "go and see it" took you to a screen the panel was hiding.
+
+   So the shell reserves the panel's width as padding while it is open. `--og-guide-width` is set by
+   GuideCopilot and tracks the drag handle live, so resizing the panel resizes the content with it.
+
+   Only from `md`: below that the console shows its "use a bigger screen" gate and the guide does not
+   render at all, so reserving space there would indent a page with nothing beside it. */
+[data-og-app-shell] {
+  transition: padding-right var(--og-dur-fast) var(--og-ease);
+}
+@media (min-width: 48rem) {
+  :root[data-og-guide-open] [data-og-app-shell] {
+    padding-right: var(--og-guide-width, 0px);
+  }
+}

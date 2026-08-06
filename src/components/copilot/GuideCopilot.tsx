@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight, Compass, X } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CopilotAnswerView } from '@/components/copilot/CopilotAnswerView';
 import { MIN_QUESTION_LENGTH, useCopilotAnswer } from '@/components/copilot/useCopilotAnswer';
@@ -13,7 +13,9 @@ import {
   type GuideDestination,
   type GuideResolution,
 } from '@/lib/guide-copilot';
+import { pageExplanationQuestion } from '@/lib/guide-events';
 import { publicLabel } from '@/lib/lineage-labels';
+import { routeIdentityForPath } from '@/modules/route-identity';
 
 // ─── THE GUIDE — a floating "show me around" copilot for an unguided visitor ───────────────────────
 //
@@ -52,6 +54,9 @@ import { publicLabel } from '@/lib/lineage-labels';
 // Width is a PREFERENCE, not a navigational position, so it lives in localStorage rather than the URL
 // — the repo rule about putting position in the URL is about places you can navigate Back out of, and
 // a panel width is not one. Open/closed is local for the same reason.
+/** The guide answers two different questions; see the mode switch in the header. */
+type GuideMode = 'tour' | 'page';
+
 const PANEL_STORAGE_KEY = 'offgrid.guide.width';
 const PANEL_MIN_PX = 380;
 /** Never wider than 80% of the viewport: the point of this surface is pointing AT the console. */
@@ -86,6 +91,21 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     if (stored) setWidth(clampPanelWidth(stored, window.innerWidth));
   }, []);
 
+  // Tell the app shell how much room to leave, so the panel SHARES the screen instead of covering it
+  // (globals.css turns these two into padding on [data-og-app-shell]). Driven from state rather than
+  // set once on open, so dragging the handle moves the content in step. Cleared on close and on
+  // unmount — a stale attribute would leave the console permanently indented against nothing.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!open) {
+      root.removeAttribute('data-og-guide-open');
+      return;
+    }
+    root.setAttribute('data-og-guide-open', '');
+    root.style.setProperty('--og-guide-width', `${width}px`);
+    return () => root.removeAttribute('data-og-guide-open');
+  }, [open, width]);
+
   // Pointer events rather than mouse events so a trackpad, a mouse and a pen all work, and
   // setPointerCapture keeps the drag alive when the cursor outruns the 4px handle.
   const startResize = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -119,6 +139,13 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
   // "enter to ask" affordance never claims to work when it will not.
   const trimmed = question.trim();
   const tooShort = trimmed.length > 0 && trimmed.length < MIN_QUESTION_LENGTH;
+
+  // TWO MODES. "Show me around" is the curated tour — a stranger who does not yet know what to ask.
+  // "Explain this page" answers for wherever they actually are, which is the question people have
+  // once they have clicked into something and want to know what they are looking at.
+  const [mode, setMode] = useState<GuideMode>('tour');
+  const pathname = usePathname();
+  const identity = routeIdentityForPath(pathname);
 
   const submit = useCallback(
     (q: string) => {
@@ -162,6 +189,40 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
     setQuestion('');
     reset();
   }, [reset]);
+
+  const explainThisPage = useCallback(() => {
+    // A route with no registered identity still deserves an answer, so fall back to the path itself
+    // rather than silently doing nothing — an "Explain this page" tab that does nothing on some pages
+    // is worse than one that gives a thinner answer.
+    submit(
+      pageExplanationQuestion(
+        identity
+          ? { title: identity.title, eyebrow: identity.eyebrow, description: identity.description }
+          : { title: pathname },
+      ),
+    );
+  }, [identity, pathname, submit]);
+
+  // Switching INTO page mode asks immediately — the mode is the request, so making the reader press a
+  // second button to get what the tab already promised would be a dead step. Switching back to the
+  // tour clears the answer so they land on the questions rather than on a stale page explanation.
+  const chooseMode = useCallback(
+    (next: GuideMode) => {
+      setMode(next);
+      if (next === 'page') explainThisPage();
+      else startOver();
+    },
+    [explainThisPage, startOver],
+  );
+
+  // In page mode, follow the reader as they navigate: arriving somewhere new IS a new question. Keyed
+  // on pathname only — re-running whenever `explainThisPage` changed identity would fire twice for one
+  // navigation, since the title updates in the same render as the path.
+  useEffect(() => {
+    if (!open || mode !== 'page') return;
+    explainThisPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, mode, open]);
 
   if (dismissed) return null;
 
@@ -223,6 +284,32 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
               <X className="size-4" />
             </button>
           </header>
+
+          {/* Mode switch. Two questions a reader actually has: "what is this product" (the curated
+              tour) and "what am I looking at right now". The second is the one they have after they
+              have clicked into something, and it was previously unanswerable here. */}
+          <div className="flex gap-1 border-b border-border px-5 py-2">
+            {(
+              [
+                ['tour', 'Show me around'],
+                ['page', 'Explain this page'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => chooseMode(value)}
+                aria-pressed={mode === value}
+                className={`rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors duration-150 ${
+                  mode === value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           {/* Body */}
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">

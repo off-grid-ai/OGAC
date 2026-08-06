@@ -27,7 +27,13 @@ export default async function ConsoleLayout({ children }: Readonly<{ children: R
   return (
     <ViewerModeProvider role={session?.user?.role}>
       <TooltipProvider>
-        <div className="flex h-screen flex-col bg-background text-foreground">
+        {/* `data-og-app-shell` is the hook the guide uses to SHARE the screen rather than cover it:
+            when the panel is open it reserves that width as padding here (see globals.css), so the
+            console stays fully readable and navigable next to it instead of hiding underneath. */}
+        <div
+          data-og-app-shell
+          className="flex h-screen flex-col bg-background text-foreground"
+        >
           <Hellobar model={banner} />
           <div className="flex flex-1 overflow-hidden">
             <Sidebar />
