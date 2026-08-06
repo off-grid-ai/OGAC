@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/authz';
 import { cloudProviderStatuses } from '@/lib/cloud-providers';
+import { gatewayFetch } from '@/lib/gateway';
+import { providersWithOnPrem, type PoolModel } from '@/lib/onprem-provider';
 import { getOrgPolicy } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -55,8 +57,20 @@ export async function GET(req: Request) {
     }),
   );
 
+  // The on-prem gateway goes FIRST. It is the default path for every request and the cloud rows are
+  // opt-in egress, so a page that listed only the five cloud providers — with a cloud router as the
+  // sole `available` entry — misrepresented how the product works. Read from the live pool so its
+  // status is the real one: an empty pool means nothing is being served locally, and this must say
+  // so rather than claim the local provider is fine because the process is up.
+  const pool = await gatewayFetch('/v1/models', {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(2500),
+  })
+    .then(async (r) => (r.ok ? (((await r.json())?.data ?? []) as PoolModel[]) : []))
+    .catch(() => [] as PoolModel[]);
+
   return NextResponse.json({
     egressAllowed: policy.egressAllowed === true,
-    providers,
+    providers: providersWithOnPrem(pool, providers as never),
   });
 }

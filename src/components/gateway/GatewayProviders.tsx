@@ -21,6 +21,9 @@ interface ProviderRow {
   health: 'up' | 'down' | 'unconfigured';
   probeStatus: number;
   available: boolean;
+  /** The local gateway — the default path, rendered ahead of and distinctly from cloud egress. */
+  onPrem?: boolean;
+  note?: string;
 }
 interface ProvidersResponse {
   egressAllowed: boolean;
@@ -75,7 +78,9 @@ export function GatewayProviders() {
   }
 
   const providers = data?.providers ?? [];
-  const anyConfigured = providers.some((p) => p.configured);
+  // Scoped to CLOUD rows: the on-prem provider is always configured, so counting it here would
+  // suppress the "no cloud provider configured" note that tells an operator egress is unwired.
+  const anyConfigured = providers.some((p) => p.configured && !p.onPrem);
 
   return (
     <div className="space-y-4">
@@ -118,12 +123,27 @@ export function GatewayProviders() {
           let unavailableLabel = 'not configured';
           if (p.configured) unavailableLabel = p.health === 'down' ? 'unreachable' : 'leashed';
           return (
-            <Card key={p.id} className="shadow-sm">
+            // The on-prem row is the DEFAULT path, not one of six equals — every cloud row below it
+            // is opt-in egress. It spans the row and carries the accent border so the page reads
+            // "this runs on your hardware, and here is what it could optionally reach".
+            <Card
+              key={p.id}
+              className={
+                p.onPrem
+                  ? 'border-primary/40 bg-primary/[0.03] shadow-sm sm:col-span-2 lg:col-span-3'
+                  : 'shadow-sm'
+              }
+            >
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2">
                     <span className={`inline-block size-2 rounded-full ${dot}`} />
                     {p.label}
+                    {p.onPrem ? (
+                      <Badge variant="secondary" className="bg-primary/10 font-mono text-[10px] text-primary">
+                        default
+                      </Badge>
+                    ) : null}
                   </span>
                   {p.available ? (
                     <Badge variant="secondary" className="bg-primary/10 text-primary">
@@ -146,9 +166,10 @@ export function GatewayProviders() {
                   <span className="font-mono text-foreground">{p.defaultModel || '—'}</span>
                 </p>
                 <p className="text-[11px]">
-                  Routes model tags:{' '}
-                  <span className="font-mono">{p.prefixes.slice(0, 4).join(', ')}</span>
+                  {p.onPrem ? 'Serving now: ' : 'Routes model tags: '}
+                  <span className="font-mono">{p.prefixes.slice(0, 4).join(', ') || '—'}</span>
                 </p>
+                {p.note ? <p className="text-[11px] text-foreground/80">{p.note}</p> : null}
                 {p.configured && p.health === 'down' && (
                   <p className="text-[11px] text-red-500">
                     Configured but not answering (probe status {p.probeStatus || 'timeout'}).
