@@ -101,9 +101,14 @@ export function buildProofPoints(input: ProofInput): ProofPoint[] {
       // Each `detail` is assembled from the parts that ARE readable. Interpolating a missing figure
       // into a sentence is how "null pieces of work have been completed" ships — the sentence has to
       // shrink when a source is down, not carry a hole.
+      // SAY WHAT IS BEING COUNTED. This read "204 pieces of work have been completed here" while the
+      // ROI page directly behind the panel read "Runs completed: 9". Both figures were correct — one
+      // counts every governed run, the other only the app runs with a measured outcome — but a reader
+      // seeing them together does not conclude "different scopes", they conclude one of them is a
+      // lie. On a surface whose entire job is being believed, an unqualified number is a liability.
       detail: sentence(
-        clause(runs, (n) => `${n} pieces of work have been completed here, end to end`),
-        waiting === '0' ? null : clause(waiting, (n) => `and ${n} are waiting on a person right now`),
+        clause(runs, (n) => `${n} governed runs have finished here — apps, agents and assistant chats`),
+        waiting === '0' ? null : clause(waiting, (n) => `${n} cases are waiting on a person right now`),
       ),
       href: '/operations/runs',
       linkLabel: 'Open any run and read its steps',
