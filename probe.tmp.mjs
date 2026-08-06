@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const B = 'https://bharatunion-onprem-console.getoffgridai.co';
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 1440, height: 950 } });
+const p = await ctx.newPage();
+await p.goto(`${B}/signin?callbackUrl=%2Finsights%2Foutcomes`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+await p.waitForTimeout(18000);
+console.log('final:', p.url().replace(B, ''));
+console.log('session cookie:', (await ctx.cookies()).some((c) => /session-token/.test(c.name)));
+await p.screenshot({ path: '/tmp/shot-autologin.png' });
+await b.close();

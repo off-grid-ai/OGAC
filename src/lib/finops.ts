@@ -1,5 +1,5 @@
 import { gatewayEvents } from '@/lib/analytics';
-import { modelLabel } from '@/lib/model-catalog';
+import { isFleetServedModel, modelLabel } from '@/lib/model-catalog';
 import { type ApiKey, type AuditEvent, listApiKeys } from '@/lib/store';
 
 // FinOps: metering + cost + usage analytics, computed from the audit/traffic log (the source of
@@ -20,7 +20,10 @@ const DEFAULT_CLOUD_PRICE = 0.002;
 // ONE place. Adding an export changes no existing behavior — the internal callers below still use it.
 export function priceFor(model: string): number {
   if (model in PRICE_PER_1K) return PRICE_PER_1K[model];
-  return model.includes('local') ? 0 : DEFAULT_CLOUD_PRICE;
+  // A model the fleet serves costs nothing per token — that is the on-device dividend this product
+  // sells, and charging cloud rates for it understated every ROI figure on the platform. Decided by
+  // the catalog + the router's own provider prefix, NOT by whether the tag contains "local".
+  return isFleetServedModel(model) ? 0 : DEFAULT_CLOUD_PRICE;
 }
 
 // Pure cost from a token count for a model — USD, priced per 1K tokens. Reused by accounting-aggs
@@ -185,7 +188,8 @@ function keySpend(keys: ApiKey[], events: AuditEvent[]): KeySpend[] {
 // rather than leaking a foreign subject/key into this tenant's view.
 export function assembleFinOps(events: AuditEvent[], keys: ApiKey[]): FinOps {
   const totalCost = round(events.reduce((a, e) => a + costOf(e), 0));
-  const localReq = events.filter((e) => priceFor(e.model) === 0).length;
+  // Asks where it RAN, not what it cost. Conflating the two made a free cloud model look on-prem.
+  const localReq = events.filter((e) => isFleetServedModel(e.model)).length;
   const daily = group(events, (e) => e.ts.slice(0, 10))
     .map((b) => ({ day: b.label, costUsd: b.costUsd }))
     .sort((a, b) => a.day.localeCompare(b.day));

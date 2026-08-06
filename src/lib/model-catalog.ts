@@ -371,6 +371,40 @@ export function getModelSpec(id: string, catalog: ModelSpec[] = MODEL_CATALOG): 
   );
 }
 
+// ─── Where did this request actually run? ────────────────────────────────────────────────────────
+//
+// The single rule for "was this answered on the customer's own hardware". It exists because the
+// answer used to be `model.includes('local')` — a substring test against the routing tag — and NONE
+// of the models this fleet actually serves are named that way. A tenant whose traffic was 94%
+// on-prem (`qwen3-vl-8b`, `onprem/gemma-4-e4b`) was reported as 1% local, on the surface whose whole
+// claim is that data does not leave the building. It also priced every on-prem call at cloud rates.
+//
+// Precedence, strongest signal first:
+//   1. An explicit provider prefix. The gateway writes `onprem/<tag>` when it routed to the fleet and
+//      `compat:<vendor>/<model>` when it went out to a hosted API — that is the router's own record
+//      of where the request went, so it outranks anything we can infer from a name.
+//   2. The curated catalog's `servedOnFleet`, resolved through aliases (a versioned fleet tag still
+//      finds its spec).
+//   3. The legacy `-local` suffix convention, for older synthetic ids still in the ledger.
+//
+// An unrecognised model is NOT local. That direction is deliberate: the error counts against our own
+// claim rather than inflating it, which is the only safe way for a number a buyer is asked to trust.
+export function isFleetServedModel(
+  id: string | null | undefined,
+  catalog: ModelSpec[] = MODEL_CATALOG,
+): boolean {
+  const raw = String(id ?? '').trim().toLowerCase();
+  if (!raw) return false;
+  if (raw.startsWith('onprem/') || raw.startsWith('onprem:')) return true;
+  if (raw.startsWith('compat:') || raw.startsWith('cloud/') || raw.startsWith('cloud-')) return false;
+  // Strip one provider segment (`ollama/qwen…`) before the catalog lookup; the catalog keys on the
+  // bare routing tag.
+  const bare = raw.includes('/') ? raw.slice(raw.indexOf('/') + 1) : raw;
+  const spec = getModelSpec(bare, catalog) ?? getModelSpec(raw, catalog);
+  if (spec) return spec.servedOnFleet;
+  return /(^|[-_/:])local$/.test(bare) || bare.endsWith('-local');
+}
+
 // Customer-facing DISPLAY name for a raw model id / routing tag. NEVER surface an internal routing
 // codename (e.g. `qwythos-9b`) or a raw Ollama-style tag (`llama3.1:70b`, `gemma-local`) to a user —
 // they read as broken/internal. Prefer the curated catalog `name`; otherwise prettify the tag
