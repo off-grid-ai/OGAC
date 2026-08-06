@@ -178,10 +178,16 @@ export function GuideCopilot({ tenantSlug }: Readonly<{ tenantSlug: string | nul
       // thing is broken", not "the answer above still applies".
       //
       // Asking about the destination reuses the whole existing pipeline — the same gather, the same
-      // honesty labels, the same loading line — so there is no second answer path to keep in step.
-      submit(`What am I looking at on ${destination.label}, and what should I check here?`);
+      // honesty labels, the same loader — so there is no second answer path to keep in step.
+      //
+      // NOT in page mode, though: there the pathname effect already asks about wherever you land, so
+      // doing it here too fired TWO overlapping requests for one click. The hook now refuses to let a
+      // superseded response land, but the right fix is not to make the second request at all.
+      if (mode !== 'page') {
+        submit(`What am I looking at on ${destination.label}, and what should I check here?`);
+      }
     },
-    [router, submit],
+    [mode, router, submit],
   );
 
   const startOver = useCallback(() => {
