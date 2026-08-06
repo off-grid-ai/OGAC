@@ -52,6 +52,61 @@ export function ranOnOwnHardware(
 }
 
 /**
+ * Where a model runs, as THREE states rather than two.
+ *
+ * Two states force a lie in one direction or the other. `isFleetServedModel` answers false for both
+ * "this is OpenAI" and "we have never seen this tag", which is fine when the question is "may we
+ * claim it stayed in" — but not when the question is "did it go out". Reporting an unrecognised
+ * Ollama tag as egress claims data left the building when it probably did not, which is just the
+ * original bug pointed the other way.
+ *
+ * `hosted` therefore means we can NAME the outside provider: the router's `compat:`/`cloud-` prefix,
+ * or a vendor model family no one self-hosts.
+ */
+export type ModelLocality = 'fleet' | 'hosted' | 'unknown';
+
+/** Vendor families that only exist behind someone else's API — naming one IS the proof of egress. */
+const HOSTED_FAMILIES = /^(gpt-|o\d-|chatgpt|claude-|gemini-|command-r|sonar-|grok-)/;
+
+export function modelLocality(
+  id: string | null | undefined,
+  catalog: ModelSpec[] = MODEL_CATALOG,
+): ModelLocality {
+  const raw = String(id ?? '').trim().toLowerCase();
+  if (!raw) return 'unknown';
+  if (isFleetServedModel(raw, catalog)) return 'fleet';
+  if (raw.startsWith('compat:') || raw.startsWith('cloud-') || raw.startsWith('cloud/')) {
+    return 'hosted';
+  }
+  const bare = raw.includes('/') ? raw.slice(raw.lastIndexOf('/') + 1) : raw;
+  return HOSTED_FAMILIES.test(bare) ? 'hosted' : 'unknown';
+}
+
+/** Requests we can prove went to an outside provider, and the ones we cannot place either way. */
+export interface EgressTally {
+  total: number;
+  /** Provably answered on the customer's own hardware. */
+  fleet: number;
+  /** Provably answered by a named outside provider. */
+  hosted: number;
+  /** Neither could be established. Reported, never silently folded into one of the other two. */
+  unknown: number;
+}
+
+export function tallyEgress(
+  events: readonly LocalityEvent[],
+  catalog: ModelSpec[] = MODEL_CATALOG,
+): EgressTally {
+  const tally: EgressTally = { total: events.length, fleet: 0, hosted: 0, unknown: 0 };
+  for (const e of events) {
+    if (ranOnOwnHardware(e, catalog)) tally.fleet += 1;
+    else if (modelLocality(e.model, catalog) === 'hosted') tally.hosted += 1;
+    else tally.unknown += 1;
+  }
+  return tally;
+}
+
+/**
  * Share of requests answered on the customer's own hardware, 0..100, rounded.
  *
  * Returns null for an empty set. That is not pedantry: 0% is the single worst thing this product can

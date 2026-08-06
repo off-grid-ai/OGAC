@@ -16,6 +16,7 @@
 //                           the charts render is a real series whenever the cards are non-empty).
 // No `fetch`, no `process.env` here — the thin adapter in analytics.ts wires those in.
 import type { Analytics, DayPoint, ModelStat } from '@/lib/analytics-types';
+import { modelLocality } from '@/lib/request-locality';
 
 // The subset of a gateway traffic record the JS rollup reads. Structurally a `store.AuditEvent`
 // (what `gatewayEvents()` returns) but declared locally so this pure module never imports the heavy,
@@ -231,8 +232,18 @@ export function parseAggsResponse(resp: OsResponse): Analytics {
     totalTokens,
     p50,
     p95,
-    // Egress rate: leftDevice is always false for gateway records, so this was — and stays — 0.0.
-    egressRate: 0,
+    // EGRESS RATE. This was the constant 0, with a comment explaining that `leftDevice` is always
+    // false on gateway records — so the overview tile told every tenant "cloud egress 0%, fully
+    // on-prem, nothing left", unconditionally, including one that had just made nine Claude calls.
+    // The product's central promise, asserted by a hard-coded zero, on the front page.
+    //
+    // It now counts the requests we can PROVE went to a named outside provider. Requests we cannot
+    // place either way are excluded rather than assumed: calling an unrecognised tag egress would
+    // claim data left when it probably did not, which is the same bug pointed the other way.
+    egressRate: rate(
+      byModel.reduce((n, m) => n + (modelLocality(m.model) === 'hosted' ? m.events : 0), 0),
+      totalEvents,
+    ),
     outcomes: { ok, redacted: 0, blocked },
     byModel,
     series,
@@ -327,8 +338,13 @@ export function assembleAnalytics(events: AnalyticsEvent[], nowMs: number): Anal
     totalTokens,
     p50: percentile(allLat, 0.5),
     p95: percentile(allLat, 0.95),
-    // Egress rate: gateway records never leftDevice — 0.0, unchanged from every prior implementation.
-    egressRate: 0,
+    // Same measured rate as the aggregation path — see the note there. This is the LIVE path
+    // (computeAnalytics assembles in JS), so leaving the constant here would have kept the front-page
+    // "nothing left" claim untrue no matter what the other one said.
+    egressRate: rate(
+      byModel.reduce((n, m) => n + (modelLocality(m.model) === 'hosted' ? m.events : 0), 0),
+      totalEvents,
+    ),
     outcomes: { ok: totalEvents - blocked, redacted, blocked },
     byModel,
     series,

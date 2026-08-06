@@ -5,7 +5,13 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { localSharePct, ranOnOwnHardware, servedByNamedNode } from '@/lib/request-locality';
+import {
+  localSharePct,
+  modelLocality,
+  ranOnOwnHardware,
+  servedByNamedNode,
+  tallyEgress,
+} from '@/lib/request-locality';
 
 // org_bharat, verbatim: 185 requests.
 const BHARAT = [
@@ -61,4 +67,38 @@ test('a request with no gateway at all falls back to the catalogue', () => {
 test('a node id is a bare host label — a routed path is not', () => {
   assert.equal(servedByNamedNode({ gateway: 'openai/gpt-4o', model: 'gpt-4o' }), false);
   assert.equal(servedByNamedNode({ gateway: 'g1', model: 'anything' }), true);
+});
+
+test('locality is three-way — "not proven local" is not the same as "it left"', () => {
+  // Two states force a lie in one direction or the other. An unrecognised Ollama tag reported as
+  // egress claims data left the building when it probably did not — the original bug, inverted.
+  assert.equal(modelLocality('qwen3-vl-8b'), 'fleet');
+  assert.equal(modelLocality('onprem/anything'), 'fleet');
+  assert.equal(modelLocality('claude-3-5-haiku-latest'), 'hosted');
+  assert.equal(modelLocality('gpt-4o-mini'), 'hosted');
+  assert.equal(modelLocality('compat:openai/whatever'), 'hosted');
+  assert.equal(modelLocality('qwen2.5:14b'), 'unknown');
+  assert.equal(modelLocality('llama3.1:70b'), 'unknown');
+  assert.equal(modelLocality(''), 'unknown');
+});
+
+test('the tally accounts for every request and never folds unknown into a claim', () => {
+  const t = tallyEgress([
+    { gateway: 'g1', model: 'qwen3-vl-8b' },
+    { gateway: 'claude-3-5-haiku-latest', model: 'claude-3-5-haiku-latest' },
+    { gateway: 'llama3.1:70b', model: 'llama3.1:70b' },
+  ]);
+  assert.deepEqual(t, { total: 3, fleet: 1, hosted: 1, unknown: 1 });
+  assert.equal(t.fleet + t.hosted + t.unknown, t.total, 'every request is accounted for');
+});
+
+test('the insurer has provable egress — the front page said it had none', () => {
+  // 9 Claude calls, under a tile reading "cloud egress 0% — fully on-prem — nothing left".
+  const insurer = [
+    ...Array(74).fill({ gateway: 'g1', model: 'qwen3-vl-8b' }),
+    ...Array(42).fill({ gateway: 'llama3.1:70b', model: 'llama3.1:70b' }),
+    ...Array(9).fill({ gateway: 'claude-3-5-haiku-latest', model: 'claude-3-5-haiku-latest' }),
+    ...Array(2).fill({ gateway: 'g3', model: 'qwen35-2b' }),
+  ];
+  assert.ok(tallyEgress(insurer).hosted > 0, 'nine hosted calls is not "nothing left"');
 });

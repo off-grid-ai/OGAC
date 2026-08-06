@@ -270,7 +270,9 @@ export function synthesizeOperatorHome(input: OperatorHomeInput): OperatorHome {
     posture.push({
       label: 'Cloud egress',
       value: pct(analytics.egressRate),
-      hint: analytics.egressRate > 0 ? 'some data left the box' : 'fully on-prem — nothing left',
+      // "nothing left" is a claim about every request, so it may only be said when the rate is a
+      // measured zero. It used to sit on top of a hard-coded 0 and was therefore always shown.
+      hint: hintFor(analytics.egressRate, analytics.totalEvents),
       tone: analytics.egressRate > 0 ? 'warn' : 'good',
       href: '/governance/posture',
     });
@@ -435,4 +437,19 @@ function blockingSummary(items: BlockingDecision[]): string {
     return 'Nothing was blocked in the last 24 hours — your controls held with no interventions needed.';
   const n = items.length;
   return `Your controls stopped ${n} risky action${n === 1 ? '' : 's'} in the last 24 hours — ${blockingBreakdown(items)}.`;
+}
+
+/**
+ * What the cloud-egress tile is allowed to say.
+ *
+ * "No request reached an outside provider" is a claim about every request there was, so it may only
+ * be made when there were some. With no traffic the honest statement is that nothing has been
+ * measured — asserting a clean record from an empty window is how a demo tenant ends up reassuring a
+ * buyer about a period in which nothing happened.
+ */
+export function hintFor(egressRate: number, totalEvents: number): string {
+  if (totalEvents <= 0) return 'no traffic recorded in this window';
+  return egressRate > 0
+    ? 'some requests went to an outside provider'
+    : 'no request reached an outside provider';
 }

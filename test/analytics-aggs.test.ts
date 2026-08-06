@@ -94,7 +94,10 @@ test('parseAggsResponse reconstructs the Analytics shape (field-by-field)', () =
   assert.equal(a.totalTokens, 54321);
   assert.equal(a.p50, 120); // Math.round(120.4)
   assert.equal(a.p95, 881); // Math.round(880.6)
-  assert.equal(a.egressRate, 0); // gateway records never leftDevice — always 0
+  // Measured, not assumed. This asserted a hard-coded 0 ("gateway records never leftDevice"), which
+  // is how the overview tile came to tell every tenant "cloud egress 0% — fully on-prem — nothing
+  // left" regardless of the traffic. This fixture is 60 gpt-4o calls against 40 on the fleet.
+  assert.equal(a.egressRate, 0.6);
 
   // outcomes: ok = total - blocked; redacted always 0
   assert.deepEqual(a.outcomes, { ok: 88, redacted: 0, blocked: 12 });

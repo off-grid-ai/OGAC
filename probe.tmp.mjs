@@ -1,20 +1,18 @@
 import { chromium } from 'playwright';
-const B = 'https://bharatunion-onprem-console.getoffgridai.co';
 const b = await chromium.launch();
-const ctx = await b.newContext();
-const p = await ctx.newPage();
-await p.goto(`${B}/signin?callbackUrl=%2Foverview`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-await p.waitForTimeout(18000);
-const d = await p.evaluate(async () => {
-  for (const u of ['/api/v1/finops', '/api/v1/admin/finops']) {
-    const r = await fetch(u, { cache: 'no-store' });
-    if (r.ok) return { u, body: await r.json() };
-  }
-  return null;
-});
-if (!d) { console.log('no finops api reachable'); } else {
-  console.log(d.u, 'totals=', JSON.stringify(d.body.totals ?? d.body?.finops?.totals));
-  const bm = d.body.byModel ?? d.body?.finops?.byModel ?? [];
-  for (const m of bm.slice(0, 15)) console.log('   ', m.label, m.requests, m.costUsd);
+for (const [name, B] of [['insurer','https://suraksha-onprem-console.getoffgridai.co'],['bank','https://bharatunion-onprem-console.getoffgridai.co']]) {
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 950 } });
+  const p = await ctx.newPage();
+  await p.goto(`${B}/signin?callbackUrl=%2Foverview`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await p.waitForTimeout(20000);
+  console.log(`== ${name} landed: ${p.url().replace(B, '')}`);
+  const d = await p.evaluate(async () => {
+    const r = await fetch('/api/v1/admin/guide/proof', { cache: 'no-store' });
+    return r.ok ? await r.json() : { err: r.status };
+  });
+  for (const pt of d.points ?? []) console.log(`   ${pt.id}: ${pt.value}`);
+  if (d.err) console.log('   ERR', d.err);
+  await p.screenshot({ path: `/tmp/shot-${name}.png` });
+  await ctx.close();
 }
 await b.close();
