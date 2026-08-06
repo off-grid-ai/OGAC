@@ -1,5 +1,8 @@
 'use client';
 
+import { useIsViewer } from '@/components/ViewerModeProvider';
+import { publicLabel } from '@/lib/lineage-labels';
+
 import {
   ArrowClockwise,
   Eye,
@@ -115,6 +118,7 @@ function Field({
 }
 
 export function ConfigManager({ only }: { only?: string[] } = {}) {
+  const isViewer = useIsViewer();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -334,7 +338,7 @@ export function ConfigManager({ only }: { only?: string[] } = {}) {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-sm font-medium text-foreground">
-                          {entry.label}
+                          {isViewer ? publicLabel(entry.label) : entry.label}
                         </span>
                         {entry.secret && <Lock className="size-3 shrink-0 text-muted-foreground" />}
                         {pending[entry.key] !== undefined && (

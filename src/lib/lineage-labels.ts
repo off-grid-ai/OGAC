@@ -43,10 +43,22 @@ const INTERNAL = [
   // `brain.retrieve.qdrant`, and `leaksInternalName` could not even detect it because these five
   // engines were missing from the list. A guard that silently passes is worse than no guard.
   [/\bopa\b|\brego\b/gi, 'policy engine'],
-  [/\bpresidio\b/gi, 'pattern detection'],
+  [/\bmicrosoft presidio\b|\bpresidio\b/gi, 'pattern detection'],
   [/\blitellm\b/gi, 'model router'],
   [/\bmarquez\b/gi, 'lineage store'],
   [/\bsuperset\b/gi, 'dashboards'],
+  // Added 2026-08-06, found by checking the rendered page as a viewer rather than trusting the list.
+  // The adapter catalogue was already passing its vendor line through this mapper and STILL printed
+  // "Unleash" and "LanceDB" — a sanitiser is only as good as its vocabulary, and a term that is
+  // missing fails silently and looks exactly like a term that was cleaned.
+  [/\bunleash\b/gi, 'feature flags'],
+  [/\blancedb\b/gi, 'vector index'],
+  [/\bredpanda\b/gi, 'event stream'],
+  [/\btemporal\b(?!\s*(data|resolution|order))/gi, 'workflow engine'],
+  [/\bvmalert\b|\bvictoriametrics\b|\bvictorialogs\b/gi, 'metrics store'],
+  [/\bjaeger\b/gi, 'trace store'],
+  [/\bairbyte\b/gi, 'data movement'],
+  [/\bgreat expectations\b/gi, 'data quality checks'],
 ] as const;
 
 /**
