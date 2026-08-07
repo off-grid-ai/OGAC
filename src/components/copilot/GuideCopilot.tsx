@@ -28,6 +28,7 @@ import {
   type PageExplanationRequest,
 } from '@/lib/guide-events';
 import { publicLabel } from '@/lib/lineage-labels';
+import { actionLabel, isOfferableAction } from '@/lib/screen-actions';
 import { routeIdentityForPath } from '@/modules/route-identity';
 
 // ─── THE GUIDE — a floating "show me around" copilot for an unguided visitor ───────────────────────
@@ -986,36 +987,26 @@ interface ScreenAction {
 /** How many actions to offer. More than a handful stops being a call to action and becomes a menu. */
 const MAX_SCREEN_ACTIONS = 4;
 
-/** Link text that says nothing on its own — every card on a list page has one. */
-const GENERIC_LABEL = /^(open|view|details|see|go|more|link|shared link|edit)$/i;
-
 /**
  * The real actions available on this screen, read from the page's own links.
  *
- * WHY READ THEM RATHER THAN ASK THE MODEL. The answer ends with "Next Action: review the Underwriter
- * decision step to approve or reject the case" and then leaves the reader to go and find it. The
- * obvious fix — have the model emit a link — is the wrong one: it would be inventing routes, and a
- * confident CTA to a page that does not exist is worse than no CTA. The page already contains its own
- * actions as real anchors, so taking them is both accurate by construction and impossible to fake.
- *
- * A bare "Open" is meaningless once it is out of its card, so a generic label borrows the nearest
- * heading — "Open · Policy Underwriting Assist".
+ * The DOM walk only — the naming and filtering rules live in src/lib/screen-actions.ts, where they
+ * can be tested. A component is a poor place to keep logic you want to assert.
  */
 function readScreenActions(main: Element): ScreenAction[] {
   const seen = new Set<string>();
   const actions: ScreenAction[] = [];
   for (const a of Array.from(main.querySelectorAll('a[href]'))) {
     const href = a.getAttribute('href') ?? '';
-    // Internal routes only. An external link is not something this guide should be steering into.
-    if (!href.startsWith('/') || href.startsWith('//')) continue;
-    const text = a.textContent?.trim().replace(/\s+/g, ' ') ?? '';
-    if (!text || text.length > 48) continue;
-    const context = a.closest('[class*="card"], li, article')?.querySelector('h2, h3, h4')?.textContent?.trim();
-    const label = GENERIC_LABEL.test(text) && context ? `${text} · ${context}` : text;
+    if (!isOfferableAction(href, a.textContent)) continue;
+    const context = a
+      .closest('[class*="card"], li, article')
+      ?.querySelector('h2, h3, h4')?.textContent;
+    const label = actionLabel(a.textContent, context);
     const key = `${href}|${label}`.toLowerCase();
-    if (seen.has(key)) continue;
+    if (!label || seen.has(key)) continue;
     seen.add(key);
-    actions.push({ label: label.slice(0, 60), href });
+    actions.push({ label, href });
     if (actions.length >= MAX_SCREEN_ACTIONS) break;
   }
   return actions;
