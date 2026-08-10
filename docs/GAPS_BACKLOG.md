@@ -2475,3 +2475,42 @@ than editing server config myself. Until it's wired, this screen is honestly emp
 the `dec_demo_0001` row should probably be removed (or replaced by a real seed on BOTH tenants) so
 neither tenant looks more finished than the other by accident. Left untouched pending that call —
 did not delete data I wasn't asked to delete.
+
+### Update 2026-08-10 — code fixed + OPA configured live; PARTIALLY RESOLVED, one step owed (deploy)
+
+Going deeper surfaced two MORE problems the initial trace didn't reach, and fixing only the OPA config
+(above) would have produced a page that is still empty on both tenants:
+
+1. **`PolicyInput` carried no org.** `evaluate()` never told the policy engine which tenant a decision
+   was for, so even a correctly-wired OPA could never log one. Fixed: `org?: string` added to
+   `PolicyInput` (`src/lib/adapters/types.ts`), forwarded verbatim into OPA's `input` (so it round-trips
+   into the decision-log event OPA ships), and passed at both call sites —
+   `src/app/api/v1/admin/abac/evaluate/route.ts` (`await currentOrgId()`) and `src/lib/agentrun.ts`
+   (`attribution.org`, the run's already-resolved attribution). Verified live against the deployed
+   `offgrid.authz` Rego (`role in {"admin","operator"}` / `attributes.clearance == "high"`, which reads
+   only `role`/`attributes` and ignores the new field) that adding `org` changes NO allow/deny outcome —
+   `test/policy-org-attribution.integration.test.ts`, run for real over an SSH tunnel to the box's OPA.
+2. **The sink attributed a whole batch to one org.** `normalizeDecisionEvents`/`normalizeDecisionEvent`
+   (`src/lib/opa-audit.ts`) now extract `org` from each event's OWN `input.org` (`orgFromInput`, unit
+   tested); `persistDecisions` (`src/lib/opa-decision-log-store.ts`) uses the per-event org and falls
+   back to the batch/caller org ONLY when an event carries none — an event that can't name its own
+   tenant is never guessed into one (`test/opa-decision-log-store.integration.test.ts` proves two
+   simultaneous tenants in one upload land in two separate ledgers, and an org-less event lands in
+   neither).
+3. **OPA configured live and proven.** `deploy/onprem/opa-config.yaml` (new, in the private
+   `onprem-fleet-orchestration` repo) mounted into the `opa` container; `GET /v1/config` now shows the
+   `decision_logs` block. A real `offgrid/authz` decision was shipped by OPA and landed in
+   `opa_decision_logs` — the OPA→sink pipe is proven end-to-end. Full detail + a trap hit and recovered
+   (recreating the container transiently wiped the loaded Rego policy; restored byte-identical) is in
+   that repo's `deploy/onprem/SERVER_STATE.md`, "OPA decision-log shipping enabled" (2026-08-10).
+4. **`dec_demo_0001` deleted** from `opa_decision_logs` (was `org_bharat`, fake).
+
+**What is NOT yet true, stated plainly:** the org-attribution code above has NOT been deployed (deploys
+are the operator's call, not taken in this pass). The two real decisions generated to prove the OPA pipe
+above therefore landed under `org_id: 'default'`, not a tenant — expected, since OPA ships one flat
+stream to one fixed URL and only a per-event `input.org` (which requires the deployed code) can split
+it by tenant. Re-ran `node scripts/demo-readiness.mjs --host suraksha|bharatunion` after the OPA config
+change: **both still report `EMPTY 4 figures, all zero`** — confirmed, not assumed.
+**G-213 closes only after:** this code is deployed, a real product action is exercised on each tenant
+(not a synthetic POST to the sink), and both ledgers are re-queried showing distinct, correctly-attributed
+`org_id`s.

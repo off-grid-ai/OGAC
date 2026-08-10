@@ -22,6 +22,11 @@ export interface OpaDecisionEvent {
   reason: string; // human reason where present
   engine: string; // which engine answered (opa / abac)
   actor: string; // requesting principal, when the event carries one
+  // The tenant this decision was made FOR — read out of the event's OWN `input.org` (see
+  // PolicyInput.org, src/lib/adapters/types.ts), never guessed. '' when the event carries none — the
+  // sink (opa-decision-log-store.ts persistDecisions) must NOT attribute an org-less event to
+  // whichever org happened to authenticate the upload; an unattributable record belongs to nobody.
+  org: string;
   timestamp: string; // ISO-8601, or '' when absent/unparseable
   input: Record<string, unknown> | null; // full decision input (for the detail view)
   result: unknown; // full decision result (for the detail view)
@@ -98,12 +103,20 @@ function normalizeInput(v: unknown): Record<string, unknown> | null {
   return v as Record<string, unknown>;
 }
 
+// Extract the tenant a decision was made FOR out of the event's own `input.org` (the field
+// PolicyInput.org round-trips through OPA's decision-log payload as `input`). Anything but a
+// non-empty string reads as '' — an event that carries no org must never be GUESSED into one.
+export function orgFromInput(input: Record<string, unknown> | null): string {
+  return input ? str(input.org) : '';
+}
+
 /** Normalize one raw OPA decision-log event into a stable, storable row. Never throws. */
 export function normalizeDecisionEvent(rec: RawDecisionEvent, index = 0): OpaDecisionEvent {
   const decisionId = str(rec.decision_id) || str(rec.id) || `decision-${index}`;
   const path = str(rec.path) || str(rec.query) || 'offgrid/authz';
   const engine = str(rec.engine) || 'opa';
   const actor = str(rec.requested_by) || str(rec.actor) || '';
+  const input = normalizeInput(rec.input);
   return {
     decisionId,
     path,
@@ -111,8 +124,9 @@ export function normalizeDecisionEvent(rec: RawDecisionEvent, index = 0): OpaDec
     reason: str(rec.reason),
     engine,
     actor,
+    org: orgFromInput(input),
     timestamp: normalizeTimestamp(rec),
-    input: normalizeInput(rec.input),
+    input,
     result: rec.result ?? null,
     labels: normalizeLabels(rec.labels),
   };

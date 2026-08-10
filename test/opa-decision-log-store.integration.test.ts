@@ -109,6 +109,65 @@ test('opa decision-log store: ingest → list/filter → detail → aggregate �
   assert.deepEqual(bareRow.labels, {});
 });
 
+// PER-EVENT attribution: OPA ships ONE decision-log stream for every tenant, so persistDecisions must
+// attribute each row by the EVENT's own org (from input.org), not by whichever org authenticated the
+// batch upload. An event with no org of its own falls back to the batch org — it must NEVER land
+// under a real tenant it didn't name itself ("an unattributable record belongs to nobody").
+test('opa decision-log store: per-event org attribution overrides the batch org; org-less events fall back', {
+  skip: dbUp ? false : SKIP_MESSAGE,
+}, async (t) => {
+  const { ensureOpaDecisionLogSchema, persistDecisions, getDecision } = await import(
+    '@/lib/opa-decision-log-store'
+  );
+  const { normalizeDecisionEvents } = await import('@/lib/opa-audit');
+  const { db } = await import('@/db');
+  const { sql } = await import('drizzle-orm');
+
+  const BATCH_ORG = 'test-int-opa-audit-batch'; // stands in for the platform org the sink's
+  // service-account bearer resolves to — NOT a real tenant.
+  const TENANT_A = 'test-int-opa-audit-tenant-a';
+  const TENANT_B = 'test-int-opa-audit-tenant-b';
+
+  await ensureOpaDecisionLogSchema();
+  t.after(async () => {
+    await db.execute(
+      sql`DELETE FROM opa_decision_logs WHERE org_id IN (${BATCH_ORG}, ${TENANT_A}, ${TENANT_B});`,
+    );
+  });
+  await db.execute(
+    sql`DELETE FROM opa_decision_logs WHERE org_id IN (${BATCH_ORG}, ${TENANT_A}, ${TENANT_B});`,
+  );
+
+  // A single OPA decision-log upload carrying BOTH tenants' decisions plus one org-less event,
+  // exactly as one shared OPA stream would ship for a multi-tenant console.
+  const upload = [
+    { decision_id: 'dec-tenant-a', input: { role: 'operator', org: TENANT_A }, result: { allow: true } },
+    { decision_id: 'dec-tenant-b', input: { role: 'operator', org: TENANT_B }, result: { allow: false } },
+    { decision_id: 'dec-no-org', input: { role: 'operator' }, result: { allow: true } },
+  ];
+  const events = normalizeDecisionEvents(upload);
+  const written = await persistDecisions(events, BATCH_ORG);
+  assert.equal(written, 3);
+
+  // Each tenant's event landed under ITS OWN org, not the batch/platform org.
+  const rowA = await getDecision('dec-tenant-a', TENANT_A);
+  assert.ok(rowA, 'tenant A decision attributed to tenant A');
+  assert.equal(rowA?.allow, true);
+  const rowB = await getDecision('dec-tenant-b', TENANT_B);
+  assert.ok(rowB, 'tenant B decision attributed to tenant B');
+  assert.equal(rowB?.allow, false);
+  // Neither tenant's ledger contains the OTHER tenant's decision or the org-less one.
+  assert.equal(await getDecision('dec-tenant-b', TENANT_A), null);
+  assert.equal(await getDecision('dec-tenant-a', TENANT_B), null);
+  assert.equal(await getDecision('dec-no-org', TENANT_A), null);
+  assert.equal(await getDecision('dec-no-org', TENANT_B), null);
+
+  // The org-less event fell back to the batch org (the sink caller's own org) — never silently
+  // promoted into either real tenant's ledger.
+  const fallback = await getDecision('dec-no-org', BATCH_ORG);
+  assert.ok(fallback, 'org-less event lands in the batch/caller org, not a guessed tenant');
+});
+
 // Empty org string falls back to DEFAULT_ORG — exercises the `orgId || DEFAULT_ORG` branch and the
 // default-parameter path without touching the dedicated test org. Reads only (no writes asserted).
 test('opa decision-log store: empty/absent org resolves to default (read paths)', {

@@ -12,6 +12,7 @@ import {
   normalizeDecisionEvents,
   normalizeLoadedPolicies,
   normalizeOpaConfig,
+  orgFromInput,
   readAllow,
   validateDecisionQuery,
 } from '../src/lib/opa-audit.ts';
@@ -40,7 +41,7 @@ test('normalizeDecisionEvent: full OPA event → stable row', () => {
   const raw: RawDecisionEvent = {
     decision_id: 'dec-1',
     path: 'offgrid/authz',
-    input: { role: 'admin', resource: 'secrets' },
+    input: { role: 'admin', resource: 'secrets', org: 'org_suraksha' },
     result: { allow: true },
     reason: 'OPA decision',
     requested_by: '10.0.0.1',
@@ -54,9 +55,37 @@ test('normalizeDecisionEvent: full OPA event → stable row', () => {
   assert.equal(e.reason, 'OPA decision');
   assert.equal(e.actor, '10.0.0.1');
   assert.equal(e.engine, 'opa');
+  assert.equal(e.org, 'org_suraksha');
   assert.equal(e.timestamp, '2026-07-01T10:00:00.000Z');
-  assert.deepEqual(e.input, { role: 'admin', resource: 'secrets' });
+  assert.deepEqual(e.input, { role: 'admin', resource: 'secrets', org: 'org_suraksha' });
   assert.deepEqual(e.labels, { id: 'node-1', version: '0.70.0', num: '3', flag: 'true' });
+});
+
+// ─── org attribution (per-event, never guessed) ────────────────────────────────
+test('orgFromInput: pulls a string org out of the decision input, never guesses one', () => {
+  assert.equal(orgFromInput({ org: 'org_bharat' }), 'org_bharat');
+  assert.equal(orgFromInput({ role: 'admin' }), '', 'no org field → unattributable');
+  assert.equal(orgFromInput({ org: 42 }), '', 'non-string org is never coerced');
+  assert.equal(orgFromInput({ org: '' }), '');
+  assert.equal(orgFromInput(null), '', 'no input at all → unattributable');
+});
+
+test('normalizeDecisionEvent: two tenants, two events, distinct org attribution', () => {
+  const suraksha = normalizeDecisionEvent({
+    decision_id: 'dec-a',
+    input: { role: 'operator', org: 'org_suraksha' },
+    result: { allow: true },
+  });
+  const bharat = normalizeDecisionEvent({
+    decision_id: 'dec-b',
+    input: { role: 'operator', org: 'org_bharat' },
+    result: { allow: true },
+  });
+  const unmarked = normalizeDecisionEvent({ decision_id: 'dec-c', input: { role: 'operator' } });
+  assert.equal(suraksha.org, 'org_suraksha');
+  assert.equal(bharat.org, 'org_bharat');
+  assert.notEqual(suraksha.org, bharat.org);
+  assert.equal(unmarked.org, '', 'an event whose input carries no org must not be guessed into one');
 });
 
 test('normalizeDecisionEvent: fallbacks — synthesized id, query→path, actor field, engine, bad ts', () => {

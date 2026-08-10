@@ -58,6 +58,7 @@ export async function ensureOpaDecisionLogSchema(): Promise<void> {
 }
 
 interface Row {
+  org_id: string;
   decision_id: string;
   path: string;
   allow: boolean;
@@ -79,6 +80,10 @@ function toEvent(r: Row): OpaDecisionEvent {
     reason: r.reason,
     engine: r.engine,
     actor: r.actor,
+    // Reads are already org-scoped by the WHERE clause (the row's stored org_id column); this is
+    // the DISPLAY value for that same row, not a re-derivation, so it always reflects where the row
+    // actually lives.
+    org: r.org_id,
     timestamp: ts && !Number.isNaN(ts.getTime()) ? ts.toISOString() : '',
     input: (r.input as Record<string, unknown> | null) ?? null,
     result: r.result ?? null,
@@ -86,16 +91,24 @@ function toEvent(r: Row): OpaDecisionEvent {
   };
 }
 
-// Persist a batch of normalized decision events for an org. Idempotent per (org, decisionId): a
-// re-delivered event refreshes the row rather than duplicating. Returns the number of rows written.
+// Persist a batch of normalized decision events. Attribution is PER EVENT, not per batch: OPA ships
+// ONE decision-log stream for every tenant, so the batch/ingest-caller's own org (`orgId` — typically
+// the platform org the admin-bearer sink authenticates as) must never be stamped onto every row. Each
+// event's own `org` (extracted from its `input.org` by normalizeDecisionEvent — see opa-audit.ts)
+// wins; `orgId` is used ONLY as the fallback for an event that carries none, so an org-less event
+// lands in the caller's own (usually non-tenant) bucket rather than being guessed into a real
+// tenant's ledger — an unattributable record belongs to nobody's tenant view.
+// Idempotent per (org, decisionId): a re-delivered event refreshes the row rather than duplicating.
+// Returns the number of rows written.
 export async function persistDecisions(
   events: readonly OpaDecisionEvent[],
   orgId: string = DEFAULT_ORG,
 ): Promise<number> {
   await ensureOpaDecisionLogSchema();
-  const org = orgId || DEFAULT_ORG;
+  const batchOrg = orgId || DEFAULT_ORG;
   let written = 0;
   for (const e of events) {
+    const org = e.org || batchOrg;
     const decidedAt = e.timestamp ? new Date(e.timestamp) : null;
     await db.execute(sql`
       INSERT INTO opa_decision_logs
@@ -126,7 +139,7 @@ export async function listDecisions(
   await ensureOpaDecisionLogSchema();
   const org = orgId || DEFAULT_ORG;
   const res = await db.execute(sql`
-    SELECT decision_id, path, allow, reason, engine, actor, decided_at, input, result, labels
+    SELECT org_id, decision_id, path, allow, reason, engine, actor, decided_at, input, result, labels
     FROM opa_decision_logs WHERE org_id = ${org}
     ORDER BY received_at DESC LIMIT 1000;
   `);
@@ -142,7 +155,7 @@ export async function getDecision(
   await ensureOpaDecisionLogSchema();
   const org = orgId || DEFAULT_ORG;
   const res = await db.execute(sql`
-    SELECT decision_id, path, allow, reason, engine, actor, decided_at, input, result, labels
+    SELECT org_id, decision_id, path, allow, reason, engine, actor, decided_at, input, result, labels
     FROM opa_decision_logs WHERE org_id = ${org} AND decision_id = ${decisionId} LIMIT 1;
   `);
   const row = (res.rows as unknown as Row[])[0];
@@ -155,7 +168,7 @@ export async function aggregateForOrg(orgId: string = DEFAULT_ORG): Promise<Deci
   await ensureOpaDecisionLogSchema();
   const org = orgId || DEFAULT_ORG;
   const res = await db.execute(sql`
-    SELECT decision_id, path, allow, reason, engine, actor, decided_at, input, result, labels
+    SELECT org_id, decision_id, path, allow, reason, engine, actor, decided_at, input, result, labels
     FROM opa_decision_logs WHERE org_id = ${org} ORDER BY received_at DESC LIMIT 1000;
   `);
   return aggregateDecisions((res.rows as unknown as Row[]).map(toEvent));

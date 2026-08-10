@@ -104,10 +104,19 @@ export interface GroundingPort {
 // Policy — an access decision (deny-overrides). The first-party port evaluates the in-console
 // ABAC rules; the OPA port asks a Rego decision API. Same contract either way, so the call site
 // never knows which engine answered.
+//
+// `org` (optional) is the TENANT this decision is being made for — see `currentOrgId()`
+// (src/lib/tenancy.ts). It is forwarded verbatim to OPA as part of `input`, so it round-trips into
+// OPA's own decision-log event for this decision and lets the console's ingest sink attribute the
+// event to the right tenant (opa-audit.ts `normalizeDecisionEvent` / opa-decision-log-store.ts
+// `persistDecisions`) instead of lumping every tenant's decisions into one bucket. It is additive —
+// existing Rego (`offgrid/authz`) does not read it, so adding it must not change any allow/deny
+// outcome; callers that have no org in scope (a worker with no request context) simply omit it.
 export interface PolicyInput {
   role: string;
   resource: string;
   attributes: Record<string, string>;
+  org?: string;
 }
 
 export interface PolicyDecision {

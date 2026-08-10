@@ -771,6 +771,7 @@ async function runAgentImpl(
     role: process.env.OFFGRID_AGENT_ROLE ?? 'operator',
     resource: `agent:${agentId}`,
     attributes: {},
+    org: attribution.org,
   });
   // Block only on an EXPLICIT deny (a deny rule matched). "No rule matched" is recorded but does
   // not fail the run closed — the run is already authenticated; admins add a deny rule to block.
