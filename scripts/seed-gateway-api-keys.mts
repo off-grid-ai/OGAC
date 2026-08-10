@@ -28,10 +28,20 @@ interface SeedKey {
   name: string;
 }
 
-// One seed key per demo tenant — matches the SAME two orgs every other demo seed targets.
+// SEVERAL keys per tenant, not one. With a single row the Keys screen read as 238 characters of
+// table headings — technically populated, and thin enough that a buyer would read it as unused. A real
+// bank or insurer issues a separate credential per consuming system, and that is also the point of the
+// screen: you can see, and cap, each one independently.
+//
+// Now that listGatewayKeys is org-scoped (it was realm-wide, which leaked one tenant's client name to
+// the other), each tenant sees only its own set.
 const SEED_KEYS: readonly SeedKey[] = [
   { orgId: 'org_bharat', name: 'Bharat Union — core banking gateway client' },
+  { orgId: 'org_bharat', name: 'Bharat Union — mobile app assistant' },
+  { orgId: 'org_bharat', name: 'Bharat Union — collections analytics' },
   { orgId: 'org_suraksha', name: 'Suraksha Life — claims platform gateway client' },
+  { orgId: 'org_suraksha', name: 'Suraksha Life — advisor portal assistant' },
+  { orgId: 'org_suraksha', name: 'Suraksha Life — underwriting batch jobs' },
 ];
 
 async function main(): Promise<void> {
@@ -40,7 +50,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  const existing = await listGatewayKeys();
+  // DEFAULT_ORG, deliberately: listGatewayKeys is now org-scoped, and the platform org is the only
+  // one that sees every tenant's keys. Calling it with no argument (as this script first did) returned
+  // an EMPTY list, so the duplicate check passed for keys that already existed and the script minted a
+  // second copy of one. An idempotency check that reads a narrower view than it writes is not a check.
+  const existing = await listGatewayKeys('default');
   for (const seed of SEED_KEYS) {
     const already = existing.some((k) => k.name === seed.name && k.owner === seed.orgId);
     if (already) {
