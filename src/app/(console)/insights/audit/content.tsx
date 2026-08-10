@@ -9,7 +9,7 @@ import { buildAuditStats } from '@/lib/insights-stats';
 import { publicLabel } from '@/lib/lineage-labels';
 import { requireModuleForUser } from '@/lib/module-access';
 import { filterAuditForPipeline } from '@/lib/pipeline-api-key-format';
-import { plainAction, plainOrg } from '@/lib/plain-identifiers';
+import { plainAction, plainOrg, plainRefs, stripOrgIds } from '@/lib/plain-identifiers';
 import { listPipelines } from '@/lib/pipelines';
 import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
@@ -200,7 +200,11 @@ export async function AuditLogSurface({
                         className="max-w-[16rem] truncate p-2 text-muted-foreground"
                         title={r.resource}
                       >
-                        {publicLabel(r.resource) || '—'}
+                        {/* stripOrgIds as well as publicLabel: the resource string embedded the org
+                            id INSIDE a seeded pipeline id — pipeline:pl_seed_org_suraksha_fraud —
+                            which a whole-field rule cannot see and an engine-name vocabulary does
+                            not cover. plainRefs un-colons the machine references either side of it. */}
+                        {plainRefs(stripOrgIds(publicLabel(r.resource))) || '—'}
                       </td>
                       <td className="p-2 text-muted-foreground">{r.model || '—'}</td>
                       <td className="p-2 text-right tabular-nums">{r.tokens || '—'}</td>

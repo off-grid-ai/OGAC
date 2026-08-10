@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { plainAction, plainOrg, plainRefs } from '@/lib/plain-identifiers';
+import { plainAction, plainOrg, plainRefs, stripOrgIds } from '@/lib/plain-identifiers';
 
 test('an action code becomes a phrase', () => {
   assert.equal(plainAction('pipeline.data.deny'), 'pipeline data refused');
@@ -59,4 +59,30 @@ test('the sentence that shipped comes out readable', () => {
   assert.notEqual(fixed, shipped);
   assert.equal(fixed, 'pipeline data refused by proof ceiling in this organisation');
   assert.ok(!/[a-z]+\.[a-z]+|org_|:[a-z]/.test(fixed), 'no machine syntax may survive');
+});
+
+test('an org id buried inside an identifier is removed, and the id stays usable', () => {
+  // The shape that survived two rounds of fixing: the audit trail's resource column read
+  // `pipeline:pl_seed_org_suraksha_fraud-screening`. plainOrg handles a whole field and could not see
+  // it; publicLabel's vocabulary is engine names, so it could not either.
+  assert.equal(
+    stripOrgIds('pipeline:pl_seed_org_suraksha_fraud-screening'),
+    'pipeline:pl_seed_fraud-screening',
+  );
+  assert.equal(stripOrgIds('app_org_bharat'), 'app');
+  assert.equal(stripOrgIds('scoped to org_suraksha today'), 'scoped to this organisation today');
+});
+
+test('an identifier with no org in it is untouched', () => {
+  for (const v of ['pl_seed_fraud-screening', 'agent:agent_c6ac38cb', 'apprun_eee51b30', '']) {
+    assert.equal(stripOrgIds(v), v);
+  }
+});
+
+test('the audit resource string comes out with no org id at all', () => {
+  // The closing assertion, on the real value read off the rendered page.
+  const shipped = 'model:agent:agent_c6ac38cb pipeline:pl_seed_org_suraksha_fraud-screening';
+  const out = plainRefs(stripOrgIds(shipped));
+  assert.doesNotMatch(out, /org_[a-z]/i, out);
+  assert.match(out, /fraud-screening/, 'the reference is still recognisable');
 });

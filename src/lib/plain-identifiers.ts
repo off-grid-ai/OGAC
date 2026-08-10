@@ -90,3 +90,25 @@ export function plainRefs(text: string | null | undefined): string {
   // sentence's own colon are left alone.
   return String(text ?? '').replace(/\b([a-z][a-z0-9]*):([a-z][a-z0-9_-]*)\b/g, '$1 $2');
 }
+
+/**
+ * Remove an org id embedded INSIDE an identifier.
+ *
+ * `plainOrg` handles a field whose whole value is the org. This handles the other shape, which is the
+ * one that actually survived on screen: the audit trail's resource column read
+ * `pipeline:pl_seed_org_suraksha_fraud-screening`, where the org id is a segment of a longer id. The
+ * whole-field rule could not see it, and neither could `publicLabel`, whose vocabulary is engine
+ * names.
+ *
+ * The id keeps its identity — an operator reading an audit trail needs a reference they can look up —
+ * it just stops carrying the tenant's internal name.
+ */
+export function stripOrgIds(text: string | null | undefined): string {
+  return String(text ?? '')
+    // Embedded segment: pl_seed_org_suraksha_fraud → pl_seed_fraud.
+    .replace(/_org_[a-z0-9]+_/gi, '_')
+    // Trailing segment: something_org_suraksha → something.
+    .replace(/_org_[a-z0-9]+\b/gi, '')
+    // Standalone, when it is one token of a longer string rather than the whole field.
+    .replace(/\borg_[a-z0-9_]+\b/gi, 'this organisation');
+}
