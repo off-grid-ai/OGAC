@@ -1,5 +1,6 @@
 'use client';
 
+import { publicActionLabel } from '@/lib/plain-identifiers';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 import type { AuditOutcome } from '@/lib/audit-log-view';
@@ -63,6 +64,7 @@ export function AuditFilterBar({ actors, actions, projects, outcomes }: Readonly
         label="Action"
         value={val('action')}
         options={actions}
+        display={publicActionLabel}
         onChange={(v) => setParam('action', v)}
       />
       <SelectFilter
@@ -116,11 +118,19 @@ function SelectFilter({
   value,
   options,
   onChange,
+  display,
 }: Readonly<{
   label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
+  /**
+   * How to WRITE an option, when the value is a machine string. The Action filter is built from the
+   * audit data's own action codes, so it listed `data.airbyte.schedule` — naming an OSS engine in a
+   * dropdown on a page a customer reads. The submitted value must stay the raw code, so only the
+   * label changes.
+   */
+  display?: (option: string) => string;
 }>) {
   // Keep the current value selectable even if it isn't in the (page-derived) facet list.
   const opts = value && !options.includes(value) ? [value, ...options] : options;
@@ -135,7 +145,7 @@ function SelectFilter({
         <option value="">all</option>
         {opts.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {display ? display(o) : o}
           </option>
         ))}
       </select>

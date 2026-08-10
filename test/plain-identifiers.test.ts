@@ -4,7 +4,14 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { plainAction, plainOrg, plainRefs, stripOrgIds } from '@/lib/plain-identifiers';
+import {
+  plainAction,
+  plainOrg,
+  plainRefs,
+  publicActionLabel,
+  stripOrgIds,
+} from '@/lib/plain-identifiers';
+import { leaksInternalName } from '@/lib/lineage-labels';
 
 test('an action code becomes a phrase', () => {
   assert.equal(plainAction('pipeline.data.deny'), 'pipeline data refused');
@@ -85,4 +92,25 @@ test('the audit resource string comes out with no org id at all', () => {
   const out = plainRefs(stripOrgIds(shipped));
   assert.doesNotMatch(out, /org_[a-z]/i, out);
   assert.match(out, /fraud-screening/, 'the reference is still recognisable');
+});
+
+test('an action code is made safe AND readable — each mapper alone is not enough', () => {
+  // 'data.airbyte.schedule' reached the regulatory page and the audit filter dropdown. plainAction
+  // fixes the syntax and knows nothing about vocabulary, so the engine name walked through it;
+  // publicLabel fixes the vocabulary and knows nothing about dots. Composed they produce a repeated
+  // word, because the replacement starts with a word the code already had.
+  assert.equal(publicActionLabel('data.airbyte.schedule'), 'data movement schedule');
+  assert.doesNotMatch(publicActionLabel('data.airbyte.schedule'), /airbyte/i);
+});
+
+test('no action code we ship leaks an engine name through the composed label', () => {
+  const CODES = [
+    'data.airbyte.schedule', 'brain.ingest', 'guardrail.change', 'pipeline.data.deny',
+    'gateway.egress.dlp', 'access.machine.rotate', 'policy.decision-log.ingest', 'backup.run',
+  ];
+  for (const c of CODES) {
+    const out = publicActionLabel(c);
+    assert.ok(!leaksInternalName(out), `${c} → ${out}`);
+    assert.doesNotMatch(out, /\./, `${c} → ${out} still reads as a machine code`);
+  }
 });

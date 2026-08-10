@@ -23,7 +23,7 @@ import { buildComplianceActivity } from '@/lib/compliance-activity';
 import { frameworkOverview, statusMap } from '@/lib/compliance-adoption';
 import { buildCrossMap, CATALOG } from '@/lib/compliance-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
-import { plainAction } from '@/lib/plain-identifiers';
+import { publicActionLabel } from '@/lib/plain-identifiers';
 import { listGovernance, readComplianceActivity } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { PageFrame } from '@/components/PageFrame';
@@ -234,7 +234,7 @@ export async function RegulatorySurface({
                                 surface exists to hand a REGULATOR — plainAction un-dots it into a
                                 phrase without inventing a meaning the code doesn't have. */}
                             <TableCell className="text-xs text-foreground" title={r.key}>
-                              {plainAction(r.key)}
+                              {publicActionLabel(r.key)}
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {r.events}
@@ -277,7 +277,7 @@ export async function RegulatorySurface({
                           </TableCell>
                           <TableCell className="text-foreground">{e.actor}</TableCell>
                           <TableCell className="text-xs text-muted-foreground" title={e.action}>
-                            {plainAction(e.action)}
+                            {publicActionLabel(e.action)}
                           </TableCell>
                           <TableCell>
                             <Badge

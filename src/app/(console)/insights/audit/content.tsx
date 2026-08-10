@@ -9,7 +9,7 @@ import { buildAuditStats } from '@/lib/insights-stats';
 import { publicLabel } from '@/lib/lineage-labels';
 import { requireModuleForUser } from '@/lib/module-access';
 import { filterAuditForPipeline } from '@/lib/pipeline-api-key-format';
-import { plainAction, plainOrg, plainRefs, stripOrgIds } from '@/lib/plain-identifiers';
+import { publicActionLabel, plainOrg, plainRefs, stripOrgIds } from '@/lib/plain-identifiers';
 import { listPipelines } from '@/lib/pipelines';
 import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
@@ -184,7 +184,7 @@ export async function AuditLogSurface({
                           for the reader; the original stays in the title attribute for anyone
                           who wants the exact code. */}
                       <td className="p-2 text-xs" title={r.action}>
-                        {plainAction(r.action)}
+                        {publicActionLabel(r.action)}
                       </td>
                       {/* The project column carries the ORG ID for platform-scoped events, so this
                           rendered "org_suraksha" to the tenant reading its own audit trail — the

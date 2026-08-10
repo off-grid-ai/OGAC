@@ -1,3 +1,5 @@
+import { publicLabel } from '@/lib/lineage-labels';
+
 // ─── Machine identifiers → plain language (PURE, zero-IO) ────────────────────────────────────────
 //
 // A different leak from the one `publicLabel` handles. That one has a VOCABULARY of things never to
@@ -111,4 +113,21 @@ export function stripOrgIds(text: string | null | undefined): string {
     .replace(/_org_[a-z0-9]+\b/gi, '')
     // Standalone, when it is one token of a longer string rather than the whole field.
     .replace(/\borg_[a-z0-9_]+\b/gi, 'this organisation');
+}
+
+/**
+ * An audit action code, safe AND readable for a customer. Use this on any buyer-facing surface.
+ *
+ * The two mappers each solve half of it and neither is enough alone. `plainAction` fixes the SYNTAX
+ * (`data.airbyte.schedule` → "data airbyte schedule") and knows nothing about vocabulary, so the
+ * engine name walked straight through it onto the regulatory page. `publicLabel` fixes the
+ * VOCABULARY and knows nothing about dots, so on the raw code it left a machine string.
+ *
+ * Composed, they produce a repeated word — "data data movement schedule" — because the replacement
+ * for the engine begins with a word the code already had. So the collapse happens LAST, after both.
+ * Doing it inside plainAction, where I first put it, was too early to see the duplicate at all.
+ */
+export function publicActionLabel(action: string | null | undefined): string {
+  const words = publicLabel(plainAction(action)).split(/\s+/).filter(Boolean);
+  return words.filter((w, i) => w.toLowerCase() !== (words[i - 1] ?? '').toLowerCase()).join(' ');
 }
