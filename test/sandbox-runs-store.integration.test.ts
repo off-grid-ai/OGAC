@@ -11,12 +11,18 @@ const dbUp = await dbReachable();
 test(
   'sandbox_runs: record + list round-trip, org-scoped, newest-first (real Postgres)',
   { skip: dbUp ? false : SKIP_MESSAGE },
-  async () => {
-    const { recordSandboxRun, listSandboxRuns } = await import('@/lib/sandbox-runs-store.ts');
+  async (t) => {
+    const { recordSandboxRun, listSandboxRuns, deleteSandboxRunsForOrg } = await import(
+      '@/lib/sandbox-runs-store.ts'
+    );
     const { normalizeSandbox } = await import('@/lib/sandbox-view.ts');
 
     const orgId = `org-sbx-${Date.now()}`;
     const otherOrg = `${orgId}-other`;
+    t.after(async () => {
+      await deleteSandboxRunsForOrg(orgId).catch(() => {});
+      await deleteSandboxRunsForOrg(otherOrg).catch(() => {});
+    });
 
     await recordSandboxRun(
       { engine: 'docker', language: 'python', ok: true, exitCode: 0, timedOut: false, refused: '', durationMs: 120 },

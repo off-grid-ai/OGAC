@@ -127,3 +127,10 @@ export async function listSandboxRuns(
     return [];
   }
 }
+
+// Org-scoped delete — lets a tenant clear its own exec history (and lets integration tests clean up
+// after themselves) without ever being able to touch another org's rows.
+export async function deleteSandboxRunsForOrg(orgId: string): Promise<void> {
+  await ensureSandboxRunsSchema();
+  await db.execute(sql`DELETE FROM sandbox_runs WHERE org_id = ${orgId};`);
+}
