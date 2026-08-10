@@ -2514,3 +2514,108 @@ change: **both still report `EMPTY 4 figures, all zero`** — confirmed, not ass
 **G-213 closes only after:** this code is deployed, a real product action is exercised on each tenant
 (not a synthetic POST to the sink), and both ledgers are re-queried showing distinct, correctly-attributed
 `org_id`s.
+
+## G-214 — the tenant console hosts bypass Caddy entirely; WAF/rate-limit protect other surfaces, not the demo tenants
+
+Found while chasing `/gateway/edge` and `/operations/edge` both showing "not configured" even though
+Caddy is genuinely live. Two separate things were true at once:
+
+1. **Console-side wiring bug (FIXED, needs a restart to take effect).** `src/lib/edge-log.ts` reads the
+   live Caddyfile from `process.cwd()/deploy/Caddyfile` by default, overridable via
+   `OFFGRID_CADDYFILE`. On the box, `~/offgrid/console/deploy/` has no `Caddyfile` at all (only
+   `docker-compose.edge.yml`, which references one that was never placed there) — the REAL, live
+   Caddyfile lives in the private fleet repo at `~/offgrid/fleet/deploy/Caddyfile`. So every read
+   silently failed open to "no policy", which the page correctly but misleadingly renders as
+   "WAF off / rate limit not configured." **Fix:** added
+   `OFFGRID_CADDYFILE=/Users/admin/offgrid/fleet/deploy/Caddyfile` to `~/offgrid/console/.env.local`
+   on the box (backed up the prior file as `.env.local.bak-edgefix` first). `edge-access.log` (the
+   other half of the read) was already correct — it's a 2MB file updated within the hour, genuinely
+   live. **This env var is read once at module load, so it takes effect on the NEXT console
+   restart/deploy — not verified live yet** (confirmed with `node scripts/demo-readiness.mjs`: still
+   reports "not configured" against the currently-running process).
+2. **A real, separate gap this does NOT fix: the tenant console hosts never go through Caddy.**
+   `~/offgrid/fleet/deploy/onprem/cloudflared-tunnel.yml`'s ingress rules send
+   `onprem-console.getoffgridai.co` AND the `*.getoffgridai.co` wildcard (which is what
+   `suraksha-onprem-console.*` / `bharatunion-onprem-console.*` match) **directly to `:3000`** — the
+   console — never through Caddy's `:80`. Caddy's `(edge)` snippet (WAF + rate limit + access log) is
+   only `import`-ed by `ai.getoffgridai.co`, `gateway.getoffgridai.co`, and `hooks.getoffgridai.co` in
+   the Caddyfile. So once the wiring fix above ships, the Overview card will honestly say "WAF: on"
+   and list real rate-limit zones — which is true of the platform's AI-gateway ingress, but **a
+   request to either demo tenant's own console host is never WAF-filtered or rate-limited by Caddy at
+   all.** This is not something I changed or attempted to fix — rerouting tenant console traffic
+   through Caddy is exactly the kind of "public-tunnel surgery" the tunnel config's own comments flag
+   as supervised/deferred work, and it risks breaking NextAuth's cookie/host handling. Flagging for the
+   operator to decide: either accept that the edge page describes gateway-ingress protection (and say
+   so explicitly on the Overview card, e.g. "protects api/gateway traffic, not the console UI itself"),
+   or take on the tunnel-routing change to actually front the console hosts too.
+
+**G-214 closes only after:** (a) the console is restarted/redeployed and
+`node scripts/demo-readiness.mjs` confirms `/gateway/edge` and `/operations/edge` no longer read "not
+configured", and (b) the operator decides on (2) — either the copy is corrected to scope the claim to
+gateway traffic, or the tunnel is re-routed so Caddy actually fronts the tenant console hosts.
+
+## G-215 — drift-monitoring project cards show the ORG's signal, not each project's own
+
+Found while seeding `docs/GAPS_BACKLOG.md`-adjacent demo state for G-empty-pages (two new
+`suraksha` projects: "Claims fraud scoring drift" / "Underwriting risk model drift"). Both cards show
+identical `reportCount: 6` / `latest` / `direction` / `peakPct` even though each project's OWN detail
+page (`getDriftProjectDetail`, which scopes by `project_id`) correctly shows only its own 3 runs.
+
+Root cause: `listDriftProjectsWithSignal` (`src/lib/evidently-projects-store.ts`) reads the org's
+retained runs ONCE (`listDriftRuns(RUN_WINDOW, orgId)` — no project filter) and calls
+`projectSignal(project.driftThreshold, runs)` for every project against that SAME shared list — only
+the breach threshold differs per project. The detail page does it correctly
+(`listDriftRunsForProject`); the list cards do not. Comment in the source already says this plainly
+("Reads the org's retained runs ONCE and applies each project's own threshold") — a deliberate
+simplification, not an oversight, but it means two projects on different datasets will show each
+other's report counts/latest status on the LIST view, same class of bug `listDriftRunsForApp` /
+`listDriftRunsForProject` were added to fix for the detail view and for per-app panels. Did not fix —
+out of scope for the empty-pages pass and touches shared list-composition logic; flagging so it isn't
+mistaken for a seeding artifact.
+
+**G-215 closes when:** `listDriftProjectsWithSignal` calls `listDriftRunsForProject` per project (with
+the same “fall back to the org window when a project has no attributed runs yet” rule
+`getDriftProjectDetail` already uses) instead of one shared org-wide list.
+
+## G-216 — `/build/sandbox` and `/operations/health/traces` fixes are code-complete but NOT yet live (need a deploy)
+
+Two of the nine empty/thin demo pages assigned in this pass turned out to be real gaps in the console's
+OWN code, not infra:
+
+- **Sandbox exec-run history was never persisted.** The GET route's own comment said so: "Exec-run
+  history is not yet persisted; pass an empty set until a store lands." Added `sandbox_runs`
+  (self-migrating, org-scoped — `src/lib/sandbox-runs-store.ts`), wired it into the run route
+  (`src/app/api/v1/admin/sandbox/run/route.ts`, best-effort insert after every run) and the read paths
+  (`src/app/api/v1/admin/sandbox/route.ts`, `src/app/(console)/build/sandbox/page.tsx` — which
+  `/solutions/test` re-exports). Proven against a real local Postgres
+  (`test/sandbox-runs-store.integration.test.ts`). **Cannot seed real historical runs this session**:
+  the box's OFFGRID_ADAPTER_SANDBOX is genuinely `docker` (exec-capable), but the deployed run route is
+  the OLD code that never persists — seeding would require either deploying first (not done; deploys
+  are the operator's call) or writing rows directly to Postgres without a real execution behind them,
+  which is exactly the "manufactured state" this pass was told not to do. Left genuinely empty on the
+  live box until deployed.
+- **Trace search always read "0 traces" on load**, even with real recent traces, because the results
+  header renders `${traces.length} trace(s)` unconditionally and no service is pre-selected. Added
+  `pickDefaultService` (`src/lib/jaeger-trace.ts`, unit tested) and wired it into
+  `src/components/operations/TraceSearch.tsx` to auto-select `offgrid-console` (or the first
+  non-Jaeger-internal service) on mount. Verified LIVE against Jaeger directly (not guessed): `offgrid-
+  console` has 12 traces in the last 7 days, `jaeger-all-in-one` has 18 — the backend was never empty,
+  only the UI's default view was.
+- Also closed **`/operations/health/logs`**, honestly: VictoriaLogs itself was genuinely empty (`query=*`
+  over 7 days → 0 rows) — same producer-gap class as the documented VictoriaMetrics gap, NOT a broken
+  read. Confirmed the collector's REAL deployed config
+  (`~/offgrid/fleet/deploy/onprem/otel-collector-g5.yml` on g5 — the console repo's own
+  `deploy/otel-collector.yaml` is a stale dev reference that only exported logs to `debug`, now also
+  fixed for local-dev parity) already forwards OTLP logs to VictoriaLogs correctly; proved the whole
+  pipe end-to-end with a manual OTLP POST that landed in VictoriaLogs seconds later. The only real gap
+  was a producer: added `emitLog` (`src/lib/otel.ts`) and wired it into `persistAuditEvent`
+  (`src/lib/store.ts`) via a new pure `logSeverityForOutcome` mapper (`src/lib/audit-event.ts`, unit
+  tested) — every governed action now emits a real log line once deployed. **The page currently reads
+  OK on suraksha only because my manual verification probe log line is still inside VictoriaLogs'
+  default 1h window — it will revert to empty once that ages out, until this code is deployed and real
+  traffic starts flowing.**
+
+**G-216 closes only after a deploy**, then: re-run `node scripts/demo-readiness.mjs --host suraksha` and
+confirm `/build/sandbox`, `/solutions/test`, and `/operations/health/traces` no longer read EMPTY, and
+exercise the run panel for real (a python + a node run) to prove persisted history end-to-end rather
+than trusting the code alone.

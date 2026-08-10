@@ -31,6 +31,7 @@ import {
   type AuditEvent as CanonicalAuditEvent,
   type AuditEventInput,
   buildAuditEvent,
+  logSeverityForOutcome,
 } from '@/lib/audit-event';
 import type { ChatBindingGovernance } from '@/lib/chat-pipeline-policy';
 import type { CheckResult } from '@/lib/checks';
@@ -41,7 +42,7 @@ import { recordCount } from '@/lib/connector-exec';
 export { execConnectorQuery, recordCount } from '@/lib/connector-exec';
 export type { ConnectorTarget, ConnectorQuery, ConnectorQueryResult } from '@/lib/connector-exec';
 import { type EdgeIntent, defaultIntent } from '@/lib/edge-intent';
-import { emitCounter, emitSpan } from '@/lib/otel';
+import { emitCounter, emitLog, emitSpan } from '@/lib/otel';
 import { type RoutingDecision, decideRouting } from '@/lib/routing-policy';
 import { shipAudit, shipAuditEvent } from '@/lib/siem';
 import { DEFAULT_ORG } from '@/lib/tenancy-policy';
@@ -621,6 +622,18 @@ export async function persistAuditEvent(input: AuditEventInput): Promise<Canonic
     emitCounter('offgrid_audit_events_total', 1, {
       action: ev.action,
       outcome: ev.outcome,
+      ...(ev.org ? { org: ev.org } : {}),
+    });
+    // THE LOG PRODUCER. /operations/health/logs read a genuinely empty VictoriaLogs — the
+    // collector's logs pipeline already forwards to it, but nothing ever emitted a log record over
+    // OTLP. Same fix shape as the metric above: every governed action already lands here, so one
+    // emit covers the operator's actual "who did what, what failed" search intent.
+    emitLog(logSeverityForOutcome(ev.outcome), `${ev.action} ${ev.outcome}`, {
+      action: ev.action,
+      actor: ev.actor.id,
+      outcome: ev.outcome,
+      service: 'offgrid-console',
+      ...(ev.runId ? { run_id: ev.runId } : {}),
       ...(ev.org ? { org: ev.org } : {}),
     });
   } catch {

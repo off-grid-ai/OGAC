@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getFlags, getSandbox } from '@/lib/adapters/registry';
 import { requireAdmin } from '@/lib/authz';
+import { listSandboxRuns } from '@/lib/sandbox-runs-store';
 import { normalizeSandbox, readSandboxStatus } from '@/lib/sandbox-view';
+import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,14 +14,17 @@ const EXEC_CAPABLE_BACKENDS = new Set(['docker', 'firecracker', 'e2b']);
 
 // Read-back of the code-execution sandbox: which backend is active, whether it's reachable, and
 // the recent exec runs. Thin handler — the display model is built by the pure normalizer, the
-// only I/O is the best-effort adapter health read (which never throws).
+// only I/O is the best-effort adapter health read (which never throws) + the org-scoped run history.
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
 
-  const { data, error } = await readSandboxStatus(getSandbox());
-  // Exec-run history is not yet persisted; pass an empty set until a store lands.
-  const view = normalizeSandbox(data, []);
+  const orgId = await currentOrgId();
+  const [{ data, error }, runs] = await Promise.all([
+    readSandboxStatus(getSandbox()),
+    listSandboxRuns(orgId),
+  ]);
+  const view = normalizeSandbox(data, runs);
   // The Run Code panel is DOUBLE-GATED (mirrors the run route): the agent-code-exec flag must be
   // ON (default OFF) AND the active adapter must be an exec-capable backend (default 'none' refuses).
   // Surfaced here so the UI can honestly disable the panel + explain why, without faking a run.

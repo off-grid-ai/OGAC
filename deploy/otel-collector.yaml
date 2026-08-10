@@ -24,6 +24,13 @@ exporters:
     endpoint: jaeger:4317
     tls:
       insecure: true
+  # Logs → VictoriaLogs (native OTLP ingestion). This was `[debug]`-only — logs never left the
+  # collector, so /operations/health/logs always read a genuinely empty backend even once a producer
+  # existed. Kept in sync with the deployed config (deploy/onprem/otel-collector-g5.yml on the fleet).
+  otlphttp/victorialogs:
+    endpoint: http://victorialogs:9428/insert/opentelemetry
+    tls:
+      insecure: true
 
 service:
   pipelines:
@@ -38,4 +45,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlphttp/victorialogs]

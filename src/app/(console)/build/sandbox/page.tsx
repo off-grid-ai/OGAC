@@ -14,12 +14,14 @@ import {
 } from '@/components/ui/table';
 import { getFlags, getSandbox } from '@/lib/adapters/registry';
 import { requireModuleForUser } from '@/lib/module-access';
+import { listSandboxRuns } from '@/lib/sandbox-runs-store';
 import {
   type ExecStatus,
   normalizeSandbox,
   readSandboxStatus,
   type SandboxView,
 } from '@/lib/sandbox-view';
+import { currentOrgId } from '@/lib/tenancy';
 import { PageFrame } from '@/components/PageFrame';
 
 export const dynamic = 'force-dynamic';
@@ -68,8 +70,12 @@ export default async function SandboxPage({
   const { status: statusParam } = await searchParams;
   const filter: 'all' | ExecStatus = isExecStatus(statusParam) ? statusParam : 'all';
 
-  const { data, error } = await readSandboxStatus(getSandbox());
-  const view: SandboxView = normalizeSandbox(data, []);
+  const orgId = await currentOrgId();
+  const [{ data, error }, execRuns] = await Promise.all([
+    readSandboxStatus(getSandbox()),
+    listSandboxRuns(orgId),
+  ]);
+  const view: SandboxView = normalizeSandbox(data, execRuns);
   const runs = filter === 'all' ? view.runs : view.runs.filter((r) => r.status === filter);
 
   // Double gate for the Run Code panel: flag ON + exec-capable backend. Surfaced honestly.
