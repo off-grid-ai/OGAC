@@ -58,7 +58,7 @@ export function WarehouseModelDetail({ id }: Readonly<{ id: string }>) {
       });
       const j = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(j.error || `edit failed (${res.status})`);
-      toast.success('New version applied to ClickHouse');
+      toast.success('New version applied to the warehouse');
       await load();
     } catch (e) {
       toast.error((e as Error).message);
@@ -85,7 +85,7 @@ export function WarehouseModelDetail({ id }: Readonly<{ id: string }>) {
   }
 
   async function remove() {
-    if (!confirm('Delete this model? The object is dropped from ClickHouse.')) return;
+    if (!confirm('Delete this model? The object is dropped from the warehouse.')) return;
     try {
       const res = await fetch(`/api/v1/admin/warehouse/models/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`delete failed (${res.status})`);
