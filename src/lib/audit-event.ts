@@ -205,6 +205,16 @@ function normalizeOutcome(o: AuditOutcome | string | null | undefined): AuditOut
   return o ? outcomeFromStatus(o) : 'ok';
 }
 
+// The log-search surface's own tips promise `level:error` / `service:x error` — this is the one
+// rule that decides which of an audit event's outcomes count as which severity, reused by every
+// producer that emits a log record alongside its audit row (DRY: one rule, not per-call-site
+// judgment calls that would drift).
+export function logSeverityForOutcome(outcome: AuditOutcome): 'info' | 'warn' | 'error' {
+  if (outcome === 'error') return 'error';
+  if (outcome === 'blocked' || outcome === 'redacted') return 'warn';
+  return 'info';
+}
+
 // Fold a partial token record into a full {prompt, completion, total}. If total is missing it is the
 // sum of prompt + completion; if prompt/completion are missing but total is present they stay 0.
 // Returns undefined when there is no token signal at all (so `tokens?` is genuinely optional).

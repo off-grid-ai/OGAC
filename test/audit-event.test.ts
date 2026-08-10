@@ -4,6 +4,7 @@ import {
   actorFrom,
   buildAuditEvent,
   costUsdFor,
+  logSeverityForOutcome,
   machineActor,
   normalizeTokens,
   outcomeFromStatus,
@@ -208,4 +209,11 @@ test('a full producer event round-trips every field', () => {
     runId: 'run_deadbeef',
     ip: '10.0.0.1',
   });
+});
+
+test('logSeverityForOutcome maps each canonical outcome to a log severity', () => {
+  assert.equal(logSeverityForOutcome('ok'), 'info');
+  assert.equal(logSeverityForOutcome('blocked'), 'warn');
+  assert.equal(logSeverityForOutcome('redacted'), 'warn');
+  assert.equal(logSeverityForOutcome('error'), 'error');
 });

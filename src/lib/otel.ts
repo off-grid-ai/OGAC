@@ -107,6 +107,67 @@ export function emitCounter(name: string, value: number, attrs: SpanAttrs = {}):
   emitMetric(name, value, attrs, 'sum');
 }
 
+// ─── Logs ───────────────────────────────────────────────────────────────────────────────────────────
+//
+// The collector's logs pipeline (deploy/onprem/otel-collector-g5.yml, the config that's actually
+// running) already forwards OTLP logs to VictoriaLogs at /insert/opentelemetry — verified live. What
+// was missing is a PRODUCER: nothing in the app ever emitted a log record over OTLP, so
+// /operations/health/logs always read a genuinely empty backend (same class of gap as the
+// documented "VictoriaMetrics held zero application series" — the pipe was wired, nobody used it).
+//
+// Same OTLP/HTTP wire as spans/metrics, the /v1/logs signal. Emitted from persistAuditEvent (below,
+// in store.ts) — every governed action already funnels through there, so this one producer covers
+// the action stream an operator actually wants to search (who did what, what failed) without a new
+// instrumentation surface per feature.
+export type LogSeverity = 'info' | 'warn' | 'error';
+const SEVERITY_NUMBER: Record<LogSeverity, number> = { info: 9, warn: 13, error: 17 };
+
+function logTargets(): SpanTarget[] {
+  return OTLP_URL ? [{ url: `${OTLP_URL}/v1/logs`, headers: {} }] : [];
+}
+
+export function emitLog(severity: LogSeverity, message: string, attrs: SpanAttrs = {}): void {
+  if (process.env.OTEL_DEBUG === 'true') {
+    process.stdout.write(`[otel] log ${severity} ${message} ${JSON.stringify(attrs)}\n`);
+  }
+  const tgts = logTargets();
+  if (tgts.length === 0) return;
+
+  const now = `${Date.now()}000000`;
+  const body = {
+    resourceLogs: [
+      {
+        resource: { attributes: toAttributes({ 'service.name': 'offgrid-console' }) },
+        scopeLogs: [
+          {
+            scope: { name: 'offgrid-console' },
+            logRecords: [
+              {
+                timeUnixNano: now,
+                severityNumber: SEVERITY_NUMBER[severity],
+                severityText: severity,
+                body: { stringValue: message },
+                attributes: toAttributes(attrs),
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const payload = JSON.stringify(body);
+  for (const t of tgts) {
+    // Fire-and-forget, exactly like spans/metrics: observability must never block or fail the
+    // request path.
+    fetch(t.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...t.headers },
+      body: payload,
+      signal: AbortSignal.timeout(3000),
+    }).catch(() => {});
+  }
+}
+
 function metricTargets(): SpanTarget[] {
   // Langfuse ingests traces, not metrics — sending it a metrics envelope would be a guaranteed 4xx on
   // every emit, so the metric path targets the collector only.
