@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { decodeArtifactText } from '@/lib/artifact-text';
 import { explainResponse } from '@/lib/api-failure';
+import { previewText } from '@/lib/plain-text';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -408,7 +409,12 @@ function ArtifactCard({
             />
           ) : (
             <pre className="h-full overflow-hidden whitespace-pre-wrap break-all bg-background p-3 text-[10px] leading-tight text-muted-foreground">
-              {decodeArtifactText(a.code).slice(0, 400)}
+              {/* This is a thumbnail SNIPPET, not the document — a markdown/text artifact's raw
+                  source (`**Findings**`, `# Summary`) read as broken output the one place a reviewer
+                  scans the whole library at a glance. previewText() strips the syntax the same way
+                  a run's one-line preview already does, and leaves anything it doesn't recognise
+                  (actual code) alone. */}
+              {previewText(decodeArtifactText(a.code), 400)}
             </pre>
           )}
           {/* The badge IS the link. It previously only announced that a link existed somewhere, which is
