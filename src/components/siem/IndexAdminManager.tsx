@@ -340,7 +340,7 @@ function DetectorsTab() {
         <p className="flex items-start gap-2 rounded-md border border-border p-3 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0" />
           {note ??
-            'The OpenSearch security-analytics plugin is not installed on this build — threat detectors are unavailable.'}
+            'The security-analytics plugin is not installed on this build — threat detectors are unavailable.'}
         </p>
       )}
       {error && (
@@ -387,7 +387,8 @@ function DetectorsTab() {
             ) : (
               <TableRow>
                 <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
-                  No detectors configured. Define them in OpenSearch Dashboards security-analytics.
+                  No detectors configured. Define them in the search index's security-analytics
+                  dashboard.
                 </TableCell>
               </TableRow>
             )}

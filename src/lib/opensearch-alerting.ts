@@ -69,10 +69,10 @@ export async function listMonitors(): Promise<MonitorsResult> {
           configured,
           supported: false,
           monitors: [],
-          note: `Alerting plugin not available (OpenSearch ${res.status} for _plugins/_alerting/monitors)`,
+          note: `Alerting plugin not available (search index ${res.status} for _plugins/_alerting/monitors)`,
         };
       }
-      return { configured, supported: true, monitors: [], error: `OpenSearch ${res.status}` };
+      return { configured, supported: true, monitors: [], error: `search index ${res.status}` };
     }
     const json = (await res.json()) as Parameters<typeof parseMonitorList>[0];
     return { configured, supported: true, monitors: parseMonitorList(json) };
@@ -104,10 +104,10 @@ export async function createMonitor(spec: MonitorSpec): Promise<MonitorWriteResu
         return {
           configured,
           supported: false,
-          note: `Alerting plugin not available (OpenSearch ${res.status})`,
+          note: `Alerting plugin not available (search index ${res.status})`,
         };
       }
-      return { configured, supported: true, error: `OpenSearch ${res.status}: ${body.slice(0, 200)}` };
+      return { configured, supported: true, error: `search index ${res.status}: ${body.slice(0, 200)}` };
     }
     const json = JSON.parse(body) as { _id?: string; monitor?: Record<string, unknown> };
     return { configured, supported: true, id: json._id, monitor: parseMonitorGet(json) };
@@ -130,10 +130,10 @@ export async function updateMonitor(id: string, spec: MonitorSpec): Promise<Moni
         return {
           configured,
           supported: false,
-          note: `Alerting plugin not available (OpenSearch ${res.status})`,
+          note: `Alerting plugin not available (search index ${res.status})`,
         };
       }
-      return { configured, supported: true, error: `OpenSearch ${res.status}: ${body.slice(0, 200)}` };
+      return { configured, supported: true, error: `search index ${res.status}: ${body.slice(0, 200)}` };
     }
     const json = JSON.parse(body) as { _id?: string; monitor?: Record<string, unknown> };
     return { configured, supported: true, id: json._id ?? id, monitor: parseMonitorGet(json) };
@@ -168,10 +168,10 @@ export async function deleteMonitor(id: string): Promise<DeleteResult> {
         configured,
         supported: false,
         deleted: false,
-        note: `Alerting plugin not available (OpenSearch ${res.status})`,
+        note: `Alerting plugin not available (search index ${res.status})`,
       };
     }
-    return { configured, supported: true, deleted: false, error: `OpenSearch ${res.status}` };
+    return { configured, supported: true, deleted: false, error: `search index ${res.status}` };
   } catch (e) {
     return { configured, supported: true, deleted: false, error: (e as Error).message };
   }
@@ -209,10 +209,10 @@ export async function getIsmPolicy(policyId: string): Promise<IsmReadResult> {
         configured,
         supported: false,
         policy: null,
-        note: `ISM plugin not available (OpenSearch ${res.status} for _plugins/_ism/policies)`,
+        note: `ISM plugin not available (search index ${res.status} for _plugins/_ism/policies)`,
       };
     }
-    return { configured, supported: true, policy: null, error: `OpenSearch ${res.status}` };
+    return { configured, supported: true, policy: null, error: `search index ${res.status}` };
   } catch (e) {
     return { configured, supported: true, policy: null, error: (e as Error).message };
   }
@@ -253,14 +253,14 @@ export async function setIsmPolicy(spec: IsmPolicySpec): Promise<IsmWriteResult>
           configured,
           supported: false,
           policy: null,
-          note: `ISM plugin not available (OpenSearch ${res.status})`,
+          note: `ISM plugin not available (search index ${res.status})`,
         };
       }
       return {
         configured,
         supported: true,
         policy: null,
-        error: `OpenSearch ${res.status}: ${body.slice(0, 200)}`,
+        error: `search index ${res.status}: ${body.slice(0, 200)}`,
       };
     }
     // Re-read so the caller gets the canonical stored shape + fresh seq numbers.
@@ -288,10 +288,10 @@ export async function deleteIsmPolicy(policyId: string): Promise<DeleteResult> {
         configured,
         supported: false,
         deleted: false,
-        note: `ISM plugin not available (OpenSearch ${res.status})`,
+        note: `ISM plugin not available (search index ${res.status})`,
       };
     }
-    return { configured, supported: true, deleted: false, error: `OpenSearch ${res.status}` };
+    return { configured, supported: true, deleted: false, error: `search index ${res.status}` };
   } catch (e) {
     return { configured, supported: true, deleted: false, error: (e as Error).message };
   }

@@ -57,7 +57,7 @@ export async function listIndexTemplates(): Promise<TemplatesResult> {
   try {
     const res = await osFetch('/_index_template');
     if (!res.ok) {
-      return { configured, templates: [], error: `OpenSearch ${res.status}` };
+      return { configured, templates: [], error: `search index ${res.status}` };
     }
     const json = (await res.json()) as Parameters<typeof parseIndexTemplates>[0];
     return { configured, templates: parseIndexTemplates(json) };
@@ -80,7 +80,7 @@ export async function listAliases(): Promise<AliasesResult> {
   try {
     const res = await osFetch('/_alias');
     if (!res.ok) {
-      return { configured, aliases: [], error: `OpenSearch ${res.status}` };
+      return { configured, aliases: [], error: `search index ${res.status}` };
     }
     const json = (await res.json()) as Parameters<typeof parseAliases>[0];
     return { configured, aliases: parseAliases(json) };
@@ -119,10 +119,10 @@ export async function listDetectors(): Promise<DetectorsResult> {
           configured,
           supported: false,
           detectors: [],
-          note: `Security-analytics plugin not available (OpenSearch ${res.status} for _plugins/_security_analytics/detectors)`,
+          note: `Security-analytics plugin not available (search index ${res.status} for _plugins/_security_analytics/detectors)`,
         };
       }
-      return { configured, supported: true, detectors: [], error: `OpenSearch ${res.status}` };
+      return { configured, supported: true, detectors: [], error: `search index ${res.status}` };
     }
     const json = (await res.json()) as Parameters<typeof parseDetectors>[0];
     const detectors = parseDetectors(json);
