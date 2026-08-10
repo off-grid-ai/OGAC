@@ -9,7 +9,7 @@
 // demo viewer and judges what a stranger would actually see: an empty state, a stat rail of zeros, a
 // wall of "nothing here yet", or something with substance.
 //
-// Usage:  node scripts/demo-readiness.mjs [--host suraksha|bharatunion] [--shots]
+// Usage:  node scripts/demo-readiness.mjs [--host suraksha|bharatunion] [--shots] [--links FILE]
 
 import { readFileSync, mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -23,7 +23,8 @@ const hostKey = args.includes('--host') ? args[args.indexOf('--host') + 1] : 'su
 const BASE = HOSTS[hostKey] ?? HOSTS.suraksha;
 const SHOTS = args.includes('--shots');
 const OUT = '/tmp/demo-shots';
-const rawPaths = JSON.parse(readFileSync('/tmp/demo-links.json', 'utf8'));
+const LINKS = args.includes('--links') ? args[args.indexOf('--links') + 1] : '/tmp/demo-links.json';
+const rawPaths = JSON.parse(readFileSync(LINKS, 'utf8'));
 // A featured run belongs to ONE tenant — the insurer's id genuinely does not exist on the bank, so
 // checking the same id against both hosts reported a correct 404 as a defect. Swap in each tenant's
 // own run, the way the one-pager does.
@@ -88,7 +89,22 @@ for (const path of paths) {
   let text = '';
   let records = 0;
   try {
-    const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 35000 });
+    // RETRY. A full 169-route sweep takes long enough that this laptop hops WiFi mid-run, and the
+    // first attempt reported ERR_NETWORK_CHANGED for ninety routes in a row — a wall of "failures"
+    // that were entirely my own network. A verification run that cannot tell a dropped connection
+    // from a broken page is worse than none, because the noise buries the real findings.
+    let res = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 35000 });
+        break;
+      } catch (err) {
+        const transient = /NETWORK_CHANGED|ERR_CONNECTION|ERR_NAME|Timeout|ERR_EMPTY_RESPONSE|socket hang up/i
+          .test(String(err));
+        if (!transient || attempt === 2) throw err;
+        await page.waitForTimeout(4000 * (attempt + 1));
+      }
+    }
     status = res?.status() ?? 0;
     await page.waitForTimeout(2600);
     // Read the page region only — never the shell, nav or hellobar, whose text is identical everywhere
