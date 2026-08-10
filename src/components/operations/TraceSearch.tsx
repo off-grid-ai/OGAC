@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { TRACE_RANGES, type TraceListRow } from '@/lib/jaeger-trace';
+import { pickDefaultService, TRACE_RANGES, type TraceListRow } from '@/lib/jaeger-trace';
 
 // Distributed-trace search — the third observability pillar next to logs and metrics. URL-DRIVEN:
 // every filter (service, operation, range, min-duration, error-only) lives in searchParams so the
@@ -56,14 +56,24 @@ export function TraceSearch() {
     [params, pathname, router],
   );
 
-  // Services for the picker.
+  // Services for the picker. Landing here with no service selected always showed "0 traces" — the
+  // count in the results header renders unconditionally — even when the platform has real, recent
+  // traces, which is indistinguishable from a genuinely empty backend. Default to a sensible service
+  // (pickDefaultService) rather than requiring a click before showing anything real.
   useEffect(() => {
     void (async () => {
       const res = await fetch('/api/v1/admin/operations/traces/services', { cache: 'no-store' });
       const j = (await res.json()) as { configured?: boolean; services?: string[] };
       setConfigured(j.configured !== false);
-      setServices(j.services ?? []);
+      const list = j.services ?? [];
+      setServices(list);
+      if (!service && list.length > 0) {
+        setParam({ service: pickDefaultService(list) });
+      }
     })();
+    // Intentionally only on mount: this seeds the initial default once; further service changes are
+    // the operator's own URL-driven picks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Operations for the chosen service.

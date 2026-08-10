@@ -259,6 +259,23 @@ export function normalizeServices(res: JaegerServicesResponse | null | undefined
   return shapeServices(res);
 }
 
+// Pick a sensible default service to search when the operator hasn't chosen one yet. Landing on
+// trace search with no service selected always rendered "0 traces" (the CardHeader shows
+// `${traces.length} trace(s)` regardless of whether a service is picked) even when the service list
+// was full of real, recent traces — indistinguishable from a genuinely empty backend. Rather than
+// require a click before showing anything, default to the platform's own service (what an operator
+// checking "is my platform healthy" cares about first) when present, else the first alphabetically.
+// Never the bare Jaeger self-instrumentation service name — that's implementation detail, not a
+// service an operator asked to monitor.
+const PREFERRED_DEFAULT_SERVICE = 'offgrid-console';
+const INTERNAL_SERVICE_NAMES = new Set(['jaeger-all-in-one', 'jaeger-query', 'jaeger-collector']);
+
+export function pickDefaultService(services: readonly string[]): string {
+  if (services.includes(PREFERRED_DEFAULT_SERVICE)) return PREFERRED_DEFAULT_SERVICE;
+  const external = services.filter((s) => !INTERNAL_SERVICE_NAMES.has(s));
+  return external[0] ?? services[0] ?? '';
+}
+
 // Pure: the operations list, tolerant of both response shapes (string[] and {name}[]). Sorted,
 // de-duped, empties dropped.
 export function normalizeOperations(

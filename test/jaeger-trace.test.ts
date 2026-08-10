@@ -14,6 +14,7 @@ import {
   normalizeTrace,
   normalizeTraces,
   parseRange,
+  pickDefaultService,
   rangeWindowMicros,
   spanHasError,
   traceHasError,
@@ -240,4 +241,27 @@ test('normalizeOperations handles string[] and {name}[] shapes', () => {
   assert.deepEqual(normalizeOperations(null), []);
   assert.deepEqual(normalizeOperations({ data: null }), []);
   assert.deepEqual(normalizeOperations({ data: 'nope' as unknown as [] }), []);
+});
+
+// ── pickDefaultService ───────────────────────────────────────────────────────────
+test('pickDefaultService prefers offgrid-console when present', () => {
+  assert.equal(
+    pickDefaultService(['jaeger-all-in-one', 'offgrid-console', 'offgrid-recovery-probe']),
+    'offgrid-console',
+  );
+});
+
+test('pickDefaultService falls back to the first non-internal service', () => {
+  assert.equal(
+    pickDefaultService(['jaeger-all-in-one', 'offgrid-recovery-probe']),
+    'offgrid-recovery-probe',
+  );
+});
+
+test('pickDefaultService falls back to the first service when every entry is internal', () => {
+  assert.equal(pickDefaultService(['jaeger-all-in-one']), 'jaeger-all-in-one');
+});
+
+test('pickDefaultService returns empty string for an empty list', () => {
+  assert.equal(pickDefaultService([]), '');
 });
