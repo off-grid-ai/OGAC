@@ -225,6 +225,20 @@ export function buildLeaseRows(prefix: string, rawKeys: unknown): LeaseRow[] {
   return rows.sort((a, b) => a.id.localeCompare(b.id));
 }
 
+// A lease-listing prefix commonly bottoms out through a chain of single-child namespaces before it
+// reaches an actual lease (e.g. the dynamic-DB engine issues leases at
+// `database/creds/<role>/<id>` — three folder hops below the mount root). Landing on the root and
+// seeing nothing but a bare "database/" row reads as empty even when a real, revocable lease exists
+// two levels down. This is the single decision that drives auto-descending through that chain: WALK
+// deeper only when the listing is UNAMBIGUOUS (exactly one entry, and it is itself a folder); stop
+// the moment there is a real lease to show, or more than one branch (a genuine choice the caller
+// should make, never guessed for them).
+export function shouldAutoDescend(rows: LeaseRow[]): string | null {
+  if (rows.length !== 1) return null;
+  const [only] = rows;
+  return only.id.endsWith('/') ? only.id : null;
+}
+
 export interface LeaseDetail {
   id: string | null;
   ttl: number | null; // seconds remaining

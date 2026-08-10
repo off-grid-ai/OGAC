@@ -6,6 +6,7 @@ import {
   openBaoConfigured,
 } from '@/lib/adapters/secrets';
 import { requireAdmin } from '@/lib/authz';
+import { type LeaseRow, shouldAutoDescend } from '@/lib/secrets-ops';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,25 @@ export const dynamic = 'force-dynamic';
 // GET  ?prefix=...          → list lease ids under a prefix (default root)
 // GET  ?id=...              → look up one lease's TTL / renewable / expiry
 // DELETE ?id=...            → revoke a lease (DESTRUCTIVE — invalidates the underlying credential)
+//
+// A lease listing routinely bottoms out through several single-child namespaces before it reaches
+// an actual lease (the dynamic-DB engine issues at `database/creds/<role>/<id>` — three hops below
+// the mount root). Landing on the root and stopping at the first folder read as an empty page even
+// with a real, revocable lease two levels down. `listWithAutoDescend` walks that chain — bounded, and
+// only while the DECISION (shouldAutoDescend, pure/tested) says the next hop is unambiguous — and
+// returns the prefix it actually stopped at, so the UI's search box reflects where it landed.
+const MAX_AUTO_DESCEND = 6;
+
+async function listWithAutoDescend(prefix: string): Promise<{ prefix: string; leases: LeaseRow[] }> {
+  let current = prefix;
+  for (let hop = 0; hop < MAX_AUTO_DESCEND; hop += 1) {
+    const rows = await baoLeaseList(current);
+    const deeper = shouldAutoDescend(rows);
+    if (!deeper) return { prefix: current, leases: rows };
+    current = deeper;
+  }
+  return { prefix: current, leases: await baoLeaseList(current) };
+}
 
 // A lease id is a slash path of the same safe charset we allow for secret keys, so validate loosely.
 function validLeaseId(raw: string | null): raw is string {
@@ -40,8 +60,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ detail });
     }
     const prefix = params.get('prefix') ?? '';
-    const leases = await baoLeaseList(prefix);
-    return NextResponse.json({ prefix, leases });
+    const { prefix: landedPrefix, leases } = await listWithAutoDescend(prefix);
+    return NextResponse.json({ prefix: landedPrefix, leases });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }
