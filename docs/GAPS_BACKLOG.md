@@ -2445,3 +2445,33 @@ reader and it would hide this. Its case subjects are now correct insurer fiction
 
 Also noted: the case picker labels every `surdom_policies` row "Record 1..20" instead of the
 policyholder's name, even though `holder_name` is present on each record.
+
+## G-213 — the OPA decision-log ledger has never received a real decision, on either tenant
+
+Found while chasing "`/governance/policies/decision-logs` renders four zeros on the insurer, but audits
+fine on the bank." Traced live against the deployed OPA and the `opa_decision_logs` table rather than
+assumed:
+
+- `GET http://127.0.0.1:8181/v1/config` on the box returns `{"result":{"default_authorization_decision":
+  "/system/authz/allow","default_decision":"/system/main","labels":{...}}}` — **there is no
+  `decision_logs` key at all.** OPA's decision-log plugin is not configured to ship anything, to
+  anyone, ever. `POST /api/v1/admin/policy/decision-logs/ingest` (the console's sink,
+  `src/app/api/v1/admin/policy/decision-logs/ingest/route.ts`) has never been called by OPA in this
+  deployment.
+- The ONE row in `opa_decision_logs` (org_id `org_bharat`) is `decision_id: "dec_demo_0001"`,
+  `actor: ""`, `input: {"action":"pipeline.edit","subject":{"role":"member"}}` — a hand-inserted demo
+  placeholder from an earlier session, not organic traffic. It is why the bank "audits fine" and the
+  insurer doesn't: one tenant got a fake row once and the other never did, which is not a real signal
+  about the feature working.
+- The reader (`listDecisions`/`aggregateForOrg` in `src/lib/opa-decision-log-store.ts`) and the
+  ingest route are correctly org-scoped and functioning — this is NOT a tenancy-leak or mis-scoped-read
+  bug. It is a deployment gap: the plugin was never wired.
+
+**Fix (infra, not console code):** add a `decision_logs` block to the deployed OPA's config pointing
+`service`/`resource` at `https://<console-host>/api/v1/admin/policy/decision-logs/ingest` with a bearer
+credential, then restart OPA. That config lives with the on-prem OPA process, not in this repo (the
+systems-of-record note at the top of `console/CLAUDE.md` applies) — flagging for the operator rather
+than editing server config myself. Until it's wired, this screen is honestly empty on every tenant, and
+the `dec_demo_0001` row should probably be removed (or replaced by a real seed on BOTH tenants) so
+neither tenant looks more finished than the other by accident. Left untouched pending that call —
+did not delete data I wasn't asked to delete.
