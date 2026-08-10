@@ -188,7 +188,7 @@ function UsageDashboards({ dashboard }: Readonly<{ dashboard: NativeSupersetDash
       <CardHeader>
         <CardTitle className="text-sm">BI dashboards</CardTitle>
         <p className="mt-1 text-xs text-muted-foreground">
-          Superset runs each governed query and the console renders the result. Open Superset to
+          The BI engine runs each governed query and the console renders the result. Open it to
           author charts.
         </p>
       </CardHeader>
