@@ -119,6 +119,8 @@ export type ContextualDestinationId =
   | 'tenants'
   | 'replication'
   | 'orchestration'
+  | 'catalog'
+  | 'namespaces'
   | 'tables'
   | 'query'
   | 'assets'

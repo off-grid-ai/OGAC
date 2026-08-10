@@ -17,6 +17,22 @@ export const FLOW_DESTINATIONS = [
     description: 'Create, schedule, run, and inspect mapped warehouse jobs.',
     route: '/data/flows/orchestration',
   },
+  // The action catalogue and namespaces existed as routes with NOTHING pointing at them. The
+  // catalogue is 193 plugins and 1,235 actions — the strongest answer in the product to "what can it
+  // connect to" — and the only way to reach it was to know the URL. A surface nobody can navigate to
+  // is not shipped.
+  {
+    id: 'catalog',
+    label: 'Action catalog',
+    description: 'Every action your workflows can take in real systems — and what each one needs.',
+    route: '/data/flows/orchestration/catalog',
+  },
+  {
+    id: 'namespaces',
+    label: 'Namespaces',
+    description: 'How orchestrated work is grouped, and the variables and secrets each group holds.',
+    route: '/data/flows/orchestration/namespaces',
+  },
 ] as const;
 
 export const WAREHOUSE_DESTINATIONS = [

@@ -1,4 +1,4 @@
-import { Lightning, Plugs, PuzzlePiece } from '@phosphor-icons/react/dist/ssr';
+import { Lightning, PuzzlePiece } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { KestraCatalogSearch } from '@/components/orchestration/KestraCatalogSearch';
 import { PageFrame } from '@/components/PageFrame';
@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { kestraCatalog } from '@/lib/adapters/kestra-catalog';
 import { filterPluginGroups, summarizePluginCatalog } from '@/lib/kestra-catalog';
+import { plural } from '@/lib/plural';
 import { requireModuleForUser } from '@/lib/module-access';
 
 export const dynamic = 'force-dynamic';
@@ -28,18 +29,12 @@ export default async function OrchestrationCatalogPage({
   return (
     <PageFrame embedded>
       <div className="w-full space-y-6">
+        {/* NO heading here. This route is now a management leaf, so the contextual shell above renders
+            "Action catalog" and its one-line description from the nav entry — printing a second copy
+            gave the page three stacked titles (Flows → Action catalog → Action catalog) and pushed the
+            catalogue itself below the fold. The shell owns the heading; this owns the content. */}
         <header className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="flex items-center gap-2 font-mono text-lg font-semibold">
-                <Plugs className="size-5 text-primary" /> Action catalog
-              </h1>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                Every action your workflows can take in real systems — messaging, APIs, databases,
-                cloud storage, transforms and more. Open a plugin to see the actions it adds and what
-                each one needs.
-              </p>
-            </div>
+          <div className="flex justify-end">
             <KestraCatalogSearch initial={q} />
           </div>
 
@@ -72,16 +67,24 @@ export default async function OrchestrationCatalogPage({
                 <Card className="h-full transition-colors hover:border-primary/50">
                   <CardHeader className="pb-2">
                     <CardTitle className="truncate text-base">{g.title}</CardTitle>
-                    <p className="truncate font-mono text-xs text-muted-foreground">{g.group}</p>
+                    {/* The plugin's raw id used to sit here — io.kestra.plugin.jdbc.actianvector —
+                        naming the orchestration engine on a page a customer reads, under every one of
+                        193 cards. The comment at the top of this file claimed the engine name never
+                        leaked; it was the single most repeated string on the screen. The title already
+                        says what this is, so the id adds nothing a reader wants. */}
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex flex-wrap gap-1.5">
-                      {g.taskCount > 0 && <Badge variant="secondary">{g.taskCount} actions</Badge>}
+                      {/* Counted properly. "1 actions" and "1 triggers" appeared on most of the 193
+                          cards — small, but it is the kind of thing a buyer reads as carelessness. */}
+                      {g.taskCount > 0 && (
+                        <Badge variant="secondary">{plural(g.taskCount, 'action')}</Badge>
+                      )}
                       {g.triggerCount > 0 && (
-                        <Badge variant="outline">{g.triggerCount} triggers</Badge>
+                        <Badge variant="outline">{plural(g.triggerCount, 'trigger')}</Badge>
                       )}
                       {g.conditionCount > 0 && (
-                        <Badge variant="outline">{g.conditionCount} conditions</Badge>
+                        <Badge variant="outline">{plural(g.conditionCount, 'condition')}</Badge>
                       )}
                     </div>
                     {g.categories.length > 0 && (
