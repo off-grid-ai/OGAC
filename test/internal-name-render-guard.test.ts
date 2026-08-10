@@ -53,8 +53,8 @@ const RAW_ACTION_CELL =
 test('regulatory: neither the "by action" nor the enforcement table renders a raw action code', () => {
   const src = read(REGULATORY_PATH);
   assert.equal(RAW_ACTION_CELL.test(src), false, 'an action code must go through plainAction()');
-  assert.match(src, /plainAction\(r\.key\)/);
-  assert.match(src, /plainAction\(e\.action\)/);
+  assert.match(src, /(?:plainAction|publicActionLabel)\(r\.key\)/);
+  assert.match(src, /(?:plainAction|publicActionLabel)\(e\.action\)/);
 });
 
 test('regulatory: the guard actually catches the shape that shipped', () => {
@@ -76,7 +76,7 @@ test('audit log: the action column and resource column are never rendered raw', 
   const src = read(AUDIT_PATH);
   assert.equal(RAW_AUDIT_ACTION.test(src), false, 'the action column must go through plainAction()');
   assert.equal(RAW_AUDIT_RESOURCE.test(src), false, 'the resource column must go through publicLabel()');
-  assert.match(src, /plainAction\(r\.action\)/);
+  assert.match(src, /(?:plainAction|publicActionLabel)\(r\.action\)/);
   assert.match(src, /publicLabel\(r\.resource\)/);
 });
 
