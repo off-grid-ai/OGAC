@@ -9,7 +9,7 @@ import { buildAuditStats } from '@/lib/insights-stats';
 import { publicLabel } from '@/lib/lineage-labels';
 import { requireModuleForUser } from '@/lib/module-access';
 import { filterAuditForPipeline } from '@/lib/pipeline-api-key-format';
-import { plainAction } from '@/lib/plain-identifiers';
+import { plainAction, plainOrg } from '@/lib/plain-identifiers';
 import { listPipelines } from '@/lib/pipelines';
 import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
@@ -186,7 +186,11 @@ export async function AuditLogSurface({
                       <td className="p-2 text-xs" title={r.action}>
                         {plainAction(r.action)}
                       </td>
-                      <td className="p-2 text-muted-foreground">{r.project || '—'}</td>
+                      {/* The project column carries the ORG ID for platform-scoped events, so this
+                          rendered "org_suraksha" to the tenant reading its own audit trail — the
+                          same field that leaked into the copilot's answers. plainOrg says "this
+                          organisation"; naming the tenant to itself adds nothing anyway. */}
+                      <td className="p-2 text-muted-foreground">{plainOrg(r.project) || '—'}</td>
                       {/* The resource string is built from an enforcement detail sentence that
                           used to interpolate the raw guardrail engine id ('llm-guard') — the
                           source (checks.ts) no longer does, but publicLabel is applied here too

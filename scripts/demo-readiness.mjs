@@ -23,7 +23,16 @@ const hostKey = args.includes('--host') ? args[args.indexOf('--host') + 1] : 'su
 const BASE = HOSTS[hostKey] ?? HOSTS.suraksha;
 const SHOTS = args.includes('--shots');
 const OUT = '/tmp/demo-shots';
-const paths = JSON.parse(readFileSync('/tmp/demo-links.json', 'utf8'));
+const rawPaths = JSON.parse(readFileSync('/tmp/demo-links.json', 'utf8'));
+// A featured run belongs to ONE tenant — the insurer's id genuinely does not exist on the bank, so
+// checking the same id against both hosts reported a correct 404 as a defect. Swap in each tenant's
+// own run, the way the one-pager does.
+const FEATURED_RUN = { suraksha: 'agent%3Arun_0d632888', bharatunion: 'agent%3Arun_b922bd7b' };
+const paths = rawPaths.map((p) =>
+  p.startsWith('/operations/runs/agent%3A')
+    ? `/operations/runs/${FEATURED_RUN[hostKey] ?? FEATURED_RUN.suraksha}`
+    : p,
+);
 
 // Phrases the console uses when it has nothing to show. Sourced from the actual empty states rather
 // than guessed, so a match is real evidence and not a coincidence.
@@ -117,7 +126,13 @@ for (const path of paths) {
   if (status !== 200) { verdict = 'BROKEN'; why = `HTTP ${status}`; }
   else if (broken2) { verdict = 'BROKEN'; why = text.match(broken2)[0].slice(0, 50); }
   else if (leak) { verdict = 'LEAK'; why = text.match(leak)[0].slice(0, 50); }
-  else if (empty) { verdict = 'EMPTY'; why = text.match(empty)[0].slice(0, 50); }
+  // An empty-state PHRASE only condemns a page that has little else. A rich page is allowed to say
+  // "not configured" about one card among many — that is honesty, not emptiness, and treating it as a
+  // failure taught me to distrust my own harness for two rounds.
+  else if (empty && (records < 12 || text.length < 900)) {
+    verdict = 'EMPTY';
+    why = text.match(empty)[0].slice(0, 50);
+  }
   else if (text.length < 260) { verdict = 'THIN'; why = `${text.length} chars`; }
   else if (nonZero === 0 && zeros > 0) { verdict = 'EMPTY'; why = `${zeros} figures, all zero`; }
   // Renders prose but points at nothing. Deliberately conservative: a page needs to be BOTH short and

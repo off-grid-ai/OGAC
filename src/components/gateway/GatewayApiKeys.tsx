@@ -1,5 +1,6 @@
 'use client';
 
+import { plainOrg } from '@/lib/plain-identifiers';
 import { Copy, Key, Plus, Trash, Warning } from '@phosphor-icons/react/dist/ssr';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -241,7 +242,9 @@ export function GatewayApiKeys() {
                       <span className="font-mono text-[11px] text-muted-foreground">{k.clientId}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{k.owner}</TableCell>
+                  {/* The raw org id used to render here — "org_suraksha" — an internal identifier on a
+                      page a customer reads. plainOrg already existed for exactly this. */}
+                  <TableCell className="text-xs text-muted-foreground">{plainOrg(k.owner)}</TableCell>
                   <TableCell>
                     <Badge
                       variant={k.status === 'active' ? 'default' : 'destructive'}
