@@ -21,6 +21,14 @@ const STATUS_CLASS: Record<string, string> = {
 
 const fmtCount = (n: number | null) => (n === null ? '—' : n.toLocaleString());
 
+// Sum a numeric field across collections, dropping unknown (null) counts rather than treating them
+// as zero — an unreadable segment count on one collection should never understate a real total.
+function sumCounts(collections: CollectionSummary[], field: 'pointsCount' | 'vectorsCount' | 'segmentsCount'): number | null {
+  const known = collections.map((c) => c[field]).filter((n): n is number => n !== null);
+  if (known.length === 0) return null;
+  return known.reduce((a, b) => a + b, 0);
+}
+
 export function CollectionsManager({ basePath = '/data/retrieval' }: Readonly<{ basePath?: string }>) {
   const [collections, setCollections] = useState<CollectionSummary[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -84,6 +92,14 @@ export function CollectionsManager({ basePath = '/data/retrieval' }: Readonly<{ 
           </CardContent>
         </Card>
       ) : (
+        <>
+          {!loading && collections.length > 0 ? (
+            <div className="grid grid-cols-3 gap-4 sm:max-w-md">
+              <IndexStat label="Collections" value={collections.length.toLocaleString()} />
+              <IndexStat label="Points indexed" value={fmtCount(sumCounts(collections, 'pointsCount'))} />
+              <IndexStat label="Segments" value={fmtCount(sumCounts(collections, 'segmentsCount'))} />
+            </div>
+          ) : null}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {collections.map((c) => (
             <Link key={c.name} href={`${basePath}/collections/${encodeURIComponent(c.name)}`}>
@@ -124,7 +140,19 @@ export function CollectionsManager({ basePath = '/data/retrieval' }: Readonly<{ 
             </Card>
           ) : null}
         </div>
+        </>
       )}
     </div>
+  );
+}
+
+function IndexStat({ label, value }: Readonly<{ label: string; value: string }>) {
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="space-y-1 py-3">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="font-mono text-lg font-semibold tabular-nums text-foreground">{value}</div>
+      </CardContent>
+    </Card>
   );
 }

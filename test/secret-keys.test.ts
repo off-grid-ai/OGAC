@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   normalizeKeyList,
   type SecretKeyRow,
+  validateFolderPath,
   validateKeyPath,
 } from '../src/lib/secret-keys.ts';
 
@@ -89,4 +90,41 @@ test('validateKeyPath result carries only key + error metadata (no value channel
   const r = validateKeyPath('foo/bar');
   assert.deepEqual(Object.keys(r).sort(), ['error', 'key', 'ok']);
   assert.equal('value' in r, false);
+});
+
+test('validateFolderPath accepts the root (empty string, undefined, null)', () => {
+  for (const rootLike of ['', undefined, null]) {
+    const r = validateFolderPath(rootLike);
+    assert.equal(r.ok, true, `${String(rootLike)} should resolve to the root`);
+    assert.equal(r.folder, '');
+    assert.equal(r.error, null);
+  }
+});
+
+test('validateFolderPath accepts well-formed folder paths', () => {
+  for (const f of ['connectors/', 'a/b/', 'tools/', 'A_B-C.1/']) {
+    const r = validateFolderPath(f);
+    assert.equal(r.ok, true, `${f} should be valid`);
+    assert.equal(r.folder, f);
+  }
+});
+
+test('validateFolderPath trims surrounding whitespace', () => {
+  const r = validateFolderPath('  connectors/  ');
+  assert.equal(r.ok, true);
+  assert.equal(r.folder, 'connectors/');
+});
+
+test('validateFolderPath rejects non-string / non-root without trailing slash / leading slash / traversal', () => {
+  for (const bad of ['connectors', '/connectors/', 'a/../b/', '../', './', 'a//b/', 42, {}, []]) {
+    const r = validateFolderPath(bad);
+    assert.equal(r.ok, false, `${JSON.stringify(bad)} should be rejected`);
+    assert.equal(r.folder, '');
+    assert.ok(r.error);
+  }
+});
+
+test('validateFolderPath rejects illegal characters and over-long paths', () => {
+  assert.equal(validateFolderPath('foo bar/').ok, false);
+  assert.equal(validateFolderPath(`${'a'.repeat(257)}/`).ok, false);
 });

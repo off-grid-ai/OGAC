@@ -34,18 +34,24 @@ import type { SecretVersionsView } from '@/lib/secrets-ops';
 // into write-only password fields, cleared after submit; every GET returns names / version metadata
 // only — there is no code path that could display secret material.
 //
-// The "add" panel open/closed state is a navigational position, so it lives in the URL (?add=1)
-// driven by the parent page; this component just receives it and reports changes via onToggleAdd.
+// The "add" panel open/closed state, and which folder is currently open, are both navigational
+// positions, so they live in the URL (?add=1, ?folder=connectors/) driven by the parent page; this
+// component just receives them and reports changes via onToggleAdd / onOpenFolder.
 export function SecretsManager({
   configured,
   sealed,
   addOpen,
   onToggleAdd,
+  folder = '',
+  onOpenFolder,
 }: Readonly<{
   configured: boolean;
   sealed: boolean;
   addOpen: boolean;
   onToggleAdd: (open: boolean) => void;
+  /** The KV "directory" currently open, e.g. `connectors/`, or '' for the root. */
+  folder?: string;
+  onOpenFolder?: (folder: string) => void;
 }>) {
   const [keys, setKeys] = useState<SecretKeyRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,22 +69,30 @@ export function SecretsManager({
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/admin/secrets');
-      const json = (await res.json()) as { keys?: SecretKeyRow[] };
+      const qs = folder ? `?folder=${encodeURIComponent(folder)}` : '';
+      const res = await fetch(`/api/v1/admin/secrets${qs}`);
+      const json = (await res.json()) as { keys?: SecretKeyRow[]; error?: string };
+      if (!res.ok) throw new Error(json.error ?? 'Failed to load secret keys.');
       setKeys(Array.isArray(json.keys) ? json.keys : []);
-    } catch {
-      toast.error('Failed to load secret keys.');
+    } catch (e) {
+      toast.error((e as Error).message ?? 'Failed to load secret keys.');
+      setKeys([]);
     } finally {
       setLoading(false);
     }
-  }, [configured]);
+  }, [configured, folder]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  const openFolder = (next: string) => onOpenFolder?.(next);
+
   const save = async () => {
-    const v = validateKeyPath(newKey);
+    // Inside a folder, a bare name you type ("api-key") lands INSIDE that folder — you're adding a
+    // secret to the place you're looking at, not to the root.
+    const candidate = folder ? `${folder}${newKey.trim()}` : newKey;
+    const v = validateKeyPath(candidate);
     if (!v.ok) {
       toast.error(v.error ?? 'Invalid key path.');
       return;
@@ -151,7 +165,21 @@ export function SecretsManager({
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
           <Key className="size-4 text-primary" />
-          Secret keys
+          {folder ? (
+            <span className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => openFolder('')}
+                className="text-muted-foreground hover:text-primary hover:underline"
+              >
+                Secret keys
+              </button>
+              <CaretRight className="size-3 text-muted-foreground" />
+              <span className="font-mono text-foreground">{folder}</span>
+            </span>
+          ) : (
+            'Secret keys'
+          )}
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             {keys.length}
           </Badge>
@@ -182,15 +210,20 @@ export function SecretsManager({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <label htmlFor="secrets-new-key" className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Key path
+                  {folder ? `Name (stored under ${folder})` : 'Key path'}
                 </label>
-                <Input
-                  id="secrets-new-key"
-                  value={newKey}
-                  onChange={(e) => setNewKey(e.target.value)}
-                  placeholder="e.g. connector.slack.token"
-                  autoFocus
-                />
+                <div className="flex items-center gap-1">
+                  {folder ? (
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">{folder}</span>
+                  ) : null}
+                  <Input
+                    id="secrets-new-key"
+                    value={newKey}
+                    onChange={(e) => setNewKey(e.target.value)}
+                    placeholder={folder ? 'e.g. api-key' : 'e.g. connector.slack.token'}
+                    autoFocus
+                  />
+                </div>
               </div>
               <div className="space-y-1">
                 <label htmlFor="secrets-new-value" className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -242,7 +275,7 @@ export function SecretsManager({
                 {keys.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="py-6 text-center text-xs text-muted-foreground">
-                      No secrets stored in this mount yet.
+                      {folder ? `Nothing stored under ${folder} yet.` : 'No secrets stored in this mount yet.'}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -257,6 +290,7 @@ export function SecretsManager({
                         setExpanded((prev) => (prev === k.key ? null : k.key))
                       }
                       onRemove={() => void remove(k.key)}
+                      onOpen={() => openFolder(k.key)}
                     />
                   ))
                 )}
@@ -270,6 +304,8 @@ export function SecretsManager({
 }
 
 // A single key row plus, when expanded, its inline KV v2 version history + rotate/destroy controls.
+// A FOLDER row is a place, not a dead end — clicking it drills in (onOpen), same as any other
+// list→detail surface in this console.
 function SecretRow({
   row,
   sealed,
@@ -277,6 +313,7 @@ function SecretRow({
   expanded,
   onToggle,
   onRemove,
+  onOpen,
 }: Readonly<{
   row: SecretKeyRow;
   sealed: boolean;
@@ -284,10 +321,11 @@ function SecretRow({
   expanded: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  onOpen: () => void;
 }>) {
   if (row.folder) {
     return (
-      <TableRow>
+      <TableRow className="cursor-pointer hover:bg-muted/40" onClick={onOpen}>
         <TableCell className="font-mono text-xs text-foreground">
           <span className="inline-flex items-center gap-1.5">
             <FolderSimple className="size-3.5 text-muted-foreground" />
@@ -300,7 +338,9 @@ function SecretRow({
           </Badge>
         </TableCell>
         <TableCell className="text-right">
-          <span className="text-[10px] text-muted-foreground">namespace</span>
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+            open <CaretRight className="size-3" />
+          </span>
         </TableCell>
       </TableRow>
     );

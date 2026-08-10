@@ -46,6 +46,40 @@ export function validateKeyPath(raw: unknown): KeyPathValidation {
   return { ok: true, key, error: null };
 }
 
+// Result of validating a folder path used to drill into a KV v2 "directory" — the same segment
+// rules as a key path, but a folder path always ENDS in "/" (that's what marks it a namespace,
+// not a leaf) and MAY be empty (the root).
+export interface FolderPathValidation {
+  ok: boolean;
+  folder: string; // '' (root) or a trimmed, normalized "a/b/" path
+  error: string | null;
+}
+
+export function validateFolderPath(raw: unknown): FolderPathValidation {
+  // Absent (undefined/null) or blank both mean "the root" — no folder was requested. Any OTHER
+  // non-string is a malformed caller, not a folder, so it must fail closed rather than silently
+  // resolve to the root.
+  if (raw === undefined || raw === null) return { ok: true, folder: '', error: null };
+  if (typeof raw !== 'string') {
+    return { ok: false, folder: '', error: 'Folder path must be a string.' };
+  }
+  const value = raw.trim();
+  if (value === '') return { ok: true, folder: '', error: null };
+  if (value.length > MAX_KEY_LEN) {
+    return { ok: false, folder: '', error: `Folder path must be ≤ ${MAX_KEY_LEN} characters.` };
+  }
+  if (value.startsWith('/') || !value.endsWith('/')) {
+    return { ok: false, folder: '', error: 'Folder path must not start with "/" and must end with "/".' };
+  }
+  const segments = value.slice(0, -1).split('/');
+  for (const seg of segments) {
+    if (seg === '' || seg === '.' || seg === '..' || !SEGMENT_RE.test(seg)) {
+      return { ok: false, folder: '', error: 'Folder path contains an invalid segment.' };
+    }
+  }
+  return { ok: true, folder: value, error: null };
+}
+
 // A row in the key-name listing. Deliberately NO `value` field — the display model is structurally
 // incapable of carrying secret material. `folder` marks KV v2 "directory" keys (trailing slash),
 // which are namespaces, not leaf secrets, and so are not individually deletable as a value.

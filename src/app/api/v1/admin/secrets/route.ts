@@ -3,7 +3,7 @@ import { openBaoConfigured, openBaoSecrets } from '@/lib/adapters/secrets';
 import { auditFromSession } from '@/lib/audit-actor';
 import { requireAdmin } from '@/lib/authz';
 import { isConnectorCredentialPath } from '@/lib/connector-secret-policy';
-import { normalizeKeyList, validateKeyPath } from '@/lib/secret-keys';
+import { normalizeKeyList, validateFolderPath, validateKeyPath } from '@/lib/secret-keys';
 import { orgSecretPrefix, scopeSecretKey, scopeSecretKeyList } from '@/lib/secret-scope';
 import { readSecretsView } from '@/lib/secrets-view';
 import { currentOrgId } from '@/lib/tenancy';
@@ -22,6 +22,12 @@ function connectorCredentialConflict(): NextResponse {
 // OpenBao KV v2 via the openBaoSecrets adapter. Secret VALUES are never returned by GET — only
 // key NAMES (normalized) plus a STATUS model (reachable/sealed/version/mounts) — so callers see
 // what's stored and the store's health without any secret material ever leaving OpenBao.
+//
+// `?folder=<a/b/>` drills one level INTO a namespace the root listing showed as a folder row (KV v2
+// folders are real places — clicking one should reveal what's in it, not dead-end at a label). The
+// folder path is validated (validateFolderPath: no leading "/", no "..", trailing "/" required) and
+// always applied ON TOP OF the tenant's own `<org>/` prefix, so a folder listing can never escape the
+// caller's namespace — it can only go deeper inside it.
 export async function GET(req: Request) {
   const gate = await requireAdmin(req);
   if (gate instanceof NextResponse) return gate;
@@ -30,21 +36,27 @@ export async function GET(req: Request) {
   if (!openBaoConfigured() || !openBaoSecrets.list) {
     return NextResponse.json({ configured: false, keys: [], status, error });
   }
-  // TENANT ISOLATION (SURFACE-2): list only THIS tenant's `<org>/` namespace so the UI never shows a
-  // sibling tenant's `org_*/` folder. The adapter LISTs under the prefix (OpenBao returns keys
-  // relative to it); scopeSecretKeyList is a defensive belt that also drops anything outside the
-  // namespace should a backend ever return absolute keys. Default org → no prefix (single-tenant).
+  const fv = validateFolderPath(new URL(req.url).searchParams.get('folder') ?? '');
+  if (!fv.ok) return NextResponse.json({ error: fv.error }, { status: 400 });
+  const folder = fv.folder;
+
+  // TENANT ISOLATION (SURFACE-2): list only THIS tenant's `<org>/` namespace (plus the requested
+  // sub-folder within it) so the UI never shows a sibling tenant's `org_*/` folder. The adapter LISTs
+  // under the prefix (OpenBao returns keys relative to it); scopeSecretKeyList is a defensive belt
+  // that also drops anything outside the namespace should a backend ever return absolute keys.
+  // Default org → no prefix (single-tenant).
   const org = await currentOrgId();
-  const prefix = orgSecretPrefix(org);
+  const orgPrefix = orgSecretPrefix(org);
+  const prefix = `${orgPrefix}${folder}`;
   const raw = await openBaoSecrets.list(prefix || undefined);
-  // When scoped, the adapter already returns tenant-relative keys; only strip when a returned key
-  // still carries the absolute prefix (belt-and-suspenders). Root keys under a namespaced org that
-  // don't belong to it are dropped by scopeSecretKeyList.
-  const relative = prefix
-    ? raw.map((k) => (k.startsWith(prefix) ? k : `${prefix}${k}`))
-    : raw;
-  const keys = normalizeKeyList(scopeSecretKeyList(org, prefix ? relative : raw));
-  return NextResponse.json({ configured: true, keys, status, error });
+  // Raw names come back relative to `prefix` (the folder we listed). Reconstruct each to the
+  // ORG-relative path (prepend `folder`) so every other key-based operation (delete, expand →
+  // version history) keeps addressing the same absolute-within-org key no matter which folder the
+  // listing happened at — the UI never has to know the difference between a root key and a nested one.
+  const orgRelative = raw.map((k) => `${folder}${k}`);
+  const fullKeys = orgPrefix ? orgRelative.map((k) => `${orgPrefix}${k}`) : orgRelative;
+  const keys = normalizeKeyList(scopeSecretKeyList(org, fullKeys));
+  return NextResponse.json({ configured: true, keys, folder, status, error });
 }
 
 // eslint-disable-next-line complexity

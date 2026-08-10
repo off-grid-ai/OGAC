@@ -1,7 +1,7 @@
 'use client';
 
 import { Clock, MagnifyingGlass, Trash } from '@phosphor-icons/react/dist/ssr';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,22 +26,32 @@ export function LeasesPanel({ sealed }: Readonly<{ sealed: boolean }>) {
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const list = async () => {
+  const list = useCallback(async (p: string) => {
     setBusy(true);
     try {
-      const res = await fetch(
-        `/api/v1/admin/secrets/leases?prefix=${encodeURIComponent(prefix)}`,
-      );
-      const d = (await res.json()) as { leases?: LeaseRow[]; error?: string };
+      const res = await fetch(`/api/v1/admin/secrets/leases?prefix=${encodeURIComponent(p)}`);
+      const d = (await res.json()) as { prefix?: string; leases?: LeaseRow[]; error?: string };
       if (!res.ok) throw new Error(d.error ?? 'Failed to list leases.');
       setLeases(Array.isArray(d.leases) ? d.leases : []);
+      // The server may have auto-descended past a chain of single-child namespaces to reach the
+      // first real branch point or lease — reflect where it actually landed so "List" (or revoke's
+      // re-list) shows the SAME prefix a follow-up search would need to type.
+      if (typeof d.prefix === 'string') setPrefix(d.prefix);
       setLoaded(true);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
-  };
+  }, []);
+
+  // List the ROOT prefix on mount, same as the dynamic-DB roles panel auto-loads its roles. Landing
+  // on this page and seeing nothing until you first guess a prefix and click "List" reads as broken
+  // even when the store is fine — an operator (or a buyer walking the demo) should see what's
+  // currently issued without acting first.
+  useEffect(() => {
+    void list('');
+  }, [list]);
 
   const lookup = async (id: string) => {
     try {
@@ -66,7 +76,7 @@ export function LeasesPanel({ sealed }: Readonly<{ sealed: boolean }>) {
       const d = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(d.error ?? 'Revoke failed.');
       toast.success(`Revoked "${id}".`);
-      await list();
+      await list(prefix);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -87,7 +97,7 @@ export function LeasesPanel({ sealed }: Readonly<{ sealed: boolean }>) {
           className="flex items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            void list();
+            void list(prefix);
           }}
         >
           <div className="flex-1 space-y-1">

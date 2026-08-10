@@ -15,6 +15,7 @@ import {
   kvMetadataPath,
   kvUndeletePath,
   leaseLookupPath,
+  shouldAutoDescend,
   validateRoleName,
   validateUnsealKey,
 } from '../src/lib/secrets-ops.ts';
@@ -104,6 +105,32 @@ test('buildLeaseRows joins prefix + suffixes, de-duped and sorted', () => {
     ['database/creds/ro/h1', 'database/creds/ro/h2'],
   );
   assert.deepEqual(buildLeaseRows('', ['x']).map((r) => r.id), ['x']);
+});
+
+test('shouldAutoDescend walks a single, unambiguous folder', () => {
+  assert.equal(shouldAutoDescend([{ id: 'database/', prefix: '' }]), 'database/');
+  assert.equal(
+    shouldAutoDescend([{ id: 'database/creds/demo-readonly/', prefix: 'database/creds' }]),
+    'database/creds/demo-readonly/',
+  );
+});
+
+test('shouldAutoDescend stops on a real lease (a leaf, not a folder)', () => {
+  assert.equal(shouldAutoDescend([{ id: 'database/creds/demo-readonly/abc123', prefix: '' }]), null);
+});
+
+test('shouldAutoDescend stops at a genuine branch point (more than one entry)', () => {
+  assert.equal(
+    shouldAutoDescend([
+      { id: 'database/', prefix: '' },
+      { id: 'sys/', prefix: '' },
+    ]),
+    null,
+  );
+});
+
+test('shouldAutoDescend stops on an empty listing (nothing to walk into)', () => {
+  assert.equal(shouldAutoDescend([]), null);
 });
 
 test('buildLeaseDetail unwraps .data or reads flat, coerces ttl', () => {
