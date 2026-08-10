@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getDrift } from '@/lib/adapters/registry';
-import { describeDriftAttribution } from '@/lib/drift-run';
+import { describeDriftAttribution, driftEngineLabel } from '@/lib/drift-run';
 import { listDriftRuns } from '@/lib/drift-runs';
 import { readDriftView, type DriftDisplayStatus } from '@/lib/drift-view';
 import { requireModuleForUser } from '@/lib/module-access';
@@ -57,7 +57,7 @@ export default async function QualityDriftPage() {
             </Badge>
           </Signal>
           <Signal label="Engine">
-            <span className="text-sm">{data?.engine ?? adapter.id}</span>
+            <span className="text-sm">{driftEngineLabel(data?.engine ?? adapter.id)}</span>
           </Signal>
           <Signal label="Baseline window">
             <span className="text-2xl">{data?.baseline ?? 0}</span>
@@ -125,8 +125,8 @@ export default async function QualityDriftPage() {
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
             {engineStatus.evidentlySelected && engineStatus.evidentlyConfigured
-              ? 'Evidently is selected and configured. Catalog selections run through the collector.'
-              : 'Evidently is not the verified active path. Checks run with the built-in eval-score PSI and mean-degradation fallback, and results remain attributed to that engine.'}
+              ? 'The verified drift engine is selected and configured. Catalog selections run through the collector.'
+              : 'No verified drift engine is active. Checks run with the built-in eval-score PSI and mean-degradation fallback, and results remain attributed to that engine.'}
           </CardContent>
         </Card>
 
@@ -134,8 +134,8 @@ export default async function QualityDriftPage() {
           <CardHeader>
             <CardTitle className="text-sm">Retained drift runs</CardTitle>
             <CardDescription className="text-xs">
-              Each run is persisted with its engine attribution, so a genuine Evidently execution is
-              distinguishable from the PSI fallback after the fact.{' '}
+              Each run is persisted with its engine attribution, so a genuine verified-engine
+              execution is distinguishable from the PSI fallback after the fact.{' '}
               <a href="/solutions/quality/drift-monitoring" className="text-primary hover:underline">
                 Track drift over time in monitoring projects →
               </a>
@@ -169,7 +169,7 @@ export default async function QualityDriftPage() {
                             {run.startedAt.slice(0, 19).replace('T', ' ')}
                           </TableCell>
                           <TableCell className="text-xs">
-                            {a?.engineLabel ?? run.engine}
+                            {a?.engineLabel ?? driftEngineLabel(run.engine)}
                             {a?.evidentlyVersion ? (
                               <span className="text-muted-foreground"> {a.evidentlyVersion}</span>
                             ) : null}
@@ -187,7 +187,7 @@ export default async function QualityDriftPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <Badge variant={a?.engineProven ? 'default' : 'outline'}>
-                              {a?.engineProven ? 'Evidently proven' : 'PSI fallback'}
+                              {a?.engineProven ? 'Verified' : 'PSI fallback'}
                             </Badge>
                           </TableCell>
                         </TableRow>

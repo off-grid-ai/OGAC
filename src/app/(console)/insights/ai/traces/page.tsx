@@ -14,6 +14,7 @@ import {
 import { listAgentRuns } from '@/lib/agentrun';
 import { safeListTraces } from '@/lib/langfuse';
 import { requireModuleForUser } from '@/lib/module-access';
+import { previewText } from '@/lib/plain-text';
 import { currentOrgId } from '@/lib/tenancy';
 
 export const dynamic = 'force-dynamic';
@@ -135,7 +136,7 @@ export default async function InsightsAiTracesPage() {
                         {run.agentId}
                       </TableCell>
                       <TableCell className="max-w-lg truncate text-xs text-muted-foreground">
-                        {run.query}
+                        {previewText(run.query)}
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={STATUS_CLASS[run.status] ?? ''}>

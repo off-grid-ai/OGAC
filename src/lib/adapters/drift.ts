@@ -140,7 +140,7 @@ function analyzeFirstParty(
   const status = overallStatus(metrics, options?.driftShareThreshold);
   const note =
     (selected
-      ? `Evidently not configured — ran the built-in PSI heuristic for "${selected}". `
+      ? `The verified drift engine isn't configured — ran the built-in PSI heuristic for "${selected}". `
       : '') +
     (delta < 0
       ? `Mean eval score down ${Math.abs(delta)} pts vs the prior window.`
@@ -269,10 +269,10 @@ export const evidentlyDrift: DriftPort = {
       const appliedMethods = Object.entries(data.methods_applied ?? {});
       const note = [
         applied
-          ? `Evidently ran "${applied}"${selected && applied !== selected ? ` (asked for "${selected}")` : ''}.`
+          ? `The verified drift engine ran "${applied}"${selected && applied !== selected ? ` (asked for "${selected}")` : ''}.`
           : selected
-            ? `Evidently ran, but did not report which preset — "${selected}" is not confirmed.`
-            : 'Evidently drift run.',
+            ? `The verified drift engine ran, but did not report which preset — "${selected}" is not confirmed.`
+            : 'Verified drift run.',
         appliedMethods.length
           ? `Tests applied: ${appliedMethods.map(([c, m]) => `${c}=${m}`).join(', ')}.`
           : '',

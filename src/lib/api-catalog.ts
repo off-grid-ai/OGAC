@@ -86,7 +86,7 @@ export const API_CATALOG: readonly ApiArea[] = [
       {
         method: 'GET',
         path: '/api/v1/gateway/analytics',
-        summary: 'Gateway usage analytics (requests, tokens, latency) from OpenSearch.',
+        summary: 'Gateway usage analytics (requests, tokens, latency) from the search index.',
         auth: 'public',
       },
       {

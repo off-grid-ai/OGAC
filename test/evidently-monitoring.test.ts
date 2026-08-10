@@ -94,7 +94,7 @@ test('normalizeReportHistory: newest-first, derives pct + engine label from attr
   const h = normalizeReportHistory(runs);
   assert.equal(h[0].startedAt, '2026-07-03T10:00:00.000Z');
   assert.equal(h[0].engineProven, true);
-  assert.equal(h[0].engineLabel, 'Evidently');
+  assert.equal(h[0].engineLabel, 'Verified drift engine');
   assert.equal(h[0].driftPct, 40);
   assert.equal(h[0].method, 'DataDriftPreset');
   // Second run has no attribution blob → falls back to row columns, not proven.

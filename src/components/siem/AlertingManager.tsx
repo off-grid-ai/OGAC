@@ -124,7 +124,7 @@ export function AlertingManager() {
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          OpenSearch alerting monitors (threshold triggers over the audit/gateway indices) and the
+          Alerting monitors (threshold triggers over the audit/gateway indices) and the
           index-lifecycle (ISM) retention policy.
         </p>
       </CardHeader>
@@ -285,7 +285,7 @@ function MonitorsTab() {
     <div className="space-y-4">
       {!supported && (
         <p className="rounded-md border border-border p-3 text-xs text-muted-foreground">
-          {note ?? 'The OpenSearch alerting plugin is not installed on this build — monitors are unavailable.'}
+          {note ?? 'The alerting plugin is not installed on this build — monitors are unavailable.'}
         </p>
       )}
       {error && (
@@ -602,7 +602,7 @@ function IsmTab() {
     <div className="space-y-4">
       {!supported && (
         <p className="rounded-md border border-border p-3 text-xs text-muted-foreground">
-          {note ?? 'The OpenSearch ISM plugin is not installed on this build — retention policies are unavailable.'}
+          {note ?? 'The ISM plugin is not installed on this build — retention policies are unavailable.'}
         </p>
       )}
       {error && (

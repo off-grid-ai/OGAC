@@ -52,6 +52,18 @@ export function normalizePrompt(text: string): string {
 }
 
 /**
+ * True when a normalized prompt is not a real question — either empty, or exactly the JS-ism a
+ * caller's null/undefined value becomes once something upstream stringifies it before logging
+ * ("null" via String(null), "undefined" via template interpolation). A gateway call with no real
+ * input is not a common prompt; showing the literal word "null" as if a customer typed it reads as
+ * broken software, and it is not going away on its own — the same upstream stringification can log
+ * it again on the next call, so this is a permanent filter, not a one-off cleanup.
+ */
+function isInvalidPrompt(normalized: string): boolean {
+  return !normalized || normalized === 'null' || normalized === 'undefined';
+}
+
+/**
  * The OpenSearch body for one org's prompt history.
  *
  * `org` is required and is applied as a `filter` term (non-scoring, cacheable). There is deliberately
@@ -81,7 +93,7 @@ export function tallyCommonPrompts(hits: readonly GatewayInputHit[]): CommonProm
   for (const hit of hits) {
     const raw = typeof hit._source?.input === 'string' ? hit._source.input : '';
     const key = normalizePrompt(raw);
-    if (!key) continue;
+    if (isInvalidPrompt(key)) continue;
     const ts = hit._source?.['@timestamp'] ?? '';
     const current = agg.get(key);
     if (current) {

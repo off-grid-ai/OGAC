@@ -49,7 +49,7 @@ export async function getCacheStatus(fetcher: Fetcher = fetch): Promise<CacheSta
     if (e instanceof LiteLLMHttpError) {
       const reason =
         e.status === 404
-          ? 'cache API not on this LiteLLM version (404)'
+          ? 'cache API not on this gateway version (404)'
           : e.message;
       return cacheStatusUnreachable(reason);
     }
@@ -67,7 +67,7 @@ async function litellmPost(
   timeoutMs = 8000,
 ): Promise<unknown> {
   const base = litellmBaseUrl();
-  if (!base) throw new LiteLLMHttpError(0, 'LiteLLM not configured (OFFGRID_LITELLM_URL unset)');
+  if (!base) throw new LiteLLMHttpError(0, 'gateway not configured (OFFGRID_LITELLM_URL unset)');
   const key = process.env.OFFGRID_LITELLM_MASTER_KEY;
   const res = await fetcher(`${base}${path}`, {
     method: 'POST',
@@ -84,7 +84,7 @@ async function litellmPost(
     const detail = await res.text().catch(() => '');
     throw new LiteLLMHttpError(
       res.status,
-      `LiteLLM ${path} ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`,
+      `gateway ${path} ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`,
     );
   }
   return res.json().catch(() => ({}));
@@ -108,7 +108,7 @@ export async function executeFlush(
   fetcher: Fetcher = fetch,
 ): Promise<FlushResult> {
   if (!litellmHttpConfigured()) {
-    return { ok: false, kind: plan.kind, error: 'LiteLLM not configured (OFFGRID_LITELLM_URL unset)' };
+    return { ok: false, kind: plan.kind, error: 'gateway not configured (OFFGRID_LITELLM_URL unset)' };
   }
   try {
     if (plan.kind === 'all') {
@@ -120,7 +120,7 @@ export async function executeFlush(
   } catch (e) {
     const reason =
       e instanceof LiteLLMHttpError && e.status === 404
-        ? 'cache flush API not on this LiteLLM version (404)'
+        ? 'cache flush API not on this gateway version (404)'
         : (e as Error).message;
     return { ok: false, kind: plan.kind, keysRequested: plan.kind === 'keys' ? plan.keys.length : undefined, error: reason };
   }

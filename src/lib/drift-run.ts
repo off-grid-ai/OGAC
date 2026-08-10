@@ -7,6 +7,18 @@
 
 export type DriftEngine = 'evidently' | 'native';
 
+/**
+ * Outcome label for a drift engine id — never the raw OSS project name. A buyer-facing surface must
+ * not learn which vendor's library actually ran; "Verified drift engine" says what happened (a real,
+ * governed test-suite execution) without naming it. The native/PSI path already had a safe name
+ * ("Off Grid PSI" is our own first-party fallback, not an OSS project), so only the true branch needed
+ * changing. One function, reused everywhere this attribution is rendered, so the two call sites can
+ * never drift into disagreement.
+ */
+export function driftEngineLabel(engine: string | null | undefined): string {
+  return engine === 'evidently' ? 'Verified drift engine' : 'Off Grid PSI';
+}
+
 export interface DriftAttribution {
   engine: DriftEngine;
   /** Evidently library version when the engine actually ran; null for the native PSI path. */
@@ -87,7 +99,7 @@ export function describeDriftAttribution(
   const status = statusRaw === 'drift' || statusRaw === 'warning' ? statusRaw : 'stable';
   return {
     engine,
-    engineLabel: engine === 'evidently' ? 'Evidently' : 'Off Grid PSI',
+    engineLabel: driftEngineLabel(engine),
     evidentlyVersion: typeof attr.evidentlyVersion === 'string' ? attr.evidentlyVersion : null,
     method: str(attr.method) || 'default drift',
     engineProven: attr.engineProven === true,

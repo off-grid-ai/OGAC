@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { kestraCatalog } from '@/lib/adapters/kestra-catalog';
 import { filterPluginGroups, summarizePluginCatalog } from '@/lib/kestra-catalog';
+import { publicLabel } from '@/lib/lineage-labels';
 import { plural } from '@/lib/plural';
 import { requireModuleForUser } from '@/lib/module-access';
 
@@ -66,12 +67,13 @@ export default async function OrchestrationCatalogPage({
               >
                 <Card className="h-full transition-colors hover:border-primary/50">
                   <CardHeader className="pb-2">
-                    <CardTitle className="truncate text-base">{g.title}</CardTitle>
-                    {/* The plugin's raw id used to sit here — io.kestra.plugin.jdbc.actianvector —
-                        naming the orchestration engine on a page a customer reads, under every one of
-                        193 cards. The comment at the top of this file claimed the engine name never
-                        leaked; it was the single most repeated string on the screen. The title already
-                        says what this is, so the id adds nothing a reader wants. */}
+                    {/* When the engine's own catalog omits a friendly title/name, PluginGroup.title
+                        falls back to the raw fully-qualified group id (kestra-catalog.ts), e.g.
+                        "io.kestra.plugin.jdbc.actianvector" — naming the orchestration engine on a
+                        page a customer reads. publicLabel() is the same DISPLAY-time sanitiser used
+                        everywhere else in the console, so a title that arrives from a live catalog
+                        pull is covered too, not just the fixture data this was tested against. */}
+                    <CardTitle className="truncate text-base">{publicLabel(g.title)}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex flex-wrap gap-1.5">

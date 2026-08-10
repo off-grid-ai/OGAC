@@ -9,6 +9,7 @@ import {
   listSolutionDeploymentCandidates,
   listSolutionDeployments,
 } from '@/lib/solution-blueprints-store';
+import { previewText } from '@/lib/plain-text';
 import { buildSolutionsFlow } from '@/lib/solutions-flow';
 import { currentOrgId } from '@/lib/tenancy';
 import { safeWithTimeout } from '@/lib/with-timeout';
@@ -81,7 +82,7 @@ export default async function SolutionsRoot() {
     activities: (runs ?? []).map((run) => ({
       id: run.id,
       label: run.agentId,
-      detail: `${run.status}: ${run.query}`,
+      detail: `${run.status}: ${previewText(run.query)}`,
       timestamp: run.startedAt.slice(0, 10),
       href: `/solutions/agents/${run.agentId}/runs/${run.id}`,
     })),

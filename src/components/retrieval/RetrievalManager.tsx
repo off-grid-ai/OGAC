@@ -43,6 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { publicLabel } from '@/lib/lineage-labels';
 import {
   type CollectionStatus,
   type RetrievalView,
@@ -180,7 +181,7 @@ export function RetrievalManager({
         ) : null}
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <Badge variant="secondary" className="bg-primary/10 text-primary">
-            {view.adapterId}
+            {publicLabel(view.adapterId)}
           </Badge>
           {view.usingEmbeddedStore ? (
             <Badge variant="secondary" className="bg-primary/10 text-primary">
@@ -213,7 +214,7 @@ export function RetrievalManager({
         <CardContent className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-3">
           <div className="space-y-0.5">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Adapter</p>
-            <p className="text-sm text-foreground">{view.adapterId}</p>
+            <p className="text-sm text-foreground">{publicLabel(view.adapterId)}</p>
           </div>
           <div className="space-y-0.5">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Endpoint</p>
@@ -239,11 +240,11 @@ export function RetrievalManager({
             <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
               <CheckCircle className="size-4 text-primary" weight="fill" />
               Retrieval is served by the built-in embedded store
-              <span className="font-mono">({view.adapterId})</span>
+              <span className="font-mono">({publicLabel(view.adapterId)})</span>
             </div>
             <p className="max-w-xl text-sm text-muted-foreground">
               This is fully operational — documents indexed through the retrieval layer are stored
-              and searched here on your infrastructure. An external vector database (Qdrant) is{' '}
+              and searched here on your infrastructure. An external vector database is{' '}
               <span className="font-medium">optional</span>: connect one in Settings only if you
               want to manage collections from this screen. The embedded store needs no external
               service.
@@ -255,8 +256,9 @@ export function RetrievalManager({
           <CardContent className="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
             <Warning className="size-5 text-muted-foreground" />
             <span>
-              Vector store unreachable{error ? ` — ${error}` : ''}. Check the Qdrant connection in
-              Settings and that Qdrant is running.
+              Vector store unreachable{error ? ` — ${error}` : ''}. {publicLabel(
+                'Check the Qdrant connection in Settings and that Qdrant is running.',
+              )}
             </span>
             <Button variant="ghost" size="sm" onClick={reload}>
               <ArrowClockwise className="size-4" /> Retry
@@ -324,7 +326,8 @@ export function RetrievalManager({
           <SheetHeader>
             <SheetTitle>New collection</SheetTitle>
             <SheetDescription>
-              Creates a Qdrant collection via <span className="font-mono">PUT /collections</span>.
+              Creates a {publicLabel('Qdrant')} collection via{' '}
+              <span className="font-mono">PUT /collections</span>.
             </SheetDescription>
           </SheetHeader>
           <SheetBody>

@@ -111,8 +111,8 @@ export function NativeSupersetPanel({ dashboard }: Readonly<{ dashboard: NativeS
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          Rendered natively from the governed warehouse — Superset runs the queries, the console draws
-          the charts. No embedded UI.
+          Rendered natively from the governed warehouse — the BI engine runs the queries, the console
+          draws the charts. No embedded UI.
         </p>
         {dashboard.supersetBase ? (
           <a
@@ -123,7 +123,7 @@ export function NativeSupersetPanel({ dashboard }: Readonly<{ dashboard: NativeS
             className="inline-flex shrink-0 items-center gap-1.5 text-sm text-primary hover:underline"
           >
             <ArrowSquareOut className="size-4" />
-            Open in Superset
+            Open in BI engine
           </a>
         ) : null}
       </div>

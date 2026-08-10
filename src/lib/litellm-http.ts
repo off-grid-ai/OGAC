@@ -52,7 +52,7 @@ export async function litellmGet(
   timeoutMs = 8000,
 ): Promise<unknown> {
   const base = litellmBaseUrl();
-  if (!base) throw new LiteLLMHttpError(0, 'LiteLLM not configured (OFFGRID_LITELLM_URL unset)');
+  if (!base) throw new LiteLLMHttpError(0, 'gateway not configured (OFFGRID_LITELLM_URL unset)');
   const res = await fetcher(`${base}${path}`, {
     headers: authHeaders(),
     signal: AbortSignal.timeout(timeoutMs),
@@ -62,7 +62,7 @@ export async function litellmGet(
     const detail = await res.text().catch(() => '');
     throw new LiteLLMHttpError(
       res.status,
-      `LiteLLM ${path} ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`,
+      `gateway ${path} ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`,
     );
   }
   return res.json();

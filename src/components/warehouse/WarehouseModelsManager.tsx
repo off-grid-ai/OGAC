@@ -79,8 +79,8 @@ export function WarehouseModelsManager() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Analytical models</CardTitle>
           <CardDescription className="text-xs">
-            Governed views + tables over the warehouse. Creating one applies the DDL live to ClickHouse
-            and freezes v1; each edit is a new version and rollback re-applies an older one.
+            Governed views + tables over the warehouse. Creating one applies the DDL live to the
+            warehouse and freezes v1; each edit is a new version and rollback re-applies an older one.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -113,7 +113,7 @@ export function WarehouseModelsManager() {
       <Card className="h-fit shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">New model</CardTitle>
-          <CardDescription className="text-xs">Applied live to ClickHouse on save.</CardDescription>
+          <CardDescription className="text-xs">Applied live to the warehouse on save.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Input
