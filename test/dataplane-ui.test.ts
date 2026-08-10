@@ -97,13 +97,21 @@ test('freshnessTone escalates green→amber→red by age and is muted when unkno
 // Bank concepts that must NEVER appear in the insurer tenant's starter examples.
 const BANK_ONLY = /\b(transaction|npa|non-performing|loan|branch|account)\b/i;
 
-test('every starter query (both flavours) is a single read-only statement against bfsi', () => {
+test('every starter query (both flavours) is a single read-only, unqualified statement', () => {
+  // Unqualified (no `db.table`) is deliberate: each tenant's starters must resolve against the
+  // viewer's OWN warehouse database (the connection default), never a hardcoded db name like the old
+  // `bfsi.` — see src/lib/warehouse-tenancy.ts assertQueryInScope and its regression test
+  // (test/warehouse-query-scope.test.ts) for the cross-tenant leak this replaced.
   for (const flavour of ['bank', 'insurer'] as const) {
     const starters = starterQueriesFor(flavour);
     assert.ok(starters.length >= 3, `${flavour} needs ≥3 starters`);
     for (const s of starters) {
       assert.ok(guardReadOnlySql(s.sql).ok, `starter "${s.id}" must pass the read-only guard`);
-      assert.match(s.sql, /bfsi\./, `starter "${s.id}" must target the bfsi schema`);
+      assert.doesNotMatch(
+        s.sql,
+        /\b(?:FROM|JOIN)\s+[A-Za-z_][A-Za-z0-9_]*\s*\./i,
+        `starter "${s.id}" must not qualify a table with a database name`,
+      );
     }
   }
 });

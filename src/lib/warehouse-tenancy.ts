@@ -72,6 +72,14 @@ export function tableInScope(name: string, database: string | null): boolean {
  * Deliberately a denylist-of-references and not a SQL parser. It runs AFTER `guardReadOnlySql`, which
  * has already rejected comments, semicolons and every non-read verb — so the input here is a single
  * read statement, and the shapes a reference can take are narrow.
+ *
+ * The match is anchored to FROM/JOIN/INTO on purpose: a bare `alias.column` (e.g. `l.npa_flag`,
+ * `p.product_name` from `FROM fact_loan AS l LEFT JOIN dim_product AS p ...`) is completely ordinary
+ * SQL and is NOT a database reference — a table can only be introduced into a query by one of these
+ * three keywords, so anything that reaches ClickHouse rows without one isn't valid SQL in the first
+ * place. Matching `word.word` anywhere (the earlier version of this guard) treated every aliased join
+ * column as a foreign-database read and rejected queries that never left the caller's own database —
+ * caught by the bank's own starter queries (test/warehouse-query-scope.test.ts).
  */
 export function assertQueryInScope(
   sql: string,
@@ -82,9 +90,12 @@ export function assertQueryInScope(
   if (database === ALL_DATABASES) return { ok: true };
   if (!database) return { ok: false, reason: 'no warehouse scope for this account' };
 
-  // `db.table` after FROM/JOIN/INTO, plus bare `db.table` anywhere (a subquery, a UNION arm).
+  // `db.table` immediately after FROM/JOIN/INTO — covers a top-level FROM, a JOIN, an INSERT INTO,
+  // and (because the keyword appears again inside) a subquery's own FROM or a UNION arm's FROM.
   const refs = new Set<string>();
-  for (const m of text.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/g)) {
+  for (const m of text.matchAll(
+    /\b(?:FROM|JOIN|INTO)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/gi,
+  )) {
     refs.add(m[1].toLowerCase());
   }
   // ClickHouse's own schema databases are readable by anyone and carry no tenant rows.

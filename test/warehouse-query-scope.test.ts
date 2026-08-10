@@ -53,6 +53,19 @@ test('a foreign database hidden in a subquery or a join is still caught', () => 
   }
 });
 
+test('an aliased join column (l.npa_flag, p.product_name) is not mistaken for a database', () => {
+  // Regression: an earlier version of this guard matched `word.word` ANYWHERE in the statement, so an
+  // ordinary aliased JOIN — table aliases are single letters, columns follow the dot — tripped the
+  // same check as a real `db.table` reference and got rejected, even though it never left the
+  // caller's own database. Found via the bank's own starter query (npa-loans-by-product).
+  const sql =
+    'SELECT p.product_name AS product, count() AS loans, countIf(l.npa_flag = 1) AS npa_loans, ' +
+    'sum(if(l.npa_flag = 1, l.outstanding_amount, 0)) AS npa_outstanding ' +
+    'FROM fact_loan AS l LEFT JOIN dim_product AS p ON p.product_id = l.product_id ' +
+    'GROUP BY product ORDER BY npa_outstanding DESC';
+  assert.deepEqual(assertQueryInScope(sql, 'bharatunion'), { ok: true });
+});
+
 test('ClickHouse\'s own schema databases stay readable', () => {
   // They carry no tenant rows, and blocking them would break every "what columns does this have"
   // question a real operator asks.
@@ -73,12 +86,11 @@ test('no starter query the product offers names a database at all', () => {
   // The defect, asserted directly: a shipped starter must be unqualified, so it cannot point at a
   // tenant that is not the viewer.
   //
-  // INSURER ONLY, for now, and deliberately: the BANK's starters still read `FROM bfsi.fact_loan`,
-  // and `bfsi` holds the only copy of that data — it is in neither tenant's database. Un-qualifying
-  // them before those tables exist inside `bharatunion` would trade a cross-tenant read for a
-  // "table not found", which is worse to demo. The bank's warehouse is being seeded separately; when
-  // it lands, 'bank' joins this loop and the two cases below become the acceptance test for it.
-  for (const flavour of ['insurer'] as const) {
+  // BOTH tenants now: the bank's own warehouse (database `bharatunion`, see
+  // scripts/seed-bharatunion-warehouse.mts) carries fact_loan/fact_account/fact_transaction/
+  // fact_kyc_event/dim_product/dim_branch, so its starters (previously `FROM bfsi.fact_loan` —
+  // a database belonging to neither tenant) are unqualified same as the insurer's.
+  for (const flavour of ['bank', 'insurer'] as const) {
     for (const q of starterQueriesFor(flavour)) {
       assert.doesNotMatch(
         q.sql,
@@ -91,11 +103,10 @@ test('no starter query the product offers names a database at all', () => {
 
 test('every starter query the product offers passes its own tenancy guard', () => {
   // The closing assertion: the product cannot ship a button that its own guard would refuse.
-  // Insurer only for now — see the note above.
-  for (const flavour of ['insurer'] as const) {
+  const scopeFor: Record<'bank' | 'insurer', string> = { bank: 'bharatunion', insurer: 'suraksha' };
+  for (const flavour of ['bank', 'insurer'] as const) {
     for (const q of starterQueriesFor(flavour)) {
-      const scope: string = 'suraksha';
-      assert.equal(assertQueryInScope(q.sql, scope).ok, true, `${flavour}/${q.id}`);
+      assert.equal(assertQueryInScope(q.sql, scopeFor[flavour]).ok, true, `${flavour}/${q.id}`);
     }
   }
 });
