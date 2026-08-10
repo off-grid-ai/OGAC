@@ -8,6 +8,8 @@
 // best-effort reader (readSiemView, below); this file never fetches.
 
 // ── Raw OpenSearch shapes (only the fields we read; everything optional/defensive) ─────────────
+import { opensearchFetch } from '@/lib/opensearch-http';
+
 export interface RawSiemHit {
   _id?: string;
   _source?: Record<string, unknown>;
@@ -233,10 +235,19 @@ export async function readSiemView(
 ): Promise<SiemReadResult> {
   const empty = normalizeSiem(null);
   const configured = Boolean(process.env.OFFGRID_OPENSEARCH_URL);
-  const url = process.env.OFFGRID_OPENSEARCH_URL ?? 'http://127.0.0.1:9200';
   const index = resolveSiemIndex(process.env);
   try {
-    const r = await fetch(`${url}/${index}/_search`, {
+    // opensearchFetch, NOT a bare fetch. This call built its own URL and sent no auth headers at all,
+    // so once the search index required authentication it returned 401 — and three pages showed the
+    // error string "OpenSearch 401" instead of their content: /insights/siem,
+    // /governance/evidence/security and /insights/usage/traffic. Everything else in the console reads
+    // through the helper and was unaffected, which is why this looked like an OpenSearch problem
+    // rather than one call site skipping the seam.
+    //
+    // This is the raw-fetch trap the auth cutover was warned about, found by rendering the page as a
+    // demo viewer — from the box with the console's own credentials the same query returns 200, so no
+    // amount of checking the service would have surfaced it.
+    const r = await opensearchFetch(`/${index}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -245,9 +256,11 @@ export async function readSiemView(
         query: siemQueryClause(pipelineTag),
       }),
       cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
-    if (!r.ok) return { configured, data: empty, error: `OpenSearch ${r.status}` };
+    // The status alone, never the engine's name. "OpenSearch 401" told a buyer which product we run
+    // and nothing about what to do.
+    if (!r.ok) return { configured, data: empty, error: `the search index refused the request (${r.status})` };
     const json = (await r.json()) as RawSiemResponse;
     return { configured, data: normalizeSiem(json), error: null };
   } catch (e) {

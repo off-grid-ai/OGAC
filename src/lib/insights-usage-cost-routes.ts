@@ -26,7 +26,9 @@ export const INSIGHTS_USAGE_DESTINATIONS = [
   {
     id: 'dashboards',
     label: 'Dashboards',
-    description: 'Read governed BI charts and open Superset for chart authoring.',
+    // Named the BI product in a nav description a buyer reads. What they care about is that the
+    // charts are governed and that a power user can go and author their own.
+    description: 'Read governed BI charts, and author your own.',
     route: '/insights/usage/dashboards',
   },
 ] as const;

@@ -68,6 +68,27 @@ const LEAKS = [
   // A count that disagrees with its noun. Was on most of 193 cards in the action catalogue.
   /\b1 (?:actions|triggers|conditions|runs|apps|rows|tables|items|cases|records)\b/,
 ];
+/**
+ * Routes where a matched string is CORRECT, verified one at a time by reading the rendered page.
+ *
+ * Kept explicit rather than loosening the patterns, because the value of this harness is that a LEAK
+ * line means something. Three earned their place:
+ *
+ *  • /data/integrations names Elasticsearch/OpenSearch in a connector-type description. That is a
+ *    search engine the CUSTOMER runs and may register as a source — the same category as Postgres or
+ *    MySQL, which we name freely. The rule is about not naming OURS.
+ *  • /operations/services/capability-map is the service-inventory page an operator uses to administer
+ *    the fleet. Its entire purpose is showing real service identities; hiding them would break it.
+ *  • /work/prompts and /workspace/prompts matched "null" inside a PROMPT TEMPLATE that instructs a
+ *    model to return valid JSON. That is user content, not a rendering bug.
+ */
+const ALLOWED_MATCHES = new Map([
+  ['/data/integrations', /opensearch|elasticsearch/i],
+  ['/operations/services/capability-map', /seaweedfs/i],
+  ['/work/prompts', /\bnull\b/],
+  ['/workspace/prompts', /\bnull\b/],
+]);
+
 if (SHOTS) mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch();
@@ -135,7 +156,11 @@ for (const path of paths) {
   const empty = EMPTY_PHRASES.find((re) => re.test(text));
 
   const broken2 = BROKEN_PHRASES.find((re) => re.test(text));
-  const leak = LEAKS.find((re) => re.test(text));
+  const allowed = ALLOWED_MATCHES.get(path);
+  const leak = LEAKS.filter((re) => !(allowed && re.source === allowed.source)).find((re) => {
+    const m = text.match(re);
+    return m && !(allowed && allowed.test(m[0]));
+  });
 
   let verdict = 'OK';
   let why = '';
