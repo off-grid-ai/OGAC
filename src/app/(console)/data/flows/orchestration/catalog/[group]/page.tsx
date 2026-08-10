@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { kestraCatalog } from '@/lib/adapters/kestra-catalog';
 import { findPluginGroup, type PluginSchema, type PluginType } from '@/lib/kestra-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
+import { plural } from '@/lib/plural';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,14 +46,28 @@ export default async function PluginGroupPage({
             <ArrowLeft className="size-3.5" /> Action catalog
           </Link>
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <h1 className="font-mono text-lg font-semibold">{plugin.title}</h1>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">{plugin.group}</p>
+              {/* The raw plugin id used to sit here, naming the orchestration engine again. Fixed on
+                  the list cards first and missed here — the detail page is where a reader who is
+                  actually interested ends up, so it mattered more here, not less. The categories say
+                  something a reader wants; the id does not. */}
+              {plugin.categories.length > 0 ? (
+                <p className="mt-1 font-mono text-xs uppercase tracking-wide text-muted-foreground">
+                  {plugin.categories.join(' · ')}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <Badge variant="secondary">{plugin.taskCount} actions</Badge>
-              <Badge variant="outline">{plugin.triggerCount} triggers</Badge>
-              <Badge variant="outline">{plugin.conditionCount} conditions</Badge>
+              {plugin.taskCount > 0 ? (
+                <Badge variant="secondary">{plural(plugin.taskCount, 'action')}</Badge>
+              ) : null}
+              {plugin.triggerCount > 0 ? (
+                <Badge variant="outline">{plural(plugin.triggerCount, 'trigger')}</Badge>
+              ) : null}
+              {plugin.conditionCount > 0 ? (
+                <Badge variant="outline">{plural(plugin.conditionCount, 'condition')}</Badge>
+              ) : null}
             </div>
           </div>
         </div>
