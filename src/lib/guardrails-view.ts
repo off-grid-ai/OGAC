@@ -16,6 +16,8 @@
 // worked. The route now scans through the real adapter, so what an operator tests is what
 // enforcement actually does, and the duplicate detector is gone rather than left to drift.
 
+import { publicLabel } from './lineage-labels';
+
 // ─── Pure display model ─────────────────────────────────────────────────────
 
 // Entity types each engine can surface. Presidio's analyzer recognizes a broad catalog (a
@@ -173,6 +175,48 @@ export function buildGuardrailsView(
     entityTypes: [...entityTypesFor(engine, remote)],
     demo: normalizeDemo(demo, demoInput),
   };
+}
+
+// ─── Enabled protections, sanitized for a customer-facing overview ─────────
+
+export interface EnforcedProtection {
+  id: string;
+  label: string; // sanitized, customer-safe description
+  action: string; // human enforcement verb ("Blocked", "Masked", …)
+}
+
+// Human enforcement verb per rule action — the ladder from guardrails-rules.ts's RuleAction, kept
+// as loose strings here so this module stays independent of that file's types (no new coupling for
+// a display mapping).
+const ACTION_VERB: Record<string, string> = {
+  redact: 'Removed',
+  mask: 'Masked',
+  hash: 'Replaced with a token',
+  allow: 'Allowed',
+  block: 'Blocked',
+  flag: 'Flagged',
+  log: 'Flagged',
+};
+
+/**
+ * The org's enabled protections, ready for a customer-facing "what's checked" summary.
+ *
+ * Every stored label is run through `publicLabel()` before it reaches this function's caller. A
+ * rule's label is operator-authored, or copied verbatim from the standard-guardrails catalog when a
+ * protection is enabled — and in practice that has carried an internal engine name straight through
+ * to a masking-rules table ("Person names (Presidio — from catalog)"). This is the first place that
+ * data reaches a customer-facing overview page, so it is sanitized here rather than trusted.
+ */
+export function buildEnforcedProtections(
+  rules: readonly { id: string; label: string; action: string; enabled: boolean }[],
+): EnforcedProtection[] {
+  return rules
+    .filter((r) => r.enabled)
+    .map((r) => ({
+      id: r.id,
+      label: publicLabel(r.label) || 'Custom protection',
+      action: ACTION_VERB[r.action] ?? r.action,
+    }));
 }
 
 // ─── Thin reader (I/O) ──────────────────────────────────────────────────────

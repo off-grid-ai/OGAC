@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  buildEnforcedProtections,
   buildGuardrailsView,
   PRESIDIO_ENTITY_TYPES,
   FLOOR_ENTITY_TYPES,
@@ -132,4 +133,50 @@ test('buildGuardrailsView: malformed demo (bad entities) degrades safely', () =>
 test('buildGuardrailsView: null demo → no demo block', () => {
   const v = buildGuardrailsView({ id: 'checks' }, true, null, '');
   assert.equal(v.demo, undefined);
+});
+
+// ── buildEnforcedProtections: the "what's checked" overview summary ────────
+
+test('buildEnforcedProtections: maps each enabled rule to a clean label + verb', () => {
+  const out = buildEnforcedProtections([
+    { id: 'r1', label: 'Block prompt-injection attempts', action: 'block', enabled: true },
+    { id: 'r2', label: 'Mask phone numbers', action: 'mask', enabled: true },
+    { id: 'r3', label: 'Redact Aadhaar numbers', action: 'redact', enabled: true },
+  ]);
+  assert.deepEqual(out, [
+    { id: 'r1', label: 'Block prompt-injection attempts', action: 'Blocked' },
+    { id: 'r2', label: 'Mask phone numbers', action: 'Masked' },
+    { id: 'r3', label: 'Redact Aadhaar numbers', action: 'Removed' },
+  ]);
+});
+
+test('buildEnforcedProtections: disabled rules are dropped', () => {
+  const out = buildEnforcedProtections([
+    { id: 'r1', label: 'Mask email addresses', action: 'mask', enabled: false },
+  ]);
+  assert.deepEqual(out, []);
+});
+
+test('buildEnforcedProtections: sanitizes a leaked engine name in a stored label', () => {
+  // The live regression this guards: a rule enabled from the standard-guardrails catalog stored
+  // "Person names (Presidio — from catalog)" verbatim — the OSS engine name reaching a
+  // customer-facing table. The overview summary must never repeat that.
+  const out = buildEnforcedProtections([
+    { id: 'r1', label: 'Person names (Presidio — from catalog)', action: 'redact', enabled: true },
+  ]);
+  assert.equal(out.length, 1);
+  assert.ok(!/presidio/i.test(out[0].label), `label leaked an engine name: ${out[0].label}`);
+  assert.equal(out[0].action, 'Removed');
+});
+
+test('buildEnforcedProtections: an unknown action passes through verbatim', () => {
+  const out = buildEnforcedProtections([
+    { id: 'r1', label: 'Some rule', action: 'quarantine', enabled: true },
+  ]);
+  assert.equal(out[0].action, 'quarantine');
+});
+
+test('buildEnforcedProtections: an empty label falls back rather than rendering blank', () => {
+  const out = buildEnforcedProtections([{ id: 'r1', label: '', action: 'mask', enabled: true }]);
+  assert.equal(out[0].label, 'Custom protection');
 });

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { leaksInternalName } from '../src/lib/lineage-labels.ts';
 import { dbReachable, SKIP_MESSAGE } from './support/db-available.mjs';
 
 // M6 (#192) export_targets INTEGRATION tests — the REAL exporter store against a REAL Postgres, no
@@ -86,4 +87,19 @@ test('export_targets CRUD + org-scoping (real Postgres)', { skip: dbUp ? false :
   assert.equal(await deleteExportTarget(splunk.id, orgId), true);
   assert.equal(await getExportTarget(splunk.id, orgId), null);
   assert.equal((await listExportTargets(orgId)).length, 1, 'only metrics target remains');
+
+  // ── lineage target's displayed "target" never names an internal engine ─────────────────────
+  // The catalog's own text for lineage was "Purview / Collibra / Marquez (any OpenLineage
+  // consumer)" — Marquez doubles as an internal engine name elsewhere in the platform, and a
+  // customer read this verbatim on /governance/evidence/export. The view must come back sanitized.
+  const lineage = await createExportTarget(
+    { kind: 'lineage', endpoint: 'https://catalog.example.com/api/v1/lineage', enabled: true, secretRef: null },
+    orgId,
+  );
+  created.push({ id: lineage.id, org: orgId });
+  assert.ok(
+    !leaksInternalName(lineage.target),
+    `lineage target label leaked an internal name: "${lineage.target}"`,
+  );
+  assert.ok(!/marquez/i.test(lineage.target), `lineage target still names Marquez: "${lineage.target}"`);
 });

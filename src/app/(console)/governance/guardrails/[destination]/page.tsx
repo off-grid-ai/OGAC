@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { GuardrailCatalog } from '@/components/guardrails/GuardrailCatalog';
@@ -14,7 +15,12 @@ import { getPii } from '@/lib/adapters/registry';
 import { resolvePresidioImageRedactorConfig } from '@/lib/adapters/presidio-image-redaction';
 import { guardrailsDestination, type GuardrailsDestination } from '@/lib/guardrails-destinations';
 import { listGuardrailRules } from '@/lib/guardrails-rules';
-import { readGuardrailsView, type GuardrailsView } from '@/lib/guardrails-view';
+import {
+  buildEnforcedProtections,
+  readGuardrailsView,
+  type EnforcedProtection,
+  type GuardrailsView,
+} from '@/lib/guardrails-view';
 import { requireModuleForUser } from '@/lib/module-access';
 import { listPipelines } from '@/lib/pipelines';
 import { getAnonymizerPolicy } from '@/lib/presidio-anonymizer-policy-store';
@@ -47,7 +53,12 @@ async function destinationContent(
   searchParams: SearchParams,
 ): Promise<ReactNode> {
   if (destination.id === 'overview') {
-    return <OverviewContent view={await readGuardrailsView()} />;
+    const orgId = await currentOrgId();
+    const [view, rules] = await Promise.all([
+      readGuardrailsView(),
+      listGuardrailRules(orgId).catch(() => []),
+    ]);
+    return <OverviewContent view={view} protections={buildEnforcedProtections(rules)} />;
   }
 
   if (destination.id === 'test') {
@@ -156,64 +167,116 @@ function ManagementCard({ title, children }: Readonly<{ title: string; children:
   );
 }
 
-function OverviewContent({ view }: Readonly<{ view: GuardrailsView }>) {
+function OverviewContent({
+  view,
+  protections,
+}: Readonly<{ view: GuardrailsView; protections: EnforcedProtection[] }>) {
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            PII detection
-            <Badge variant={view.reachable ? 'default' : 'destructive'}>
-              {view.reachable ? 'reachable' : 'unreachable'}
-            </Badge>
-            {view.engine === 'presidio' && !view.configured ? (
-              <Badge variant="secondary">not configured</Badge>
-            ) : null}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1 text-sm text-muted-foreground">
-          <p>
-            Detection:{' '}
-            <span className="text-foreground">
-              {view.engine === 'presidio'
-                ? 'Entity-grade PII detection'
-                : 'Built-in pattern detection'}
-            </span>
-          </p>
-          {view.engine === 'presidio' ? (
-            <p className="text-xs">
-              Falls back to the always-on pattern detector when the detection service is down.
+    <div className="w-full space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              PII detection
+              <Badge variant={view.reachable ? 'default' : 'destructive'}>
+                {view.reachable ? 'reachable' : 'unreachable'}
+              </Badge>
+              {view.engine === 'presidio' && !view.configured ? (
+                <Badge variant="secondary">not configured</Badge>
+              ) : null}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>
+              Detection:{' '}
+              <span className="text-foreground">
+                {view.engine === 'presidio'
+                  ? 'Entity-grade PII detection'
+                  : 'Built-in pattern detection'}
+              </span>
             </p>
-          ) : null}
-        </CardContent>
-      </Card>
+            {view.engine === 'presidio' ? (
+              <p className="text-xs">
+                Falls back to the always-on pattern detector when the detection service is down.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
 
-      <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm">Supported entity types</CardTitle>
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              {view.entityTypes.length}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {view.entityTypes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No entity types reported yet — the always-on baseline pattern protection still
+                applies.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {view.entityTypes.map((entityType) => (
+                  <Badge
+                    key={entityType}
+                    variant="outline"
+                    className="font-mono text-xs text-muted-foreground"
+                  >
+                    {entityType}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm">Supported entity types</CardTitle>
-          <Badge variant="secondary" className="bg-primary/10 text-primary">
-            {view.entityTypes.length}
+          <div>
+            <CardTitle className="text-sm">What&apos;s checked on every request</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Every prompt is scanned for prompt-injection attempts before it reaches a model, and
+              every answer is scanned before it reaches the user. These are the protections this
+              organization has turned on.
+            </p>
+          </div>
+          <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0">
+            {protections.length} active
           </Badge>
         </CardHeader>
         <CardContent>
-          {view.entityTypes.length === 0 ? (
+          {protections.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No entity types reported yet — the always-on baseline pattern protection still
-              applies.
+              No protections are enabled for this organization yet.{' '}
+              <Link href="/governance/guardrails/protections" className="text-primary underline">
+                Browse the standard protections
+              </Link>{' '}
+              to turn one on.
             </p>
           ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {view.entityTypes.map((entityType) => (
-                <Badge
-                  key={entityType}
-                  variant="outline"
-                  className="font-mono text-xs text-muted-foreground"
-                >
-                  {entityType}
+            <div className="flex flex-wrap gap-2">
+              {protections.map((p) => (
+                <Badge key={p.id} variant="outline" className="gap-1.5 py-1 text-xs">
+                  <span className="font-medium text-foreground">{p.action}</span>
+                  <span className="text-muted-foreground">{p.label}</span>
                 </Badge>
               ))}
             </div>
           )}
+          <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <Link href="/governance/guardrails/protections" className="text-primary underline">
+              Browse the standard protections
+            </Link>
+            <Link href="/governance/guardrails/masking" className="text-primary underline">
+              Manage masking rules
+            </Link>
+            <Link href="/governance/guardrails/test" className="text-primary underline">
+              Test a string live
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

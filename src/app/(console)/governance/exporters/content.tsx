@@ -1,6 +1,7 @@
 import { ExportersManager } from '@/components/exporters/ExportersManager';
 import { listExportTargets } from '@/lib/exporters/store';
 import { EXPORTER_CATALOG } from '@/lib/exporters/types';
+import { publicLabel } from '@/lib/lineage-labels';
 import { requireModuleForUser } from '@/lib/module-access';
 import { currentOrgId } from '@/lib/tenancy';
 import { PageFrame } from '@/components/PageFrame';
@@ -15,9 +16,13 @@ export async function ExportersSurface({
   await requireModuleForUser('exporters');
   const orgId = await currentOrgId();
   const targets = await listExportTargets(orgId).catch(() => []);
+  // The "New exporter" picker shows each catalog entry's target tools directly from the catalog
+  // (not through listExportTargets' own sanitized view), so it needs the same publicLabel() pass —
+  // one of the catalog's own names (Marquez) doubles as an internal engine name elsewhere.
+  const catalog = EXPORTER_CATALOG.map((c) => ({ ...c, target: publicLabel(c.target) }));
   return (
     <PageFrame embedded={embedded}>
-      <ExportersManager targets={targets} catalog={[...EXPORTER_CATALOG]} embedded={embedded} />
+      <ExportersManager targets={targets} catalog={catalog} embedded={embedded} />
     </PageFrame>
   );
 }
