@@ -1,6 +1,6 @@
 'use client';
 
-import { publicActionLabel } from '@/lib/plain-identifiers';
+import { plainOrg, publicActionLabel } from '@/lib/plain-identifiers';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 import type { AuditOutcome } from '@/lib/audit-log-view';
@@ -71,6 +71,12 @@ export function AuditFilterBar({ actors, actions, projects, outcomes }: Readonly
         label="Project"
         value={val('project')}
         options={projects}
+        // The project facet is built from the audit data, and platform-scoped events carry the ORG ID
+        // there — so this dropdown listed "org_suraksha" to the tenant reading its own trail. Same
+        // shape as the Action filter above: the submitted value stays the raw one, only the label
+        // changes. I fixed the table cell for this field two commits ago and missed the dropdown,
+        // which is why the leak survived a deploy.
+        display={plainOrg}
         onChange={(v) => setParam('project', v)}
       />
       <SelectFilter
