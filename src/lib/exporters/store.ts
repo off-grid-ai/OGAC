@@ -9,6 +9,7 @@ import { db } from '@/db';
 import { exportTargets } from '@/db/schema';
 import type { ExportTarget as ExportTargetRow } from '@/db/schema';
 import { openBaoSecrets } from '@/lib/adapters/secrets';
+import { publicLabel } from '@/lib/lineage-labels';
 import { isRunnable, type NormalizedExportTarget } from './config';
 import { catalogFor, type ExporterKind, type ResolvedTarget } from './types';
 
@@ -73,7 +74,11 @@ function toView(row: ExportTargetRow): ExportTargetView {
     id: row.id,
     kind,
     label: cat?.label ?? kind,
-    target: cat?.target ?? '',
+    // The catalog's target string names the enterprise tools this exporter speaks to (e.g.
+    // "Purview / Collibra / Marquez") — sanitized through the shared display mapper because one of
+    // those names (Marquez) is also an internal engine name elsewhere in the platform, and this is a
+    // customer-facing card.
+    target: publicLabel(cat?.target ?? ''),
     endpoint: row.endpoint ?? '',
     enabled: row.enabled,
     secretRef: row.secretRef ?? null,
