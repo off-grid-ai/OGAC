@@ -17,6 +17,8 @@
 // The IO (create/list/delete via the Keycloak Admin API) lives in gateway-api-keys.ts.
 
 // The opaque-key prefix an operator pastes into `x-api-key`.
+import { DEFAULT_ORG } from '@/lib/tenancy-policy';
+
 export const GATEWAY_KEY_PREFIX = 'ogak_';
 // The Keycloak clientId prefix that marks a client as a gateway API key (vs a service/OIDC client).
 export const GATEWAY_KEY_CLIENT_PREFIX = 'ogak-';
@@ -159,6 +161,31 @@ export function mapKeyClient(client: RawKeyClient, lastUsedAt: string | null = n
     createdAt: attr(client, 'createdAt'),
     lastUsedAt,
   };
+}
+
+/**
+ * The gateway keys a given org may see. PURE.
+ *
+ * WHY THIS EXISTS. The create route stamped `ownerOrg` from `currentOrgId()`, but the LIST route
+ * called Keycloak with no filter at all — so every tenant saw every tenant's gateway credentials.
+ * It went unnoticed because the realm had no keys: the list was empty, so there was nothing to leak.
+ * The moment one key per org was minted, the bank's page showed "Suraksha Life — claims platform
+ * gateway client · org_suraksha", on a public demo link.
+ *
+ * This is the third leak of the same shape in this codebase, and the settled fix is the same: org is
+ * a REQUIRED argument, and matching is exact.
+ *
+ * THE ONE DELIBERATE EXCEPTION. A key with no `ownerOrg` maps to owner 'default', and the platform
+ * operator org sees everything. On a read-only surface the strict rule is "unattributed belongs to
+ * nobody" — but these are live credentials, and a key nobody can see is a key nobody can REVOKE.
+ * Hiding an orphaned credential from the only account able to revoke it would trade a disclosure
+ * problem for a worse one. Tenants still see only their own.
+ */
+export function filterKeysForOrg(rows: GatewayKeyView[], orgId: string): GatewayKeyView[] {
+  const org = (orgId ?? '').trim();
+  if (!org) return [];
+  if (org === DEFAULT_ORG) return [...rows];
+  return rows.filter((r) => r.owner === org);
 }
 
 // Sort key rows newest-first by createdAt (nulls last), then by clientId for stability. Pure.

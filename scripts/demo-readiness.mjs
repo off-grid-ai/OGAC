@@ -43,6 +43,21 @@ const EMPTY_PHRASES = [
 ];
 const BROKEN_PHRASES = [/page not found/i, /something went wrong/i, /application error/i, /unhandled/i];
 
+// Defects that make a screen unshowable even when it is full of content. Every one of these has
+// reached a customer-facing surface in this product at least once, and each was found by a person
+// looking at a screenshot rather than by any test.
+const LEAKS = [
+  // An OSS engine or our own codename, on a page a buyer reads. Found three times in three days.
+  /io\.kestra|\bkestra\b/i, /\bpresidio\b/i, /\bopensearch\b/i, /\bqdrant\b/i, /\bllm[- ]?guard\b/i,
+  /\blangfuse\b/i, /\bseaweedfs\b/i, /\bclickhouse\b/i, /\bopenbao\b/i, /\bmarquez\b/i,
+  /\bunleash\b/i, /\blitellm\b/i, /\bairbyte\b/i, /\bevidently\b/i, /\bragas\b/i, /\bsuperset\b/i,
+  // Internal identifiers. "blocked by proof:ceiling on org_suraksha" reached a buyer in an answer.
+  /\borg_[a-z0-9_]+/, /\b[a-z]+\.[a-z]+\.(?:deny|allow|run|create|delete|write|read)\b/,
+  // Rendering failures that read as broken software.
+  /\*\*[A-Za-z]/, /\bundefined\b/, /\bNaN\b/, /\[object Object\]/, /\bnull\b/,
+  // A count that disagrees with its noun. Was on most of 193 cards in the action catalogue.
+  /\b1 (?:actions|triggers|conditions|runs|apps|rows|tables|items|cases|records)\b/,
+];
 if (SHOTS) mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch();
@@ -62,16 +77,25 @@ for (const path of paths) {
   const url = `${BASE}${path}`;
   let status = 0;
   let text = '';
+  let records = 0;
   try {
     const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 35000 });
     status = res?.status() ?? 0;
     await page.waitForTimeout(2600);
     // Read the page region only — never the shell, nav or hellobar, whose text is identical everywhere
-    // and would mask a genuinely bare page.
-    text = await page.evaluate(() => {
+    // and would mask a genuinely bare page as thousands of characters of content.
+    const read = await page.evaluate(() => {
       const main = document.querySelector('[data-og-shell="page"]') ?? document.querySelector('main');
-      return (main?.innerText ?? document.body.innerText).replace(/\s+/g, ' ').trim();
+      const scope = main ?? document.body;
+      // SUBSTANCE, not length. A page can be full of headings, labels and empty-state prose and still
+      // show a buyer nothing. Rows, cards and links to real records are what they came for.
+      const records = scope.querySelectorAll(
+        'tbody tr, li, a[href], button, [class*="card"], [class*="Card"], [role="row"], [role="listitem"]',
+      ).length;
+      return { text: (scope.innerText ?? '').replace(/\s+/g, ' ').trim(), records };
     });
+    text = read.text;
+    records = read.records;
   } catch (e) {
     rows.push({ path, status, verdict: 'ERROR', why: String(e.message).slice(0, 60), chars: 0, zeros: 0 });
     continue;
@@ -83,18 +107,26 @@ for (const path of paths) {
   const zeros = numbers.filter((n) => n === '0').length;
   const nonZero = numbers.filter((n) => n !== '0' && Number(n) > 0).length;
 
-  const broken = BROKEN_PHRASES.find((re) => re.test(text));
   const empty = EMPTY_PHRASES.find((re) => re.test(text));
+
+  const broken2 = BROKEN_PHRASES.find((re) => re.test(text));
+  const leak = LEAKS.find((re) => re.test(text));
 
   let verdict = 'OK';
   let why = '';
   if (status !== 200) { verdict = 'BROKEN'; why = `HTTP ${status}`; }
-  else if (broken) { verdict = 'BROKEN'; why = text.match(broken)[0].slice(0, 50); }
+  else if (broken2) { verdict = 'BROKEN'; why = text.match(broken2)[0].slice(0, 50); }
+  else if (leak) { verdict = 'LEAK'; why = text.match(leak)[0].slice(0, 50); }
   else if (empty) { verdict = 'EMPTY'; why = text.match(empty)[0].slice(0, 50); }
-  else if (text.length < 260) { verdict = 'THIN'; why = `${text.length} chars of content`; }
+  else if (text.length < 260) { verdict = 'THIN'; why = `${text.length} chars`; }
   else if (nonZero === 0 && zeros > 0) { verdict = 'EMPTY'; why = `${zeros} figures, all zero`; }
+  // Renders prose but points at nothing. Deliberately conservative: a page needs to be BOTH short and
+  // unclickable to fail on this. An earlier version failed on records alone and flagged fourteen pages
+  // that were fine, because plenty of surfaces here are built from divs my selector cannot see. A
+  // false failure is worse than a miss — it sends people to fix what is not broken.
+  else if (records === 0 && text.length < 700) { verdict = 'THIN'; why = `${text.length} chars, nothing to click`; }
 
-  rows.push({ path, status, verdict, why, chars: text.length, zeros });
+  rows.push({ path, status, verdict, why, chars: text.length, records, zeros });
   if (SHOTS) {
     const name = path.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'root';
     await page.screenshot({ path: `${OUT}/${hostKey}-${name}.png` });
@@ -103,7 +135,7 @@ for (const path of paths) {
 
 await browser.close();
 
-const order = { BROKEN: 0, EMPTY: 1, THIN: 2, ERROR: 3, OK: 4 };
+const order = { BROKEN: 0, LEAK: 1, EMPTY: 2, THIN: 3, ERROR: 4, OK: 5 };
 rows.sort((a, b) => order[a.verdict] - order[b.verdict] || a.path.localeCompare(b.path));
 for (const r of rows) {
   console.log(`${r.verdict.padEnd(7)} ${r.path.padEnd(42)} ${r.why}`);

@@ -10,6 +10,7 @@ import {
   deriveKeyClientId,
   formatApiKey,
   isGatewayKeyClient,
+  filterKeysForOrg,
   mapKeyClient,
   sortKeyViews,
   validateKeyName,
@@ -35,7 +36,15 @@ export interface CreatedKey {
 
 // List every gateway API key in the realm (clients with the `ogak-` prefix), newest first. Never
 // returns secrets. Best-effort last-used: pulled from each client's active sessions if available.
+/**
+ * The gateway keys visible to `orgId`.
+ *
+ * `orgId` is REQUIRED and leading, deliberately: this function had no org parameter and returned
+ * every client in the realm to every tenant. Making the boundary a required argument is what stops
+ * the next caller forgetting it — the same change that closed two earlier leaks here.
+ */
 export async function listGatewayKeys(
+  orgId: string,
   kc: KeycloakAdminClient = requireKc(),
 ): Promise<GatewayKeyView[]> {
   // Keycloak's ?clientId= filter is an EXACT match, so we can't prefix-filter server-side; list all
@@ -43,7 +52,7 @@ export async function listGatewayKeys(
   const clients = await kc.listClients();
   const keyClients = clients.filter((c) => isGatewayKeyClient(c));
   const rows = await Promise.all(keyClients.map((c) => toView(kc, c)));
-  return sortKeyViews(rows);
+  return sortKeyViews(filterKeysForOrg(rows, orgId));
 }
 
 async function toView(kc: KeycloakAdminClient, c: KcClient): Promise<GatewayKeyView> {

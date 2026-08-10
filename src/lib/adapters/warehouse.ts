@@ -75,7 +75,11 @@ export interface WarehousePort {
   sample(table: string, limit?: number, scope?: WarehouseScope): Promise<ParsedClickHouse | null>;
   // Operator-typed READ-ONLY SQL. Returns the parsed rows, or a rejection reason (guard failure /
   // engine error) — never throws.
-  query(sql: string): Promise<{ ok: true; result: ParsedClickHouse } | { ok: false; reason: string }>;
+  query(
+    sql: string,
+    /** The caller's own database, used as the connection default so bare names resolve to it. */
+    database?: string | null,
+  ): Promise<{ ok: true; result: ParsedClickHouse } | { ok: false; reason: string }>;
   // Run a sequence of GOVERNED DDL statements (built + validated by src/lib/schema-model.ts) in
   // order. Every statement must be pre-validated by the pure model — this method does NOT guard, it
   // only executes. Stops at the first failure and returns the reason. Used by the analytical-model
@@ -86,9 +90,18 @@ export interface WarehousePort {
 // Run a statement over the ClickHouse HTTP interface. POST the SQL as the body (GET query-string has
 // length limits and logs the SQL); auth via the X-ClickHouse-User/Key headers. Returns the raw text
 // so the caller parses with the pure parser; throws on a transport/HTTP error so callers can degrade.
-async function runSql(sql: string): Promise<string> {
+/**
+ * Run one statement.
+ *
+ * `database` sets the connection's DEFAULT database, which is what makes an unqualified table name
+ * (`FROM fact_policy`) resolve to the caller's own tenant. Without it every unqualified reference
+ * resolved against ClickHouse's `default` database — so scoping the console's starter queries by
+ * un-qualifying them would have silently pointed them all at the wrong place.
+ */
+async function runSql(sql: string, database?: string | null): Promise<string> {
   const { url, user, password } = warehouseConfig();
-  const res = await fetch(url, {
+  const target = database ? `${url}${url.includes('?') ? '&' : '?'}database=${encodeURIComponent(database)}` : url;
+  const res = await fetch(target, {
     method: 'POST',
     headers: {
       'content-type': 'text/plain',
@@ -197,11 +210,12 @@ export const clickhouseWarehouse: WarehousePort = {
     }
   },
 
-  async query(sql) {
+  async query(sql, database = ALL_DATABASES) {
     const guard = guardReadOnlySql(sql);
     if (!guard.ok) return { ok: false, reason: guard.reason ?? 'rejected' };
     try {
-      const text = await runSql(withJsonFormat(sql));
+      // The tenant's database becomes the connection default, so bare table names are theirs.
+      const text = await runSql(withJsonFormat(sql), database);
       return { ok: true, result: parseClickHouseJson(text) };
     } catch (err) {
       return { ok: false, reason: describeError(err) };

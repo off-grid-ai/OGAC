@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   if (gate instanceof NextResponse) return gate;
   if (!keycloakConfigured()) return NextResponse.json({ configured: false, keys: [] });
   try {
-    const keys = await listGatewayKeys();
+    const keys = await listGatewayKeys(await currentOrgId());
     return NextResponse.json({ configured: true, keys }, { headers: { 'cache-control': 'no-store' } });
   } catch (err) {
     const status = err instanceof KeycloakError ? err.status : 500;

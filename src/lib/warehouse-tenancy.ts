@@ -52,3 +52,51 @@ export function tableInScope(name: string, database: string | null): boolean {
   const prefix = name.slice(0, dot).trim().toLowerCase();
   return prefix === database;
 }
+
+/**
+ * Reject an operator SQL statement that reaches outside the viewer's own warehouse database. PURE.
+ *
+ * WHY THIS EXISTS. `listTables`, `tableStats` and `sample` were all scoped through the helpers above.
+ * The operator SQL console was not: `POST /api/v1/admin/warehouse/query` handed the statement
+ * straight to ClickHouse, and the only guard in front of it checked that the verb was a read. So a
+ * `SELECT … FROM <other tenant>.fact_claim` was a valid, executable query.
+ *
+ * It was not theoretical. The insurer's own suggested starter queries were hardcoded to
+ * `FROM bfsi.fact_claim` and `FROM bfsi.fact_kyc_event` — another database entirely — so the shortest
+ * path to reading someone else's rows was to click a button the product itself offered.
+ *
+ * HOW IT DECIDES. Every `database.table` reference in the statement must name the viewer's database.
+ * An UNQUALIFIED table (`FROM fact_policy`) is fine: the connection's own default database applies,
+ * and that is the viewer's. Anything qualified with a different database is refused by name.
+ *
+ * Deliberately a denylist-of-references and not a SQL parser. It runs AFTER `guardReadOnlySql`, which
+ * has already rejected comments, semicolons and every non-read verb — so the input here is a single
+ * read statement, and the shapes a reference can take are narrow.
+ */
+export function assertQueryInScope(
+  sql: string,
+  database: string | null,
+): { ok: true } | { ok: false; reason: string } {
+  const text = String(sql ?? '');
+  // ALL_DATABASES (the platform operator) is unscoped by design — it administers every tenant.
+  if (database === ALL_DATABASES) return { ok: true };
+  if (!database) return { ok: false, reason: 'no warehouse scope for this account' };
+
+  // `db.table` after FROM/JOIN/INTO, plus bare `db.table` anywhere (a subquery, a UNION arm).
+  const refs = new Set<string>();
+  for (const m of text.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/g)) {
+    refs.add(m[1].toLowerCase());
+  }
+  // ClickHouse's own schema databases are readable by anyone and carry no tenant rows.
+  const OPEN = new Set(['system', 'information_schema']);
+  const foreign = [...refs].filter((db) => db !== database.toLowerCase() && !OPEN.has(db));
+  if (foreign.length > 0) {
+    return {
+      ok: false,
+      // Name what was refused and what IS allowed. "forbidden" on its own taught the reader nothing
+      // and made a working guard look like a broken page.
+      reason: `this account can only query the "${database}" database — remove the reference to "${foreign[0]}"`,
+    };
+  }
+  return { ok: true };
+}

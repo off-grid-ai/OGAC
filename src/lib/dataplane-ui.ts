@@ -127,7 +127,7 @@ const BANK_STARTER_QUERIES: StarterQuery[] = [
     description: 'Count of transactions marked as flagged, grouped by the channel they came through.',
     sql:
       'SELECT channel, count() AS txns, countIf(is_flagged = 1) AS flagged\n' +
-      'FROM bfsi.fact_transaction\n' +
+      'FROM fact_transaction\n' +
       'GROUP BY channel\n' +
       'ORDER BY flagged DESC',
   },
@@ -151,7 +151,7 @@ const BANK_STARTER_QUERIES: StarterQuery[] = [
     description: 'Daily volume of KYC verification events — a freshness + activity check on the pipeline.',
     sql:
       'SELECT toDate(event_time) AS day, count() AS events\n' +
-      'FROM bfsi.fact_kyc_event\n' +
+      'FROM fact_kyc_event\n' +
       'GROUP BY day\n' +
       'ORDER BY day DESC\n' +
       'LIMIT 30',
@@ -181,7 +181,7 @@ const INSURER_STARTER_QUERIES: StarterQuery[] = [
     description: 'In-force book by policy status — in-force, lapsed, matured, surrendered — with sum assured.',
     sql:
       'SELECT status, count() AS policies, sum(sum_assured) AS sum_assured\n' +
-      'FROM bfsi.fact_policy\n' +
+      'FROM fact_policy\n' +
       'GROUP BY status\n' +
       'ORDER BY policies DESC',
   },
@@ -194,7 +194,7 @@ const INSURER_STARTER_QUERIES: StarterQuery[] = [
       '       count() AS policies,\n' +
       "       countIf(is_paid = 1) AS paid,\n" +
       "       round(100.0 * countIf(is_paid = 1) / count(), 1) AS persistency_pct\n" +
-      'FROM bfsi.fact_premium\n' +
+      'FROM fact_premium\n' +
       'GROUP BY band\n' +
       'ORDER BY persistency_pct DESC',
   },
@@ -207,7 +207,7 @@ const INSURER_STARTER_QUERIES: StarterQuery[] = [
       '       count() AS claims,\n' +
       "       countIf(status = 'settled') AS settled,\n" +
       "       sum(if(status = 'settled', settled_amount, 0)) AS settled_amount\n" +
-      'FROM bfsi.fact_claim\n' +
+      'FROM fact_claim\n' +
       'GROUP BY type\n' +
       'ORDER BY claims DESC',
   },
@@ -217,14 +217,22 @@ const INSURER_STARTER_QUERIES: StarterQuery[] = [
     description: 'Daily volume of KYC verification events — a freshness + activity check on the pipeline.',
     sql:
       'SELECT toDate(event_time) AS day, count() AS events\n' +
-      'FROM bfsi.fact_kyc_event\n' +
+      'FROM fact_kyc_event\n' +
       'GROUP BY day\n' +
       'ORDER BY day DESC\n' +
       'LIMIT 30',
   },
 ];
 
-/** Starter queries for a tenant — bank vs insurer. Keeps bank concepts off the insurer tenant. */
+/**
+ * Starter queries for a tenant — bank vs insurer. Keeps bank concepts off the insurer tenant.
+ *
+ * The table names are DELIBERATELY UNQUALIFIED. They used to read `FROM bfsi.fact_claim` — a
+ * database belonging to nobody in this tenant — so the insurer's own "Claims by type" button, offered
+ * by the product, read another tenant's claim register. An unqualified name resolves to the
+ * connection's default database, which is the viewer's own, so the query is both correct and
+ * impossible to point somewhere else by accident.
+ */
 export function starterQueriesFor(flavour: 'bank' | 'insurer'): StarterQuery[] {
   return flavour === 'bank' ? BANK_STARTER_QUERIES : INSURER_STARTER_QUERIES;
 }
