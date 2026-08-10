@@ -109,9 +109,10 @@ export function freshnessTone(label: string, ageMs: number | null | undefined): 
 }
 
 // ─── Starter queries (the Query console's "Athena" examples) ───────────────────
-// Real, runnable read-only queries against the live `bfsi` schema (8 tables, 600k+ rows). Each is a
-// single SELECT so it passes the server-side read-only guard. Titles/descriptions are operator
-// language — no engine names.
+// Real, runnable read-only queries against the viewer's OWN warehouse database (the tenant's
+// ClickHouse db, named by its slug — see src/lib/warehouse-tenancy.ts). Each is a single SELECT so
+// it passes the server-side read-only guard. Titles/descriptions are operator language — no engine
+// names.
 export interface StarterQuery {
   id: string;
   title: string;
@@ -119,7 +120,12 @@ export interface StarterQuery {
   sql: string;
 }
 
-// ── BANK starters (org_bharat) — the union-bank book: transactions, loans/NPA, KYC, branches. ──
+// ── BANK starters (org_bharat) — the union-bank book: transactions, loans/NPA, KYC, branches.
+//
+// The table names are DELIBERATELY UNQUALIFIED (see starterQueriesFor's doc below). They used to read
+// `FROM bfsi.fact_loan` — a database belonging to NEITHER tenant — so the shortest path to reading
+// someone else's rows was clicking a button the product itself offered. The bank's own warehouse
+// (database `bharatunion`, see scripts/seed-bharatunion-warehouse.mts) now carries these tables. ──
 const BANK_STARTER_QUERIES: StarterQuery[] = [
   {
     id: 'flagged-by-channel',
@@ -140,8 +146,8 @@ const BANK_STARTER_QUERIES: StarterQuery[] = [
       '       count() AS loans,\n' +
       "       countIf(l.npa_flag = 1) AS npa_loans,\n" +
       "       sum(if(l.npa_flag = 1, l.outstanding_amount, 0)) AS npa_outstanding\n" +
-      'FROM bfsi.fact_loan AS l\n' +
-      'LEFT JOIN bfsi.dim_product AS p ON p.product_id = l.product_id\n' +
+      'FROM fact_loan AS l\n' +
+      'LEFT JOIN dim_product AS p ON p.product_id = l.product_id\n' +
       'GROUP BY product\n' +
       'ORDER BY npa_outstanding DESC',
   },
@@ -162,8 +168,8 @@ const BANK_STARTER_QUERIES: StarterQuery[] = [
     description: 'How the account base is distributed across branches, joined to the branch dimension.',
     sql:
       'SELECT b.branch_name AS branch, b.city AS city, count() AS accounts\n' +
-      'FROM bfsi.fact_account AS a\n' +
-      'LEFT JOIN bfsi.dim_branch AS b ON b.branch_id = a.branch_id\n' +
+      'FROM fact_account AS a\n' +
+      'LEFT JOIN dim_branch AS b ON b.branch_id = a.branch_id\n' +
       'GROUP BY branch, city\n' +
       'ORDER BY accounts DESC\n' +
       'LIMIT 25',
