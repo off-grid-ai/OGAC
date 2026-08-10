@@ -39,7 +39,7 @@ test('describeDriftAttribution: normalizes engine label + drift pct', () => {
     summarizeDrift({ ...base, engine: 'evidently', fallbackReason: null }) as unknown as Record<string, unknown>,
   );
   assert.ok(v);
-  assert.equal(v!.engineLabel, 'Evidently');
+  assert.equal(v!.engineLabel, 'Verified drift engine');
   assert.equal(v!.engineProven, true);
   assert.equal(v!.driftPct, 50);
   assert.equal(v!.status, 'warning');

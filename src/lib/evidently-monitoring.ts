@@ -8,7 +8,7 @@
 // fully unit-testable; the store/route feed it real data. Attribution normalization is reused from
 // drift-run.ts (DRY) — this module never re-implements engine-provenance logic.
 
-import { describeDriftAttribution, type DriftAttributionView } from '@/lib/drift-run';
+import { describeDriftAttribution, driftEngineLabel, type DriftAttributionView } from '@/lib/drift-run';
 import type { DriftRun } from '@/lib/drift-runs';
 
 // The default breach line — matches the PSI "drift" threshold in adapters/drift.ts (0.25) so a
@@ -112,7 +112,7 @@ function entryFromRun(run: DriftRun): DriftReportEntry {
     id: run.id,
     startedAt: run.startedAt,
     engine: attr?.engine ?? run.engine,
-    engineLabel: attr?.engineLabel ?? (run.engine === 'evidently' ? 'Evidently' : 'Off Grid PSI'),
+    engineLabel: attr?.engineLabel ?? driftEngineLabel(run.engine),
     engineProven: attr?.engineProven ?? false,
     driftShare: driftShare,
     driftPct: driftShare === null ? null : Math.round(driftShare * 100),
