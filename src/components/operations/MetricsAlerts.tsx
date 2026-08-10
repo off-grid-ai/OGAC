@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -38,16 +39,36 @@ export function MetricsAlerts({
   }
   if (!engineDeployed) {
     return (
-      <div className="flex w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border p-10 text-center">
-        <span className="text-sm font-medium text-foreground">No alerting engine deployed</span>
-        <span className="max-w-lg text-xs text-muted-foreground">
-          VictoriaMetrics is connected, but no rule engine (vmalert) is running against it — so there
-          are no recording/alerting rules or firing alerts to show. Deploy vmalert and point it at
-          this instance to manage alert rules here.
-        </span>
-        {engineError ? (
-          <span className="font-mono text-[11px] text-muted-foreground/60">{engineError}</span>
-        ) : null}
+      <div className="w-full space-y-4">
+        <div className="flex w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border p-10 text-center">
+          <span className="text-sm font-medium text-foreground">No alerting engine deployed</span>
+          <span className="max-w-lg text-xs text-muted-foreground">
+            VictoriaMetrics is connected, but no rule engine (vmalert) is running against it — so
+            there are no recording/alerting rules or firing alerts to show. This is a genuinely
+            unconfigured capability, not a broken one: a single-node VictoriaMetrics deploys without
+            an alerting engine by default. Deploy vmalert and point it at this instance to define and
+            evaluate rules here.
+          </span>
+          {engineError ? (
+            <span className="font-mono text-[11px] text-muted-foreground/60">{engineError}</span>
+          ) : null}
+        </div>
+        <div className="rounded-md border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">What this view will show once vmalert is deployed</p>
+          <p className="mt-1">
+            Firing/pending counts, the alerting and recording rules currently loaded, and each rule&apos;s
+            health and query — evaluated on a schedule against the metric series already flowing into
+            VictoriaMetrics. A rule can only fire on a series that exists: an application also needs to
+            be emitting the metrics you want to alert on.
+          </p>
+          <p className="mt-2">
+            In the meantime, run any query directly against what VictoriaMetrics already holds in the{' '}
+            <Link href="/operations/health/metrics/explorer" className="text-primary hover:underline">
+              Metrics Explorer
+            </Link>
+            .
+          </p>
+        </div>
       </div>
     );
   }
