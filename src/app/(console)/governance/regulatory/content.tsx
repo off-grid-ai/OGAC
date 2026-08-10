@@ -23,6 +23,7 @@ import { buildComplianceActivity } from '@/lib/compliance-activity';
 import { frameworkOverview, statusMap } from '@/lib/compliance-adoption';
 import { buildCrossMap, CATALOG } from '@/lib/compliance-catalog';
 import { requireModuleForUser } from '@/lib/module-access';
+import { plainAction } from '@/lib/plain-identifiers';
 import { listGovernance, readComplianceActivity } from '@/lib/store';
 import { currentOrgId } from '@/lib/tenancy';
 import { PageFrame } from '@/components/PageFrame';
@@ -229,8 +230,11 @@ export async function RegulatorySurface({
                       <TableBody>
                         {activity.byAction.slice(0, 8).map((r) => (
                           <TableRow key={r.key}>
-                            <TableCell className="font-mono text-xs text-foreground">
-                              {r.key}
+                            {/* A machine action code ('pipeline.data.read') on the pack this
+                                surface exists to hand a REGULATOR — plainAction un-dots it into a
+                                phrase without inventing a meaning the code doesn't have. */}
+                            <TableCell className="text-xs text-foreground" title={r.key}>
+                              {plainAction(r.key)}
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">
                               {r.events}
@@ -272,8 +276,8 @@ export async function RegulatorySurface({
                             {e.ts ? e.ts.replace('T', ' ').slice(0, 19) : '—'}
                           </TableCell>
                           <TableCell className="text-foreground">{e.actor}</TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {e.action}
+                          <TableCell className="text-xs text-muted-foreground" title={e.action}>
+                            {plainAction(e.action)}
                           </TableCell>
                           <TableCell>
                             <Badge

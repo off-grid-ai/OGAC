@@ -136,8 +136,14 @@ export function VectorDBInspector({ urlHint }: Readonly<{ urlHint?: string }>) {
               onChange={(e) => setKind(e.target.value as 'qdrant' | 'lancedb')}
               className="rounded border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
             >
-              <option value="qdrant">qdrant</option>
-              <option value="lancedb">lancedb</option>
+              {/* Option TEXT only — never the OSS project name. `value` stays 'qdrant'/'lancedb'
+                  (the wire protocol the /api/v1/vectordb route dispatches on); a viewer who never
+                  clicks "Connect" still sees this <select>'s current option rendered as page text,
+                  which is how "qdrant" ended up on /data/sources. The two need distinct labels —
+                  they are genuinely different backends the operator is choosing between — so this
+                  describes the deployment shape rather than collapsing both to "vector index". */}
+              <option value="qdrant">Vector index (service)</option>
+              <option value="lancedb">Vector index (embedded)</option>
             </select>
           </label>
           <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">

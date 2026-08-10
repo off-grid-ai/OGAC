@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import type { BlockingDecision, HomeTile, OperatorHome } from '@/lib/overview-synthesis';
+import { previewText } from '@/lib/plain-text';
 import { cn } from '@/lib/utils';
 
 // Presentational pieces for the operator home. Pure render — every datum comes from the synthesized
@@ -183,7 +184,14 @@ export function ActivityCard({ activity }: Readonly<{ activity: OperatorHome['ac
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <Sparkle className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-sm text-foreground">{r.query || r.agentId}</span>
+                  {/* A multi-step agent run's query is composed from prior steps, which can
+                      include an earlier step's own model-written answer — genuine markdown, not
+                      something a person typed. This is exactly the "list-row summary" case
+                      plain-text.ts's previewText exists for: literal `**` asterisks showed up as
+                      page text here rather than a bold word. */}
+                  <span className="truncate text-sm text-foreground">
+                    {previewText(r.query, 80) || r.agentId}
+                  </span>
                 </span>
                 <Badge variant="secondary" className={statusCls}>
                   {r.status}

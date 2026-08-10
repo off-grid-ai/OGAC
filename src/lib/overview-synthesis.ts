@@ -1,4 +1,7 @@
-// PURE operator-home synthesizer — ZERO imports, zero I/O, fully unit-testable in isolation. This
+// PURE operator-home synthesizer — zero I/O, fully unit-testable in isolation. Its one import,
+// `publicLabel`, is itself zero-import/zero-IO (see lineage-labels.ts), so the whole chain stays
+// synchronous and mock-free; it is reused here rather than re-deriving a second "hide the engine
+// name" rule, which is exactly the DRY failure lineage-labels.ts's own header warns against. This
 // is the SOLID seam for the Overview module (mirrors tenancy-policy.ts): the page in
 // (console)/overview/page.tsx does ALL the fetching — analytics, finops, policy/guardrails status,
 // the SIEM audit stream, service health, recent agent runs — then hands the raw module snapshots to
@@ -16,9 +19,12 @@
 // "blocking decisions (last 24h)" feed that UNIONS the audit stream's blocked/denied events, the
 // policy engine's denies, and the guardrail redactions — the governance events an operator must see.
 
+import { publicLabel } from './lineage-labels';
+
 // ── Loose input snapshots (only the fields the synthesis reads; every field defensive) ──────────
 // These mirror the shapes the real module functions return, but are re-declared loosely here so the
-// pure file imports nothing. The page passes the real objects; extra fields are ignored.
+// pure file imports nothing FROM THE I/O LAYER. The page passes the real objects; extra fields are
+// ignored.
 
 export interface AnalyticsSnapshot {
   totalEvents: number;
@@ -388,8 +394,12 @@ function synthesizeBlocking(
       source: 'guardrails',
       kind: 'redacted',
       title: `${redactedCount.toLocaleString()} PII redaction${redactedCount === 1 ? '' : 's'}`,
+      // NOT the raw engine id — this interpolated 'llm-guard' straight onto the Overview's
+      // blocking feed, the first governance surface a buyer opens, contradicting this very
+      // function's own "never surface the underlying engine/product name" rule two functions up
+      // (guardrailPosture). publicLabel says what the engine DID instead.
       subject: guardrails
-        ? `${guardrails.engine} engine masked sensitive data`
+        ? `${publicLabel(guardrails.engine)} engine masked sensitive data`
         : 'sensitive data masked',
       ts: '', // rollup, not a single-event timestamp
       href: '/governance/guardrails',

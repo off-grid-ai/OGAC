@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { leaksInternalName } from '../src/lib/lineage-labels.ts';
 import { type OperatorHomeInput, synthesizeOperatorHome } from '../src/lib/overview-synthesis.ts';
 
 // Pure operator-home synthesizer. No network, no mocks — representative module snapshots in, the
@@ -144,6 +145,26 @@ test('blocking items are newest-first, timestamped ones before the undated rollu
     ['policy:d1', 'audit:a1', 'audit:a2', 'guardrails:redactions'],
   );
   assert.equal(blocking.items[blocking.items.length - 1].ts, '');
+});
+
+// LIVE FINDING: /overview rendered "llm-guard" in the blocking feed's redaction rollup subject —
+// the guardrails engine id was interpolated raw into `${guardrails.engine} engine masked sensitive
+// data`, on the first governance surface a buyer opens. This is the same engine field
+// `guardrailPosture` (a few lines up in overview-synthesis.ts) already treats as forbidden to
+// surface; the rollup subject just hadn't been fixed to match.
+test('blocking guardrails rollup subject never names the guardrail engine', () => {
+  const input = fullInput();
+  input.guardrails = { engine: 'llm-guard', reachable: true, configured: true };
+  const { blocking } = synthesizeOperatorHome(input);
+  const g = blocking.items.find((i) => i.source === 'guardrails')!;
+  assert.equal(leaksInternalName(g.subject), false, g.subject);
+  assert.match(g.subject, /engine masked sensitive data/);
+});
+
+test('blocking guardrails rollup: the guard actually catches the shape that shipped', () => {
+  // The exact subject overview-synthesis.ts wrote before this fix (guardrails.engine interpolated
+  // raw). If this stops passing, the assertion above has stopped meaning anything.
+  assert.equal(leaksInternalName('llm-guard engine masked sensitive data'), true);
 });
 
 test('every blocking item deep-links to its source module', () => {
