@@ -1,4 +1,5 @@
 import { toPlainText } from '@/lib/plain-text';
+import { publicLabel } from '@/lib/lineage-labels';
 import { Markdown } from '@/components/chat/Markdown';
 import {
   ArrowLeft,
@@ -167,7 +168,15 @@ export default async function RunDetailPage({
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-foreground">{s.label}</span>
+                            {/* A step's label is sometimes an engine id ('llm-guard', a policy or
+                                sandbox engine) rather than authored copy — it is what named the
+                                LLM Guard scanner directly in a run's timeline, the worst of the
+                                five confirmed leaks (the payoff screen the one-pager sends buyers
+                                to open first). Applied at display time, like `publicLabel`'s other
+                                call sites, so it also cleans up steps already persisted. */}
+                            <span className="text-xs font-medium text-foreground">
+                              {publicLabel(s.label)}
+                            </span>
                             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                               {s.kind}
                             </span>

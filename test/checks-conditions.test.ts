@@ -17,6 +17,7 @@ import {
   piiVerdict,
   runChecks,
 } from '@/lib/checks';
+import { leaksInternalName } from '@/lib/lineage-labels';
 
 // ─── piiVerdict — the fail-closed / not-configured / hit / clean mapping (pure) ────────────────────
 
@@ -96,6 +97,49 @@ test('piiOutputVerdict retains degraded shard coverage on a blocked output hit',
   });
   assert.equal(out.verdict, 'blocked');
   assert.match(out.detail ?? '', /coverage degraded/);
+});
+
+// ─── engine-name leak guard ─────────────────────────────────────────────────────────────────────
+//
+// LIVE FINDING: the demo readiness sweep found "llm-guard" on /governance/evidence/audit and
+// /overview. Both surfaces render an audit event's `resource`/`detail` field, which is built from
+// exactly the sentences below (auditEnforcement appends the CheckResult.detail onto the audit
+// resource; siem-view's `detail` field also picks up `resource`). Before this fix these four
+// branches wrote the raw PiiCheckInput.engine id (e.g. 'llm-guard') straight into a sentence that
+// ends up on a customer-facing screen — `leaksInternalName` is the one vocabulary list every such
+// screen is checked against, so it is what this guard asserts on too.
+
+test("engine-name leak guard: none of piiVerdict/piiOutputVerdict's sentences name the engine", () => {
+  const blocked = piiVerdict({
+    hits: true,
+    blocked: true,
+    configured: true,
+    entities: ['GUARDRAIL_UNAVAILABLE'],
+    engine: 'llm-guard',
+  });
+  assert.equal(leaksInternalName(blocked.detail), false, blocked.detail);
+
+  const notConfigured = piiVerdict({ hits: false, configured: false, entities: [], engine: 'llm-guard' });
+  assert.equal(leaksInternalName(notConfigured.detail), false, notConfigured.detail);
+
+  const hit = piiVerdict({ hits: true, configured: true, entities: ['Anonymize'], engine: 'llm-guard' });
+  assert.equal(leaksInternalName(hit.detail), false, hit.detail);
+
+  const masked = piiOutputVerdict(
+    { hits: true, entities: ['Sensitive'], engine: 'llm-guard', redacted: 'sanitized' },
+    true,
+  );
+  assert.equal(leaksInternalName(masked.detail), false, masked.detail);
+
+  const outputBlocked = piiOutputVerdict({ hits: true, entities: ['Sensitive'], engine: 'llm-guard' });
+  assert.equal(leaksInternalName(outputBlocked.detail), false, outputBlocked.detail);
+});
+
+test('engine-name leak guard: the guard actually catches the shape that shipped', () => {
+  // The exact sentence checks.ts wrote before this fix (result.engine interpolated raw). If this
+  // assertion ever stops passing, the guard above has stopped meaning anything.
+  const shipped = 'guardrail engine unavailable (llm-guard) — run blocked (fail-closed): GUARDRAIL_UNAVAILABLE';
+  assert.equal(leaksInternalName(shipped), true, 'the vocabulary check must catch the real defect');
 });
 
 // ─── injectionCheck — hit + miss + null-input nullish arm ──────────────────────────────────────────

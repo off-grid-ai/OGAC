@@ -6,8 +6,10 @@ import { PipelineFacetSelect } from '@/components/pipelines/PipelineFacetSelect'
 import { readAuditPage } from '@/lib/audit-log-reader';
 import { auditFiltersToQuery, parseAuditFilters, type AuditOutcome } from '@/lib/audit-log-view';
 import { buildAuditStats } from '@/lib/insights-stats';
+import { publicLabel } from '@/lib/lineage-labels';
 import { requireModuleForUser } from '@/lib/module-access';
 import { filterAuditForPipeline } from '@/lib/pipeline-api-key-format';
+import { plainAction } from '@/lib/plain-identifiers';
 import { listPipelines } from '@/lib/pipelines';
 import { resolvePipelineFacet } from '@/lib/pipelines-policy';
 import { currentOrgId } from '@/lib/tenancy';
@@ -178,10 +180,23 @@ export async function AuditLogSurface({
                           </span>
                         )}
                       </td>
-                      <td className="p-2 font-mono text-xs">{r.action}</td>
+                      {/* A machine action code ('pipeline.data.read') — plainAction un-dots it
+                          for the reader; the original stays in the title attribute for anyone
+                          who wants the exact code. */}
+                      <td className="p-2 text-xs" title={r.action}>
+                        {plainAction(r.action)}
+                      </td>
                       <td className="p-2 text-muted-foreground">{r.project || '—'}</td>
-                      <td className="max-w-[16rem] truncate p-2 text-muted-foreground">
-                        {r.resource || '—'}
+                      {/* The resource string is built from an enforcement detail sentence that
+                          used to interpolate the raw guardrail engine id ('llm-guard') — the
+                          source (checks.ts) no longer does, but publicLabel is applied here too
+                          so a future producer that composes a resource string the same way is
+                          caught at display rather than silently reappearing on this page. */}
+                      <td
+                        className="max-w-[16rem] truncate p-2 text-muted-foreground"
+                        title={r.resource}
+                      >
+                        {publicLabel(r.resource) || '—'}
                       </td>
                       <td className="p-2 text-muted-foreground">{r.model || '—'}</td>
                       <td className="p-2 text-right tabular-nums">{r.tokens || '—'}</td>

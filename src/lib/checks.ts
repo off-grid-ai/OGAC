@@ -1,6 +1,13 @@
 import { getPii } from './adapters/registry';
 import type { PiiResult } from './adapters/types';
 import { CHECK_IDS } from './check-ids';
+// The engine id (`result.engine`, e.g. 'llm-guard') is kept on the result for internal logic
+// (guardrailCoverageDetail, the catalog), but a customer reads the sentences below — the audit
+// resource column, the run timeline's guard step — so the OSS engine name is never interpolated
+// into them raw. `publicLabel` is the one place that vocabulary lives; reused here rather than a
+// second copy of it (this module used to write `guardrail engine unavailable (llm-guard) — ...`
+// straight into a persisted, customer-facing sentence).
+import { publicLabel } from './lineage-labels';
 
 export { CHECK_IDS } from './check-ids';
 
@@ -104,7 +111,7 @@ export function piiVerdict(result: PiiCheckInput): CheckResult {
       name: 'pii',
       verdict: 'blocked',
       detail: withCoverage(
-        `guardrail engine unavailable (${result.engine}) — run blocked (fail-closed): ${result.entities.join(', ')}`,
+        `guardrail engine unavailable (${publicLabel(result.engine)}) — run blocked (fail-closed): ${result.entities.join(', ')}`,
         result,
       ),
     };
@@ -114,7 +121,7 @@ export function piiVerdict(result: PiiCheckInput): CheckResult {
       name: 'pii',
       verdict: 'warn',
       detail: withCoverage(
-        `guardrails not configured (${result.engine}) — input was NOT screened`,
+        `guardrails not configured (${publicLabel(result.engine)}) — input was NOT screened`,
         result,
       ),
     };
@@ -124,7 +131,7 @@ export function piiVerdict(result: PiiCheckInput): CheckResult {
     name: 'pii',
     verdict: result.hits ? 'redacted' : coverage ? 'warn' : 'pass',
     detail: withCoverage(
-      result.hits ? `PII (${result.engine}): ${result.entities.join(', ')}` : undefined,
+      result.hits ? `PII (${publicLabel(result.engine)}): ${result.entities.join(', ')}` : undefined,
       result,
     ),
   };
@@ -153,7 +160,7 @@ export function piiOutputVerdict(result: PiiCheckInput, requireMasking = false):
       ...verdict,
       redactedText: sanitized,
       detail: withCoverage(
-        `output PII masked for release (${result.engine}): ${result.entities.join(', ')}`,
+        `output PII masked for release (${publicLabel(result.engine)}): ${result.entities.join(', ')}`,
         result,
       ),
     };
@@ -162,7 +169,7 @@ export function piiOutputVerdict(result: PiiCheckInput, requireMasking = false):
     ...verdict,
     verdict: 'blocked',
     detail: withCoverage(
-      `output guardrail blocked release (${result.engine}): ${result.entities.join(', ')}`,
+      `output guardrail blocked release (${publicLabel(result.engine)}): ${result.entities.join(', ')}`,
       result,
     ),
   };
