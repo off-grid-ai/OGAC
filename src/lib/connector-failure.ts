@@ -87,7 +87,7 @@ export function describeThrown(error: unknown): string | undefined {
  *
  * `describeDecision()` is documented as "a ready log line" for the AUDIT LEDGER, and it reads like one:
  *   data-domain "expense claims" [dom_7d17b157-0e6] → connector con_f5c959 :: expense_claims (read)
- *   → ok(1 rows via mysql) — scoped to the case by claim_no, employee_id
+ *   → ok(1 row via mysql) — scoped to the case by claim_no, employee_id
  * app-run put that string into `step.detail`, and AppRunStatus renders `step.detail` verbatim — so the
  * audit line was on a department user's screen. Verified on the live run detail page for
  * apprun_a60fcc2f: `data-domain`, `connector`, raw ids, and `mysql` all visible.

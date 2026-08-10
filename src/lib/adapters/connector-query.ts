@@ -13,6 +13,7 @@
 // (recordAudit lives in store.ts, off-limits this phase). Instead every call returns a
 // `ResolutionDecision` describing the bind + outcome, and the caller (route / executor) is expected
 // to persist it via the existing audit helper. See `describeDecision` for a ready log line.
+import { plural } from '@/lib/plural';
 import { execConnectorRead } from '@/lib/connector-exec';
 import type {
   ConnectorQueryResult,
@@ -112,7 +113,10 @@ export async function queryDomain(
 export function describeDecision(d: ResolutionDecision): string {
   let outcome: string;
   if (d.ok) {
-    outcome = `ok(${d.rowsReturned} rows via ${d.dialect})`;
+    // plural(): a single-row read wrote "ok(1 rows via mysql)" into the audit resource, and that
+    // string is rendered verbatim on the evidence trail a buyer and an auditor both read. The dialect
+    // stays — that is the CUSTOMER's own database engine, which is useful to them, not one of ours.
+    outcome = `ok(${plural(d.rowsReturned ?? 0, 'row')} via ${d.dialect})`;
   } else if (d.failure) {
     // Name the cause in the audit line. "miss" was true but useless: it read the same whether the
     // table was empty or the credential was refused.
