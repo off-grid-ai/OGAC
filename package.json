@@ -28,6 +28,7 @@
     "seed:domains": "tsx scripts/seed-data-domains.mts",
     "seed:tenants": "tsx scripts/seed-demo-tenants.mts",
     "seed:telemetry-os": "tsx scripts/seed-tenant-telemetry-opensearch.mts",
+    "seed:gateway-keys": "tsx scripts/seed-gateway-api-keys.mts",
     "db:studio": "drizzle-kit studio",
     "test": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.test.ts",
     "test:integration": "node --test --experimental-strip-types --import ./test/support/register-alias.mjs test/**/*.integration.test.ts",
