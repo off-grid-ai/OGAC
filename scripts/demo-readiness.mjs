@@ -134,13 +134,22 @@ for (const path of paths) {
     // reading the page region mid-hop found it empty — so the harness reported "0 chars" on a page
     // that actually renders 1,861 characters of real lineage. A verification run that calls a working
     // page broken is worse than one that misses a fault: it sends someone to fix nothing.
+    // Reading page.url() is safe mid-navigation, but the settle loop can hand control back exactly as
+    // a CLIENT-side redirect tears down the execution context — which threw
+    // "Execution context was destroyed" for three routes and reported them as failures. Swallow that:
+    // a destroyed context means a navigation happened, which is the thing we were waiting for.
     let settled = page.url();
     for (let i = 0; i < 8; i += 1) {
-      await page.waitForTimeout(500);
-      const now = page.url();
-      if (now === settled) break;
-      settled = now;
+      try {
+        await page.waitForTimeout(500);
+        const now = page.url();
+        if (now === settled) break;
+        settled = now;
+      } catch {
+        await page.waitForTimeout(800);
+      }
     }
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
     await page.waitForTimeout(2600);
     // Read the page region only — never the shell, nav or hellobar, whose text is identical everywhere
     // and would mask a genuinely bare page as thousands of characters of content.
