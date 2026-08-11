@@ -84,7 +84,17 @@ export interface WarehousePort {
   // order. Every statement must be pre-validated by the pure model — this method does NOT guard, it
   // only executes. Stops at the first failure and returns the reason. Used by the analytical-model
   // management surface, never for arbitrary operator input.
-  execDdl(statements: string[]): Promise<{ ok: true } | { ok: false; reason: string }>;
+  //
+  // `database` sets the connection default for this DDL — the SAME reason `query()` takes it. The
+  // view/table's own qualified name in the DDL is already scoped, but its BODY (a model's SELECT,
+  // e.g. `FROM fact_policy`) is written with bare table names, exactly like the SQL console's own
+  // starter queries. Without a connection default those bare names resolve against ClickHouse's
+  // `default` database regardless of which tenant database the model targets — a model created for
+  // a tenant's own warehouse would 404 on its own tables the first time it read one.
+  execDdl(
+    statements: string[],
+    database?: string | null,
+  ): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
 // Run a statement over the ClickHouse HTTP interface. POST the SQL as the body (GET query-string has
@@ -222,7 +232,7 @@ export const clickhouseWarehouse: WarehousePort = {
     }
   },
 
-  async execDdl(statements) {
+  async execDdl(statements, database) {
     // Governed DDL only — the caller (schema-model routes) validates each statement through the
     // pure model before this runs. We execute in order and fail at the first error so a broken
     // migration doesn't leave a half-applied model silently.
@@ -234,7 +244,10 @@ export const clickhouseWarehouse: WarehousePort = {
         return { ok: false, reason: 'empty DDL statement' };
       }
       try {
-        await runSql(stmt);
+        // Same reason as query(): the DDL's own object name is qualified, but its BODY (a model's
+        // SELECT) is written with bare table names — those must resolve against the model's own
+        // tenant database, not ClickHouse's `default`.
+        await runSql(stmt, database);
       } catch (err) {
         return { ok: false, reason: describeError(err) };
       }

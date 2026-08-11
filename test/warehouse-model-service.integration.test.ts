@@ -19,6 +19,11 @@ const dbUp = await dbReachable();
 // be told to reject (simulating a ClickHouse error) so we can assert fail-closed ordering.
 function stubWarehouse(opts: { fail?: boolean } = {}) {
   const ran: string[][] = [];
+  // The database execDdl was called with, per call — asserts the create/edit/rollback/delete
+  // service methods thread the model's OWN database through to the warehouse (regression guard for
+  // the bug where execDdl always ran against ClickHouse's `default` database, so an unqualified
+  // `FROM fact_policy` in a model's SELECT body resolved against the wrong tenant's tables).
+  const dbs: (string | null | undefined)[] = [];
   const port = {
     meta: { id: 'stub', capability: 'bi', vendor: 'stub', render: 'native' as const },
     async health() {
@@ -36,14 +41,15 @@ function stubWarehouse(opts: { fail?: boolean } = {}) {
     async query() {
       return { ok: false as const, reason: 'not used' };
     },
-    async execDdl(statements: string[]) {
+    async execDdl(statements: string[], database?: string | null) {
       ran.push(statements);
+      dbs.push(database);
       return opts.fail
         ? { ok: false as const, reason: 'clickhouse 500: simulated' }
         : { ok: true as const };
     },
   };
-  return { port, ran };
+  return { port, ran, dbs };
 }
 
 test('analytical-model service lifecycle (real Postgres + stub warehouse)', {
@@ -84,6 +90,9 @@ test('analytical-model service lifecycle (real Postgres + stub warehouse)', {
   assert.deepEqual(wh.ran[0], [
     'CREATE OR REPLACE VIEW `suraksha_warehouse`.`' + name + '` AS SELECT toDate(filed_at) d, count() n FROM claims GROUP BY d',
   ]);
+  // Regression guard: the model's own database is the connection default for its DDL, so an
+  // unqualified table in its SELECT body resolves against the model's tenant, not `default`.
+  assert.equal(wh.dbs[0], 'suraksha_warehouse', 'create scopes execDdl to the model\'s own database');
   const d1 = created.ok ? created.value : null;
   assert.equal(d1!.currentVersion, 1);
   assert.deepEqual(d1!.versions[0].applyDdl, wh.ran[0], 'store froze the exact applied DDL');
@@ -107,6 +116,7 @@ test('analytical-model service lifecycle (real Postgres + stub warehouse)', {
   assert.equal(edited.ok, true);
   assert.equal(edited.ok && edited.value.currentVersion, 2);
   assert.equal(wh2.ran.length, 1);
+  assert.equal(wh2.dbs[0], 'suraksha_warehouse', 'edit scopes execDdl to the existing model\'s database');
   const d2 = await getModel(createdId, orgId);
   assert.equal(d2!.versions.length, 2);
 
@@ -116,6 +126,7 @@ test('analytical-model service lifecycle (real Postgres + stub warehouse)', {
   assert.equal(rolled.ok, true);
   assert.equal(rolled.ok && rolled.value.currentVersion, 1, 'pointer back to v1');
   assert.deepEqual(wh3.ran[0], d1!.versions[0].applyDdl, 're-applied v1 frozen DDL');
+  assert.equal(wh3.dbs[0], 'suraksha_warehouse', 'rollback scopes execDdl to the model\'s database');
   // trail preserved — v2 still exists
   assert.equal((await getModel(createdId, orgId))!.versions.length, 2);
 
@@ -130,6 +141,7 @@ test('analytical-model service lifecycle (real Postgres + stub warehouse)', {
   const del = await deleteModelLive(createdId, orgId, wh4.port);
   assert.equal(del.ok, true);
   assert.deepEqual(wh4.ran[0], ['DROP VIEW IF EXISTS `suraksha_warehouse`.`' + name + '`']);
+  assert.equal(wh4.dbs[0], 'suraksha_warehouse', 'delete scopes execDdl to the model\'s database');
   assert.equal(await getModel(createdId, orgId), null, 'store rows gone');
   createdId = '';
 });

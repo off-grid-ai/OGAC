@@ -60,7 +60,7 @@ export async function createModelLive(
   const plan = planModelApply(toModelInput(input.name, input.kind, input.database, input.definition));
   if (!plan.ok) return { ok: false, kind: 'invalid', errors: plan.errors };
 
-  const applied = await warehouse.execDdl(plan.statements);
+  const applied = await warehouse.execDdl(plan.statements, input.database);
   if (!applied.ok) return { ok: false, kind: 'warehouse', message: applied.reason };
 
   const created = await createModel(
@@ -94,7 +94,7 @@ export async function editModelLive(
   const plan = planModelApply(toModelInput(existing.name, existing.kind, existing.database, definition));
   if (!plan.ok) return { ok: false, kind: 'invalid', errors: plan.errors };
 
-  const applied = await warehouse.execDdl(plan.statements);
+  const applied = await warehouse.execDdl(plan.statements, existing.database);
   if (!applied.ok) return { ok: false, kind: 'warehouse', message: applied.reason };
 
   const version = nextVersion(existing.currentVersion);
@@ -118,7 +118,7 @@ export async function rollbackModelLive(
   const plan = planRollback(existing.versions, targetVersion);
   if (!plan.ok) return { ok: false, kind: 'invalid', errors: [plan.reason] };
 
-  const applied = await warehouse.execDdl(plan.statements);
+  const applied = await warehouse.execDdl(plan.statements, existing.database);
   if (!applied.ok) return { ok: false, kind: 'warehouse', message: applied.reason };
 
   const moved = await setCurrentVersion(id, targetVersion, orgId);
@@ -138,7 +138,10 @@ export async function deleteModelLive(
   const existing = await getModel(id, orgId);
   if (!existing) return { ok: false, kind: 'not_found', message: `model ${id} not found` };
 
-  const applied = await warehouse.execDdl(planModelDrop(existing.kind, existing.name, existing.database));
+  const applied = await warehouse.execDdl(
+    planModelDrop(existing.kind, existing.name, existing.database),
+    existing.database,
+  );
   if (!applied.ok) return { ok: false, kind: 'warehouse', message: applied.reason };
 
   await deleteModel(id, orgId);
