@@ -1,3 +1,4 @@
+import { opensearchFetch } from '@/lib/opensearch-http';
 import { AnalyticsStore, type TrafficRecord } from '@offgrid/analytics';
 import { NextResponse } from 'next/server';
 import { analyticsScopeFilters } from '@/lib/analytics-aggs';
@@ -27,12 +28,12 @@ export async function GET() {
   };
 
   try {
-    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
+    const r = await opensearchFetch(`/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
       cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
     if (!r.ok) return NextResponse.json({ available: false }, { status: 200 });
     const data = await r.json();

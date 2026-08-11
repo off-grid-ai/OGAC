@@ -1,3 +1,4 @@
+import { opensearchFetch } from '@/lib/opensearch-http';
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireUser } from '@/lib/authz';
 import {
@@ -37,12 +38,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const days = Number.isFinite(daysParam) && daysParam > 0 && daysParam <= 365 ? Math.floor(daysParam) : 30;
 
   try {
-    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
+    const r = await opensearchFetch(`/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(buildPromptAggsQuery(id, Date.now(), days)),
       cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
     if (!r.ok) return NextResponse.json(emptyPromptObservability(days));
     const data = await r.json();

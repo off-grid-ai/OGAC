@@ -84,7 +84,9 @@ const LEAKS = [
  */
 const ALLOWED_MATCHES = new Map([
   ['/data/integrations', /opensearch|elasticsearch/i],
-  ['/operations/services/capability-map', /seaweedfs/i],
+  // Any engine: this page IS the service inventory. Listing one pattern per product would mean
+  // re-editing the harness every time the fleet gains a component.
+  ['/operations/services/capability-map', /./],
   ['/work/prompts', /\bnull\b/],
   ['/workspace/prompts', /\bnull\b/],
 ]);

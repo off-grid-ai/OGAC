@@ -1,3 +1,4 @@
+import { opensearchFetch } from '@/lib/opensearch-http';
 import { costOf, type TrafficRecord } from '@offgrid/finops';
 import { desc, eq, sql } from 'drizzle-orm';
 import { bigint, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
@@ -120,12 +121,12 @@ export async function usageFor(subject: string, sinceMs: number): Promise<Subjec
     },
   };
   try {
-    const r = await fetch(`${OS_URL}/${OS_INDEX}/_search`, {
+    const r = await opensearchFetch(`/${OS_INDEX}/_search`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
       cache: 'no-store',
-      signal: AbortSignal.timeout(6000),
+      timeoutMs: 6000,
     });
     if (!r.ok) return { ...ZERO_USAGE };
     const data = await r.json();
