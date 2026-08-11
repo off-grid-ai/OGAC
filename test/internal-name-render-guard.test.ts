@@ -361,3 +361,29 @@ test('common prompts: the pre-fix rule would have kept a literal "null" hit', ()
   const newRuleRejects = (key: string) => !key || key === 'null' || key === 'undefined';
   assert.equal(newRuleRejects('null'), true, 'the fixed rule drops it');
 });
+
+test('a compound eval engine id never renders the evaluator name', async () => {
+  // '/insights/quality/evals' rendered "Answer relevancy:ragas". Values arrive both bare ('ragas')
+  // and compound ('answer_relevancy:ragas'); only the bare form was in the lookup table, so the
+  // compound one fell through to titleCase of the WHOLE string — suffix included.
+  const { evalEngineLabel } = await import('@/lib/eval-engine-label');
+  const { leaksInternalName } = await import('@/lib/lineage-labels');
+  for (const id of [
+    'answer_relevancy:ragas',
+    'faithfulness:ragas',
+    'context_precision:ragas',
+    'pii_leakage:heuristic',
+    'drift:evidently',
+    'ragas',
+  ]) {
+    const out = evalEngineLabel(id);
+    assert.ok(!leaksInternalName(out), `${id} → ${out}`);
+    assert.doesNotMatch(out, /:/, `${id} → ${out} still reads as a machine id`);
+  }
+});
+
+test('the guard catches the exact label that shipped', () => {
+  // A guard that can only pass is not a guard. titleCase of the raw compound id is what was on screen.
+  const shipped = 'Answer relevancy:ragas';
+  assert.match(shipped, /ragas/i, 'the shipped label did name the evaluator');
+});

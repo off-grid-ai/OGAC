@@ -1,3 +1,5 @@
+import { checkLabel } from '@/lib/quality-plain';
+
 // PURE render-label mapping for eval engines/suites — ZERO imports, ZERO I/O, unit-testable.
 //
 // The underlying evaluator engine (ragas / deepeval / presidio / guardrails / heuristic / promptfoo)
@@ -28,5 +30,19 @@ function titleCase(id: string): string {
 export function evalEngineLabel(engine: string | null | undefined): string {
   if (!engine) return 'Check';
   const key = engine.toLowerCase();
-  return ENGINE_LABEL[key] ?? titleCase(engine);
+  const known = ENGINE_LABEL[key];
+  if (known) return known;
+
+  // COMPOUND ids. Values arrive both bare ('ragas') and as '<metric>:<engine>'
+  // ('answer_relevancy:ragas', 'faithfulness:ragas'). Only the bare form was in the lookup, so a
+  // compound one fell through to titleCase of the WHOLE string and rendered "Answer relevancy:ragas"
+  // on the quality surfaces — naming the OSS evaluator to a customer, which is precisely what this
+  // mapper exists to prevent.
+  //
+  // The metric is the part a business reader wants; the library that computed it is not. checkLabel
+  // in quality-plain.ts already makes exactly that split and carries the plain-English vocabulary for
+  // each metric, so this delegates rather than growing a third mapper — the warning at the top of
+  // lineage-labels.ts is about how easily that happens here.
+  if (key.includes(':')) return checkLabel(engine);
+  return titleCase(engine);
 }
