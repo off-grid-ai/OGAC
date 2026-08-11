@@ -129,6 +129,18 @@ for (const path of paths) {
       }
     }
     status = res?.status() ?? 0;
+
+    // WAIT FOR A REDIRECT TO SETTLE before reading. /data/lineage 308s to /data/lineage/graph, and
+    // reading the page region mid-hop found it empty — so the harness reported "0 chars" on a page
+    // that actually renders 1,861 characters of real lineage. A verification run that calls a working
+    // page broken is worse than one that misses a fault: it sends someone to fix nothing.
+    let settled = page.url();
+    for (let i = 0; i < 8; i += 1) {
+      await page.waitForTimeout(500);
+      const now = page.url();
+      if (now === settled) break;
+      settled = now;
+    }
     await page.waitForTimeout(2600);
     // Read the page region only — never the shell, nav or hellobar, whose text is identical everywhere
     // and would mask a genuinely bare page as thousands of characters of content.
