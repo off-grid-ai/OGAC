@@ -16,6 +16,10 @@ test('Data exposes each existing management place as a stable route', () => {
       ['overview', '/data/flows'],
       ['replication', '/data/flows/replication'],
       ['orchestration', '/data/flows/orchestration'],
+      // The catalog and namespaces pages existed with no way to reach them from the menu — the
+      // whole point of this list is that a management place is reachable, so they belong in it.
+      ['catalog', '/data/flows/orchestration/catalog'],
+      ['namespaces', '/data/flows/orchestration/namespaces'],
     ],
   );
   assert.deepEqual(
