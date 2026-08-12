@@ -1,29 +1,32 @@
-<div align="center">
-  <img src="public/logo.png" width="88" alt="Off Grid AI" />
-  <h1>Off Grid AI</h1>
-  <h3>Enable every person to operate with the intelligence and capabilities of the entire enterprise.</h3>
-  <p>Source available. Five working AI use cases, live in 14 days, at zero cost. Set your rules once. Everyone builds governed AI on top.</p>
-  <p>
-    <a href="https://github.com/off-grid-ai/console/actions/workflows/ci.yml"><img src="https://github.com/off-grid-ai/console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <img src="https://img.shields.io/badge/coverage%20gate-%E2%89%A580%25%20enforced-brightgreen" alt="Coverage gate: lines, branches, functions and statements each held at &#8805;80%, enforced in pre-push and CI" />
-    <img src="https://img.shields.io/badge/tests-node--test-blue" alt="Tests: node --test" />
-    <img src="https://img.shields.io/badge/license-Off_Grid_AI_1.0-blue" alt="License: Off Grid AI Source-Available License 1.0" />
-    <img src="https://img.shields.io/badge/node-%E2%89%A522-brightgreen" alt="Node 22+" />
-  </p>
-  <p>
-    <b>The rest of the family</b> — the same private AI, on the devices your people already carry.
-  </p>
-  <p>
-    <a href="https://github.com/off-grid-ai/OGAM"><img src="https://img.shields.io/github/stars/off-grid-ai/OGAM?style=flat&amp;label=OGAM%20%C2%B7%20Mobile&amp;color=059669" alt="Off Grid AI Mobile (OGAM) — GitHub stars" /></a>
-    <a href="https://github.com/off-grid-ai/OGAD"><img src="https://img.shields.io/github/stars/off-grid-ai/OGAD?style=flat&amp;label=OGAD%20%C2%B7%20Desktop&amp;color=059669" alt="Off Grid AI Desktop (OGAD) — GitHub stars" /></a>
-  </p>
-  <p>
-    <sub>
-      <a href="https://github.com/off-grid-ai/OGAM"><b>OGAM</b></a> — chat, see, speak and generate on your phone or Mac. Local models, no account, nothing leaves the device.<br />
-      <a href="https://github.com/off-grid-ai/OGAD"><b>OGAD</b></a> — the same on your desktop, through one OpenAI-compatible gateway. Optional screen memory, all of it on-device.
-    </sub>
-  </p>
-</div>
+# Off Grid AI
+
+<img src="public/logo.png" alt="Off Grid AI" width="104" align="left" />
+
+### Enable every person to operate with the intelligence and capabilities of the entire enterprise.
+
+Source available. Five working AI use cases, live in 14 days, at zero cost. Set your rules once.
+Everyone builds governed AI on top.
+
+<br clear="left" />
+
+[![CI](https://github.com/off-grid-ai/OGAC/actions/workflows/ci.yml/badge.svg)](https://github.com/off-grid-ai/OGAC/actions/workflows/ci.yml)
+![Coverage gate: lines, branches, functions and statements each held at 80%, enforced in pre-push and CI](https://img.shields.io/badge/coverage%20gate-%E2%89%A580%25%20enforced-brightgreen)
+![Tests: node --test](https://img.shields.io/badge/tests-node--test-blue)
+![License: Off Grid AI Source-Available License 1.0](https://img.shields.io/badge/license-Off_Grid_AI_1.0-blue)
+![Node 22+](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)
+
+<sub><b>BUILT BY</b> <a href="https://wednesday.is/?utm_source=github&utm_medium=offgrid-console-readme&utm_content=logo">Wednesday Solutions</a></sub>
+
+---
+
+Don't take the privacy claim on faith - **read the code** that keeps your data on your own
+infrastructure. Three products, one ecosystem:
+
+[![OGAM stars on GitHub](https://img.shields.io/github/stars/off-grid-ai/OGAM?style=flat&logo=github&label=OGAM%20%C2%B7%20iOS%20%26%20Android&labelColor=000000&color=059669)](https://github.com/off-grid-ai/OGAM/stargazers)
+[![OGAD stars on GitHub](https://img.shields.io/github/stars/off-grid-ai/OGAD?style=flat&logo=github&label=OGAD%20%C2%B7%20macOS%20%26%20Windows&labelColor=000000&color=059669)](https://github.com/off-grid-ai/OGAD/stargazers)
+[![OGAC stars on GitHub](https://img.shields.io/github/stars/off-grid-ai/OGAC?style=flat&logo=github&label=OGAC%20%C2%B7%20Console%20%C2%B7%20you%20are%20here&labelColor=000000&color=059669)](https://github.com/off-grid-ai/OGAC/stargazers)
+
+---
 
 ![The flow: your data into one governed gateway, through composable pipelines, out to apps and agents your people build in plain language](docs/assets/diagrams/flow-people.png)
 
@@ -36,7 +39,7 @@ It is one interface where all of it is already set up and connected. You define 
 rules, policies, guardrails, and knowledge once. Everyone builds on top of them. It just works.
 
 ```bash
-git clone https://github.com/off-grid-ai/console.git && cd console
+git clone https://github.com/off-grid-ai/OGAC.git && cd console
 npm install
 cp .env.example .env.local        # fill in DATABASE_URL, AUTH_SECRET, AUTH_KEYCLOAK_*
 make -C deploy up                 # the whole stack comes up, wired together
