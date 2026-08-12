@@ -5,13 +5,23 @@
   <p>Source available. Five working AI use cases, live in 14 days, at zero cost. Set your rules once. Everyone builds governed AI on top.</p>
   <p>
     <a href="https://github.com/off-grid-ai/console/actions/workflows/ci.yml"><img src="https://github.com/off-grid-ai/console/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-    <img src="https://img.shields.io/badge/coverage-97%25-brightgreen" alt="Coverage: 97% statements &amp; lines" />
-    <img src="https://img.shields.io/badge/branches-89%25-brightgreen" alt="Branch coverage: 89%" />
-    <img src="https://img.shields.io/badge/functions-97%25-brightgreen" alt="Function coverage: 97%" />
-    <img src="https://img.shields.io/badge/gate-%E2%89%A585%25%20enforced-blue" alt="Coverage gate: enforced &#8805;85% on all dimensions in pre-push + CI" />
+    <img src="https://img.shields.io/badge/coverage%20gate-%E2%89%A580%25%20enforced-brightgreen" alt="Coverage gate: lines, branches, functions and statements each held at &#8805;80%, enforced in pre-push and CI" />
     <img src="https://img.shields.io/badge/tests-node--test-blue" alt="Tests: node --test" />
     <img src="https://img.shields.io/badge/license-Off_Grid_AI_1.0-blue" alt="License: Off Grid AI Source-Available License 1.0" />
     <img src="https://img.shields.io/badge/node-%E2%89%A522-brightgreen" alt="Node 22+" />
+  </p>
+  <p>
+    <b>The rest of the family</b> — the same private AI, on the devices your people already carry.
+  </p>
+  <p>
+    <a href="https://github.com/off-grid-ai/OGAM"><img src="https://img.shields.io/github/stars/off-grid-ai/OGAM?style=flat&amp;label=OGAM%20%C2%B7%20Mobile&amp;color=059669" alt="Off Grid AI Mobile (OGAM) — GitHub stars" /></a>
+    <a href="https://github.com/off-grid-ai/OGAD"><img src="https://img.shields.io/github/stars/off-grid-ai/OGAD?style=flat&amp;label=OGAD%20%C2%B7%20Desktop&amp;color=059669" alt="Off Grid AI Desktop (OGAD) — GitHub stars" /></a>
+  </p>
+  <p>
+    <sub>
+      <a href="https://github.com/off-grid-ai/OGAM"><b>OGAM</b></a> — chat, see, speak and generate on your phone or Mac. Local models, no account, nothing leaves the device.<br />
+      <a href="https://github.com/off-grid-ai/OGAD"><b>OGAD</b></a> — the same on your desktop, through one OpenAI-compatible gateway. Optional screen memory, all of it on-device.
+    </sub>
   </p>
 </div>
 
