@@ -973,7 +973,7 @@ must be created with the password from env **`DEMO_VIEWER_PASSWORD`** (never a l
 that Keycloak provisioning runs, the hellobar creds won't authenticate. Owner: deploy/identity step.
 
 ## G-SEC-VIEWER-1 — connector endpoint strings expose inline creds to the read-only viewer
-Found by adversarial /hygiene audit (2026-07-10, tenant-isolation). `/api/v1/admin/connectors` returns
+Found by an adversarial engineering audit (2026-07-10, tenant-isolation). `/api/v1/admin/connectors` returns
 `endpoint` connection strings with embedded credentials (e.g. `postgres://corebank:corebank@127.0.0.1:5433/corebank`)
 UNREDACTED to a `viewer` session. The dedicated secret store IS safe (values hidden, `config/reveal` → 403
 for viewer), but connector endpoints bypass `redactSecretForViewer`. Demo impact LOW (values are demo creds on
