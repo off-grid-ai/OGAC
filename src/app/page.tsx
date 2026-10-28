@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   Brain,
   Cpu,
   GithubLogo,
@@ -13,10 +12,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { ControlPlaneStage } from '@/app/_landing/control-plane-stage';
-import { CtaButtons } from '@/app/_landing/cta-buttons';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
 import { ProductTour } from '@/app/_landing/product-tour';
-import { SeeItLive } from '@/app/_landing/see-it-live';
 import { BookCallDialog } from '@/components/auth/BookCallDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuroraText } from '@/components/ui/aurora-text';
@@ -43,9 +40,8 @@ const SHOTS: TourShot[] = [
 
 const PILLAR_ICONS = [Cpu, Brain, Stack, ShieldCheck] as const;
 
-// Resolve a copy link key to a real href. "View the live product" leads into the running console.
-function href(key: 'liveProduct' | 'source' | 'docs' | 'email'): string {
-  if (key === 'liveProduct') return '/overview';
+// Resolve a copy link key to a real href.
+function href(key: 'source' | 'docs' | 'email'): string {
   return LANDING.links[key];
 }
 
@@ -72,9 +68,7 @@ function Nav() {
               <span className="hidden sm:inline">Source</span>
             </a>
           </Button>
-          <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-            <Link href={href('liveProduct')}>View the live product</Link>
-          </Button>
+          <BookCallDialog label="Book a call" variant="default" size="sm" className="" />
         </div>
       </div>
     </header>
@@ -139,21 +133,7 @@ export default function LandingPage() {
               </BlurFade>
               <BlurFade delay={0.36} inView>
                 <div className="mt-7 flex flex-wrap gap-3">
-                  <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    <Link href={href('liveProduct')}>
-                      {c.hero.cta}
-                      <ArrowRight className="size-4" weight="bold" />
-                    </Link>
-                  </Button>
-                  <BookCallDialog label="Book a call" variant="outline" size="lg" className="" autoOpenParam="book" />
-                </div>
-              </BlurFade>
-              <BlurFade delay={0.48} inView>
-                <div className="mt-8">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    {c.hero.trustLabel}
-                  </p>
-                  <SeeItLive className="mt-3 max-w-xl" />
+                  <BookCallDialog label="Book a call" variant="default" size="lg" className="" autoOpenParam="book" />
                 </div>
               </BlurFade>
             </div>
@@ -372,9 +352,13 @@ export default function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Button asChild variant={i === 2 ? 'default' : 'outline'} size="sm" className="mt-6">
-                    <Link href={href(plan.cta.href)}>{plan.cta.label}</Link>
-                  </Button>
+                  {plan.cta.href === 'book' ? (
+                    <BookCallDialog label={plan.cta.label} variant={i === 2 ? 'default' : 'outline'} size="sm" className="mt-6" />
+                  ) : (
+                    <Button asChild variant={i === 2 ? 'default' : 'outline'} size="sm" className="mt-6">
+                      <Link href={href(plan.cta.href)}>{plan.cta.label}</Link>
+                    </Button>
+                  )}
                 </MagicCard>
               </BlurFade>
             ))}
@@ -417,9 +401,7 @@ export default function LandingPage() {
                 <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">{c.faq.asideKicker}</p>
                 <p className="mt-2 text-base font-semibold text-foreground">{c.faq.asideHeading}</p>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.faq.asideBody}</p>
-                <Button asChild size="sm" className="mt-4">
-                  <Link href={href('liveProduct')}>View the live product</Link>
-                </Button>
+                <BookCallDialog label="Book a call" variant="default" size="sm" className="mt-4" />
               </div>
             </BlurFade>
           </div>
@@ -451,13 +433,13 @@ export default function LandingPage() {
               {c.footer.ctaBody}
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <Link href={href('liveProduct')}>
-                  {c.footer.ctaButton}
-                  <ArrowRight className="size-4" weight="bold" />
-                </Link>
+              <BookCallDialog label={c.footer.ctaButton} variant="default" size="lg" className="" />
+              <Button asChild size="lg" variant="outline">
+                <a href={LANDING.links.source} target="_blank" rel="noopener noreferrer">
+                  <GithubLogo className="size-4" />
+                  View the source
+                </a>
               </Button>
-              <CtaButtons githubLabel="View the source" />
             </div>
             <div className="mt-8 flex flex-wrap gap-2">
               {c.footer.trustBadges.map((b) => (
