@@ -382,9 +382,6 @@ export default function FeaturesPage() {
             <Button asChild variant="ghost" size="sm">
               <Link href="/journey">The journey</Link>
             </Button>
-            <Button asChild size="sm">
-              <Link href="/operations/devices">Open console</Link>
-            </Button>
           </div>
         </div>
       </header>
@@ -409,12 +406,6 @@ export default function FeaturesPage() {
               keys, no lock-in.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Button asChild>
-                <Link href="/operations/devices">
-                  Open the console
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
               <Button asChild variant="outline">
                 <Link href="/fleet-control">Fleet Control</Link>
               </Button>
@@ -550,12 +541,6 @@ export default function FeaturesPage() {
             through a server we own.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Button asChild>
-              <Link href="/operations/devices">
-                Open the console
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
             <Button asChild variant="outline">
               <Link href="/handbook/catalog">Browse every component</Link>
             </Button>

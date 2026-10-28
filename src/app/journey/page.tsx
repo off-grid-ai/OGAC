@@ -1,7 +1,6 @@
 import type { Icon } from '@phosphor-icons/react';
 import {
   ArrowLeft,
-  ArrowRight,
   ChartLineUp,
   Gauge,
   Lock,
@@ -163,9 +162,6 @@ export default function JourneyPage() {
             <ArrowLeft className="size-4" />
             OGAC
           </Link>
-          <Button asChild size="sm">
-            <Link href="/operations/devices">Open console</Link>
-          </Button>
         </div>
       </header>
 
@@ -251,15 +247,9 @@ export default function JourneyPage() {
             Find your stage. Take the next one.
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            See the live console, or read the reference architecture layer by layer.
+            Read the reference architecture layer by layer.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Button asChild>
-              <Link href="/operations/devices">
-                Open the console
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
             <Button asChild variant="outline">
               <Link href="/architecture/a">Explore the architecture</Link>
             </Button>

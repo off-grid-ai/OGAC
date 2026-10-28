@@ -31,9 +31,6 @@ export default async function PhasePage({ params }: Readonly<{ params: Promise<{
             <ArrowLeft className="size-4" />
             OGAC
           </Link>
-          <Button asChild size="sm">
-            <Link href="/operations/devices">Open console</Link>
-          </Button>
         </div>
       </header>
 

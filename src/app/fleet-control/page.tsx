@@ -163,9 +163,6 @@ export default function FleetControlPage() {
             <Button asChild variant="ghost" size="sm">
               <Link href="/features">All features</Link>
             </Button>
-            <Button asChild size="sm">
-              <Link href="/operations/devices">Open console</Link>
-            </Button>
           </div>
         </div>
       </header>
@@ -189,12 +186,6 @@ export default function FleetControlPage() {
               infrastructure.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Button asChild>
-                <Link href="/operations/devices">
-                  Open the console
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
               <Button asChild variant="outline">
                 <Link href="/features">See all features</Link>
               </Button>
@@ -309,12 +300,6 @@ export default function FleetControlPage() {
             on top.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Button asChild>
-              <Link href="/operations/devices">
-                Open the console
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
             <Button asChild variant="outline">
               <Link href="/handbook/catalog">See the components</Link>
             </Button>
