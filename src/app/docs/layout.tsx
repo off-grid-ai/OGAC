@@ -1,4 +1,3 @@
-import { ArrowSquareOut } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -19,12 +18,6 @@ export default function DocsLayout({ children }: Readonly<{ children: ReactNode 
             <a href="/docs/api" className="text-muted-foreground transition-colors hover:text-foreground">
               API reference
             </a>
-            <Link
-              href="/overview"
-              className="inline-flex items-center gap-1 text-primary transition-colors hover:opacity-80"
-            >
-              Open console <ArrowSquareOut className="size-3.5" />
-            </Link>
           </div>
         </div>
       </header>

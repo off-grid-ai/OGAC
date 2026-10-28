@@ -157,7 +157,7 @@ one authed origin so you can browse them together without CORS or LAN issues.
 - \`/specs/<service>\` returns that service's OpenAPI JSON. The service token names the underlying
   capability - e.g. the vector store, tracing store, secrets store, data lineage, dashboards,
   feature flags, PII detection, and device management. The full set of available tokens is listed on
-  the [API docs & playground](/operations/api-docs) page.
+  API docs & playground page in your console.
 - The console (\`/openapi.json\`) is the platform's own spec, rendered interactively at
   [/docs/api](/docs/api).
 
