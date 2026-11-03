@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "releasedAt": "2026-07-17",
+  "releasedAt": "2026-11-03",
   "authorization": {
     "record": "INTERNAL_USE_AUTHORIZATION.md",
     "scope": "Internal Off Grid Console use only; registry publication and external redistribution are not authorized."
@@ -9,11 +9,11 @@
     {
       "name": "@offgrid/ui",
       "version": "0.2.4",
-      "sourceRepository": "https://github.com/wednesday-solutions/component-library-animations.git",
-      "sourceSha": "ca35d2f9004b212ea034b73109fcd2819a08816b",
-      "archive": "offgrid-ui-0.2.4.tgz",
-      "sha256": "9e20c5e8e4221b702e53aa63eced9a4a10a6796254404183f45c0007482153b8",
-      "license": "UNLICENSED",
+      "sourceRepository": "https://github.com/off-grid-ai/ui-library.git",
+      "sourceSha": "b7b87c200d5ab0275a68c10807b0857dfd237ba0",
+      "archive": "offgrid-ui-0.2.4-b7b87c2.tgz",
+      "sha256": "0cf5027d5d81bbb1e77fde2c2b146e94789731619dddd91af569a251632c921c",
+      "license": "AGPL-3.0-only",
       "distribution": "private-internal-only"
     },
     {
