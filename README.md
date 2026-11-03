@@ -220,6 +220,48 @@ npm test                          # real tests, against a real database
 `make -C deploy` lists every stack target (data, secrets, identity, agents, and more) so you can
 bring up only what you need. Full self-hosting and configuration are documented in the app at `/docs`.
 
+## Deploy the public site (console.getoffgridai.co)
+
+[console.getoffgridai.co](https://console.getoffgridai.co) serves this repo's **public pages only**:
+`/`, `/features`, `/journey`, `/fleet-control`, `/architecture/*`, `/handbook` and `/docs`. The
+signed-in console, its API and sign-in are not deployed there.
+
+- **Where it runs:** the Vercel project `console-landing-page` (team `engineering-wednesdays-projects`).
+  It is **not** connected to GitHub. Pushing to `main` deploys nothing; you deploy from the CLI.
+- **What gets uploaded:** [`.vercelignore`](.vercelignore) leaves out `src/app/(console)`, `src/app/api`,
+  `src/app/app`, `src/app/invite`, `src/app/shared`, `src/app/signin`, `src/middleware.ts` and every
+  `.env*.local`. Keep it that way. With the app included, the build traces Temporal and LanceDB into
+  the API routes, one function reaches about 350MB, and Vercel rejects it (the limit is 250MB). It
+  would also need auth secrets the public site does not have.
+- **The other repo is not the source.** `off-grid-ai/console-landing-page` is an old copy (last
+  changed July 2026). The live site is built from this repo.
+
+```bash
+npm install
+npm run build                       # build locally first; the Vercel build runs the same command
+vercel link --yes --project console-landing-page   # once per clone (needs access to the team)
+vercel deploy                       # preview: check the routes on the preview URL
+vercel promote <preview-url>        # or `vercel deploy --prod` once you trust it
+```
+
+`vercel link` writes a `.env.local` (a Vercel OIDC token only) and adds `.vercel` and `.env*` to
+`.gitignore`. Revert the `.gitignore` change; `.vercelignore` already keeps every `.env*.local` out of the
+upload.
+
+**After a deploy,** check that `/`, `/features` and `/handbook` return 200, `/signin` returns 404, and the
+page carries `data-og-public` (the public layout):
+
+```bash
+for p in / /features /handbook /signin; do curl -s -o /dev/null -w "$p %{http_code}\n" https://console.getoffgridai.co$p; done
+curl -s https://console.getoffgridai.co/ | grep -c data-og-public
+```
+
+**If the build says a package path is "not exported from package @offgrid/ui",** Vercel reused a
+cached `node_modules` that holds an older build of the vendored library. Every rebuilt archive in
+`vendor/offgrid-ui/` must carry a version that has not been used before (for example
+`0.2.4-b7b87c2`), so a cached install is replaced. For a one-off, `vercel deploy --force` skips the
+build cache.
+
 ## When to use it
 
 A data-sensitive or regulated enterprise that wants AI inside real operational workflows (claims,
