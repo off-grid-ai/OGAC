@@ -1,24 +1,26 @@
 'use client';
 
-import { Moon, Sun } from '@phosphor-icons/react/dist/ssr';
+import LibraryThemeToggle from '@offgrid/ui/operator/theme-toggle';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
 
+// The library's SmoothUI theme toggle, set up exactly as the website sets it up (sun-moon, small,
+// no "system" option), controlled by next-themes so the choice persists the console's way.
+// Until mount the theme is unknown, so it renders light, which is the console default.
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const dark = mounted && theme === 'dark';
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="Toggle theme"
-      onClick={() => setTheme(dark ? 'light' : 'dark')}
-    >
-      {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-    </Button>
+    <span className="theme-ctl">
+      <LibraryThemeToggle
+        variant="sun-moon"
+        size="sm"
+        showSystem={false}
+        theme={mounted && resolvedTheme === 'dark' ? 'dark' : 'light'}
+        onThemeChange={(next) => setTheme(next)}
+      />
+    </span>
   );
 }
