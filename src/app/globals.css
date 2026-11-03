@@ -1,51 +1,41 @@
 @import 'tailwindcss';
+@import '@offgrid/design/tokens.css';
 @import '@offgrid/ui/styles.css';
 
 @custom-variant dark (&:is(.dark *));
 
-/* Off Grid brand tokens. Light is the default (:root); dark via [data-theme='dark']. */
-:root {
-  --og-primary: #059669;
-  --og-background: #f7f8f8;
-  --og-surface: #ffffff;
-  --og-surface-light: #f1f2f4;
-  --og-text: #0f1115;
-  --og-text-secondary: #4b5563;
-  --og-text-muted: #9097a1;
-  --og-border: #e6e8eb;
-  --og-border-light: #eef0f2;
-  --og-border-focus: #059669;
-  --og-error: #dc2626;
-  /* Landing hero spotlight sweeps - restrained on white so they read as a faint tint,
-     never a dirty smudge. Deeper emerald + low alpha for the light ground. */
-  --og-spotlight-a: rgba(5, 150, 105, 0.1);
-  --og-spotlight-b: rgba(4, 120, 87, 0.07);
-  color-scheme: light;
-}
-
+/* Off Grid brand tokens come from @offgrid/design (brand/DESIGN_PHILOSOPHY.md section 5), the same
+   source the website uses. next-themes always sets data-theme, so the package's
+   [data-theme='light'] block applies in light mode. Below: only what sits on top of the package. */
+:root,
 [data-theme='dark'] {
-  --og-primary: #34d399;
-  --og-background: #0a0a0a;
-  --og-surface: #141414;
-  --og-surface-light: #1e1e1e;
-  --og-text: #ffffff;
-  --og-text-secondary: #b0b0b0;
-  --og-text-muted: #808080;
-  --og-border: #232323;
-  --og-border-light: #2a2a2a;
-  --og-border-focus: #34d399;
-  --og-error: #c75050;
-  /* Brighter emerald glow on the near-black ground - the killer dark look. */
+  /* Muted brick: red exists only for errors and never shouts (website tokens). */
+  --og-error: #b06a6a;
+  --og-rgb-error: 176 106 106;
+  /* Brighter emerald glow on the near-black ground. */
   --og-spotlight-a: rgba(52, 211, 153, 0.16);
   --og-spotlight-b: rgba(5, 150, 105, 0.12);
   color-scheme: dark;
 }
 
+[data-theme='light'] {
+  --og-error: #8a4a4a;
+  --og-rgb-error: 138 74 74;
+  /* Restrained on white so the spotlight reads as a faint tint, never a smudge. */
+  --og-spotlight-a: rgba(5, 150, 105, 0.1);
+  --og-spotlight-b: rgba(4, 120, 87, 0.07);
+  color-scheme: light;
+}
+
 /* Map Tailwind palette + shadcn semantic tokens to brand, so utility classes and pulled
    library components inherit Off Grid and flip light/dark with zero per-component styling. */
 @theme {
-  --font-mono: 'Menlo', ui-monospace, SFMono-Regular, monospace;
-  --radius: 0.625rem;
+  /* One family everywhere: Menlo (section 2). `font-sans` maps to it too, so no utility or pulled
+     library component can bring in a second font. */
+  --font-sans: var(--og-font-mono);
+  --font-mono: var(--og-font-mono);
+  /* Minimal ~8px radius (anti-patterns). */
+  --radius: 0.5rem;
 
   --color-neutral-950: var(--og-background);
   --color-neutral-900: var(--og-surface);
@@ -372,8 +362,24 @@ body {
 body {
   background-color: var(--og-background);
   color: var(--og-text);
-  font-family: var(--font-mono);
+  font-family: var(--og-font-mono);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Weights stay light (section 2): hierarchy comes from size and spacing. Unlayered on purpose,
+   so it wins over a heading's `font-semibold`/`font-bold` utility on every page. */
+:is(h1, h2, h3) {
+  font-weight: 300;
+}
+
+:focus-visible {
+  outline: 2px solid var(--og-border-focus);
+  outline-offset: 4px;
+}
+
+::selection {
+  background: var(--og-primary);
+  color: var(--og-background);
 }
 
 /* Console shell composition. Shared @offgrid/ui owns surface elevation and interactive motion;
@@ -442,10 +448,10 @@ body {
   --hljs-keyword: #059669;
   --hljs-string: #0f766e;
   --hljs-number: #b45309;
-  --hljs-comment: #9097a1;
-  --hljs-title: #0f1115;
-  --hljs-attr: #4b5563;
-  --hljs-meta: #6b7280;
+  --hljs-comment: var(--og-text-muted);
+  --hljs-title: var(--og-text);
+  --hljs-attr: var(--og-text-secondary);
+  --hljs-meta: var(--og-text-muted);
 }
 [data-theme='dark'] {
   --hljs-keyword: #34d399;
