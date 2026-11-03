@@ -127,7 +127,11 @@ Service accounts use `Authorization: Bearer <OFFGRID_ADMIN_TOKEN>` — middlewar
 
 ## Design
 
-Inherit the shared Off Grid design philosophy from `../brand/DESIGN_PHILOSOPHY.md` (the source of truth — brutalist/terminal, Menlo mono, emerald accent, tokens in `@offgrid/design`). Platform specifics: this repo has no separate design doc yet — follow the shared philosophy and the tokens directly.
+Inherit the shared Off Grid design philosophy from `../brand/DESIGN_PHILOSOPHY.md` (the source of truth — minimal and alive, Geist with Geist Mono for detail, emerald as the light source, depth from layers of light, tokens in `@offgrid/design`, components and the alive layer from `@offgrid/ui`). Platform specifics:
+
+- **Public pages** (`/`, `/features`, `/journey`, `/fleet-control`, `/architecture/*`, `/handbook`) match the website: wrap the page root in `PublicPage` (`src/components/PublicPage.tsx`). It keeps the root transparent so the living field shows through, and scopes the website's type (Geist, Geist Mono for labels and numbers) and depth layer (glass cards, glass header, hairlines) in `globals.css` under `[data-og-public]`. Never give a public page an opaque `bg-background` root.
+- **Signed-in pages** still render in Menlo; moving them to Geist is a separate change.
+- **Primary buttons glow** through the alive layer, which keys on `data-slot="button"`. A Radix `*Trigger asChild` renames that slot, so open a controlled dialog from the button's `onClick` instead (see `BookCallDialog`).
 
 ### Use the full width — no wasted real estate (NON-NEGOTIABLE, applies to EVERY page)
 
