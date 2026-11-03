@@ -1,0 +1,15 @@
+# console.getoffgridai.co (Vercel project console-landing-page) serves the PUBLIC pages only:
+# /, /features, /journey, /fleet-control, /architecture/*, /handbook and /docs. The signed-in
+# console application, its API, sign-in and the auth middleware are not deployed there. Leaving
+# them out also keeps every function far under Vercel's 250MB limit (the full app traces
+# Temporal's native bridge and LanceDB into its API routes).
+src/app/(console)
+src/app/api
+src/app/app
+src/app/invite
+src/app/shared
+src/app/signin
+src/middleware.ts
+
+# Local secrets never leave the machine.
+.env*.local
