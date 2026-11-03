@@ -4,6 +4,8 @@
    still win over both. */
 @layer theme, base, og-alive-semantic, components, utilities, og-alive;
 @import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 @import '@offgrid/design/tokens.css';
 @import '@offgrid/ui/styles.css';
 @import '@offgrid/ui/alive-semantic.css' layer(og-alive-semantic);
@@ -435,6 +437,30 @@ body {
   --og-glass: color-mix(in oklab, #fff 80%, transparent);
   --og-glass-dense: color-mix(in oklab, #fff 95%, transparent);
   --og-glass-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.28), 0 1px 3px rgb(0 0 0 / 0.06);
+}
+
+/* The website's type, on public pages only: Geist for reading text, titles, buttons and inputs;
+   Geist Mono for small uppercase labels, numbers, timestamps and code. Both Tailwind font
+   utilities resolve inside this scope, so `font-mono` here is Geist Mono. Titles are large, light
+   and slightly tightened (ui-library docs/direction/DESIGN_PHILOSOPHY.md section 4). */
+[data-og-public] {
+  --og-font-sans:
+    'Geist Variable', 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+    system-ui, sans-serif;
+  --og-font-mono:
+    'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    monospace;
+  --font-sans: var(--og-font-sans);
+  --font-mono: var(--og-font-mono);
+  font-family: var(--og-font-sans);
+  font-feature-settings: 'ss01', 'cv11';
+  text-rendering: optimizeLegibility;
+}
+[data-og-public] :is(h1, h2) {
+  letter-spacing: -0.035em;
+}
+[data-og-public] h3 {
+  letter-spacing: -0.02em;
 }
 
 /* Sticky headers are glass, as the website's site header. */

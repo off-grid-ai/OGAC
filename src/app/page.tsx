@@ -166,7 +166,7 @@ export default function LandingPage() {
                 </span>
               </BlurFade>
               <BlurFade delay={0.12} inView>
-                <h1 className="mt-6 text-[1.8rem] font-semibold leading-[1.08] tracking-tight text-foreground sm:text-4xl lg:text-[3.1rem]">
+                <h1 className="mt-6 text-[2.1rem] font-semibold leading-[1.02] tracking-tight text-foreground sm:text-5xl lg:text-[3.6rem] xl:text-[4.4rem]">
                   Enable every person to operate with the{' '}
                   <AuroraText className="font-semibold">intelligence and capabilities</AuroraText>{' '}
                   of the entire enterprise.
@@ -180,7 +180,7 @@ export default function LandingPage() {
                 </p>
               </BlurFade>
               <BlurFade delay={0.3} inView>
-                <p className="mt-4 max-w-xl font-mono text-sm leading-relaxed text-foreground">
+                <p className="mt-4 max-w-xl text-sm leading-relaxed text-foreground">
                   {c.hero.offer}
                 </p>
               </BlurFade>
@@ -341,7 +341,7 @@ export default function LandingPage() {
             {c.numbers.metrics.map((m, i) => (
               <BlurFade key={m.label} delay={0.06 * i} inView>
                 <div className="text-center">
-                  <div className="font-mono text-3xl font-semibold tracking-tight text-primary sm:text-4xl">
+                  <div className="text-3xl font-semibold tracking-tight text-primary sm:text-4xl">
                     <NumberTicker value={m.value} />
                   </div>
                   <p className="mt-2 text-xs font-semibold text-foreground">{m.label}</p>
@@ -441,7 +441,7 @@ export default function LandingPage() {
                 >
                   <p className="text-sm font-semibold text-foreground">{plan.name}</p>
                   <p className="mt-2 flex items-baseline gap-1">
-                    <span className="font-mono text-3xl font-semibold tracking-tight text-foreground">
+                    <span className="text-3xl font-semibold tracking-tight text-foreground">
                       {plan.price}
                     </span>
                     <span className="text-xs text-muted-foreground">{plan.suffix}</span>
