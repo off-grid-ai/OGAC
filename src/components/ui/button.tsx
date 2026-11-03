@@ -1,71 +1,48 @@
-import {
-  Button as SharedButton,
-  buttonVariants as sharedButtonVariants,
-  type ButtonProps as SharedButtonProps,
-} from '@offgrid/ui/operator/button';
+import SmoothButton, {
+  smoothButtonVariants,
+  type SmoothButtonProps,
+} from '@offgrid/ui/operator/smooth-button';
+import { forwardRef } from 'react';
 
-import {
-  legacyButtonSizeClass,
-  sharedButtonSize,
-  type LegacyButtonSize,
-} from '@/lib/button-compatibility';
-import { cn } from '@/lib/utils';
-
-type ButtonVariant = NonNullable<SharedButtonProps['variant']>;
-
-// ─── Press + hover feel for EVERY button in the console ───────────────────────────────────────────
+// The library's SmoothUI button, intact, joined to the alive layer — the same button the website
+// ships (website/preview-ui/button.jsx). The alive layer reads two attributes, data-slot="button"
+// and data-variant, and gives every button its hover lift, press give, pointer light and click
+// ring. data-size mirrors the size so CSS can size touch targets per size.
 //
-// Measured 2026-08-05: the built shared primitive (`@offgrid/ui/operator/button`) carries no
-// `transition`, no `hover:` and no `active:` state at all, so every button in the product changed
-// colour instantly and did nothing at all on press. Across `src/components` only 97 of 441 files used
-// a transition of any kind — the console was ~78% static, which is what "it feels difficult" is
-// actually describing.
-//
-// WHY HERE AND NOT IN THE SHARED PACKAGE: `@offgrid/ui` is consumed as a PREBUILT artifact in
-// node_modules with no linked source in the monorepo, so it cannot be edited from this repo. This
-// wrapper already exists to inject legacy size classes, which makes it the one place every console
-// Button passes through.
-//
-// Transform is listed explicitly rather than using `transition-all`, so a button never animates
-// layout properties (width/height) when its label changes — that reads as a wobble, not a response.
-// No `motion-reduce:` guard is needed: globals.css strips transitions app-wide under
-// `prefers-reduced-motion: reduce`.
-const BUTTON_MOTION =
-  'transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150 ease-out active:scale-[0.98]';
+// SmoothButton already has every size the console uses; `icon-xs` was a console-only size and
+// maps to the library's smallest icon size.
 
-type ButtonVariantOptions = {
-  className?: string;
-  size?: LegacyButtonSize;
-  variant?: ButtonVariant;
-};
+type ButtonSize = NonNullable<SmoothButtonProps['size']> | 'icon-xs';
+type ButtonProps = Omit<SmoothButtonProps, 'size'> & { size?: ButtonSize };
+
+function librarySize(size: ButtonSize): NonNullable<SmoothButtonProps['size']> {
+  return size === 'icon-xs' ? 'icon-sm' : size;
+}
+
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = 'default', size = 'default', ...props },
+  ref,
+) {
+  return (
+    <SmoothButton
+      ref={ref}
+      data-slot="button"
+      data-variant={variant ?? 'default'}
+      data-size={size}
+      variant={variant}
+      size={librarySize(size)}
+      {...props}
+    />
+  );
+});
 
 function buttonVariants({
   className,
   size = 'default',
   variant = 'default',
-}: ButtonVariantOptions = {}) {
-  return cn(
-    sharedButtonVariants({ size: sharedButtonSize(size), variant }),
-    legacyButtonSizeClass(size),
-    BUTTON_MOTION,
-    className,
-  );
-}
-
-function Button({
-  className,
-  variant = 'default',
-  size = 'default',
-  ...props
-}: Omit<SharedButtonProps, 'size'> & { size?: LegacyButtonSize }) {
-  return (
-    <SharedButton
-      {...props}
-      className={cn(legacyButtonSizeClass(size), BUTTON_MOTION, className)}
-      size={sharedButtonSize(size)}
-      variant={variant}
-    />
-  );
+}: { className?: string; size?: ButtonSize; variant?: SmoothButtonProps['variant'] } = {}) {
+  return smoothButtonVariants({ className, size: librarySize(size), variant });
 }
 
 export { Button, buttonVariants };
+export type { ButtonProps };
