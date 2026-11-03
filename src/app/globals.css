@@ -1,6 +1,17 @@
+/* Cascade order, as the website orders it: the library's alive layer sits in two low layers, the
+   semantic dialect (plain HTML and ARIA under [data-og-alive]) next to Tailwind's base, and the slot
+   dialect after Tailwind's utilities so it can retime component motion. Unlayered rules below
+   still win over both. */
+@layer theme, base, og-alive-semantic, components, utilities, og-alive;
 @import 'tailwindcss';
 @import '@offgrid/design/tokens.css';
 @import '@offgrid/ui/styles.css';
+@import '@offgrid/ui/alive-semantic.css' layer(og-alive-semantic);
+@import '@offgrid/ui/alive.css' layer(og-alive);
+/* Library components the console renders directly ship their Tailwind classes uncompiled, so
+   their sources are scanned here, one directory per component in use. */
+@source '../../node_modules/@offgrid/ui/dist/sourced/alive';
+@source '../../node_modules/@offgrid/ui/dist/sourced/smoothui/packages/smoothui/components/smooth-button';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -12,6 +23,14 @@
   /* Muted brick: red exists only for errors and never shouts (website tokens). */
   --og-error: #b06a6a;
   --og-rgb-error: 176 106 106;
+  /* The shadcn names the library's alive layer and sourced components read, mapped to the brand
+     tokens as the website maps them. */
+  --background: var(--og-background);
+  --foreground: var(--og-text);
+  --card: var(--og-surface);
+  --card-foreground: var(--og-text);
+  --border: var(--og-border);
+  --muted-foreground: var(--og-text-muted);
   /* Brighter emerald glow on the near-black ground. */
   --og-spotlight-a: rgba(52, 211, 153, 0.16);
   --og-spotlight-b: rgba(5, 150, 105, 0.12);
@@ -359,8 +378,14 @@ body {
   height: 100%;
 }
 
-body {
+/* html paints the page colour and body stays transparent, as on the website: the library's living
+   field (fixed, behind everything) sits between them. */
+html {
   background-color: var(--og-background);
+}
+
+body {
+  background-color: transparent;
   color: var(--og-text);
   font-family: var(--og-font-mono);
   -webkit-font-smoothing: antialiased;
@@ -382,12 +407,31 @@ body {
   color: var(--og-background);
 }
 
+/* The living field fades in once it mounts, as on the website. */
+.og-living-field {
+  animation: og-living-field-in 1.2s var(--og-ease-out) both;
+}
+@keyframes og-living-field-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 860px) {
+  .og-living-field [data-slot='living-field-grain'] {
+    display: none;
+  }
+}
+
 /* Console shell composition. Shared @offgrid/ui owns surface elevation and interactive motion;
-   this product layer only establishes the full-width background -> chrome -> route hierarchy. */
+   this product layer only establishes the background -> chrome -> route hierarchy. The route
+   area stays transparent so the living field shows through behind the cards. */
 [data-og-shell='content'],
 [data-og-shell='route'],
 [data-og-shell='page'] {
-  background: var(--og-background);
+  background: transparent;
 }
 
 [data-og-shell='content'] {

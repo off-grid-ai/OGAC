@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { Alive } from '@/components/Alive';
 import { PostHog } from '@/components/PostHog';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { LANDING } from '@/lib/landing-copy';
@@ -64,7 +65,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       </head>
       <body className="font-mono antialiased">
         <PostHog />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <Alive>{children}</Alive>
+        </ThemeProvider>
       </body>
     </html>
   );
