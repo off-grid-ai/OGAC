@@ -454,6 +454,12 @@ body {
   box-shadow: var(--og-glass-edge), var(--og-glass-shadow);
 }
 
+/* Full-width tinted bands stay see-through, so the field's light reads as one layer behind the
+   whole page instead of stopping at a solid band. */
+[data-og-public] section[class*='bg-card'] {
+  background-color: transparent;
+}
+
 /* Full-width section rules become the website's faint hairlines. */
 [data-og-public] section:is(.border-b, .border-t, .border-y) {
   border-color: var(--line);

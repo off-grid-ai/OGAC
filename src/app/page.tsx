@@ -144,16 +144,23 @@ export default function LandingPage() {
       <Nav />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section id="hero" className="relative overflow-hidden border-b border-border">
+      {/* The hero is sized to the screen, not to its copy: it fills the first fold minus a fixed
+          9rem, so the top of the animation always peeks in below it as the cue to scroll, on any
+          screen height. The header is 3.5rem (h-14). */}
+      <section
+        id="hero"
+        className="relative flex overflow-hidden border-b border-border lg:min-h-[calc(100svh-3.5rem-9rem)]"
+      >
         <Spotlight />
-        <div className="relative z-10 mx-auto max-w-[100rem] px-4 pb-8 pt-12 sm:px-6 sm:pb-10 sm:pt-16 lg:pt-20">
+        <div className="relative z-10 mx-auto flex w-full max-w-[100rem] items-center px-4 pb-8 pt-12 sm:px-6 sm:pb-10 sm:pt-16 lg:py-16">
           {/* Headline left, the rest right. The animation needs the FULL container width below (it is
               a 1600x900 stage), so the copy above it has to be short — stacked in one column it was
-              tall enough to push the animation off the fold, and left the right half empty besides. */}
-          <div className="grid items-start gap-x-12 gap-y-6 lg:grid-cols-2">
+              tall enough to push the animation off the fold, and left the right half empty besides.
+              Both columns sit on the vertical centre of the fold. */}
+          <div className="grid w-full items-center gap-x-12 gap-y-6 lg:grid-cols-2">
             <div>
               <BlurFade delay={0.05} inView>
-                <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                   <Sparkle className="size-3.5 text-primary" weight="fill" />
                   {c.hero.eyebrow} · source available
                 </span>
@@ -166,7 +173,7 @@ export default function LandingPage() {
                 </h1>
               </BlurFade>
             </div>
-            <div className="lg:pt-2">
+            <div>
               <BlurFade delay={0.24} inView>
                 <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
                   {c.hero.supporting}
