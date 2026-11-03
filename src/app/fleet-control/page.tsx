@@ -21,6 +21,7 @@ import {
   UsersThree,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import { PublicPage } from '@/components/PublicPage';
 import { Badge } from '@/components/ui/badge';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { BorderBeam } from '@/components/ui/border-beam';
@@ -149,7 +150,7 @@ function Cards({ items, cols }: Readonly<{ items: Item[]; cols: string }>) {
 
 export default function FleetControlPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <PublicPage>
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link
@@ -307,6 +308,6 @@ export default function FleetControlPage() {
           <BorderBeam duration={12} size={300} colorFrom="#34d399" colorTo="#059669" />
         </div>
       </section>
-    </div>
+    </PublicPage>
   );
 }

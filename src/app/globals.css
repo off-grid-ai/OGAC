@@ -12,6 +12,7 @@
    their sources are scanned here, one directory per component in use. */
 @source '../../node_modules/@offgrid/ui/dist/sourced/alive';
 @source '../../node_modules/@offgrid/ui/dist/sourced/smoothui/packages/smoothui/components/smooth-button';
+@source '../../node_modules/@offgrid/ui/dist/sourced/smoothui/packages/smoothui/components/theme-toggle';
 @source '../../node_modules/@offgrid/ui/dist/sourced/smoothui/packages/shadcn-ui/components/ui';
 @source '../../node_modules/@offgrid/ui/dist/sourced/magicui';
 @source '../../node_modules/@offgrid/ui/dist/sourced/motion-primitives/spotlight.js';
@@ -414,6 +415,68 @@ body {
    so it takes the minimal radius here, as the website's announcement tag does. */
 [data-slot='badge'] {
   border-radius: var(--og-radius-md);
+}
+
+/* ── Public pages: the website's depth layer ─────────────────────────────────────────────────
+   Scoped to [data-og-public] (components/PublicPage.tsx), so signed-in pages are untouched.
+   Values are the website's (website/preview-ui/page.css): hairlines drawn from the text colour,
+   translucent glass surfaces over the living field, a lit top edge and a wide soft shadow. */
+[data-og-public] {
+  --line: rgb(var(--og-rgb-text) / 0.09);
+  --line-2: rgb(var(--og-rgb-text) / 0.15);
+  --og-glass: color-mix(in oklab, var(--og-surface) 72%, transparent);
+  --og-glass-dense: color-mix(in oklab, var(--og-surface) 94%, transparent);
+  --og-glass-edge:
+    inset 0 0 0 1px rgb(var(--og-rgb-text) / 0.08), inset 0 1px 0 rgb(var(--og-rgb-text) / 0.05);
+  --og-glass-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.85), 0 2px 8px -4px rgb(0 0 0 / 0.4);
+  --color-border: var(--line);
+}
+[data-theme='light'] [data-og-public] {
+  --og-glass: color-mix(in oklab, #fff 80%, transparent);
+  --og-glass-dense: color-mix(in oklab, #fff 95%, transparent);
+  --og-glass-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.28), 0 1px 3px rgb(0 0 0 / 0.06);
+}
+
+/* Sticky headers are glass, as the website's site header. */
+[data-og-public] header.sticky {
+  background-color: rgb(var(--og-rgb-background) / 0.72);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border-bottom-color: var(--line);
+}
+
+/* Every card-like surface (rounded, bordered, card-coloured) is a glass panel over the field. */
+[data-og-public] :is(.bg-card, [data-slot='card']):where([class*='rounded'], [data-slot='card']) {
+  background-color: var(--og-glass);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  border-color: transparent;
+  box-shadow: var(--og-glass-edge), var(--og-glass-shadow);
+}
+
+/* Full-width section rules become the website's faint hairlines. */
+[data-og-public] section:is(.border-b, .border-t, .border-y) {
+  border-color: var(--line);
+}
+
+/* The theme toggle sits in the website's 38px control box with a quiet secondary-tone glyph. */
+.theme-ctl {
+  display: inline-flex;
+}
+.theme-ctl button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+.theme-ctl button:hover {
+  background-color: var(--og-surface-light);
+}
+.theme-ctl svg {
+  width: 17px !important;
+  height: 17px !important;
+  color: var(--og-text-secondary) !important;
 }
 
 /* The living field fades in once it mounts, as on the website. */

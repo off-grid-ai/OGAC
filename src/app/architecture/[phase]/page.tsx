@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { PublicPage } from '@/components/PublicPage';
 import { Badge } from '@/components/ui/badge';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { BorderBeam } from '@/components/ui/border-beam';
@@ -11,7 +12,9 @@ import { ARCH, getPhase } from '@/lib/architecture';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PhasePage({ params }: Readonly<{ params: Promise<{ phase: string }> }>) {
+export default async function PhasePage({
+  params,
+}: Readonly<{ params: Promise<{ phase: string }> }>) {
   const { phase } = await params;
   const p = getPhase(phase);
   if (!p) notFound();
@@ -21,7 +24,7 @@ export default async function PhasePage({ params }: Readonly<{ params: Promise<{
   const next = idx < ARCH.length - 1 ? ARCH[idx + 1] : null;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <PublicPage>
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link
@@ -138,6 +141,6 @@ export default async function PhasePage({ params }: Readonly<{ params: Promise<{
           )}
         </div>
       </div>
-    </div>
+    </PublicPage>
   );
 }

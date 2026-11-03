@@ -15,6 +15,7 @@ import { ControlPlaneStage } from '@/app/_landing/control-plane-stage';
 import { LandingThemeDefault } from '@/app/_landing/landing-theme';
 import { ProductTour } from '@/app/_landing/product-tour';
 import { BookCallDialog } from '@/components/auth/BookCallDialog';
+import { PublicPage } from '@/components/PublicPage';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuroraText } from '@/components/ui/aurora-text';
 import { BentoGrid, BentoTile } from '@/components/ui/bento-grid';
@@ -30,12 +31,48 @@ import type { TourShot } from '@/lib/landing-hero';
 // Six real surfaces from the running product — proof, not promise. The Studio shot leads (the
 // plain-language authoring moment), then the governed path in order. Ids drive the ?shot= URL.
 const SHOTS: TourShot[] = [
-  { id: 'studio', src: '/docs-shots/studio.png', alt: 'A business team stands up a governed app in plain language', label: 'Act', caption: 'A business team builds a governed app in plain language. No code.' },
-  { id: 'route', src: '/docs-shots/gateways-list.png', alt: 'Model-serving gateways, on-prem and cloud, each observed', label: 'Route', caption: 'Many models, on your servers or in the cloud. Each one observed.' },
-  { id: 'pipelines', src: '/docs-shots/pipeline-overview.png', alt: 'A pipeline: model, evals, guardrails, policy, and drift bound to one use case', label: 'Govern', caption: 'Bind the rules to a use case once. Everything inherits them.' },
-  { id: 'watch', src: '/docs-shots/observability.png', alt: 'Observability: live eval scores, drift detection, and per-run traces', label: 'Watch', caption: 'Live scoring on real traffic. Drift caught as it starts.' },
-  { id: 'oversee', src: '/docs-shots/app-review.png', alt: 'The review inbox: a run paused for a person to approve, reject, or edit', label: 'Review', caption: 'A run pauses for a person, then finishes on its own.' },
-  { id: 'prove', src: '/docs-shots/regulatory.png', alt: 'Regulatory: controls mapped to ISO 42001, NIST AI RMF, and the EU AI Act', label: 'Prove', caption: 'Controls mapped to the frameworks a regulator asks for.' },
+  {
+    id: 'studio',
+    src: '/docs-shots/studio.png',
+    alt: 'A business team stands up a governed app in plain language',
+    label: 'Act',
+    caption: 'A business team builds a governed app in plain language. No code.',
+  },
+  {
+    id: 'route',
+    src: '/docs-shots/gateways-list.png',
+    alt: 'Model-serving gateways, on-prem and cloud, each observed',
+    label: 'Route',
+    caption: 'Many models, on your servers or in the cloud. Each one observed.',
+  },
+  {
+    id: 'pipelines',
+    src: '/docs-shots/pipeline-overview.png',
+    alt: 'A pipeline: model, evals, guardrails, policy, and drift bound to one use case',
+    label: 'Govern',
+    caption: 'Bind the rules to a use case once. Everything inherits them.',
+  },
+  {
+    id: 'watch',
+    src: '/docs-shots/observability.png',
+    alt: 'Observability: live eval scores, drift detection, and per-run traces',
+    label: 'Watch',
+    caption: 'Live scoring on real traffic. Drift caught as it starts.',
+  },
+  {
+    id: 'oversee',
+    src: '/docs-shots/app-review.png',
+    alt: 'The review inbox: a run paused for a person to approve, reject, or edit',
+    label: 'Review',
+    caption: 'A run pauses for a person, then finishes on its own.',
+  },
+  {
+    id: 'prove',
+    src: '/docs-shots/regulatory.png',
+    alt: 'Regulatory: controls mapped to ISO 42001, NIST AI RMF, and the EU AI Act',
+    label: 'Prove',
+    caption: 'Controls mapped to the frameworks a regulator asks for.',
+  },
 ];
 
 const PILLAR_ICONS = [Cpu, Brain, Stack, ShieldCheck] as const;
@@ -75,7 +112,12 @@ function Nav() {
   );
 }
 
-function SectionHead({ number, kicker, heading, intro }: Readonly<{ number: string; kicker: string; heading: string; intro?: string }>) {
+function SectionHead({
+  number,
+  kicker,
+  heading,
+  intro,
+}: Readonly<{ number: string; kicker: string; heading: string; intro?: string }>) {
   return (
     <BlurFade inView>
       <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-primary">
@@ -85,7 +127,11 @@ function SectionHead({ number, kicker, heading, intro }: Readonly<{ number: stri
       <h2 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {heading}
       </h2>
-      {intro ? <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">{intro}</p> : null}
+      {intro ? (
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+          {intro}
+        </p>
+      ) : null}
     </BlurFade>
   );
 }
@@ -93,7 +139,7 @@ function SectionHead({ number, kicker, heading, intro }: Readonly<{ number: stri
 export default function LandingPage() {
   const c = LANDING;
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <PublicPage>
       <LandingThemeDefault />
       <Nav />
 
@@ -115,8 +161,8 @@ export default function LandingPage() {
               <BlurFade delay={0.12} inView>
                 <h1 className="mt-6 text-[1.8rem] font-semibold leading-[1.08] tracking-tight text-foreground sm:text-4xl lg:text-[3.1rem]">
                   Enable every person to operate with the{' '}
-                  <AuroraText className="font-semibold">intelligence and capabilities</AuroraText> of the
-                  entire enterprise.
+                  <AuroraText className="font-semibold">intelligence and capabilities</AuroraText>{' '}
+                  of the entire enterprise.
                 </h1>
               </BlurFade>
             </div>
@@ -133,14 +179,18 @@ export default function LandingPage() {
               </BlurFade>
               <BlurFade delay={0.36} inView>
                 <div className="mt-7 flex flex-wrap gap-3">
-                  <BookCallDialog label="Book a call" variant="default" size="lg" className="" autoOpenParam="book" />
+                  <BookCallDialog
+                    label="Book a call"
+                    variant="default"
+                    size="lg"
+                    className=""
+                    autoOpenParam="book"
+                  />
                 </div>
               </BlurFade>
             </div>
-
           </div>
         </div>
-
       </section>
 
       {/* The product, alive. Starts at container width and GROWS on scroll until it is pinned at the
@@ -197,14 +247,21 @@ export default function LandingPage() {
       {/* ── 01 Overview ────────────────────────────────────────────────────── */}
       <section id="overview" className="relative border-b border-border">
         <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead number={c.overview.number} kicker={c.overview.kicker} heading={c.overview.heading} intro={c.overview.body} />
+          <SectionHead
+            number={c.overview.number}
+            kicker={c.overview.kicker}
+            heading={c.overview.heading}
+            intro={c.overview.body}
+          />
           <BlurFade delay={0.12} inView>
             <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {c.overview.steps.map((s) => (
                 <div key={s.number} className="rounded-2xl border border-border bg-card p-5">
                   <span className="font-mono text-xs text-primary">{s.number}</span>
                   <h3 className="mt-2 text-sm font-semibold text-foreground">{s.title}</h3>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{s.description}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                    {s.description}
+                  </p>
                 </div>
               ))}
             </div>
@@ -214,14 +271,19 @@ export default function LandingPage() {
               {c.overview.pillars.map((p, i) => {
                 const Icon = PILLAR_ICONS[i] ?? Cpu;
                 return (
-                  <div key={p.label} className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
+                  <div
+                    key={p.label}
+                    className="rounded-2xl border border-primary/30 bg-primary/5 p-5"
+                  >
                     <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-background text-primary">
                       <Icon className="size-4" weight="bold" />
                     </span>
                     <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                       {p.label} · {p.name}
                     </p>
-                    <p className="mt-1.5 text-sm leading-relaxed text-foreground">{p.description}</p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-foreground">
+                      {p.description}
+                    </p>
                   </div>
                 );
               })}
@@ -233,7 +295,12 @@ export default function LandingPage() {
       {/* ── 02 Capabilities ────────────────────────────────────────────────── */}
       <section id="capabilities" className="relative border-b border-border bg-card/40">
         <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead number={c.capabilities.number} kicker={c.capabilities.kicker} heading={c.capabilities.heading} intro={c.capabilities.intro} />
+          <SectionHead
+            number={c.capabilities.number}
+            kicker={c.capabilities.kicker}
+            heading={c.capabilities.heading}
+            intro={c.capabilities.intro}
+          />
           <BlurFade delay={0.1} inView>
             <BentoGrid className="mt-10">
               {c.capabilities.items.map((it, i) => (
@@ -257,7 +324,12 @@ export default function LandingPage() {
           className="[mask-image:radial-gradient(60rem_circle_at_center,white,transparent)] opacity-60"
         />
         <div className="relative mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead number={c.numbers.number} kicker={c.numbers.kicker} heading={c.numbers.heading} intro={c.numbers.intro} />
+          <SectionHead
+            number={c.numbers.number}
+            kicker={c.numbers.kicker}
+            heading={c.numbers.heading}
+            intro={c.numbers.intro}
+          />
           <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-7">
             {c.numbers.metrics.map((m, i) => (
               <BlurFade key={m.label} delay={0.06 * i} inView>
@@ -279,14 +351,21 @@ export default function LandingPage() {
       {/* ── 04 Outcomes ────────────────────────────────────────────────────── */}
       <section id="outcomes" className="relative border-b border-border bg-card/40">
         <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead number={c.outcomes.number} kicker={c.outcomes.kicker} heading={c.outcomes.heading} intro={c.outcomes.intro} />
+          <SectionHead
+            number={c.outcomes.number}
+            kicker={c.outcomes.kicker}
+            heading={c.outcomes.heading}
+            intro={c.outcomes.intro}
+          />
           <div className="mt-10 grid gap-4 lg:grid-cols-3">
             {c.outcomes.items.map((it, i) => (
               <BlurFade key={it.number} delay={0.1 * i} inView>
                 <div className="flex h-full flex-col rounded-2xl border border-border bg-background p-6">
                   <span className="font-mono text-xs text-muted-foreground">{it.number}</span>
                   <h3 className="mt-2 text-base font-semibold text-foreground">{it.name}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{it.description}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {it.description}
+                  </p>
                   <p className="mt-4 border-l-2 border-primary/50 pl-3 text-sm font-medium text-foreground">
                     {it.outcome}
                   </p>
@@ -300,11 +379,19 @@ export default function LandingPage() {
       {/* ── 05 Trust ───────────────────────────────────────────────────────── */}
       <section id="trust" className="relative border-b border-border">
         <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead number={c.trust.number} kicker={c.trust.kicker} heading={c.trust.heading} intro={c.trust.intro} />
+          <SectionHead
+            number={c.trust.number}
+            kicker={c.trust.kicker}
+            heading={c.trust.heading}
+            intro={c.trust.intro}
+          />
           <BlurFade delay={0.1} inView>
             <div className="mt-6 flex flex-wrap gap-2">
               {c.trust.attributes.map((a) => (
-                <span key={a} className="rounded-full border border-primary/40 bg-primary/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.12em] text-primary">
+                <span
+                  key={a}
+                  className="rounded-full border border-primary/40 bg-primary/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.12em] text-primary"
+                >
                   {a}
                 </span>
               ))}
@@ -319,7 +406,9 @@ export default function LandingPage() {
                   </span>
                   <span>
                     <span className="block text-sm font-semibold text-foreground">{it.name}</span>
-                    <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{it.outcome}</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                      {it.outcome}
+                    </span>
                   </span>
                 </div>
               </BlurFade>
@@ -331,7 +420,12 @@ export default function LandingPage() {
       {/* ── 06 Pricing ─────────────────────────────────────────────────────── */}
       <section id="pricing" className="relative border-b border-border bg-card/40">
         <div className="mx-auto max-w-[100rem] px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHead number={c.pricing.number} kicker={c.pricing.kicker} heading={c.pricing.heading} intro={c.pricing.intro} />
+          <SectionHead
+            number={c.pricing.number}
+            kicker={c.pricing.kicker}
+            heading={c.pricing.heading}
+            intro={c.pricing.intro}
+          />
           <div className="mt-10 grid gap-4 lg:grid-cols-3">
             {c.pricing.plans.map((plan, i) => (
               <BlurFade key={plan.name} delay={0.08 * i} inView>
@@ -340,10 +434,14 @@ export default function LandingPage() {
                 >
                   <p className="text-sm font-semibold text-foreground">{plan.name}</p>
                   <p className="mt-2 flex items-baseline gap-1">
-                    <span className="font-mono text-3xl font-semibold tracking-tight text-foreground">{plan.price}</span>
+                    <span className="font-mono text-3xl font-semibold tracking-tight text-foreground">
+                      {plan.price}
+                    </span>
                     <span className="text-xs text-muted-foreground">{plan.suffix}</span>
                   </p>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{plan.description}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {plan.description}
+                  </p>
                   <ul className="mt-5 grid flex-1 gap-2">
                     {plan.features.map((f) => (
                       <li key={f} className="flex gap-2 text-sm text-foreground">
@@ -353,9 +451,19 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   {plan.cta.href === 'book' ? (
-                    <BookCallDialog label={plan.cta.label} variant={i === 2 ? 'default' : 'outline'} size="sm" className="mt-6" />
+                    <BookCallDialog
+                      label={plan.cta.label}
+                      variant={i === 2 ? 'default' : 'outline'}
+                      size="sm"
+                      className="mt-6"
+                    />
                   ) : (
-                    <Button asChild variant={i === 2 ? 'default' : 'outline'} size="sm" className="mt-6">
+                    <Button
+                      asChild
+                      variant={i === 2 ? 'default' : 'outline'}
+                      size="sm"
+                      className="mt-6"
+                    >
                       <Link href={href(plan.cta.href)}>{plan.cta.label}</Link>
                     </Button>
                   )}
@@ -369,9 +477,13 @@ export default function LandingPage() {
               <table className="w-full min-w-[42rem] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-border bg-card">
-                    <th className="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Comparison</th>
+                    <th className="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Comparison
+                    </th>
                     {c.pricing.comparison.planNames.map((n) => (
-                      <th key={n} className="px-4 py-3 text-left font-semibold text-foreground">{n}</th>
+                      <th key={n} className="px-4 py-3 text-left font-semibold text-foreground">
+                        {n}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -380,7 +492,9 @@ export default function LandingPage() {
                     <tr key={row.capability} className="border-b border-border last:border-0">
                       <td className="px-4 py-3 text-muted-foreground">{row.capability}</td>
                       {row.values.map((v, j) => (
-                        <td key={j} className="px-4 py-3 text-foreground">{v}</td>
+                        <td key={j} className="px-4 py-3 text-foreground">
+                          {v}
+                        </td>
                       ))}
                     </tr>
                   ))}
@@ -398,9 +512,13 @@ export default function LandingPage() {
             <SectionHead number={c.faq.number} kicker={c.faq.kicker} heading={c.faq.heading} />
             <BlurFade delay={0.12} inView>
               <div className="mt-6 rounded-2xl border border-border bg-card p-6">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">{c.faq.asideKicker}</p>
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">
+                  {c.faq.asideKicker}
+                </p>
                 <p className="mt-2 text-base font-semibold text-foreground">{c.faq.asideHeading}</p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.faq.asideBody}</p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {c.faq.asideBody}
+                </p>
                 <BookCallDialog label="Book a call" variant="default" size="sm" className="mt-4" />
               </div>
             </BlurFade>
@@ -443,7 +561,10 @@ export default function LandingPage() {
             </div>
             <div className="mt-8 flex flex-wrap gap-2">
               {c.footer.trustBadges.map((b) => (
-                <span key={b} className="rounded-full border border-border bg-card px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                <span
+                  key={b}
+                  className="rounded-full border border-border bg-card px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                >
                   {b}
                 </span>
               ))}
@@ -454,10 +575,12 @@ export default function LandingPage() {
 
       <footer className="bg-background">
         <div className="mx-auto flex max-w-[100rem] flex-col items-center justify-between gap-2 px-4 py-8 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground sm:flex-row sm:px-6">
-          <span>{c.footer.legal[0]} · {c.footer.legal[1]}</span>
+          <span>
+            {c.footer.legal[0]} · {c.footer.legal[1]}
+          </span>
           <span>{c.footer.companyDescription}</span>
         </div>
       </footer>
-    </div>
+    </PublicPage>
   );
 }

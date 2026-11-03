@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Image from 'next/image';
 import Link from 'next/link';
+import { PublicPage } from '@/components/PublicPage';
 import { Badge } from '@/components/ui/badge';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { BorderBeam } from '@/components/ui/border-beam';
@@ -110,9 +111,7 @@ function StageRow({ stage, last }: Readonly<{ stage: (typeof STAGES)[number]; la
           </h3>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{stage.reality}</p>
           <div className="mt-3 max-w-2xl rounded-md border border-border bg-card/60 p-3">
-            <span className="text-[10px] uppercase tracking-wide text-primary">
-              With OGAC
-            </span>
+            <span className="text-[10px] uppercase tracking-wide text-primary">With OGAC</span>
             <p className="mt-1 text-sm text-foreground">{stage.console}</p>
           </div>
         </div>
@@ -152,7 +151,7 @@ function DiagramBlock({ d, flip }: Readonly<{ d: Diagram; flip: boolean }>) {
 
 export default function JourneyPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <PublicPage>
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link
@@ -257,6 +256,6 @@ export default function JourneyPage() {
           <BorderBeam duration={12} size={300} colorFrom="#34d399" colorTo="#059669" />
         </div>
       </section>
-    </div>
+    </PublicPage>
   );
 }
