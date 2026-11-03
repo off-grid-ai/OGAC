@@ -2,13 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // "Book a call" → opens the cal.com booking widget inline in a modal. Uses cal.com's iframe embed
 // (?embed=true) rather than their JS snippet, so no third-party script loads — the auth-page CSP
@@ -52,11 +46,19 @@ export function BookCallDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant={variant} size={size} className={className}>
-          {label}
-        </Button>
-      </DialogTrigger>
+      {/* Opens the controlled dialog directly rather than through DialogTrigger asChild: the trigger
+          renames the button's data-slot to "dialog-trigger", and the alive layer keys the primary
+          button's emerald halo and lift on data-slot="button". Radix still returns focus here on close. */}
+      <Button
+        variant={variant}
+        size={size}
+        className={className}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        {label}
+      </Button>
       <DialogContent className="max-w-3xl p-0">
         <DialogHeader className="border-b border-border px-4 py-3">
           <DialogTitle className="text-sm">Book a call with Off Grid AI</DialogTitle>
