@@ -12,6 +12,7 @@
    their sources are scanned here, one directory per component in use. */
 @source '../../node_modules/@offgrid/ui/dist/sourced/alive';
 @source '../../node_modules/@offgrid/ui/dist/sourced/smoothui/packages/smoothui/components/smooth-button';
+@source '../../node_modules/@offgrid/ui/dist/sourced/smoothui/packages/shadcn-ui/components/ui';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -405,6 +406,12 @@ body {
 ::selection {
   background: var(--og-primary);
   color: var(--og-background);
+}
+
+/* No pill shapes (DESIGN_PHILOSOPHY anti-patterns): the library badge is rounded-full upstream,
+   so it takes the minimal radius here, as the website's announcement tag does. */
+[data-slot='badge'] {
+  border-radius: var(--og-radius-md);
 }
 
 /* The living field fades in once it mounts, as on the website. */
