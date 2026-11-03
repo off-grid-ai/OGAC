@@ -8,11 +8,11 @@
   "packages": [
     {
       "name": "@offgrid/ui",
-      "version": "0.2.4",
+      "version": "0.2.4-b7b87c2",
       "sourceRepository": "https://github.com/off-grid-ai/ui-library.git",
       "sourceSha": "b7b87c200d5ab0275a68c10807b0857dfd237ba0",
       "archive": "offgrid-ui-0.2.4-b7b87c2.tgz",
-      "sha256": "0cf5027d5d81bbb1e77fde2c2b146e94789731619dddd91af569a251632c921c",
+      "sha256": "e94e99255c0855c5aec066a1f407cb68c3ef2c7005e0ea1a0b16d3e255908e62",
       "license": "AGPL-3.0-only",
       "distribution": "private-internal-only"
     },
