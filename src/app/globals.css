@@ -13,6 +13,8 @@
 @source '../../node_modules/@offgrid/ui/dist/sourced/alive';
 @source '../../node_modules/@offgrid/ui/dist/sourced/smoothui/packages/smoothui/components/smooth-button';
 @source '../../node_modules/@offgrid/ui/dist/sourced/smoothui/packages/shadcn-ui/components/ui';
+@source '../../node_modules/@offgrid/ui/dist/sourced/magicui';
+@source '../../node_modules/@offgrid/ui/dist/sourced/motion-primitives/spotlight.js';
 
 @custom-variant dark (&:is(.dark *));
 
