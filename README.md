@@ -11,7 +11,7 @@ Enable every person to operate with the intelligence and capabilities of the ent
 
 <br clear="left" />
 
-<sub><b>BUILT BY</b> <a href="https://wednesday.is/?utm_source=github&utm_medium=offgrid-console-readme&utm_content=logo">Wednesday Solutions</a></sub>
+<sub><b>BUILT BY</b> <a href="https://wednesday.is/?utm_source=github&utm_medium=offgrid-console-readme&utm_content=logo">Wednesday Solutions</a></sub> · <sub>Made by <a href="https://github.com/alichherawalla">Mac (@alichherawalla)</a>. Follow me for what ships next.</sub>
 
 ---
 
